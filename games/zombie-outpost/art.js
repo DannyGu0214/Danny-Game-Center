@@ -1343,13 +1343,29 @@ function drawWeapon(ctx, hx, hy, dx, dy, o, sc, C) {
   if (look.head === 'nails') for (let i = 0; i < 3; i++) stroke(ctx, [ex - ux * i * 2 * sc, ey - uy * i * 2 * sc], [ex - ux * i * 2 * sc + uy * 2 * sc, ey - uy * i * 2 * sc - ux * 2 * sc], C('#c4cacf'), 0.6 * sc);
 }
 
+// 동료 직업별 차림(몸통·바지 색, 모자, 장비, 손에 든 무기 모양). 등급은 목도리·테두리 색(trim)으로 보인다.
+const ROLE_LOOK = {
+  gunner: { body: '#5d6b45', legs: '#3a4030', hat: 'helmet', hatCol: '#4a5a3a', gear: 'rig', weaponId: 'rifle' },
+  brawler: { body: '#7a3a30', legs: '#33302c', hat: 'bandana', hatCol: '#c0392b', gear: 'bare', weaponId: 'bat', w: 15 },
+  scout: { body: '#3f5a4a', legs: '#2e3a34', hat: 'hood', hatCol: '#4f6e5a', gear: 'bandolier', weaponId: 'milestone' },
+  medic: { body: '#d9dde2', legs: '#4a5560', hat: 'cap', hatCol: '#eef0f2', gear: 'cross', weaponId: 'pistol' },
+  engineer: { body: '#b9b83c', legs: '#3a4048', hat: 'hardhat', hatCol: '#f2c230', gear: 'hivis', weaponId: 'nailgun' },
+};
+const SKINS = ['#e3c4a0', '#d2a67e', '#b9875e', '#8d5f3e'], HAIRS = ['#2a221c', '#4a3626', '#6a4a2c', '#1e1e22', '#8a6a44'];
+
 export function drawCharacter(pen, x, y, o) {
-  const L = CHAR[o.kind] ?? CHAR.walker, { ctx, zoom } = pen, sc = L.scale * (o.scale ?? 1) * zoom;
+  let L = CHAR[o.kind] ?? CHAR.walker;
+  if (o.role && ROLE_LOOK[o.role]) L = { ...L, ...ROLE_LOOK[o.role], helmet: null };
+  const { ctx, zoom } = pen, sc = L.scale * (o.scale ?? 1) * zoom;
   const [sx, sy] = pen.P(x, y, o.z ?? 0);
   const C = o.hit ? () => '#ffffff' : (c) => c;
   const [dx, dy] = o.dir ?? [0, 1], px = -dy, py = dx; // 진행 방향, 화면에서 그에 수직
   const back = dy < -0.15, ph = o.phase ?? 0, mv = o.moving ? 1 : 0;
-  const zombie = !!L.shirts, body = o.shirt ?? L.body ?? L.shirts[(o.seed ?? 0) % L.shirts.length];
+  const zombie = !!L.shirts, human = !zombie, body = o.shirt ?? L.body ?? L.shirts[(o.seed ?? 0) % L.shirts.length];
+  // 동료는 사람마다 피부·머리색이 다르다
+  const crew = human && o.kind === 'defender', sd = o.seed ?? 0;
+  const skin = crew ? SKINS[sd % SKINS.length] : L.skin, hairCol = crew ? HAIRS[Math.floor(sd / 2) % HAIRS.length] : L.hair;
+  const player = o.kind === 'player';
   ctx.save();
   if (o.alpha != null) ctx.globalAlpha = o.alpha;
   ctx.lineCap = 'round';
@@ -1364,7 +1380,18 @@ export function drawCharacter(pen, x, y, o) {
     const sw = mv ? Math.sin(ph + (side > 0 ? 0 : Math.PI)) : 0, lift = mv ? Math.max(0, Math.cos(ph + (side > 0 ? 0 : Math.PI))) * 1.8 * sc : 0;
     return { side, k: side * py, hip: [sx + px * side * (L.w * 0.17) * sc, hipY], foot: [sx + px * side * (L.w * 0.2) * sc + dx * sw * stride, sy + dy * sw * stride * 0.5 - lift] };
   }).sort((a, b) => a.k - b.k);
-  for (const g of legs) { stroke(ctx, g.hip, g.foot, C(L.legs), 4.2 * sc); dot(ctx, g.foot[0] + dx * 1 * sc, g.foot[1], 2.2 * sc, C(L.boots ?? shade(L.legs, 0.7))); }
+  const bootCol = L.boots ?? shade(L.legs, 0.7);
+  for (const g of legs) {
+    stroke(ctx, g.hip, g.foot, C(L.legs), 4.2 * sc);
+    if (human) {
+      // 바지 주름(안쪽 그늘)과 밑창 있는 부츠
+      stroke(ctx, [g.hip[0] + 0.9 * sc, g.hip[1] + 1 * sc], [g.foot[0] + 0.9 * sc, g.foot[1] - 2 * sc], C(shade(L.legs, 0.72)), 1.1 * sc);
+      const fx = g.foot[0] + dx * 1.2 * sc, fy = g.foot[1];
+      ctx.fillStyle = C('#121416'); ctx.beginPath(); ctx.ellipse(fx, fy + 0.7 * sc, 2.9 * sc, 1.7 * sc, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C(bootCol); ctx.beginPath(); ctx.ellipse(fx, fy - 0.2 * sc, 2.6 * sc, 1.9 * sc, 0, 0, Math.PI * 2); ctx.fill();
+      dot(ctx, fx - 0.8 * sc, fy - 0.9 * sc, 0.7 * sc, C(shade(bootCol, 1.6)));
+    } else dot(ctx, g.foot[0] + dx * 1 * sc, g.foot[1], 2.2 * sc, C(bootCol));
+  }
   // 팔: 어깨 → 손
   // 손을 흔들 때는 어깨를 화면 좌우로 벌린다(옆을 봐도 팔이 머리에 가리지 않게)
   const sh = (side) => (o.wave ? [tx + side * (L.w * 0.5 - 1) * sc, topY + 3 * sc] : [tx + px * side * (L.w * 0.5 - 1) * sc, topY + 3 * sc]);
@@ -1377,50 +1404,120 @@ export function drawCharacter(pen, x, y, o) {
     if (o.weapon && side === 1) return [s0[0] + dx * 7 * sc, s0[1] + dy * 4 * sc + 4 * sc];
     return [s0[0] + dx * sw * 3.5 * sc, s0[1] + 8 * sc];
   };
-  const armCol = zombie || o.kind === 'survivor' ? L.skin : body;
+  const bare = L.gear === 'bare'; // 근접전사는 민소매라 맨팔
+  const armCol = zombie || o.kind === 'survivor' || bare ? skin : body;
+  const wo = o.weaponId || !L.weaponId ? o : { ...o, weaponId: L.weaponId };
   const arms = [-1, 1].map((side) => ({ side, k: side * py })).sort((a, b) => a.k - b.k);
   const drawArm = (side) => {
     const s0 = sh(side), h = hand(side);
-    stroke(ctx, s0, h, C(armCol), (o.kind === 'brute' ? 4.6 : 3.2) * sc);
-    dot(ctx, h[0], h[1], 1.7 * sc, C(L.skin));
-    if (side === 1 && o.weapon) drawWeapon(ctx, h[0], h[1], dx, dy, o, sc, C);
+    stroke(ctx, s0, h, C(armCol), (o.kind === 'brute' ? 4.6 : bare ? 3.6 : 3.2) * sc);
+    if (human) {
+      const k = 0.78, cx = s0[0] + (h[0] - s0[0]) * k, cy = s0[1] + (h[1] - s0[1]) * k;
+      if (!bare && o.kind !== 'survivor') stroke(ctx, [cx, cy], [s0[0] + (h[0] - s0[0]) * 0.9, s0[1] + (h[1] - s0[1]) * 0.9], C(shade(body, 0.72)), 3.4 * sc); // 소매 끝
+      if (L.gear === 'cross') stroke(ctx, [s0[0] + (h[0] - s0[0]) * 0.3, s0[1] + (h[1] - s0[1]) * 0.3], [s0[0] + (h[0] - s0[0]) * 0.4, s0[1] + (h[1] - s0[1]) * 0.4], C('#d23c34'), 3 * sc); // 적십자 완장(가는 띠)
+    }
+    dot(ctx, h[0], h[1], 1.7 * sc, C(player ? '#3a332c' : skin)); // 플레이어는 장갑
+    if (side === 1 && o.weapon) drawWeapon(ctx, h[0], h[1], dx, dy, wo, sc, C);
   };
-  const bag = () => { // 배낭: 가방이 찰수록 불룩해진다
-    if (o.kind !== 'player') return;
+  const bag = () => { // 배낭: 가방이 찰수록 불룩해진다. 위에 침낭을 말아 묶었다.
+    if (!player) return;
     const bw = (7 + (o.bag ?? 0) * 2.5) * sc, bh = (8 + (o.bag ?? 0) * 2.5) * sc, bx = tx - dx * 4.5 * sc - bw / 2, by = topY + 2 * sc;
     rrect(ctx, bx, by, bw, bh, 2.5 * sc); ctx.fillStyle = C('#5a4a36'); ctx.fill();
     stroke(ctx, [bx + 1.5 * sc, by + bh * 0.45], [bx + bw - 1.5 * sc, by + bh * 0.45], C('#3e3226'), 1 * sc);
+    rrect(ctx, bx + bw * 0.25, by + bh * 0.55, bw * 0.5, bh * 0.32, 1.2 * sc); ctx.fillStyle = C('#4e4030'); ctx.fill(); // 앞주머니
+    rrect(ctx, bx - 1 * sc, by - 2.8 * sc, bw + 2 * sc, 3.4 * sc, 1.7 * sc); ctx.fillStyle = C('#8a7a52'); ctx.fill(); // 침낭
+    for (const t of [0.28, 0.72]) stroke(ctx, [bx + bw * t, by - 2.8 * sc], [bx + bw * t, by + 0.6 * sc], C('#3e3226'), 0.9 * sc);
   };
   if (back) { drawArm(arms[0].side); drawArm(arms[1].side); }
   else { if (!back) bag(); drawArm(arms[0].side); }
   // 몸통: 왼쪽이 밝고 오른쪽이 어둡다
-  const w = L.w * sc, th = 13 * sc, bx = tx - w / 2, by = topY;
+  const w = (L.w) * sc, th = 13 * sc, bx = tx - w / 2, by = topY, cx = tx;
   const g = ctx.createLinearGradient(bx, 0, bx + w, 0);
   g.addColorStop(0, C(shade(body, 1.12))); g.addColorStop(0.55, C(body)); g.addColorStop(1, C(shade(body, 0.7)));
   rrect(ctx, bx, by, w, th, 4 * sc); ctx.fillStyle = g; ctx.fill();
-  if (o.trim) { ctx.strokeStyle = o.hit ? '#ffffff' : o.trim; ctx.lineWidth = 1.4 * sc; rrect(ctx, bx, by, w, th, 4 * sc); ctx.stroke(); }
   if (zombie && !o.hit) { // 찢어진 옷·핏자국
     ctx.fillStyle = L.skin;
     for (let i = 0; i < 3; i++) { const tx0 = bx + (i + 0.5) * w / 3; ctx.beginPath(); ctx.moveTo(tx0 - 1.6 * sc, by + th); ctx.lineTo(tx0, by + th - 3 * sc); ctx.lineTo(tx0 + 1.6 * sc, by + th); ctx.fill(); }
     dot(ctx, bx + w * 0.3, by + th * 0.4, 1.6 * sc, 'rgba(110,20,20,0.75)'); dot(ctx, bx + w * 0.65, by + th * 0.7, 1.1 * sc, 'rgba(110,20,20,0.6)');
   }
-  if (o.kind === 'player' && !o.hit) stroke(ctx, [bx + w * 0.5, by + 1 * sc], [bx + w * 0.5, by + th - 1 * sc], 'rgba(0,0,0,0.25)', 0.8 * sc); // 지퍼
-  if (o.kind === 'defender' && !o.hit) stroke(ctx, [bx + 1 * sc, by + th * 0.55], [bx + w - 1 * sc, by + th * 0.55], 'rgba(0,0,0,0.3)', 1.6 * sc); // 탄띠
+  if (human && !o.hit) {
+    ctx.save(); rrect(ctx, bx, by, w, th, 4 * sc); ctx.clip();
+    ctx.fillStyle = shade(body, 0.78); ctx.fillRect(bx, by + th - 2.2 * sc, w, 2.2 * sc); // 밑단
+    // 직업별 장비
+    if (L.gear === 'hivis') for (const t of [0.34, 0.66]) { ctx.fillStyle = '#e8ecef'; ctx.fillRect(bx, by + th * t, w, 1.3 * sc); }
+    if (L.gear === 'bare') { ctx.fillStyle = shade(body, 0.6); ctx.fillRect(cx - 0.5 * sc, by, 1 * sc, th); } // 조끼 앞섶
+    ctx.restore();
+    // 벨트·버클
+    stroke(ctx, [bx + 0.6 * sc, by + th - 2.6 * sc], [bx + w - 0.6 * sc, by + th - 2.6 * sc], '#2a2420', 1.5 * sc);
+    if (!back) { ctx.fillStyle = '#c9a83a'; ctx.fillRect(cx - 1.1 * sc, by + th - 3.4 * sc, 2.2 * sc, 1.6 * sc); }
+    if (!back) { // 옷깃(V)
+      stroke(ctx, [cx - 2.6 * sc, by + 0.6 * sc], [cx, by + 3.2 * sc], shade(body, 0.62), 1 * sc);
+      stroke(ctx, [cx + 2.6 * sc, by + 0.6 * sc], [cx, by + 3.2 * sc], shade(body, 0.62), 1 * sc);
+    }
+    if (player && !back) {
+      stroke(ctx, [cx, by + 3 * sc], [cx, by + th - 3 * sc], 'rgba(0,0,0,0.3)', 0.8 * sc); // 지퍼
+      for (const s of [-1, 1]) { ctx.strokeStyle = shade(body, 0.66); ctx.lineWidth = 0.7 * sc; ctx.strokeRect(cx + s * 3.4 * sc - 1.6 * sc, by + 4.2 * sc, 3.2 * sc, 2.6 * sc); } // 가슴 주머니
+      for (const s of [-1, 1]) stroke(ctx, [cx + s * w * 0.3, by + 0.4 * sc], [cx + s * w * 0.27, by + th - 3 * sc], '#3e3226', 1.3 * sc); // 배낭 어깨끈
+    }
+    if (L.gear === 'rig' && !back) for (const i of [-1, 0, 1]) { rrect(ctx, cx + i * 3.2 * sc - 1.3 * sc, by + th * 0.42, 2.6 * sc, 3 * sc, 0.6 * sc); ctx.fillStyle = shade(body, 0.7); ctx.fill(); } // 탄입대
+    if (L.gear === 'bandolier') { stroke(ctx, [bx + 1.5 * sc, by + 1 * sc], [bx + w - 1.5 * sc, by + th - 3 * sc], '#5a4029', 1.6 * sc); for (const t of [0.3, 0.5, 0.7]) dot(ctx, bx + 1.5 * sc + (w - 3 * sc) * t, by + 1 * sc + (th - 4 * sc) * t, 0.8 * sc, '#c9a83a'); } // 탄띠
+    if (L.gear === 'cross') { // 가슴(뒤에서는 등)의 적십자 + 옆구리 구급 가방
+      ctx.fillStyle = '#d23c34'; ctx.fillRect(cx - 0.8 * sc, by + 3.2 * sc, 1.6 * sc, 4.6 * sc); ctx.fillRect(cx - 2.3 * sc, by + 4.7 * sc, 4.6 * sc, 1.6 * sc);
+      rrect(ctx, cx - px * w * 0.55 - 2 * sc, by + th - 4 * sc, 4 * sc, 3.4 * sc, 0.8 * sc); ctx.fillStyle = '#f2f2f2'; ctx.fill();
+      ctx.fillStyle = '#d23c34'; ctx.fillRect(cx - px * w * 0.55 - 0.4 * sc, by + th - 3.6 * sc, 0.8 * sc, 2.6 * sc);
+    }
+    if (L.gear === 'hivis') { stroke(ctx, [cx + px * w * 0.5, by + th - 2.6 * sc], [cx + px * w * 0.5 + 0.6 * sc, by + th + 1.6 * sc], '#9aa0a6', 1.3 * sc); } // 허리에 찬 렌치
+    if (crew) { rrect(ctx, cx - 3.6 * sc, by - 0.6 * sc, 7.2 * sc, 2.4 * sc, 1.2 * sc); ctx.fillStyle = o.trim ?? '#9aa0a6'; ctx.fill(); } // 등급 색 목도리
+  }
+  // 테두리: 등급(trim)이 있으면 그 색, 없으면 어두운 외곽선으로 또렷하게
+  if (o.trim) { ctx.strokeStyle = o.hit ? '#ffffff' : o.trim; ctx.lineWidth = 1.2 * sc; rrect(ctx, bx, by, w, th, 4 * sc); ctx.stroke(); }
+  else if (human) { ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.7 * sc; rrect(ctx, bx, by, w, th, 4 * sc); ctx.stroke(); }
+  if (o.kind === 'defender' && !o.role && !o.hit) stroke(ctx, [bx + 1 * sc, by + th * 0.55], [bx + w - 1 * sc, by + th * 0.55], 'rgba(0,0,0,0.3)', 1.6 * sc); // 탄띠(직업 정보가 없을 때)
   if (back) bag(); else drawArm(arms[1].side);
   // 머리
   const hr = (o.kind === 'brute' ? 5 : 5.8) * sc, hx = tx + dx * (zombie ? L.hunch * 0.5 * sc : 0), hy = topY - 5.5 * sc + (zombie ? 1 * sc : 0);
-  dot(ctx, hx, hy, hr, C(L.skin));
-  if (L.helmet) { ctx.fillStyle = C(L.helmet); ctx.beginPath(); ctx.arc(hx, hy - 0.6 * sc, hr * 1.12, Math.PI, 0); ctx.fill(); stroke(ctx, [hx - hr * 1.3, hy - 0.4 * sc], [hx + hr * 1.3, hy - 0.4 * sc], C(shade(L.helmet, 0.8)), 1.4 * sc); }
-  else if (L.hair) {
-    ctx.fillStyle = C(L.hair); ctx.beginPath();
+  const hat = L.hat;
+  if (hat === 'hood') dot(ctx, hx - dx * 0.8 * sc, hy - 0.6 * sc, hr * 1.3, C(shade(L.hatCol, 0.85))); // 후드 뒤판
+  if (human && hat !== 'hood' && !back) for (const s of [-1, 1]) dot(ctx, hx + px * s * hr * 0.92, hy + 0.6 * sc, 1.3 * sc, C(shade(skin, 0.88))); // 귀
+  if (human && !o.hit) { // 얼굴 명암: 왼쪽 위가 밝다
+    const rg = ctx.createRadialGradient(hx - hr * 0.35, hy - hr * 0.4, hr * 0.15, hx, hy, hr * 1.05);
+    rg.addColorStop(0, shade(skin, 1.1)); rg.addColorStop(0.6, skin); rg.addColorStop(1, shade(skin, 0.78));
+    ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(hx, hy, hat === 'hood' ? hr * 0.86 : hr, 0, Math.PI * 2); ctx.fill();
+  } else dot(ctx, hx, hy, hr, C(skin));
+  const capArc = (r, col, lift = 0.6) => { ctx.fillStyle = C(col); ctx.beginPath(); ctx.arc(hx, hy - lift * sc, r, Math.PI, 0); ctx.fill(); };
+  if (hat === 'helmet') { // 철모 + 테 + 턱끈
+    capArc(hr * 1.14, L.hatCol); stroke(ctx, [hx - hr * 1.3, hy - 0.4 * sc], [hx + hr * 1.3, hy - 0.4 * sc], C(shade(L.hatCol, 0.75)), 1.5 * sc);
+    dot(ctx, hx - hr * 0.4, hy - hr * 0.75, hr * 0.22, C(shade(L.hatCol, 1.35)));
+    if (!back) for (const s of [-1, 1]) stroke(ctx, [hx + s * hr * 0.95, hy - 0.2 * sc], [hx + s * hr * 0.72, hy + hr * 0.62], C(shade(L.hatCol, 0.6)), 0.6 * sc); // 양쪽 턱끈(얼굴 가장자리)
+  } else if (hat === 'hardhat') { // 안전모: 둥근 머리 + 넓은 챙 + 가운데 줄
+    capArc(hr * 1.18, L.hatCol, 0.9); stroke(ctx, [hx - hr * 1.45, hy - 0.5 * sc], [hx + hr * 1.45, hy - 0.5 * sc], C(shade(L.hatCol, 0.8)), 1.6 * sc);
+    stroke(ctx, [hx, hy - hr * 1.2], [hx, hy - 0.8 * sc], C(shade(L.hatCol, 1.2)), 1 * sc);
+  } else if (hat === 'cap') { // 흰 모자 + 챙 + 작은 적십자
+    capArc(hr * 1.04, L.hatCol, 0.8);
+    if (!back) { stroke(ctx, [hx + dx * hr * 0.4 - px * hr * 0.6, hy - 0.6 * sc + dy * 1.2 * sc], [hx + dx * hr * 1.1 + px * hr * 0.6, hy - 0.6 * sc + dy * 1.6 * sc], C(shade(L.hatCol, 0.82)), 1.4 * sc); ctx.fillStyle = C('#d23c34'); ctx.fillRect(hx - 0.4 * sc, hy - hr * 0.95, 0.8 * sc, 2.4 * sc); ctx.fillRect(hx - 1.2 * sc, hy - hr * 0.95 + 0.8 * sc, 2.4 * sc, 0.8 * sc); }
+  } else if (hat === 'hood') { // 후드: 얼굴 둘레를 감싼다
+    ctx.strokeStyle = C(L.hatCol); ctx.lineWidth = 2.2 * sc; ctx.beginPath(); ctx.arc(hx, hy, hr * 0.98, back ? 0 : Math.PI * 0.85, back ? Math.PI * 2 : Math.PI * 2.15); ctx.stroke();
+    if (back) dot(ctx, hx, hy, hr, C(L.hatCol));
+  } else if (hat === 'bandana') { // 짧은 머리 + 이마의 두건 + 뒤로 날리는 매듭
+    capArc(hr * 1.02, hairCol ?? '#2a221c', 0.8);
+    stroke(ctx, [hx - hr * 1.0, hy - hr * 0.42], [hx + hr * 1.0, hy - hr * 0.42], C(L.hatCol), 2.2 * sc);
+    for (const k of [0.6, -0.4]) stroke(ctx, [hx - dx * hr * 0.9, hy - hr * 0.4], [hx - dx * hr * 1.9 + px * k * 2 * sc, hy - hr * 0.1 + Math.sin(ph + k) * 0.8 * sc], C(shade(L.hatCol, 0.85)), 1.2 * sc);
+  } else if (L.helmet) { ctx.fillStyle = C(L.helmet); ctx.beginPath(); ctx.arc(hx, hy - 0.6 * sc, hr * 1.12, Math.PI, 0); ctx.fill(); stroke(ctx, [hx - hr * 1.3, hy - 0.4 * sc], [hx + hr * 1.3, hy - 0.4 * sc], C(shade(L.helmet, 0.8)), 1.4 * sc); }
+  else if (hairCol) {
+    ctx.fillStyle = C(hairCol); ctx.beginPath();
     if (back) ctx.arc(hx, hy, hr * 1.02, 0, Math.PI * 2); else ctx.arc(hx - dx * 1.5 * sc, hy - 1 * sc, hr * 1.02, Math.PI * 1.05, Math.PI * 1.95);
     ctx.fill();
+    if (player && !back) for (const k of [-1, 0, 1]) dot(ctx, hx + dx * hr * 0.35 + px * k * hr * 0.42, hy - hr * 0.62 + Math.abs(k) * 0.4 * sc, hr * 0.32, C(hairCol)); // 앞머리
   }
   if (o.kind === 'brute' && !o.hit) stroke(ctx, [hx - 2 * sc, hy - 3 * sc], [hx + 2.5 * sc, hy - 1 * sc], 'rgba(60,20,20,0.6)', 0.8 * sc); // 흉터
   if (!back) {
     const ex = hx + dx * 2.2 * sc, ey = hy - 0.5 * sc + dy * 1 * sc, ew = (zombie ? 1.3 : 0.9) * sc;
     for (const s of [-1, 1]) dot(ctx, ex + px * s * 2 * sc, ey, ew, o.hit ? '#ffffff' : (o.eyes ?? '#2a2018'));
     if (zombie && !o.hit) dot(ctx, ex, ey + 2.6 * sc, 1 * sc, 'rgba(30,10,10,0.8)'); // 벌린 입
+    if (human && !o.hit) {
+      for (const s of [-1, 1]) stroke(ctx, [ex + px * s * 2.9 * sc, ey - 1.5 * sc], [ex + px * s * 1.2 * sc, ey - 1.7 * sc], hat === 'hood' || !hairCol ? '#3a2a20' : hairCol, 0.6 * sc); // 눈썹
+      stroke(ctx, [ex - px * 0.9 * sc, ey + 2.3 * sc], [ex + px * 0.9 * sc, ey + 2.3 * sc], shade(skin, 0.6), 0.55 * sc); // 입
+    }
   }
   ctx.restore();
 }

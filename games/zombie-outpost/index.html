@@ -1084,7 +1084,7 @@ function pushBase(list) {
     const c = S.posts[v.id];
     if (!c || c.x === undefined) continue;
     const ranged = G.ROLES[v.role].ranged;
-    list.push({ k: c.x + c.y + 2, draw: () => drawChar(c.x, c.y, { kind: 'defender', dir: screenDir(c.face ?? 0), phase: performance.now() / 500 + v.id, moving: false, trim: RARITY_COLOR[v.rarity], weapon: ranged ? 'gun' : 'melee', weaponId: ranged ? 'rifle' : 'bat', z: 6 }) });
+    list.push({ k: c.x + c.y + 2, draw: () => drawChar(c.x, c.y, { kind: 'defender', role: v.role, seed: v.id, dir: screenDir(c.face ?? 0), phase: performance.now() / 500 + v.id, moving: false, trim: RARITY_COLOR[v.rarity], weapon: ranged ? 'gun' : 'melee', z: 6 }) });
   }
 }
 
@@ -1254,7 +1254,7 @@ function render(t) {
     const c = S.posts[v.id];
     if (!c || Pl.dead) continue;
     const ranged = G.ROLES[v.role].ranged;
-    list.push({ k: c.x + c.y + 0.4, draw: () => drawChar(c.x, c.y, { kind: 'defender', dir: screenDir(c.face ?? 0), phase: escPh[v.id] ?? 0, moving: c.moving, trim: RARITY_COLOR[v.rarity], weapon: ranged ? 'gun' : 'melee', weaponId: ranged ? 'rifle' : 'bat' }) });
+    list.push({ k: c.x + c.y + 0.4, draw: () => drawChar(c.x, c.y, { kind: 'defender', role: v.role, seed: v.id, dir: screenDir(c.face ?? 0), phase: escPh[v.id] ?? 0, moving: c.moving, trim: RARITY_COLOR[v.rarity], weapon: ranged ? 'gun' : 'melee' }) });
   }
   // 바닥 자국(핏자국·그을음): 땅 위, 오브젝트 아래
   for (const d of decals) {
