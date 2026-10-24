@@ -608,6 +608,7 @@ export function newGame(seed = (Date.now() & 0x7fffffff) || 1) {
     growth: { hp: 0, atk: 0, bag: 0 },
     stats: { kills: 0, deaths: 0, looted: 0, rescued: 0, raidsWon: 0, raidsLost: 0, militaryLoot: 0, playTime: 0, eliteKills: 0 },
     ended: null, // 엔딩에 닿은 때 { at: 플레이 시간(초), goals: 달성한 목표 id }
+    hero: null, // 이번 판의 생존자 { id: HEROES 키, name, runId }
     over: null,
     nextId: 1,
   };
@@ -1192,19 +1193,37 @@ export function step(s, dt, input = null) {
   return ev;
 }
 
+// ---------- 생존자(플레이어 캐릭터) ----------
+// 새 판마다 4명 중 하나를 고르고 이름을 붙인다(추천 이름 또는 직접 입력). 쓰러지거나 엔딩을 보면 이 이름으로 기록이 남는다.
+export const HEROES = {
+  youngM: { label: '젊은 남자', age: '20대', names: ['민준', '도윤', '지호', '현우'] },
+  oldM: { label: '중년 남자', age: '50대', names: ['영수', '성호', '정훈', '상철'] },
+  youngF: { label: '젊은 여자', age: '20대', names: ['서연', '하은', '수아', '예린'] },
+  oldF: { label: '중년 여자', age: '50대', names: ['미경', '은정', '혜숙', '정숙'] },
+};
+export const HERO_NAME_MAX = 10;
+export const cleanName = (name) => String(name ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, HERO_NAME_MAX);
+export function setHero(s, id, name) {
+  if (!Object.hasOwn(HEROES, id)) return fail('없는 생존자예요');
+  const n = cleanName(name);
+  if (!n) return fail('이름을 정해 주세요');
+  s.hero = { id, name: n, runId: String(s.seed) }; // 판 번호 = 시드(새 판마다 다르다)
+  return ok(`${n}(${HEROES[id].label}) · 새 판 시작`);
+}
+
 // ---------- 엔딩 ----------
 // 목표 8개 중 3개 이상을 달성하고 그중 필수 목표(기지·동료·전진기지)가 하나 이상이면 엔딩이다. 한 판에 한 번 뜨고, 이어서 계속할 수 있다.
-// 수치는 봇 시뮬로 맞췄다: 처음 안(동료 16·상급 150·레벨 40)은 봇이 128~149분에 닿아 너무 빨라, 동료 20·상급 300·레벨 45로 올렸다.
+// 목표: 사람 기준 2~3시간에 엔딩. 사람은 손으로 파밍하고 멈춰 고르므로 봇의 약 1.2~1.8배가 걸린다고 보고, 봇이 100~110분쯤 닿게 맞췄다.
 export const ENDING_NEED = 3;
 export const ENDING_GOALS = [
-  { id: 'hq', req: true, name: '재건된 거점', desc: '본부 9레벨', goal: 9, progress: (s) => s.hq },
-  { id: 'crew', req: true, name: '생존자 공동체', desc: '동료 20명', goal: 20, progress: (s) => s.survivors.length },
-  { id: 'network', req: true, name: '개척 거점망', desc: '전진기지 4곳, 모두 3레벨', goal: 4, progress: (s) => s.outposts.filter((o) => o.lv >= OUTPOST_MAX_LV).length },
-  { id: 'elite', name: '학살자 사냥꾼', desc: '상급 좀비(거구·학살자) 300마리 처치', goal: 300, progress: (s) => s.stats.eliteKills },
-  { id: 'military', name: '군사 구역 정복', desc: '군사 구역에서 200번 파밍', goal: 200, progress: (s) => s.stats.militaryLoot },
-  { id: 'fortress', name: '난공불락', desc: '기지 습격 25회 방어', goal: 25, progress: (s) => s.stats.raidsWon },
-  { id: 'master', name: '명장', desc: `무기 하나를 최대 강화(+${WEAPON_MAX_LV - 1})`, goal: WEAPON_MAX_LV, progress: (s) => Math.max(1, ...Object.values(s.weapons)) },
-  { id: 'veteran', name: '베테랑', desc: '플레이어 레벨 45', goal: 45, progress: (s) => s.level },
+  { id: 'hq', req: true, name: '재건된 거점', desc: '본부 7레벨', goal: 7, progress: (s) => s.hq },
+  { id: 'crew', req: true, name: '생존자 공동체', desc: '동료 14명', goal: 14, progress: (s) => s.survivors.length },
+  { id: 'network', req: true, name: '개척 거점망', desc: '전진기지 3곳, 모두 3레벨', goal: 3, progress: (s) => s.outposts.filter((o) => o.lv >= OUTPOST_MAX_LV).length },
+  { id: 'elite', name: '학살자 사냥꾼', desc: '상급 좀비(거구·학살자) 100마리 처치', goal: 100, progress: (s) => s.stats.eliteKills },
+  { id: 'military', name: '군사 구역 정복', desc: '군사 구역에서 100번 파밍', goal: 100, progress: (s) => s.stats.militaryLoot },
+  { id: 'fortress', name: '난공불락', desc: '기지 습격 12회 방어', goal: 12, progress: (s) => s.stats.raidsWon },
+  { id: 'master', name: '명장', desc: '무기 하나를 +6까지 강화', goal: 7, progress: (s) => Math.max(1, ...Object.values(s.weapons)) },
+  { id: 'veteran', name: '베테랑', desc: '플레이어 레벨 30', goal: 30, progress: (s) => s.level },
 ];
 export const goalDone = (s, g) => g.progress(s) >= g.goal;
 export function endingStatus(s) {
@@ -1774,7 +1793,7 @@ export function serialize(s) {
     nodeMoves: s.nodes.flatMap((n, i) => (n.moved ? [[i, n.x, n.y]] : [])), // 옮겨진 대상물 자리(나머지는 시드로 다시 만든다)
     player: { x: s.player.x, y: s.player.y, hp: s.player.hp, mag: s.player.mag }, ammo: s.ammo, ammoOn: s.ammoOn, gunOn: s.gunOn, dur: s.dur,
     autoHunt: s.autoHunt, autoZone: s.autoZone, stance: s.stance, stats: s.stats, nextId: s.nextId,
-    items: s.items, claimed: s.claimed, over: s.over, ended: s.ended,
+    items: s.items, claimed: s.claimed, over: s.over, ended: s.ended, hero: s.hero,
   });
 }
 
@@ -1869,6 +1888,7 @@ export function deserialize(text) {
   s.autoZone = Math.floor(num(o.autoZone, 1, 0, ZONE_NAMES.length - 1));
   s.stance = STANCES[o.stance] ? o.stance : 'aggressive';
   for (const k of Object.keys(s.stats)) s.stats[k] = Math.floor(num(o.stats?.[k], 0));
+  if (o.hero && Object.hasOwn(HEROES, o.hero.id) && cleanName(o.hero.name)) s.hero = { id: o.hero.id, name: cleanName(o.hero.name), runId: String(o.hero.runId ?? s.seed) };
   if (o.ended && Number.isFinite(o.ended.at)) s.ended = { at: Math.floor(num(o.ended.at, 0)), goals: (Array.isArray(o.ended.goals) ? o.ended.goals : []).filter((id) => ENDING_GOALS.some((g) => g.id === id)) };
   for (const k of ITEM_KEYS) s.items[k] = Math.floor(num(o.items?.[k], 0, 0, ITEM_MAX));
   for (const m of MISSIONS) if (o.claimed?.[m.id] === true) s.claimed[m.id] = true;

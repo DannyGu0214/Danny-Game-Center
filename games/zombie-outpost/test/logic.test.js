@@ -448,6 +448,28 @@ test('습격: 방어 동료가 강하면 막아 내고 보상을 받는다', () 
   assert.ok(s.res.scrap > scrap);
 });
 
+test('생존자: 남녀 × 젊은·중년 4명, 추천 이름이나 직접 입력한 이름으로 판을 시작하고 저장된다', () => {
+  assert.deepEqual(Object.keys(G.HEROES), ['youngM', 'oldM', 'youngF', 'oldF']);
+  for (const h of Object.values(G.HEROES)) assert.ok(h.names.length >= 4 && h.label && h.age);
+  const s = fresh(190);
+  assert.equal(s.hero, null, '새 판은 고르기 전');
+  assert.equal(G.setHero(s, 'elder', '누구').ok, false, '없는 생존자');
+  assert.equal(G.setHero(s, 'oldF', '   ').ok, false, '빈 이름');
+  const r = G.setHero(s, 'oldF', '  <미경>\u0007 ');
+  assert.equal(r.ok, true);
+  assert.deepEqual(s.hero, { id: 'oldF', name: '미경', runId: String(s.seed) }, '앞뒤 공백·꺾쇠·제어 문자를 지운다');
+  assert.equal(G.cleanName('가나다라마바사아자차카타').length, G.HERO_NAME_MAX, '최대 10자');
+  // 저장·불러오기
+  const t = G.deserialize(G.serialize(s));
+  assert.deepEqual(t.hero, s.hero);
+  // 잘못된 저장값은 버린다
+  const o = JSON.parse(G.serialize(s)); o.hero = { id: 'ghost', name: 'x' };
+  assert.equal(G.deserialize(JSON.stringify(o)).hero, null);
+  // 판마다 다른 번호(시드)
+  const u = fresh(191); G.setHero(u, 'youngM', '민준');
+  assert.notEqual(u.hero.runId, s.hero.runId);
+});
+
 test('엔딩: 목표 8개 중 3개 이상, 그중 필수(기지·동료·전진기지) 1개 이상이면 한 번 뜨고 이어서 할 수 있다', () => {
   assert.equal(G.ENDING_GOALS.length, 8);
   assert.deepEqual(G.ENDING_GOALS.filter((g) => g.req).map((g) => g.id), ['hq', 'crew', 'network']);
@@ -1024,7 +1046,7 @@ test('균형: 자동사냥 봇이 30분 안에 본부 2레벨 이상, 상태값�
     assert.ok(s.hq >= 2, `seed ${seed}: hq ${s.hq}`);
     assert.ok(s.stats.kills > 120, `seed ${seed}: kills ${s.stats.kills}`); // 난이도 상향(체력 ×1.3·탄약 제한·이동 -30%) 뒤 기준
     const flat = JSON.stringify(s, (k, v) => (k === 'zombies' || k === 'posts' || k === 'autoTarget' ? undefined : v));
-    assert.ok(!/null|NaN/.test(flat.replace(/"(waypoint|rescue|gather|raid|gun|over|ended)":null/g, '')), 'NaN 없음');
+    assert.ok(!/null|NaN/.test(flat.replace(/"(waypoint|rescue|gather|raid|gun|over|ended|hero)":null/g, '')), 'NaN 없음');
     for (const k of G.RES_KEYS) assert.ok(Number.isFinite(s.res[k]) && s.res[k] >= 0);
   }
 });

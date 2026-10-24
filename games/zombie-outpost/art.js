@@ -1355,6 +1355,13 @@ const ROLE_LOOK = {
   medic: { body: '#d9dde2', legs: '#4a5560', hat: 'cap', hatCol: '#eef0f2', gear: 'cross', weaponId: 'pistol' },
   engineer: { body: '#b9b83c', legs: '#3a4048', hat: 'hardhat', hatCol: '#f2c230', gear: 'hivis', weaponId: 'nailgun' },
 };
+// 플레이어 생존자 4명: 주황 겉옷은 같아 늘 눈에 띄고, 머리 모양·색, 체격, 수염·안경으로 구분한다
+const HERO_LOOK = {
+  youngM: { hairStyle: 'spiky' }, // 젊은 남자: 짧고 삐친 갈색 머리
+  oldM: { hair: '#9a958c', w: 15, hairStyle: 'receding', beard: '#8f8a80', body: '#c9772a' }, // 중년 남자: 벗어진 회색 머리, 짧은 수염, 다부진 몸
+  youngF: { hair: '#4a2e20', w: 12.5, hairStyle: 'long', body: '#e0912e' }, // 젊은 여자: 어깨까지 오는 긴 머리, 옆으로 넘긴 앞머리
+  oldF: { hair: '#8a7f74', w: 13.5, hairStyle: 'curly', glasses: true, body: '#d68a3a' }, // 중년 여자: 희끗한 파마머리, 안경
+};
 const SKINS = ['#e3c4a0', '#d2a67e', '#b9875e', '#8d5f3e'], HAIRS = ['#2a221c', '#4a3626', '#6a4a2c', '#1e1e22', '#8a6a44'];
 
 export const charScale = (kind) => CHAR[kind]?.scale ?? 1;
@@ -1362,6 +1369,7 @@ export const charScale = (kind) => CHAR[kind]?.scale ?? 1;
 export function drawCharacter(pen, x, y, o) {
   let L = CHAR[o.kind] ?? CHAR.runner;
   if (o.role && ROLE_LOOK[o.role]) L = { ...L, ...ROLE_LOOK[o.role], helmet: null };
+  if (o.kind === 'player') L = { ...L, ...(HERO_LOOK[o.hero] ?? HERO_LOOK.youngM) };
   const { ctx, zoom } = pen, sc = L.scale * (o.scale ?? 1) * zoom;
   const [sx, sy] = pen.P(x, y, o.z ?? 0);
   const C = o.hit ? () => '#ffffff' : (c) => c;
@@ -1516,6 +1524,7 @@ export function drawCharacter(pen, x, y, o) {
   const hr = (L.head ?? 5.8) * sc, hx = tx + dx * (zombie ? L.hunch * 0.5 * sc : 0), hy = topY - 5.5 * sc + (zombie ? 1 * sc : 0);
   const hat = L.hat;
   if (hat === 'hood') dot(ctx, hx - dx * 0.8 * sc, hy - 0.6 * sc, hr * 1.3, C(shade(L.hatCol, 0.85))); // 후드 뒤판
+  if (L.hairStyle === 'long' && !back) { rrect(ctx, hx - hr * 1.08, hy - hr * 0.7, hr * 2.16, hr * 2.05, hr * 0.85); ctx.fillStyle = C(hairCol); ctx.fill(); } // 얼굴 뒤로 내려오는 긴 머리
   if (human && hat !== 'hood' && !back) for (const s of [-1, 1]) dot(ctx, hx + px * s * hr * 0.92, hy + 0.6 * sc, 1.3 * sc, C(shade(skin, 0.88))); // 귀
   if (human && !o.hit) { // 얼굴 명암: 왼쪽 위가 밝다
     const rg = ctx.createRadialGradient(hx - hr * 0.35, hy - hr * 0.4, hr * 0.15, hx, hy, hr * 1.05);
@@ -1542,11 +1551,20 @@ export function drawCharacter(pen, x, y, o) {
     for (const k of [0.6, -0.4]) stroke(ctx, [hx - dx * hr * 0.9, hy - hr * 0.4], [hx - dx * hr * 1.9 + px * k * 2 * sc, hy - hr * 0.1 + Math.sin(ph + k) * 0.8 * sc], C(shade(L.hatCol, 0.85)), 1.2 * sc);
   } else if (L.helmet) { ctx.fillStyle = C(L.helmet); ctx.beginPath(); ctx.arc(hx, hy - 0.6 * sc, hr * 1.12, Math.PI, 0); ctx.fill(); stroke(ctx, [hx - hr * 1.3, hy - 0.4 * sc], [hx + hr * 1.3, hy - 0.4 * sc], C(shade(L.helmet, 0.8)), 1.4 * sc); }
   else if (hairCol) {
-    ctx.fillStyle = C(hairCol); ctx.beginPath();
-    if (back) ctx.arc(hx, hy, hr * 1.02, 0, Math.PI * 2); else ctx.arc(hx - dx * 1.5 * sc, hy - 1 * sc, hr * 1.02, Math.PI * 1.05, Math.PI * 1.95);
-    ctx.fill();
-    if (player && !back) for (const k of [-1, 0, 1]) dot(ctx, hx + dx * hr * 0.35 + px * k * hr * 0.42, hy - hr * 0.62 + Math.abs(k) * 0.4 * sc, hr * 0.32, C(hairCol)); // 앞머리
+    const style = L.hairStyle;
+    if (style === 'receding' && !back) { // 벗어진 머리: 옆머리만 남는다
+      for (const s of [-1, 1]) dot(ctx, hx + px * s * hr * 0.82 * (1 - Math.abs(dx) * 0.7) - dx * hr * 0.62, hy - hr * 0.2, hr * 0.42, C(hairCol)); // 옆을 보면 뒤통수 쪽으로
+    } else {
+      ctx.fillStyle = C(hairCol); ctx.beginPath();
+      if (back) ctx.arc(hx, hy, hr * 1.02, 0, Math.PI * 2); else ctx.arc(hx - dx * 1.5 * sc, hy - 1 * sc, hr * 1.02, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.fill();
+    }
+    if (style === 'long' && back) { rrect(ctx, hx - hr * 0.95, hy - hr * 0.2, hr * 1.9, hr * 1.75, hr * 0.7); ctx.fillStyle = C(hairCol); ctx.fill(); } // 등 뒤로 늘어진 머리
+    if (style === 'curly') for (let k = 0; k < 7; k++) { const a = Math.PI * (1.02 + k * 0.16); dot(ctx, hx + Math.cos(a) * hr * 0.98, hy - 0.6 * sc + Math.sin(a) * hr * 0.98, hr * 0.3, C(shade(hairCol, k % 2 ? 1.12 : 0.92))); } // 파마 곱슬
+    if (player && !back && style === 'spiky') for (const k of [-1, 0, 1]) dot(ctx, hx + dx * hr * 0.35 + px * k * hr * 0.42, hy - hr * 0.62 + Math.abs(k) * 0.4 * sc, hr * 0.32, C(hairCol)); // 삐친 앞머리
+    if (player && !back && style === 'long') dot(ctx, hx + dx * hr * 0.3 + px * hr * 0.32, hy - hr * 0.58, hr * 0.48, C(hairCol)); // 옆으로 넘긴 앞머리
   }
+  if (L.beard && !back && !o.hit) { ctx.fillStyle = C(L.beard); ctx.beginPath(); ctx.arc(hx + dx * 0.6 * sc, hy + 0.4 * sc, hr * 0.92, Math.PI * 0.12, Math.PI * 0.88); ctx.fill(); } // 짧은 수염
   if (o.kind === 'slayer' && !o.hit) stroke(ctx, [hx - 2 * sc, hy - 3 * sc], [hx + 2.5 * sc, hy - 1 * sc], 'rgba(60,20,20,0.6)', 0.8 * sc); // 흉터
   if (L.feat === 'armor' && !back && !o.hit) stroke(ctx, [hx - hr * 0.85, hy - 0.2 * sc], [hx + hr * 0.85, hy - 0.2 * sc], 'rgba(20,24,30,0.85)', 2 * sc); // 헬멧 가리개
   if (!back) {
@@ -1555,7 +1573,12 @@ export function drawCharacter(pen, x, y, o) {
     if (zombie && !o.hit) dot(ctx, ex, ey + 2.6 * sc, 1 * sc, 'rgba(30,10,10,0.8)'); // 벌린 입
     if (human && !o.hit) {
       for (const s of [-1, 1]) stroke(ctx, [ex + px * s * 2.9 * sc, ey - 1.5 * sc], [ex + px * s * 1.2 * sc, ey - 1.7 * sc], hat === 'hood' || !hairCol ? '#3a2a20' : hairCol, 0.6 * sc); // 눈썹
-      stroke(ctx, [ex - px * 0.9 * sc, ey + 2.3 * sc], [ex + px * 0.9 * sc, ey + 2.3 * sc], shade(skin, 0.6), 0.55 * sc); // 입
+      stroke(ctx, [ex - px * 0.9 * sc, ey + 2.3 * sc], [ex + px * 0.9 * sc, ey + 2.3 * sc], L.beard ? shade(L.beard, 0.6) : shade(skin, 0.6), 0.55 * sc); // 입
+      if (L.glasses) { // 안경
+        ctx.strokeStyle = '#2a2622'; ctx.lineWidth = 0.55 * sc;
+        for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(ex + px * s * 2 * sc, ey, 1.45 * sc, 0, Math.PI * 2); ctx.stroke(); }
+        stroke(ctx, [ex - px * 0.55 * sc, ey], [ex + px * 0.55 * sc, ey], '#2a2622', 0.5 * sc);
+      }
     }
   }
   ctx.restore();
