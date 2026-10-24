@@ -1299,9 +1299,13 @@ const CHAR = {
   player: { skin: '#e0c29f', body: '#d98a2b', legs: '#2f3540', hair: '#3a2a1e', scale: 1, w: 14, hunch: 0, arms: 'walk', boots: '#1f2226' },
   defender: { skin: '#d8b896', body: '#3f8f82', legs: '#2c3a36', helmet: '#3d4a36', scale: 1, w: 14, hunch: 0, arms: 'walk', boots: '#1f2226' },
   survivor: { skin: '#e9cba6', body: '#d7dde3', legs: '#4c5560', hair: '#5a4632', scale: 0.95, w: 13, hunch: 0, arms: 'walk', boots: '#2a2d33' },
-  walker: { skin: '#93a77f', legs: '#3b3f35', scale: 1, w: 14, hunch: 2.5, arms: 'reach', shirts: ['#6f6450', '#4f5a68', '#6a5050', '#56664a'], hair: '#2e2a22' },
-  runner: { skin: '#a7b08a', legs: '#3d3a31', scale: 0.92, w: 11, hunch: 4.5, arms: 'flail', shirts: ['#7a4a3a', '#5a5a6a', '#857a5a'], hair: '#3a2e22' },
-  brute: { skin: '#7c8d69', legs: '#2c3027', scale: 1.45, w: 19, hunch: 1.5, arms: 'hang', shirts: ['#3a3f35', '#4a3a30', '#3a4048'] },
+  // 좀비 3등급 6종: 강점이 겉모습에 드러난다(체력형은 덩치, 피해형은 무기 같은 손, 속도형은 마르고 긴 다리)
+  runner: { skin: '#a7b08a', legs: '#3d3a31', scale: 0.92, w: 11, hunch: 4.5, arms: 'flail', stride: 5.5, shirts: ['#7a4a3a', '#5a5a6a', '#857a5a'], hair: '#3a2e22' }, // 하급 속도형: 마르고 작게, 팔을 휘저으며 달린다
+  bloater: { skin: '#a3b06a', legs: '#3b3f35', scale: 1.12, w: 19, hunch: 1, arms: 'hang', stride: 3.2, head: 5.3, armW: 4.2, feat: 'belly', shirts: ['#6f6450', '#4f5a68', '#6a5050'], hair: '#2e2a22' }, // 하급 체력형: 불룩한 배, 뒤뚱 걸음
+  sprinter: { skin: '#8e9a86', legs: '#2e3036', scale: 1, w: 10, hunch: 6, arms: 'flail', stride: 7, leg: 1.45, head: 5.3, eyes: '#ff4030', hat: 'hood', hatCol: '#4a4c54', shirts: ['#3e4048', '#4a3e3e'] }, // 중급 속도형: 긴 다리, 낮은 질주 자세, 찢어진 후드
+  butcher: { skin: '#94a37c', legs: '#33302c', scale: 1.18, w: 16, hunch: 2, arms: 'reach', stride: 4, armW: 4.4, feat: 'apron', shirts: ['#5a4a40', '#4a4a50'], hair: '#2a2420' }, // 중급 피해형: 피 묻은 앞치마, 식칼 손
+  hulk: { skin: '#7c8d69', legs: '#262a30', scale: 1.6, w: 20, hunch: 1.2, arms: 'hang', stride: 3.4, head: 5, armW: 5, feat: 'armor', hat: 'helmet', hatCol: '#2a2f38', shirts: ['#3a4250'] }, // 상급 체력형: 진압복 갑옷·헬멧·방패
+  slayer: { skin: '#8a6a62', legs: '#2c2624', scale: 1.35, w: 15, hunch: 3.5, arms: 'reach', stride: 4.8, armW: 3.8, head: 5.2, feat: 'claws', eyes: '#ff6a3c', shirts: ['#4a2a28', '#3a2a2a'] }, // 상급 피해형: 뼈 갈퀴, 드러난 갈비뼈, 붉은 기운
 };
 // 무기 모양: len(화면 길이), col, 종류별 머리 모양
 const ARMS_LOOK = {
@@ -1353,8 +1357,10 @@ const ROLE_LOOK = {
 };
 const SKINS = ['#e3c4a0', '#d2a67e', '#b9875e', '#8d5f3e'], HAIRS = ['#2a221c', '#4a3626', '#6a4a2c', '#1e1e22', '#8a6a44'];
 
+export const charScale = (kind) => CHAR[kind]?.scale ?? 1;
+
 export function drawCharacter(pen, x, y, o) {
-  let L = CHAR[o.kind] ?? CHAR.walker;
+  let L = CHAR[o.kind] ?? CHAR.runner;
   if (o.role && ROLE_LOOK[o.role]) L = { ...L, ...ROLE_LOOK[o.role], helmet: null };
   const { ctx, zoom } = pen, sc = L.scale * (o.scale ?? 1) * zoom;
   const [sx, sy] = pen.P(x, y, o.z ?? 0);
@@ -1373,9 +1379,14 @@ export function drawCharacter(pen, x, y, o) {
   ctx.fillStyle = 'rgba(0,0,0,0.36)'; ctx.beginPath(); ctx.ellipse(sx, sy, (L.w * 0.65) * sc, 4.4 * sc, 0, 0, Math.PI * 2); ctx.fill();
   if (o.fall) { ctx.translate(sx, sy); ctx.rotate((o.fallSide ?? 1) * o.fall * 1.45); ctx.translate(-sx, -sy); }
   const bob = mv ? Math.abs(Math.sin(ph)) * 1.3 * sc : Math.sin(ph * 0.35) * 0.35 * sc;
-  const lean = L.hunch * sc, tx = sx + dx * lean, hipY = sy - 9 * sc, topY = sy - 21 * sc - bob + (zombie ? L.hunch * 0.3 * sc : 0);
+  if (L.feat === 'claws' && !o.fall) { // 학살자: 몸 둘레의 붉은 기운
+    const rg = ctx.createRadialGradient(sx, sy - 14 * sc, 2 * sc, sx, sy - 14 * sc, 20 * sc);
+    rg.addColorStop(0, 'rgba(220,40,20,0.28)'); rg.addColorStop(1, 'rgba(220,40,20,0)');
+    ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(sx, sy - 14 * sc, 20 * sc, 0, Math.PI * 2); ctx.fill();
+  }
+  const legK = L.leg ?? 1, lean = L.hunch * sc, tx = sx + dx * lean, hipY = sy - 9 * sc * legK, topY = sy - (21 + 9 * (legK - 1)) * sc - bob + (zombie ? L.hunch * 0.3 * sc : 0);
   // 다리: 진행 방향으로 엇갈려 내딛는다. 먼 쪽(화면 위쪽) 다리부터.
-  const stride = (o.kind === 'runner' ? 5.5 : o.kind === 'brute' ? 3.5 : 4.5) * sc;
+  const stride = (L.stride ?? 4.5) * sc;
   const legs = [-1, 1].map((side) => {
     const sw = mv ? Math.sin(ph + (side > 0 ? 0 : Math.PI)) : 0, lift = mv ? Math.max(0, Math.cos(ph + (side > 0 ? 0 : Math.PI))) * 1.8 * sc : 0;
     return { side, k: side * py, hip: [sx + px * side * (L.w * 0.17) * sc, hipY], foot: [sx + px * side * (L.w * 0.2) * sc + dx * sw * stride, sy + dy * sw * stride * 0.5 - lift] };
@@ -1410,7 +1421,19 @@ export function drawCharacter(pen, x, y, o) {
   const arms = [-1, 1].map((side) => ({ side, k: side * py })).sort((a, b) => a.k - b.k);
   const drawArm = (side) => {
     const s0 = sh(side), h = hand(side);
-    stroke(ctx, s0, h, C(armCol), (o.kind === 'brute' ? 4.6 : bare ? 3.6 : 3.2) * sc);
+    stroke(ctx, s0, h, C(armCol), (L.armW ?? (bare ? 3.6 : 3.2)) * sc);
+    if (zombie && !o.hit) {
+      if (L.feat === 'claws') for (const k of [-1, 0, 1]) stroke(ctx, h, [h[0] + dx * 5 * sc + px * k * 1.6 * sc, h[1] + dy * 3 * sc + 1.6 * sc + Math.abs(k) * 0.8 * sc], '#e8dcc0', 0.9 * sc); // 뼈 갈퀴
+      if (L.feat === 'apron' && side === 1) { // 도살자 식칼
+        const bx0 = h[0] + dx * 1.5 * sc, by0 = h[1] + 1 * sc;
+        ctx.fillStyle = '#b9c0ca'; ctx.beginPath(); ctx.moveTo(bx0, by0); ctx.lineTo(bx0 + dx * 7 * sc, by0 + dy * 4 * sc + 2 * sc); ctx.lineTo(bx0 + dx * 7 * sc, by0 + dy * 4 * sc + 6 * sc); ctx.lineTo(bx0, by0 + 4 * sc); ctx.closePath(); ctx.fill();
+        stroke(ctx, [bx0, by0 + 4 * sc], [bx0 + dx * 7 * sc, by0 + dy * 4 * sc + 6 * sc], 'rgba(110,20,20,0.8)', 0.8 * sc);
+      }
+      if (L.feat === 'armor' && side === -1) { // 거구 진압 방패
+        rrect(ctx, h[0] - 4 * sc, h[1] - 8 * sc, 8 * sc, 12 * sc, 1.5 * sc); ctx.fillStyle = 'rgba(150,175,195,0.75)'; ctx.fill();
+        ctx.fillStyle = '#e8ecef'; ctx.fillRect(h[0] - 3 * sc, h[1] - 3.5 * sc, 6 * sc, 1.2 * sc);
+      }
+    }
     if (human) {
       const k = 0.78, cx = s0[0] + (h[0] - s0[0]) * k, cy = s0[1] + (h[1] - s0[1]) * k;
       if (!bare && o.kind !== 'survivor') stroke(ctx, [cx, cy], [s0[0] + (h[0] - s0[0]) * 0.9, s0[1] + (h[1] - s0[1]) * 0.9], C(shade(body, 0.72)), 3.4 * sc); // 소매 끝
@@ -1439,6 +1462,21 @@ export function drawCharacter(pen, x, y, o) {
     ctx.fillStyle = L.skin;
     for (let i = 0; i < 3; i++) { const tx0 = bx + (i + 0.5) * w / 3; ctx.beginPath(); ctx.moveTo(tx0 - 1.6 * sc, by + th); ctx.lineTo(tx0, by + th - 3 * sc); ctx.lineTo(tx0 + 1.6 * sc, by + th); ctx.fill(); }
     dot(ctx, bx + w * 0.3, by + th * 0.4, 1.6 * sc, 'rgba(110,20,20,0.75)'); dot(ctx, bx + w * 0.65, by + th * 0.7, 1.1 * sc, 'rgba(110,20,20,0.6)');
+    if (L.feat === 'belly' && !back) { // 뚱보: 옷 밖으로 불룩한 배, 핏줄과 고름
+      ctx.fillStyle = shade(L.skin, 1.05); ctx.beginPath(); ctx.ellipse(cx + dx * 2 * sc, by + th * 0.64, w * 0.42, th * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+      stroke(ctx, [cx - 2 * sc, by + th * 0.5], [cx + 1 * sc, by + th * 0.7], 'rgba(70,90,60,0.7)', 0.6 * sc);
+      for (const [ox, oy] of [[-3, 0.55], [2.5, 0.75], [0.5, 0.45]]) dot(ctx, cx + ox * sc, by + th * oy, 0.9 * sc, '#c8d07a');
+    }
+    if (L.feat === 'apron') { // 도살자: 피 묻은 앞치마(뒤에서는 끈)
+      if (!back) { rrect(ctx, bx + 2 * sc, by + 2.5 * sc, w - 4 * sc, th + 2 * sc, 1.5 * sc); ctx.fillStyle = '#c9c2b0'; ctx.fill(); for (const [ox, oy, r] of [[-2, 6, 1.6], [2, 9, 1.2], [0, 12, 1.8]]) dot(ctx, cx + ox * sc, by + oy * sc, r * sc, 'rgba(120,20,18,0.85)'); }
+      else for (const s of [-1, 1]) stroke(ctx, [cx + s * 2 * sc, by + 2 * sc], [cx - s * 2.5 * sc, by + th - 2 * sc], '#c9c2b0', 0.8 * sc);
+    }
+    if (L.feat === 'armor') { // 거구: 가슴 판·어깨 받침
+      rrect(ctx, bx + 1.5 * sc, by + 1.5 * sc, w - 3 * sc, th * 0.62, 2 * sc); ctx.fillStyle = '#2e3542'; ctx.fill();
+      stroke(ctx, [bx + 3 * sc, by + 2.4 * sc], [bx + w - 3 * sc, by + 2.4 * sc], 'rgba(255,255,255,0.18)', 0.8 * sc);
+      for (const s of [-1, 1]) dot(ctx, cx + s * w * 0.45, by + 1.5 * sc, 3.6 * sc, '#3a4250');
+    }
+    if (L.feat === 'claws' && !back) for (const s of [-1, 1]) for (let k = 0; k < 3; k++) stroke(ctx, [cx + s * 1.5 * sc, by + (4 + k * 2.4) * sc], [cx + s * (w * 0.4), by + (3.4 + k * 2.4) * sc], '#e8dcc0', 0.7 * sc); // 드러난 갈비뼈
   }
   if (human && !o.hit) {
     ctx.save(); rrect(ctx, bx, by, w, th, 4 * sc); ctx.clip();
@@ -1475,7 +1513,7 @@ export function drawCharacter(pen, x, y, o) {
   if (o.kind === 'defender' && !o.role && !o.hit) stroke(ctx, [bx + 1 * sc, by + th * 0.55], [bx + w - 1 * sc, by + th * 0.55], 'rgba(0,0,0,0.3)', 1.6 * sc); // 탄띠(직업 정보가 없을 때)
   if (back) bag(); else drawArm(arms[1].side);
   // 머리
-  const hr = (o.kind === 'brute' ? 5 : 5.8) * sc, hx = tx + dx * (zombie ? L.hunch * 0.5 * sc : 0), hy = topY - 5.5 * sc + (zombie ? 1 * sc : 0);
+  const hr = (L.head ?? 5.8) * sc, hx = tx + dx * (zombie ? L.hunch * 0.5 * sc : 0), hy = topY - 5.5 * sc + (zombie ? 1 * sc : 0);
   const hat = L.hat;
   if (hat === 'hood') dot(ctx, hx - dx * 0.8 * sc, hy - 0.6 * sc, hr * 1.3, C(shade(L.hatCol, 0.85))); // 후드 뒤판
   if (human && hat !== 'hood' && !back) for (const s of [-1, 1]) dot(ctx, hx + px * s * hr * 0.92, hy + 0.6 * sc, 1.3 * sc, C(shade(skin, 0.88))); // 귀
@@ -1509,10 +1547,11 @@ export function drawCharacter(pen, x, y, o) {
     ctx.fill();
     if (player && !back) for (const k of [-1, 0, 1]) dot(ctx, hx + dx * hr * 0.35 + px * k * hr * 0.42, hy - hr * 0.62 + Math.abs(k) * 0.4 * sc, hr * 0.32, C(hairCol)); // 앞머리
   }
-  if (o.kind === 'brute' && !o.hit) stroke(ctx, [hx - 2 * sc, hy - 3 * sc], [hx + 2.5 * sc, hy - 1 * sc], 'rgba(60,20,20,0.6)', 0.8 * sc); // 흉터
+  if (o.kind === 'slayer' && !o.hit) stroke(ctx, [hx - 2 * sc, hy - 3 * sc], [hx + 2.5 * sc, hy - 1 * sc], 'rgba(60,20,20,0.6)', 0.8 * sc); // 흉터
+  if (L.feat === 'armor' && !back && !o.hit) stroke(ctx, [hx - hr * 0.85, hy - 0.2 * sc], [hx + hr * 0.85, hy - 0.2 * sc], 'rgba(20,24,30,0.85)', 2 * sc); // 헬멧 가리개
   if (!back) {
     const ex = hx + dx * 2.2 * sc, ey = hy - 0.5 * sc + dy * 1 * sc, ew = (zombie ? 1.3 : 0.9) * sc;
-    for (const s of [-1, 1]) dot(ctx, ex + px * s * 2 * sc, ey, ew, o.hit ? '#ffffff' : (o.eyes ?? '#2a2018'));
+    for (const s of [-1, 1]) dot(ctx, ex + px * s * 2 * sc, ey, ew, o.hit ? '#ffffff' : (L.eyes ?? o.eyes ?? '#2a2018'));
     if (zombie && !o.hit) dot(ctx, ex, ey + 2.6 * sc, 1 * sc, 'rgba(30,10,10,0.8)'); // 벌린 입
     if (human && !o.hit) {
       for (const s of [-1, 1]) stroke(ctx, [ex + px * s * 2.9 * sc, ey - 1.5 * sc], [ex + px * s * 1.2 * sc, ey - 1.7 * sc], hat === 'hood' || !hairCol ? '#3a2a20' : hairCol, 0.6 * sc); // 눈썹

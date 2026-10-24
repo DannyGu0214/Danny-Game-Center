@@ -10,7 +10,7 @@ const fresh = (seed) => { const s = G.newGame(seed); G.setObstacles(s, []); retu
 // 진행 중인 건설·강화·제작·훈련을 모두 끝낸다
 const finish = (s) => G.advanceJobs(s, 1e9);
 const zombieAt = (s, x, y, hp = 1000) => {
-  const z = { id: 999, type: 'walker', x, y, hp, max: hp, dmg: 0, speed: 0, reward: 2, r: 11, d: 1, atk: 9, wa: 0, wt: 99, hit: 0 };
+  const z = { id: 999, type: 'runner', x, y, hp, max: hp, dmg: 0, speed: 0, reward: 2, r: 11, d: 1, atk: 9, wa: 0, wt: 99, hit: 0 };
   s.zombies.push(z);
   return z;
 };
@@ -281,7 +281,7 @@ test('군사 구역에 맨주먹으로 서 있으면 위험하다(난이도가 �
   s.player.x = G.CENTER.x + Math.cos(a) * r; s.player.y = G.CENTER.y + Math.sin(a) * r;
   stepFor(s, 90);
   assert.ok(s.stats.deaths >= 1);
-  assert.ok(G.zombieStats('walker', 4.5).hp > G.zombieStats('walker', 0.5).hp * 5);
+  assert.ok(G.zombieStats('butcher', 4.5).hp > G.zombieStats('butcher', 0.5).hp * 5);
 });
 
 test('동료: 방어 배치는 감시탑 레벨 + 1명까지', () => {
@@ -448,10 +448,85 @@ test('습격: 방어 동료가 강하면 막아 내고 보상을 받는다', () 
   assert.ok(s.res.scrap > scrap);
 });
 
+test('엔딩: 목표 8개 중 3개 이상, 그중 필수(기지·동료·전진기지) 1개 이상이면 한 번 뜨고 이어서 할 수 있다', () => {
+  assert.equal(G.ENDING_GOALS.length, 8);
+  assert.deepEqual(G.ENDING_GOALS.filter((g) => g.req).map((g) => g.id), ['hq', 'crew', 'network']);
+  const s = fresh(180);
+  s.spawnT = 1e9; s.rescueT = 1e9; s.raidT = 1e9; s.autoHunt = false;
+  const run = () => { const ev = []; for (let k = 0; k < 3; k++) ev.push(...G.step(s, DT)); return ev.filter((e) => e.t === 'ending'); };
+  // 서브 목표만 3개: 엔딩 아님
+  s.stats.militaryLoot = 200; s.stats.raidsWon = 25; s.level = 45;
+  assert.equal(G.endingStatus(s).count, 3);
+  assert.equal(G.endingStatus(s).reached, false, '필수 목표가 없으면 아니다');
+  assert.equal(run().length, 0);
+  // 필수 하나(전진기지 4곳 모두 3레벨) — 3레벨이 아니면 세지 않는다
+  s.outposts = [0, 1, 2, 3].map((site) => ({ site, lv: 2 }));
+  assert.equal(G.goalDone(s, G.ENDING_GOALS[2]), false);
+  s.outposts.forEach((o) => { o.lv = 3; });
+  const ev = run();
+  assert.equal(ev.length, 1, '엔딩 이벤트');
+  assert.deepEqual(ev[0].goals.sort(), ['fortress', 'military', 'network', 'veteran']);
+  assert.ok(s.ended && s.ended.at >= 0);
+  assert.equal(run().length, 0, '한 번만 뜬다');
+  assert.equal(s.over, null, '게임은 이어진다');
+  // 저장해도 엔딩 상태가 남아 다시 뜨지 않는다
+  const t = G.deserialize(G.serialize(s));
+  assert.deepEqual(t.ended, s.ended);
+  // 필수 2개 + 서브 1개도 엔딩
+  const u = fresh(181); u.spawnT = 1e9; u.rescueT = 1e9; u.raidT = 1e9;
+  u.hq = 9; u.bld.dorm = 9; for (let i = 0; i < 20; i++) u.survivors.push(G.makeSurvivor(u)); u.weapons.pipe = G.WEAPON_MAX_LV;
+  assert.deepEqual(G.endingStatus(u).done.map((g) => g.id), ['hq', 'crew', 'master']);
+  assert.equal(G.endingStatus(u).reached, true);
+  // 상급 처치 수는 상급(거구·학살자)만 센다
+  const w = fresh(182); w.spawnT = 1e9; w.rescueT = 1e9; w.raidT = 1e9; w.autoHunt = false;
+  for (const type of ['hulk', 'slayer', 'butcher', 'runner']) { const z = zombieAt(w, w.player.x + 300, w.player.y, 1); z.type = type; z.hp = 0; }
+  G.step(w, DT);
+  assert.equal(w.stats.eliteKills, 2);
+});
+
+test('좀비 3등급 6종: 강점 하나·약점 하나, 등급마다 강점 ×2·약점 ×½, 같은 등급 두 종은 강점·약점이 다르다', () => {
+  const types = Object.entries(G.ZTYPES), stat = ['hp', 'dmg', 'spd'];
+  assert.equal(types.length, 6);
+  for (let g = 0; g < 3; g++) {
+    const [a, b] = G.ZTYPES_BY_GRADE[g].map((k) => G.ZTYPES[k]);
+    assert.equal(G.ZTYPES_BY_GRADE[g].length, 2, `${G.ZGRADES[g].name} 2종`);
+    const st = (t) => G.ZSTYLES[t.style];
+    assert.notEqual(st(a).strong, st(b).strong, '강점이 다르다'); assert.notEqual(st(a).weak, st(b).weak, '약점이 다르다');
+    for (const t of [a, b]) {
+      const up = stat.filter((k) => t[k] > 1), down = stat.filter((k) => t[k] < 1);
+      assert.deepEqual([up, down], [[st(t).strong], [st(t).weak]], `${t.name}: 강점 하나·약점 하나`);
+      assert.equal(t[st(t).strong], 1 + 0.5 * 2 ** g, `${t.name} 강점`);
+      assert.equal(t[st(t).weak], 1 - 0.5 / 2 ** g, `${t.name} 약점`);
+    }
+  }
+  // 같은 유형의 위 등급: 강점 보너스 2배 이상, 약점 페널티는 줄어든다(바로 위 등급이면 ×2·25%)
+  assert.deepEqual([G.ZTYPES.sprinter.spd - 1, 1 - G.ZTYPES.sprinter.hp], [2 * (G.ZTYPES.runner.spd - 1), 0.25]);
+  assert.deepEqual([G.ZTYPES.slayer.dmg - 1, 1 - G.ZTYPES.slayer.spd], [2 * (G.ZTYPES.butcher.dmg - 1), 0.125]);
+  // 덩치·속도·공격 간격이 강점을 따른다
+  assert.ok(G.ZTYPES.hulk.r > G.ZTYPES.bloater.r && G.ZTYPES.bloater.r > G.ZTYPES.runner.r);
+  assert.ok(G.zombieStats('sprinter', 3).speed > G.zombieStats('butcher', 3).speed);
+  assert.equal(G.zombieStats('sprinter', 3).atkCd, G.ZOMBIE_ATK_CD / 2, '속도 ×2면 공격 간격 절반');
+  // 출현: 주택가는 하급만, 구역 비율대로 뽑는다
+  const s = fresh(170), count = { 0: 0, 1: 0, 2: 0 };
+  for (let i = 0; i < 3000; i++) count[G.ZTYPES[G.pickZombieType(s, 6.5)].grade]++;
+  assert.ok(Math.abs(count[2] / 3000 - 0.45) < 0.04 && Math.abs(count[0] / 3000 - 0.15) < 0.04, JSON.stringify(count));
+  for (let i = 0; i < 200; i++) assert.equal(G.ZTYPES[G.pickZombieType(s, 1.4)].grade, 0);
+  // 공격 간격대로 때린다: 질주자는 0.6초마다
+  const t = fresh(171); t.spawnT = 1e9; t.rescueT = 1e9; t.autoHunt = false; t.raidT = 1e9;
+  t.player.x = 1000; t.player.y = 1000; t.player.hp = 1e6;
+  t.weapons = { fist: 1 }; t.equip = { melee: 'fist', gun: null };
+  const z = { ...G.zombieStats('sprinter', 1), id: 1, type: 'sprinter', x: 1010, y: 1000, max: 1e9, d: 1, atk: 0, wa: 0, wt: 99, hit: 0 }; z.hp = 1e9; z.speed = 0;
+  t.zombies.push(z);
+  const ev = []; for (let k = 0; k < 90; k++) ev.push(...G.step(t, DT)); // 3초
+  const hits = ev.filter((e) => e.t === 'hurt').length;
+  assert.ok(hits >= 5 && hits <= 6, `3초에 ${hits}번`);
+});
+
 test('습격 편성은 The Last Spark 공식과 같은 모양으로 커진다', () => {
-  assert.deepEqual(G.raidComposition(1), { walker: 4, runner: 0, brute: 0 });
-  assert.deepEqual(G.raidComposition(60), { walker: 25, runner: 10, brute: 10 });
-  assert.ok(G.raidComposition(30).walker > G.raidComposition(12).walker);
+  // [하급, 중급, 상급] 수(예전 워커·러너·브루트 수와 같은 식)
+  assert.deepEqual(G.raidComposition(1), [4, 0, 0]);
+  assert.deepEqual(G.raidComposition(60), [25, 10, 10]);
+  assert.ok(G.raidComposition(30)[0] > G.raidComposition(12)[0]);
 });
 
 test('저장 → 불러오기 왕복, 깨진 저장은 거부', () => {
@@ -933,11 +1008,13 @@ test('거리 비례: 좀비 개체수는 위험도에 비례하고(스폰 간격
   };
   const near = count(1), far = count(4);
   assert.ok(near <= G.fieldPopulation(1.3) && far >= 3 * near, `위험도 1: ${near}마리, 위험도 4: ${far}마리`);
-  for (let d = 1; d < 5; d++) {
-    const a = G.tierShare(d), b = G.tierShare(d + 1);
-    assert.ok(b.brute >= a.brute && b.runner >= a.runner);
+  // 멀수록 높은 등급 비율이 오른다(중급 이상, 상급 각각)
+  for (let d = 1; d < 6.5; d++) {
+    const a = G.gradeShare(d), b = G.gradeShare(d + 1);
+    assert.ok(b[1] + b[2] >= a[1] + a[2] && b[2] >= a[2], `위험도 ${d}`);
   }
-  assert.ok(G.tierShare(4.5).brute > 0.2 && G.tierShare(1).brute === 0);
+  assert.deepEqual(G.gradeShare(1.5), [1, 0, 0], '주택가는 하급만');
+  assert.ok(G.gradeShare(6.5)[2] > 0.4, '군사 구역은 상급이 가장 많다');
 });
 
 test('균형: 자동사냥 봇이 30분 안에 본부 2레벨 이상, 상태값에 NaN이 없다', () => {
@@ -947,7 +1024,7 @@ test('균형: 자동사냥 봇이 30분 안에 본부 2레벨 이상, 상태값�
     assert.ok(s.hq >= 2, `seed ${seed}: hq ${s.hq}`);
     assert.ok(s.stats.kills > 120, `seed ${seed}: kills ${s.stats.kills}`); // 난이도 상향(체력 ×1.3·탄약 제한·이동 -30%) 뒤 기준
     const flat = JSON.stringify(s, (k, v) => (k === 'zombies' || k === 'posts' || k === 'autoTarget' ? undefined : v));
-    assert.ok(!/null|NaN/.test(flat.replace(/"(waypoint|rescue|gather|raid|gun|over)":null/g, '')), 'NaN 없음');
+    assert.ok(!/null|NaN/.test(flat.replace(/"(waypoint|rescue|gather|raid|gun|over|ended)":null/g, '')), 'NaN 없음');
     for (const k of G.RES_KEYS) assert.ok(Number.isFinite(s.res[k]) && s.res[k] >= 0);
   }
 });
@@ -1006,6 +1083,80 @@ test('작업 시간: 같은 줄은 한 번에 하나, 다른 줄끼리는 동시
   assert.equal(s.equip.gun, 'pistol', '제작이 끝나면 장착');
   assert.equal(s.survivors[0].lv, 2);
   assert.equal(G.upgradeHq(s).ok, true, '끝나면 다시 쓸 수 있다');
+});
+
+test('작업 취소: 모든 건설·강화·제작·훈련·전진기지 공사는 진행 중에 취소할 수 있고, 낸 자원을 모두 돌려받는다', () => {
+  const s = rich(fresh(94));
+  s.hq = 4; s.bld.workbench = 2;
+  G.gainWeapon(s, 'pipe');
+  const v = G.makeSurvivor(s); s.survivors.push(v);
+  s.outposts.push({ site: 0, lv: 1 });
+  const site = s.sites[2]; s.player.x = site.x; s.player.y = site.y;
+  const craftable = Object.keys(G.WEAPONS).find((id) => G.weaponSource(id) === 'craft' && !s.weapons[id] && G.WEAPONS[id].tier <= 2);
+  const cases = [
+    ['hq', 0, () => G.upgradeHq(s)],
+    ['bld', 'sawmill', () => G.buyBuilding(s, 'sawmill')],
+    ['craft', craftable, () => G.craftWeapon(s, craftable)],
+    ['wup', 'pipe', () => G.upgradeWeapon(s, 'pipe')],
+    ['lvl', v.id, () => G.levelSurvivor(s, v.id)],
+    ['obuild', 2, () => G.buildOutpost(s, 2)],
+    ['oup', 0, () => G.upgradeOutpost(s, 0)],
+    ['odemo', 0, () => G.demolishOutpost(s, 0)],
+  ];
+  for (const [kind, key, start] of cases) {
+    const before = { ...s.res }, state = JSON.stringify([s.hq, s.bld, s.weapons, s.survivors, s.outposts]);
+    assert.equal(start().ok, true, `${kind} 시작`);
+    const paid = Object.fromEntries(G.RES_KEYS.map((r) => [r, before[r] - s.res[r]]));
+    G.advanceJobs(s, 1); // 조금 진행된 뒤
+    const r = G.cancelJob(s, kind, key);
+    assert.equal(r.ok, true, `${kind} 취소`); assert.match(r.msg, /취소/);
+    assert.deepEqual(s.res, before, `${kind}: 낸 자원(${JSON.stringify(paid)})을 모두 돌려받는다`);
+    assert.equal(G.jobOf(s, kind, key), null);
+    assert.equal(JSON.stringify([s.hq, s.bld, s.weapons, s.survivors, s.outposts]), state, `${kind}: 효과는 붙지 않는다`);
+  }
+  assert.equal(s.outposts.length, 1, '철거를 취소하면 전진기지가 남는다');
+  assert.equal(G.cancelJob(s, 'hq', 0).ok, false, '진행 중이 아니면 취소할 수 없다');
+  // 취소한 줄은 바로 다른 작업을 시작할 수 있다
+  G.buyBuilding(s, 'sawmill'); G.cancelJob(s, 'bld', 'sawmill');
+  assert.equal(G.upgradeHq(s).ok, true);
+});
+
+test('전진기지 철거: 자원 반환 없이 레벨에 비례한 시간이 걸리고, 끝나면 다른 곳에 지을 수 있다', () => {
+  const s = rich(fresh(93));
+  s.hq = 2; // 한도 1곳
+  s.outposts.push({ site: 0, lv: 2 });
+  const a = s.sites[0], b = s.sites[2];
+  assert.equal(G.demolishOutpost(s, 5).ok, false, '세우지 않은 곳은 철거할 수 없다');
+  // 한도가 차 있으면 다른 곳에 못 짓는다
+  s.player.x = b.x; s.player.y = b.y;
+  assert.equal(G.buildOutpost(s, 2).ok, false);
+  const res0 = { ...s.res };
+  const r = G.demolishOutpost(s, 0);
+  assert.equal(r.ok, true); assert.match(r.msg, /철거/);
+  assert.deepEqual(s.res, res0, '철거는 자원을 쓰지도 돌려주지도 않는다');
+  const j = G.jobOf(s, 'odemo', 0);
+  assert.equal(j.total, Math.round(G.jobTime(2, G.OUTPOST_MAX_LV) * G.DEMOLISH_SHARE), '2레벨 철거 시간');
+  assert.deepEqual([1, 2, 3].map((lv) => G.jobDuration('odemo', 0, lv)), [50, 100, 150], '레벨에 비례');
+  // 헐리는 동안에는 그대로 쓰이고, 같은 공사 줄이라 다른 공사는 못 한다
+  assert.ok(G.safeZoneAt(s, a.x, a.y));
+  assert.equal(G.upgradeOutpost(s, 0).ok, false);
+  assert.equal(G.buildOutpost(s, 2).ok, false);
+  // 저장해도 철거 작업이 이어진다
+  const t = G.deserialize(G.serialize(s));
+  assert.ok(G.jobOf(t, 'odemo', 0), '저장 후에도 철거 중');
+  G.advanceJobs(s, j.total - 1);
+  assert.equal(s.outposts.length, 1, '다 헐리기 전');
+  const ev = G.advanceJobs(s, 2);
+  assert.equal(s.outposts.length, 0);
+  assert.ok(ev.some((e) => e.t === 'job-done' && e.kind === 'odemo' && /철거/.test(e.name)));
+  assert.ok(!G.safeZoneAt(s, a.x, a.y), '안전지대가 사라진다');
+  assert.deepEqual(s.res, res0, '끝나도 자원은 돌아오지 않는다');
+  // 비운 자리 대신 다른 후보지에 짓는다(같은 자리도 다시 지을 수 있다)
+  assert.equal(G.buildOutpost(s, 2).ok, true);
+  // 없는 전진기지를 가리키는 철거 작업은 불러올 때 버린다
+  const o = JSON.parse(G.serialize(s));
+  o.jobs = [{ lane: 'outpost', kind: 'odemo', key: 7, next: 1, t: 10, total: 50 }];
+  assert.equal(G.deserialize(JSON.stringify(o)).jobs.length, 0);
 });
 
 test('작업 시간: 전진기지는 공사가 끝나야 안전지대가 되고, 공사 중에는 다른 후보지를 못 짓는다', () => {
@@ -1098,7 +1249,7 @@ test('가방: 레벨업마다 레벨당 10의 ±10%(9~11)에서 균일 분포로
 
 test('난이도: 이동 속도 -30%, 좀비 체력 ×1.3에 바깥 구역일수록 구역마다 +15%', () => {
   assert.equal(G.PLAYER_SPEED, 91);
-  const hp = (d) => G.zombieStats('walker', d).hp;
+  const hp = (d) => G.zombieStats('butcher', d).hp;
   assert.equal(hp(0), Math.round(22 * 1.3));
   // 같은 거리 배율(1.5^d)을 빼면 구역 번호에 비례해 커진다
   const base = (d) => hp(d) / (22 * 1.5 ** d);
@@ -1356,7 +1507,7 @@ test('탐험 지역: 구역 7개(폐허 도심·검은 숲 추가), 군사 구�
   for (const t of [...Object.values(G.LOOT_TYPES), ...Object.values(G.OBSTACLE_TYPES)]) assert.equal(t.zones.length, 7);
   assert.equal(G.RESPAWN_ZONE_MULT.length, 7);
   // 바깥일수록 위험: 좀비 체력·개체수·스폰 간격, 리스폰도 빨라진다
-  assert.ok(G.zombieStats('walker', 6.5).hp > G.zombieStats('walker', 4.5).hp);
+  assert.ok(G.zombieStats('butcher', 6.5).hp > G.zombieStats('butcher', 4.5).hp);
   assert.ok(G.spawnInterval(6.5) < G.spawnInterval(4.5) && G.RESPAWN_ZONE_MULT[6] < G.RESPAWN_ZONE_MULT[4]);
   // 주력 자원: 폐허 도심 = 고철, 검은 숲 = 목재
   const main = (zone) => G.RES_KEYS.map((r) => [r, Object.values(G.LOOT_TYPES).filter((t) => t.res === r).reduce((a, t) => a + t.zones[zone], 0)]).sort((a, b) => b[1] - a[1])[0][0];

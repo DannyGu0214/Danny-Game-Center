@@ -120,12 +120,30 @@ export const STIM_S = 60, STIM_HP = 0.2, STIM_MULT = 1.5; // 스팀팩: 1분, �
 export const gunAccuracy = (d, range) => 1 - 0.8 * clamp(d / range, 0, 1);
 
 // ---------- 좀비 ----------
-// 러너·브루트 배율은 Zumbidle 관측값(러너 체력 0.5·속도 1.8, 브루트 체력 4·속도 0.6)에 가깝게 잡았다.
-export const ZTYPES = {
-  walker: { name: '워커', hp: 1, dmg: 1, spd: 1, r: 11, xp: 4 },
-  runner: { name: '러너', hp: 0.6, dmg: 0.8, spd: 1.7, r: 9, xp: 5 },
-  brute: { name: '브루트', hp: 3.4, dmg: 2.2, spd: 0.62, r: 16, xp: 12 },
+// 3등급 6종(2026-10-25). 능력치(체력·공격·속도) 중 강점 하나, 약점 하나를 가진다. 기준(×1)은 예전 워커.
+// 강점·약점 크기: 하급 +50%/−50%, 중급 +100%/−25%, 상급 +200%/−12.5%(등급이 하나 오를 때마다 강점 ×2, 약점 ×½).
+// 유형마다 약점이 정해져 있어 한 등급의 두 종은 강점도 약점도 서로 다르다. 속도는 이동 속도와 공격 속도(공격 간격 ÷ 속도)를 함께 바꾼다.
+export const ZGRADES = [{ name: '하급', bonus: 0.5, penalty: 0.5 }, { name: '중급', bonus: 1, penalty: 0.25 }, { name: '상급', bonus: 2, penalty: 0.125 }];
+export const ZSTYLES = {
+  tank: { name: '체력형', strong: 'hp', weak: 'dmg' },
+  power: { name: '피해형', strong: 'dmg', weak: 'spd' },
+  speed: { name: '속도형', strong: 'spd', weak: 'hp' },
 };
+const ztype = (name, grade, style, r, xp) => {
+  const m = { hp: 1, dmg: 1, spd: 1 };
+  m[ZSTYLES[style].strong] = 1 + ZGRADES[grade].bonus;
+  m[ZSTYLES[style].weak] = 1 - ZGRADES[grade].penalty;
+  return { name, grade, style, ...m, r, xp };
+};
+export const ZTYPES = {
+  runner: ztype('러너', 0, 'speed', 9, 4),
+  bloater: ztype('뚱보', 0, 'tank', 14, 4),
+  sprinter: ztype('질주자', 1, 'speed', 10, 7),
+  butcher: ztype('도살자', 1, 'power', 13, 7),
+  hulk: ztype('거구', 2, 'tank', 19, 12),
+  slayer: ztype('학살자', 2, 'power', 15, 12),
+};
+export const ZTYPES_BY_GRADE = [0, 1, 2].map((g) => Object.keys(ZTYPES).filter((k) => ZTYPES[k].grade === g));
 
 export const ZOMBIE_HP_MULT = 1.3, ZONE_HP_STEP = 0.15;
 // zone = 좀비가 나타난 자리의 구역(습격 좀비는 강함을 정하는 위험도 d와 나타난 자리가 다르다)
@@ -136,17 +154,20 @@ export function zombieStats(type, d, zone = zoneIndex(d)) {
     hp: Math.round(22 * ZOMBIE_HP_MULT * (1 + ZONE_HP_STEP * zone) * 1.5 ** d * T.hp),
     dmg: 4.5 * 1.36 ** d * T.dmg,
     speed: (46 + 5 * d) * T.spd,
+    atkCd: ZOMBIE_ATK_CD / T.spd, // 빠른 좀비는 공격도 빠르다
     r: T.r,
   };
 }
 
-// 위험도가 오를수록 러너·브루트 비율이 커진다(최대 35% / 25%).
-// 기지에서 멀수록(위험도 d) 고티어 비율이 거리에 비례해 커진다: 러너 10%×(d−0.5), 브루트 7%×(d−1).
-export const tierShare = (d) => ({ runner: clamp(0.1 * (d - 0.5), 0, 0.35), brute: clamp(0.07 * (d - 1), 0, 0.3) });
+// 구역별 등급 비율 [하급, 중급, 상급](기지 주변·주택가 → 군사 구역). 같은 등급 두 종은 반반이다.
+export const GRADE_SHARE = [[1, 0, 0], [1, 0, 0], [0.8, 0.2, 0], [0.6, 0.35, 0.05], [0.4, 0.45, 0.15], [0.25, 0.45, 0.3], [0.15, 0.4, 0.45]];
+export const gradeShare = (d) => GRADE_SHARE[zoneIndex(d)];
+export const pickInGrade = (s, g) => ZTYPES_BY_GRADE[g][Math.floor(rand(s) * ZTYPES_BY_GRADE[g].length)];
 export function pickZombieType(s, d) {
-  const { brute, runner } = tierShare(d);
-  const r = rand(s);
-  return r < brute ? 'brute' : r < brute + runner ? 'runner' : 'walker';
+  const share = gradeShare(d);
+  let r = rand(s), g = 0;
+  while (g < 2 && r >= share[g]) { r -= share[g]; g++; }
+  return pickInGrade(s, g);
 }
 
 // ---------- 무기 ----------
@@ -585,7 +606,8 @@ export function newGame(seed = (Date.now() & 0x7fffffff) || 1) {
     level: 1,
     xp: 0,
     growth: { hp: 0, atk: 0, bag: 0 },
-    stats: { kills: 0, deaths: 0, looted: 0, rescued: 0, raidsWon: 0, raidsLost: 0, militaryLoot: 0, playTime: 0 },
+    stats: { kills: 0, deaths: 0, looted: 0, rescued: 0, raidsWon: 0, raidsLost: 0, militaryLoot: 0, playTime: 0, eliteKills: 0 },
+    ended: null, // 엔딩에 닿은 때 { at: 플레이 시간(초), goals: 달성한 목표 id }
     over: null,
     nextId: 1,
   };
@@ -654,7 +676,10 @@ function nearestSafe(s, x, y) {
 // 줄마다 한 번에 하나만 진행한다. 다른 줄끼리는 동시에 돌아간다.
 export const JOB_MAX_S = 300;
 export const JOB_LANES = { base: '기지 건설', forge: '무기 작업', train: '훈련', outpost: '전진기지 공사' };
-const JOB_KINDS = { hq: 'base', bld: 'base', craft: 'forge', wup: 'forge', lvl: 'train', obuild: 'outpost', oup: 'outpost' };
+const JOB_KINDS = { hq: 'base', bld: 'base', craft: 'forge', wup: 'forge', lvl: 'train', obuild: 'outpost', oup: 'outpost', odemo: 'outpost' };
+// 전진기지 철거: 자원은 돌려받지 못하고, 그 레벨까지 지은 시간의 절반이 걸린다(1레벨 50초 · 2레벨 1분 40초 · 3레벨 2분 30초).
+// 다 헐릴 때까지는 안전지대·생산이 그대로이고, 끝나면 그 자리는 다시 후보지가 된다.
+export const DEMOLISH_SHARE = 0.5;
 export const CRAFT_MAX_TIER = Math.max(...Object.values(WEAPONS).map((w) => w.tier ?? 0));
 export const jobTime = (next, max) => Math.round(JOB_MAX_S * Math.min(1, next / max));
 export const durText = (sec) => {
@@ -669,6 +694,7 @@ export function jobDuration(kind, key, next) {
     case 'craft': return jobTime(WEAPONS[key].tier, CRAFT_MAX_TIER);
     case 'wup': return jobTime(next, WEAPON_MAX_LV);
     case 'lvl': return jobTime(next, MAX_SURVIVOR_LV);
+    case 'odemo': return Math.round(jobTime(next, OUTPOST_MAX_LV) * DEMOLISH_SHARE); // next = 헐리는 전진기지의 레벨
     default: return jobTime(next, OUTPOST_MAX_LV); // obuild(1레벨)·oup
   }
 }
@@ -682,7 +708,7 @@ function jobLevel(s, kind, key) {
     case 'wup': return Object.hasOwn(WEAPONS, key) && s.weapons[key] ? s.weapons[key] : null;
     case 'lvl': return s.survivors.find((v) => v.id === key)?.lv ?? null;
     case 'obuild': return site ? (s.outposts.some((o) => o.site === key) ? 1 : 0) : null;
-    case 'oup': return site ? s.outposts.find((o) => o.site === key)?.lv ?? null : null;
+    case 'oup': case 'odemo': return site ? s.outposts.find((o) => o.site === key)?.lv ?? null : null;
     default: return null;
   }
 }
@@ -707,6 +733,7 @@ export function jobName(s, j) {
     case 'wup': return `${WEAPONS[j.key].name} +${j.next - 1}`;
     case 'lvl': return `${s.survivors.find((v) => v.id === j.key)?.name ?? '동료'} ${j.next}레벨`;
     case 'obuild': return `${s.sites[j.key].name} 전진기지`;
+    case 'odemo': return `${s.sites[j.key].name} 철거`;
     default: return `${s.sites[j.key].name} ${j.next}레벨`;
   }
 }
@@ -744,6 +771,7 @@ function finishJob(s, j) {
     }
     case 'lvl': { const v = s.survivors.find((x) => x.id === j.key); if (v) v.lv = Math.max(v.lv, j.next); break; }
     case 'obuild': if (!s.outposts.some((o) => o.site === j.key)) s.outposts.push({ site: j.key, lv: 1 }); break;
+    case 'odemo': s.outposts = s.outposts.filter((o) => o.site !== j.key); break;
     default: { const o = s.outposts.find((x) => x.site === j.key); if (o) o.lv = Math.max(o.lv, j.next); }
   }
 }
@@ -758,6 +786,30 @@ export function advanceJobs(s, dt, ev = []) {
     ev.push({ t: 'job-done', kind: j.kind, key: j.key, next: j.next, name });
   }
   return ev;
+}
+
+// 작업에 낸 자원(시작할 때와 같은 계산, 작업 중에는 대상 레벨이 바뀌지 않는다). 취소하면 이만큼 돌려준다.
+export function jobCost(s, j) {
+  switch (j.kind) {
+    case 'hq': return hqCost(j.next);
+    case 'bld': return buildCost(j.key, j.next);
+    case 'craft': return WEAPONS[j.key].cost;
+    case 'wup': return weaponUpgradeCost(s, j.key);
+    case 'lvl': { const v = s.survivors.find((x) => x.id === j.key); return v ? levelUpCost(v) : {}; }
+    case 'obuild': return outpostCost(s, j.key);
+    case 'oup': { const o = s.outposts.find((x) => x.site === j.key); return o ? outpostUpgradeCost(s, j.key, o.lv) : {}; }
+    default: return {}; // 철거는 자원을 쓰지 않는다
+  }
+}
+// 진행 중인 작업 취소: 낸 자원을 모두 돌려주고 효과는 붙지 않는다. 철거를 취소하면 전진기지가 그대로 남는다.
+export function cancelJob(s, kind, key) {
+  const j = jobOf(s, kind, key);
+  if (!j) return fail('진행 중인 작업이 아니에요');
+  const c = jobCost(s, j), name = jobName(s, j);
+  s.jobs.splice(s.jobs.indexOf(j), 1);
+  for (const [r, v] of Object.entries(c)) s.res[r] += v;
+  const back = Object.entries(c).filter(([, v]) => v > 0).map(([r, v]) => `${RES_NAMES[r]} ${fmt(v)}`).join(' · ');
+  return ok(`${name} 취소${back ? ` · ${back} 돌려받음` : ''}`);
 }
 
 // ---------- 행동(버튼) ----------
@@ -888,6 +940,15 @@ export function upgradeOutpost(s, site) {
   return startJob(s, 'oup', site, o.lv + 1, c);
 }
 
+// 철거: 자원 반환 없음, 레벨에 비례한 작업 시간. 공사 줄을 쓰므로 그동안 다른 전진기지 공사는 못 한다.
+export function demolishOutpost(s, site) {
+  const o = s.outposts.find((x) => x.site === site);
+  if (!o) return fail('세운 전진기지가 아니에요');
+  const wait = busy(s, 'outpost'); if (wait) return wait;
+  const r = startJob(s, 'odemo', site, o.lv, {});
+  return ok(`${r.msg} · 자원은 돌아오지 않아요`);
+}
+
 // 목적지까지 자동 이동(전진기지 후보지 안내 등). 손가락으로 움직이면 취소된다.
 export function travelTo(s, x, y) {
   s.waypoint = { x: clamp(x, 20, WORLD.w - 20), y: clamp(y, 20, WORLD.h - 20) };
@@ -978,7 +1039,8 @@ export const raidLevel = (s) => clamp(s.hq * 6 + s.stats.raidsWon, 1, 60);
 export const raidDanger = (s) => 1 + 0.4 * s.hq;
 export function raidComposition(L) {
   const r = clamp((L - 15) / 45, 0, 1);
-  return { walker: Math.round(4 + 21 * ((L - 1) / 59) ** 1.35), runner: Math.floor(10 * r ** 1.65), brute: Math.floor(10 * r * r) };
+  // 예전 워커·러너·브루트 수를 하급·중급·상급 수로 그대로 옮겼다
+  return [Math.round(4 + 21 * ((L - 1) / 59) ** 1.35), Math.floor(10 * r ** 1.65), Math.floor(10 * r * r)];
 }
 const RAID_LOSS = 0.2; // 방벽이 뚫리면 창고 자원의 20%를 잃는다
 export const raidAmmo = (s) => 10 + 3 * s.hq; // 습격을 막으면 탄약도 받는다
@@ -987,7 +1049,7 @@ export const DEFENDER_DMG = 1.3; // 방어 동료 공격력: 좀비 체력 ×1.3
 function startRaid(s, ev) {
   const comp = raidComposition(raidLevel(s));
   const queue = [];
-  for (const [type, n] of Object.entries(comp)) for (let i = 0; i < n; i++) queue.push(type);
+  comp.forEach((n, g) => { for (let i = 0; i < n; i++) queue.push(ZTYPES_BY_GRADE[g][i % 2]); }); // 등급 안 두 종을 번갈아
   for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(rand(s) * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
   s.raid = { queue, spawnT: 0, ang: rand(s) * TAU, total: queue.length, hpTotal: 0 };
   ev.push({ t: 'raid-start', count: queue.length });
@@ -1044,7 +1106,7 @@ function updateRaid(s, dt, ev) {
 // ---------- 필드 시뮬레이션 ----------
 function makeZombie(s, type, x, y, d, extra = {}) {
   const st = zombieStats(type, d, zoneIndex(dangerAt(x, y)));
-  return { id: s.zid++, type, x, y, hp: st.hp, max: st.hp, dmg: st.dmg, speed: st.speed, r: st.r, d, atk: 0.6, wa: rand(s) * TAU, wt: 0, hit: 0, ...extra };
+  return { id: s.zid++, type, x, y, hp: st.hp, max: st.hp, dmg: st.dmg, speed: st.speed, atkCd: st.atkCd, r: st.r, d, atk: 0.6, wa: rand(s) * TAU, wt: 0, hit: 0, ...extra };
 }
 
 // input: 조이스틱 벡터 {x, y}(길이 ≤ 1, 월드 좌표계) 또는 null. 반환값은 화면 효과용 이벤트 목록.
@@ -1126,7 +1188,35 @@ export function step(s, dt, input = null) {
     s.over = { at: Date.now(), summary: runSummary(s) };
     ev.push({ t: 'gameover', summary: s.over.summary });
   }
+  checkEnding(s, ev);
   return ev;
+}
+
+// ---------- 엔딩 ----------
+// 목표 8개 중 3개 이상을 달성하고 그중 필수 목표(기지·동료·전진기지)가 하나 이상이면 엔딩이다. 한 판에 한 번 뜨고, 이어서 계속할 수 있다.
+// 수치는 봇 시뮬로 맞췄다: 처음 안(동료 16·상급 150·레벨 40)은 봇이 128~149분에 닿아 너무 빨라, 동료 20·상급 300·레벨 45로 올렸다.
+export const ENDING_NEED = 3;
+export const ENDING_GOALS = [
+  { id: 'hq', req: true, name: '재건된 거점', desc: '본부 9레벨', goal: 9, progress: (s) => s.hq },
+  { id: 'crew', req: true, name: '생존자 공동체', desc: '동료 20명', goal: 20, progress: (s) => s.survivors.length },
+  { id: 'network', req: true, name: '개척 거점망', desc: '전진기지 4곳, 모두 3레벨', goal: 4, progress: (s) => s.outposts.filter((o) => o.lv >= OUTPOST_MAX_LV).length },
+  { id: 'elite', name: '학살자 사냥꾼', desc: '상급 좀비(거구·학살자) 300마리 처치', goal: 300, progress: (s) => s.stats.eliteKills },
+  { id: 'military', name: '군사 구역 정복', desc: '군사 구역에서 200번 파밍', goal: 200, progress: (s) => s.stats.militaryLoot },
+  { id: 'fortress', name: '난공불락', desc: '기지 습격 25회 방어', goal: 25, progress: (s) => s.stats.raidsWon },
+  { id: 'master', name: '명장', desc: `무기 하나를 최대 강화(+${WEAPON_MAX_LV - 1})`, goal: WEAPON_MAX_LV, progress: (s) => Math.max(1, ...Object.values(s.weapons)) },
+  { id: 'veteran', name: '베테랑', desc: '플레이어 레벨 45', goal: 45, progress: (s) => s.level },
+];
+export const goalDone = (s, g) => g.progress(s) >= g.goal;
+export function endingStatus(s) {
+  const done = ENDING_GOALS.filter((g) => goalDone(s, g)), req = done.some((g) => g.req);
+  return { done, req, count: done.length, reached: req && done.length >= ENDING_NEED };
+}
+function checkEnding(s, ev) {
+  if (s.ended || s.over) return;
+  const st = endingStatus(s);
+  if (!st.reached) return;
+  s.ended = { at: Math.floor(s.stats.playTime), goals: st.done.map((g) => g.id) };
+  ev.push({ t: 'ending', goals: s.ended.goals, summary: runSummary(s) });
 }
 
 // 한 판의 결과(게임 오버 화면·최고 기록용)
@@ -1214,7 +1304,7 @@ export function canBreakSiege(s) {
   const gunDps = s.equip.gun && (s.player.mag > 0 || s.ammo > 0) ? weaponDamage(s, s.equip.gun) / WEAPONS[s.equip.gun].cd * 0.6 : 0; // 명중률 감안
   const hpTotal = zs.reduce((a, z) => a + z.hp, 0), clearTime = hpTotal / Math.max(dps, gunDps * 0.7);
   // 한꺼번에 붙는 좀비는 절반쯤으로 본다
-  const incoming = zs.reduce((a, z) => a + z.dmg, 0) / ZOMBIE_ATK_CD * 0.5 * (1 - playerGuard(s));
+  const incoming = zs.reduce((a, z) => a + z.dmg / (z.atkCd ?? ZOMBIE_ATK_CD), 0) * 0.5 * (1 - playerGuard(s));
   return clearTime * incoming < s.player.hp * 0.6;
 }
 
@@ -1341,10 +1431,10 @@ function moveZombies(s, dt, ev) {
     const atWall = z.raid && dist(z.x, z.y, CENTER.x, CENTER.y) <= hqR + z.r + 3;
     if (chase && dp < z.r + 14) {
       z.atk -= dt;
-      if (z.atk <= 0) { z.atk = ZOMBIE_ATK_CD; const dmg = z.dmg * (1 - playerGuard(s)); P.hp -= dmg; ev.push({ t: 'hurt', dmg }); }
+      if (z.atk <= 0) { z.atk = z.atkCd ?? ZOMBIE_ATK_CD; const dmg = z.dmg * (1 - playerGuard(s)); P.hp -= dmg; ev.push({ t: 'hurt', dmg }); }
     } else if (atWall && !chase) {
       z.atk -= dt;
-      if (z.atk <= 0) { z.atk = ZOMBIE_ATK_CD; s.wall -= z.dmg; ev.push({ t: 'wall-hit', x: z.x, y: z.y, dmg: z.dmg }); }
+      if (z.atk <= 0) { z.atk = z.atkCd ?? ZOMBIE_ATK_CD; s.wall -= z.dmg; ev.push({ t: 'wall-hit', x: z.x, y: z.y, dmg: z.dmg }); }
     } else {
       z.x += vx * sp * dt; z.y += vy * sp * dt;
     }
@@ -1540,6 +1630,7 @@ function collectKills(s, ev) {
   for (const z of s.zombies) {
     if (z.hp > 0) continue;
     s.stats.kills++;
+    if (ZTYPES[z.type]?.grade === 2) s.stats.eliteKills++; // 상급(거구·학살자), 누가 잡았든
     const xp = z.by === 'player' ? zombieXp(z) : z.by === 'escort' ? Math.round(zombieXp(z) * ESCORT_XP) : 0;
     ev.push({ t: 'kill', x: z.x, y: z.y, type: z.type, raid: !!z.raid, xp });
     if (xp) gainXp(s, xp, ev);
@@ -1683,7 +1774,7 @@ export function serialize(s) {
     nodeMoves: s.nodes.flatMap((n, i) => (n.moved ? [[i, n.x, n.y]] : [])), // 옮겨진 대상물 자리(나머지는 시드로 다시 만든다)
     player: { x: s.player.x, y: s.player.y, hp: s.player.hp, mag: s.player.mag }, ammo: s.ammo, ammoOn: s.ammoOn, gunOn: s.gunOn, dur: s.dur,
     autoHunt: s.autoHunt, autoZone: s.autoZone, stance: s.stance, stats: s.stats, nextId: s.nextId,
-    items: s.items, claimed: s.claimed, over: s.over,
+    items: s.items, claimed: s.claimed, over: s.over, ended: s.ended,
   });
 }
 
@@ -1751,7 +1842,8 @@ export function deserialize(text) {
     const x = j && JOB_KINDS[j.kind] === 'outpost' ? { ...j, key: siteOf(j.key) } : j;
     const lane = x && Object.hasOwn(JOB_KINDS, x.kind) ? JOB_KINDS[x.kind] : null;
     const cur = lane ? jobLevel(s, x.kind, x.key) : null;
-    if (cur === null || laneJob(s, lane) || x.next !== cur + 1 || x.next > jobMax(s, x.kind, x.key)) continue;
+    const nextOk = x.kind === 'odemo' ? x.next === cur : x.next === cur + 1 && x.next <= jobMax(s, x.kind, x.key); // 철거는 지금 레벨 그대로
+    if (cur === null || laneJob(s, lane) || !nextOk) continue;
     const total = jobDuration(x.kind, x.key, x.next);
     s.jobs.push({ lane, kind: x.kind, key: x.key, next: x.next, t: num(x.t, total, 0, total), total });
   }
@@ -1777,6 +1869,7 @@ export function deserialize(text) {
   s.autoZone = Math.floor(num(o.autoZone, 1, 0, ZONE_NAMES.length - 1));
   s.stance = STANCES[o.stance] ? o.stance : 'aggressive';
   for (const k of Object.keys(s.stats)) s.stats[k] = Math.floor(num(o.stats?.[k], 0));
+  if (o.ended && Number.isFinite(o.ended.at)) s.ended = { at: Math.floor(num(o.ended.at, 0)), goals: (Array.isArray(o.ended.goals) ? o.ended.goals : []).filter((id) => ENDING_GOALS.some((g) => g.id === id)) };
   for (const k of ITEM_KEYS) s.items[k] = Math.floor(num(o.items?.[k], 0, 0, ITEM_MAX));
   for (const m of MISSIONS) if (o.claimed?.[m.id] === true) s.claimed[m.id] = true;
   // 게임 오버로 끝난 판이면 결과 화면을 다시 보여 주도록 그대로 둔다

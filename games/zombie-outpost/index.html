@@ -255,6 +255,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 }
 .act.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
 .act.teal { background: var(--teal); color: #08201c; }
+.act.danger { background: var(--red); color: #fff; }
 .act:disabled { background: #2d333e; color: #6f7884; border: 0; cursor: default; }
 .tagline { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #2d333e; color: var(--muted); font-weight: 600; }
 .tagline.def { background: #183a35; color: var(--teal); }
@@ -643,8 +644,8 @@ const sfx = (() => {
       tone(d, t, { dur: 0.14, peak: 0.9, f: 130, f2: 55 }); noise(d, t, { dur: 0.08, peak: 0.6, type: 'lowpass', f: 500 });
       noise(d, t + 0.04, { dur: 0.16, peak: 0.25, type: 'bandpass', f: 1100, q: 0.8, attack: 0.03 });
     },
-    kill: (d, t, o) => { // 처치: 쓰러지는 "쿵"(브루트는 더 묵직하게)
-      const big = o.type === 'brute';
+    kill: (d, t, o) => { // 처치: 쓰러지는 "쿵"(덩치 큰 종은 더 묵직하게)
+      const big = o.big;
       noise(d, t, { dur: big ? 0.3 : 0.2, peak: 0.8, type: 'lowpass', f: 380, f2: 120 }); tone(d, t + 0.03, { dur: big ? 0.22 : 0.15, peak: 0.7, f: big ? 70 : 95, f2: 40 });
     },
     reload: (d, t) => { noise(d, t, { dur: 0.03, peak: 0.7, type: 'bandpass', f: 2200, q: 3 }); tone(d, t + 0.01, { dur: 0.04, peak: 0.3, type: 'square', f: 520, f2: 380 }); }, // 탄창 빼기 "탁"
@@ -774,10 +775,10 @@ function handleEvents(list) {
       case 'kill':
         fx.corpses.push({ x: e.x, y: e.y, type: e.type, raid: e.raid, seed: Math.floor(Math.random() * 12), side: Math.random() < 0.5 ? -1 : 1, dir: screenDir(Math.atan2(e.y - S.player.y, e.x - S.player.x)), t: 0 });
         if (fx.corpses.length > 24) fx.corpses.shift();
-        mark(e.x + rnd(-4, 4), e.y + rnd(-4, 4), e.type === 'brute' ? 14 : 9, '100,14,12', 0.75, 10);
+        mark(e.x + rnd(-4, 4), e.y + rnd(-4, 4), A.charScale(e.type) > 1.1 ? 14 : 9, '100,14,12', 0.75, 10);
         burst(e.x, e.y, 2, 4, { kind: 'puff', col: '#6a6a5a', sp: [10, 30], up: [5, 15], life: [0.5, 0.8], size: [4, 7], g: 0 });
         if (e.xp) floatText(e.x + 12, e.y - 18, `+${e.xp} XP`, '#a98bff');
-        sfx.play('kill', { type: e.type, dist: G.dist(e.x, e.y, S.player.x, S.player.y) });
+        sfx.play('kill', { big: A.charScale(e.type) > 1.1, dist: G.dist(e.x, e.y, S.player.x, S.player.y) }); // 덩치 큰 종은 더 묵직하게
         break;
       case 'levelup':
         floatText(S.player.x, S.player.y - 30, `LEVEL UP · Lv ${e.level}`, '#c9b6ff', true);
@@ -825,6 +826,12 @@ function handleEvents(list) {
       }
       case 'bagfull': toast('가방이 가득 찼어요. 귀환 버튼을 누르면 가까운 기지로 가서 비워요', 'warn'); sfx.play('bagfull'); break;
       case 'hurt': sfx.play('hurt'); fx.hurt = Math.min(1, fx.hurt + 0.35); burst(S.player.x, S.player.y, 16, 4, { sp: [25, 60], up: [30, 80], life: [0.4, 0.6], size: [1, 1.6], col: BLOOD }); break;
+      case 'ending':
+        sfx.play('win');
+        save(); pushCloud();
+        markTab('missions');
+        showOver('ending', e.summary);
+        break;
       case 'gameover': {
         const { records, beaten } = G.mergeRecords(loadRecords(), e.summary);
         saveRecords(records);
@@ -1120,11 +1127,11 @@ function pushOutposts(list) {
         A.poly(LIVE, [[x - 2.2, y + 2.2, ph], [x + 2.2, y + 2.2, ph], [x + 2.2, y - 2.2, ph], [x, y, ph + 4]], '#8a6a46');
       } });
     }
-    const job = G.jobOf(S, 'oup', i);
+    const job = G.jobOf(S, 'oup', i), demo = G.jobOf(S, 'odemo', i);
     list.push({ k: o.x + o.y, draw: () => {
       blit(sprite(`op:${built.lv}`, A.OUTPOST_BOX[0] * OP_K, A.OUTPOST_BOX[1] * OP_K, (pen) => A.drawOutpost(A.scaled(pen, OP_K), built.lv)), o.x, o.y);
-      if (job) blit(sprite('scaf:op', 24 * OP_K, 36 * OP_K, (pen) => A.drawScaffold(A.scaled(pen, OP_K), 16, 30)), o.x, o.y);
-      label(o.x, o.y, (50 + built.lv * 5) * OP_K, `${o.name} Lv${built.lv}${job ? ` → ${job.next} ${mmss(job.t)}` : ''}`, '#5bb8a7');
+      if (job || demo) blit(sprite('scaf:op', 24 * OP_K, 36 * OP_K, (pen) => A.drawScaffold(A.scaled(pen, OP_K), 16, 30)), o.x, o.y);
+      label(o.x, o.y, (50 + built.lv * 5) * OP_K, demo ? `${o.name} 철거 중 ${mmss(demo.t)}` : `${o.name} Lv${built.lv}${job ? ` → ${job.next} ${mmss(job.t)}` : ''}`, demo ? '#e0533f' : '#5bb8a7');
     } });
     glow(o.x - 20 * OP_K, o.y + 14 * OP_K, 18 * OP_K, 30, '255,200,110', 0.35);
     if (built.lv === 3) glow(o.x + 24 * OP_K, o.y - 8 * OP_K, 31 * OP_K, 26, '255,240,200', 0.3);
@@ -1163,17 +1170,19 @@ function drawZombie(z) {
   let m = zmem.get(z);
   if (!m) { m = { x: z.x, y: z.y, face: Math.atan2(S.player.y - z.y, S.player.x - z.x), phase: z.id }; zmem.set(z, m); }
   const mx = z.x - m.x, my = z.y - m.y, moved = Math.hypot(mx, my);
-  if (moved > 0.05) { m.face = Math.atan2(my, mx); m.phase += moved * (z.type === 'runner' ? 0.32 : z.type === 'brute' ? 0.16 : 0.24); }
+  if (moved > 0.05) { m.face = Math.atan2(my, mx); m.phase += moved * (ZPHASE[z.type] ?? 0.24); }
   else m.phase += 0.02;
   m.x = z.x; m.y = z.y;
   drawChar(z.x, z.y, { kind: z.type, dir: screenDir(m.face), phase: m.phase, moving: moved > 0.05, hit: z.hit > 0, seed: z.id, eyes: z.raid ? '#ff5a3c' : '#d8e07a' });
   if (z.hp < z.max) {
-    const [sx, sy] = P(z.x, z.y), k = z.type === 'brute' ? 1.45 : 1;
+    const [sx, sy] = P(z.x, z.y), k = A.charScale(z.type);
     const w = 22 * zoom * k, top = sy - 40 * zoom * k;
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(sx - w / 2, top, w, 3.5 * zoom);
     ctx.fillStyle = z.raid ? '#e0533f' : '#d9c45a'; ctx.fillRect(sx - w / 2, top, w * Math.max(0, z.hp / z.max), 3.5 * zoom);
   }
 }
+// 좀비 종류별 걸음 주기(움직인 거리당): 다리가 긴 질주자는 성큼, 덩치 큰 종은 느릿하게
+const ZPHASE = { runner: 0.32, bloater: 0.2, sprinter: 0.3, butcher: 0.2, hulk: 0.14, slayer: 0.19 };
 // 쓰러지는 좀비: 0.45초 동안 넘어지고, 잠깐 누워 있다가 사라진다
 function drawCorpse(c) {
   drawChar(c.x, c.y, { kind: c.type, dir: c.dir, phase: 0, moving: false, seed: c.seed, eyes: '#3a3a2a', fall: Math.min(1, c.t / 0.45), fallSide: c.side, alpha: c.t > 1.1 ? Math.max(0, 1 - (c.t - 1.1) / 0.5) : 1 });
@@ -1684,7 +1693,7 @@ function costText(c) {
 function costHtml(c, sec = 0) {
   return `<div class="cost">${Object.entries(c).map(([k, v]) => `<span class="${S.res[k] < v ? 'lack' : ''}" style="${S.res[k] < v ? '' : `color:${RES_COLOR[k]}`}">${G.RES_NAMES[k]} ${G.fmt(v)}</span>`).join('')}${sec ? `<span class="dur">⏱ ${G.durText(sec)}</span>` : ''}</div>`;
 }
-const KIND_TAB = { hq: 'base', bld: 'base', craft: 'arms', wup: 'arms', lvl: 'crew', obuild: 'outposts', oup: 'outposts' };
+const KIND_TAB = { hq: 'base', bld: 'base', craft: 'arms', wup: 'arms', lvl: 'crew', obuild: 'outposts', oup: 'outposts', odemo: 'outposts' };
 // 진행 중인 작업 안내. 남은 시간·막대는 tickJobs가 매 프레임 채운다(시트 HTML이 매초 바뀌어 버튼 누름이 끊기지 않게).
 function jobBanner(lane) {
   const j = G.laneJob(S, lane);
@@ -1695,6 +1704,11 @@ function tickJobs() {
   for (const el of document.querySelectorAll('[data-bar]')) { const j = G.laneJob(S, el.dataset.bar); if (j) el.style.width = `${((1 - j.t / j.total) * 100).toFixed(1)}%`; }
 }
 const isJob = (kind, key) => !!G.jobOf(S, kind, key);
+// 진행 중이면 누를 수 없는 '진행 중'과 '취소'(낸 자원을 모두 돌려받음)를, 아니면 원래 버튼을 보여 준다
+const jobBtn = (kind, key, label, act, opts, busyLabel = '진행 중') => isJob(kind, key)
+  ? `${btn(busyLabel, act, key, { disabled: true })}<button class="act ghost" data-act="cancel" data-kind="${kind}" data-id="${key}">취소</button>`
+  : btn(label, act, key, opts);
+let demoArm = null; // 철거 확인 대기 { site, until }
 const btn = (label, act, id, { disabled = false, cls = '' } = {}) =>
   `<button class="act ${cls}" data-act="${act}" data-id="${id}" ${disabled ? 'disabled' : ''}>${label}</button>`;
 
@@ -1729,17 +1743,17 @@ function renderBase() {
     <h3>본부 <span class="lv">Lv ${S.hq}</span></h3>
     <p>${hqCost ? `기지 확장 → 안전지대가 넓어지고, 건물 최대 레벨 ${next}, 전진기지 한도 ${Math.floor(next / 2)}개가 돼요. 습격도 강해져요.` : '최고 레벨이에요.'}</p>
     ${hqCost ? costHtml(hqCost, G.jobDuration('hq', 0, next)) : ''}
-    <div class="acts">${hqCost ? btn(isJob('hq', 0) ? '진행 중' : '기지 확장', 'hq', 0, { disabled: busy || !G.canAfford(S.res, hqCost) }) : ''}</div>
+    <div class="acts">${hqCost ? jobBtn('hq', 0, '기지 확장', 'hq', { disabled: busy || !G.canAfford(S.res, hqCost) }) : ''}</div>
   </div>`;
   for (const [id, b] of Object.entries(G.BUILDINGS)) {
     const lv = S.bld[id], max = G.buildingMax(S, id), locked = S.hq < b.unlockHq;
     const atMax = lv >= max, cost = G.buildCost(id, lv + 1);
-    const label = isJob('bld', id) ? '진행 중' : locked ? `본부 ${b.unlockHq}` : atMax ? (lv >= (b.max ?? G.HQ_MAX) ? '최고' : '본부↑') : lv ? '강화' : '건설';
+    const label = locked ? `본부 ${b.unlockHq}` : atMax ? (lv >= (b.max ?? G.HQ_MAX) ? '최고' : '본부↑') : lv ? '강화' : '건설';
     h += `<div class="row">
       <h3>${b.name} <span class="lv">Lv ${lv}</span></h3>
       <p>${b.desc} · 현재 ${lv ? bldEffect(id, lv) : '없음'}${!atMax && !locked ? ` → ${bldEffect(id, lv + 1)}` : ''}</p>
       ${!atMax && !locked ? costHtml(cost, G.jobDuration('bld', id, lv + 1)) : ''}
-      <div class="acts">${btn(label, 'bld', id, { disabled: busy || locked || atMax || !G.canAfford(S.res, cost) })}${id === 'ammo' && lv ? btn(S.ammoOn ? '가동 중 · 끄기' : '멈춤 · 켜기', 'ammoToggle', id, { cls: S.ammoOn ? 'teal' : 'ghost' }) : ''}</div>
+      <div class="acts">${jobBtn('bld', id, label, 'bld', { disabled: busy || locked || atMax || !G.canAfford(S.res, cost) })}${id === 'ammo' && lv ? btn(S.ammoOn ? '가동 중 · 끄기' : '멈춤 · 켜기', 'ammoToggle', id, { cls: S.ammoOn ? 'teal' : 'ghost' }) : ''}</div>
     </div>`;
   }
   const prod = G.productionPerSec(S);
@@ -1765,7 +1779,7 @@ function weaponRow(id) {
   if (!lv) {
     if (src === 'craft') {
       const locked = S.bld.workbench < w.tier;
-      acts = btn(isJob('craft', id) ? '진행 중' : locked ? `공방 ${w.tier}` : '제작', 'craft', id, { disabled: forgeBusy() || locked || !G.canAfford(S.res, w.cost) });
+      acts = jobBtn('craft', id, locked ? `공방 ${w.tier}` : '제작', 'craft', { disabled: forgeBusy() || locked || !G.canAfford(S.res, w.cost) });
       if (!locked) cost = costHtml(w.cost, G.jobDuration('craft', id, 1));
       p = weaponStats(id);
     } else if (src === 'loot') {
@@ -1776,7 +1790,7 @@ function weaponRow(id) {
     }
   } else {
     const up = G.weaponUpgradeCost(S, id), maxed = lv >= G.WEAPON_MAX_LV;
-    acts = (equipped ? '' : btn('장착', 'equip', id, { cls: 'ghost' })) + btn(isJob('wup', id) ? '진행 중' : maxed ? '최고' : '강화', 'wup', id, { disabled: forgeBusy() || maxed || !G.canAfford(S.res, up) });
+    acts = (equipped ? '' : btn('장착', 'equip', id, { cls: 'ghost' })) + jobBtn('wup', id, maxed ? '최고' : '강화', 'wup', { disabled: forgeBusy() || maxed || !G.canAfford(S.res, up) });
     if (!maxed) cost = costHtml(up, G.jobDuration('wup', id, lv + 1));
     p = weaponStats(id);
     if (w.dur) { // 내구도 막대 + 수리(본부 안·수리점)
@@ -1820,8 +1834,22 @@ function renderArms() {
   return { sub: '가까우면 타격 무기, 멀면 총으로 자동 공격해요', html: h };
 }
 
+// 엔딩 목표: 진행도 글자(명장은 +강화 수, 거점망은 곳 수)
+const goalText = (g, p) => g.id === 'master' ? `+${Math.min(p, g.goal) - 1}/+${g.goal - 1}` : `${Math.min(p, g.goal)}/${g.goal}${g.id === 'network' ? '곳' : ''}`;
 function renderMissions() {
-  let h = '';
+  const st = G.endingStatus(S);
+  let h = S.ended ? `<div class="job"><div><b>엔딩 달성</b> · ${G.durText(S.ended.at)} 플레이 · 이어서 하는 중이에요</div></div>` : '';
+  h += `<div class="section-label">엔딩 목표 · ${G.ENDING_NEED}개 달성(필수 1개 이상 포함)</div>
+  <div class="limits"><div class="limit">달성<b>${st.count} / ${G.ENDING_NEED}</b></div><div class="limit">필수 목표<b>${st.req ? '달성' : '아직'}</b></div></div>`;
+  for (const g of G.ENDING_GOALS) {
+    const p = Math.floor(g.progress(S)), done = p >= g.goal;
+    h += `<div class="row${done ? ' hero' : ''}">
+      <h3>${g.name} <span class="lv">${goalText(g, p)}</span> ${g.req ? '<span class="tagline exp">필수</span>' : ''} ${done ? '<span class="tagline def">달성</span>' : ''}</h3>
+      <p>${g.desc}</p>
+      <div class="mbar"><span style="width:${Math.min(1, p / g.goal) * 100}%"></span></div>
+    </div>`;
+  }
+  h += `<div class="section-label">미션 · 유니크 무기 보상</div>`;
   for (const m of G.MISSIONS) {
     const prog = Math.min(m.goal, Math.floor(m.progress(S))), done = prog >= m.goal, got = !!S.claimed[m.id];
     const w = G.WEAPONS[m.reward];
@@ -1832,7 +1860,7 @@ function renderMissions() {
       <div class="acts">${got ? btn('받음', 'claim', m.id, { disabled: true, cls: 'ghost' }) : btn('보상 받기', 'claim', m.id, { disabled: !done })}</div>
     </div>`;
   }
-  return { sub: '미션을 달성하면 유니크 무기를 받아요', html: h };
+  return { sub: `엔딩 목표 ${st.count}/${G.ENDING_NEED} · 미션을 달성하면 유니크 무기를 받아요`, html: h };
 }
 
 const POST_TAG = { defense: ['방어', 'def'], work: ['생산', ''], explore: ['탐험', 'exp'] };
@@ -1867,7 +1895,7 @@ function renderCrew() {
       <div class="stats">${stat('전투력', pw.toFixed(1))}${stat('공격', G.survivorAtk(v).toFixed(1))}${stat('사거리', R.range)}${stat('공속', `${G.survivorRate(v).toFixed(1)}/초`)}${stat('생산', `+${Math.round(G.survivorWork(v) * 100)}%`)}${stat('짐', `+${G.survivorCarry(v)}`)}${R.repair ? stat('보수', `${(R.repair * pw).toFixed(1)}/초`) : ''}</div>
       ${maxed ? '' : costHtml(cost, G.jobDuration('lvl', v.id, v.lv + 1))}
       <div class="acts">
-        ${btn(isJob('lvl', v.id) ? '진행 중' : maxed ? '최고' : '훈련', 'lvl', v.id, { disabled: trainBusy || maxed || !G.canAfford(S.res, cost) })}
+        ${jobBtn('lvl', v.id, maxed ? '최고' : '훈련', 'lvl', { disabled: trainBusy || maxed || !G.canAfford(S.res, cost) })}
       </div>
       <div class="mission">${mission}</div>
     </div>`;
@@ -1890,18 +1918,20 @@ function renderOutposts() {
     let acts, cost = '', p;
     if (built) {
       const maxed = built.lv >= G.OUTPOST_MAX_LV, up = G.outpostUpgradeCost(S, i, built.lv);
-      p = `${zone} · 안전지대·창고 · ${prodText(G.outpostProd(S, i, built.lv))}`;
-      acts = btn('이동', 'go', i, { cls: 'ghost' }) + btn(isJob('oup', i) ? '진행 중' : maxed ? '최고' : '강화', 'oup', i, { disabled: busy || maxed || !G.canAfford(S.res, up) });
+      const demo = isJob('odemo', i), armed = demoArm && demoArm.site === i && performance.now() < demoArm.until;
+      p = `${zone} · 안전지대·창고 · ${prodText(G.outpostProd(S, i, built.lv))} · ${demo ? '철거 중이에요. 다 헐릴 때까지는 그대로 쓸 수 있어요' : `철거 ${G.durText(G.jobDuration('odemo', i, built.lv))}(자원 반환 없음)`}`;
+      acts = btn('이동', 'go', i, { cls: 'ghost' }) + jobBtn('oup', i, maxed ? '최고' : '강화', 'oup', { disabled: busy || maxed || !G.canAfford(S.res, up) })
+        + jobBtn('odemo', i, armed ? '정말 철거?' : '철거', 'odemo', { cls: armed ? 'danger' : 'ghost', disabled: busy }, '철거 중');
       if (!maxed) cost = costHtml(up, G.jobDuration('oup', i, built.lv + 1));
     } else {
       const near = G.nearSite(S, i), building = isJob('obuild', i);
       p = `${zone} · 위험 ${o.d.toFixed(1)} · 특산 ${prodText(G.outpostProd(S, i, 1))} · ${building ? '공사 중이에요. 자리를 떠나도 계속 지어져요' : near ? '지금 후보지에 있어요' : '직접 가야 세울 수 있어요'}`;
-      acts = btn('이동', 'go', i, { cls: 'ghost' }) + btn(building ? '진행 중' : '건설', 'obuild', i, { disabled: busy || !near || S.outposts.length >= lim || !G.canAfford(S.res, G.outpostCost(S, i)) });
+      acts = btn('이동', 'go', i, { cls: 'ghost' }) + jobBtn('obuild', i, '건설', 'obuild', { disabled: busy || !near || S.outposts.length >= lim || !G.canAfford(S.res, G.outpostCost(S, i)) });
       cost = costHtml(G.outpostCost(S, i), G.jobDuration('obuild', i, 1));
     }
     h += `<div class="row${built ? ' hero' : ''}"><h3>${o.name} ${built ? `<span class="lv">Lv ${built.lv}</span>` : '<span class="tagline">후보지</span>'}</h3><p>${p}</p>${cost}<div class="acts">${acts}</div></div>`;
   });
-  return { sub: '전진기지 수는 본부 레벨 ÷ 2까지예요', html: h };
+  return { sub: '전진기지 수는 본부 레벨 ÷ 2까지예요 · 철거하면 다른 후보지에 지을 수 있어요', html: h };
 }
 
 let lastSheet = '';
@@ -1935,6 +1965,11 @@ $('#sheetBody').addEventListener('click', (e) => {
     case 'resetPosts': r = G.resetPosts(S); break;
     case 'lvl': r = G.levelSurvivor(S, n); break;
     case 'oup': r = G.upgradeOutpost(S, n); break;
+    case 'cancel': { const k = b.dataset.kind; r = G.cancelJob(S, k, ['bld', 'craft', 'wup'].includes(k) ? id : n); hudCache.ctx = null; break; }
+    case 'odemo': // 되돌릴 수 없어 두 번 눌러야 한다(4초 안에 한 번 더)
+      if (demoArm && demoArm.site === n && performance.now() < demoArm.until) { demoArm = null; r = G.demolishOutpost(S, n); }
+      else { demoArm = { site: n, until: performance.now() + 4000 }; toast(`한 번 더 누르면 ${S.sites[n].name} 전진기지를 철거해요 · 자원은 돌아오지 않아요`, 'warn'); setTimeout(() => refreshSheet(true), 4100); }
+      break;
     case 'claim': r = G.claimMission(S, id); if (r.ok) markTab('arms'); break;
     case 'obuild': r = G.buildOutpost(S, n); break;
     case 'go': {
@@ -1968,15 +2003,19 @@ function showOver(mode, summary, beaten = []) {
   const rec = loadRecords();
   const m = $('#overModal');
   m.classList.toggle('menu', mode === 'menu');
-  $('#overTitle').textContent = mode === 'over' ? '생존 실패' : '게임 메뉴';
+  const goals = (S.ended?.goals ?? []).map((id) => G.ENDING_GOALS.find((g) => g.id === id)?.name).filter(Boolean);
+  $('#overTitle').textContent = mode === 'over' ? '생존 실패' : mode === 'ending' ? '엔딩 · 폐허 위에 다시 세운 거점' : '게임 메뉴';
   $('#overText').textContent = mode === 'over'
     ? '쓰러졌어요. 로그라이크라 이번 판은 여기서 끝나요. 새로 시작하면 새 지도에서 처음부터예요.'
-    : '로그라이크 규칙: 쓰러지면 이번 판의 자원·기지·동료·무기·레벨이 모두 사라지고, 최고 기록만 남아요.';
+    : mode === 'ending'
+      ? `${goals.join(' · ')}을(를) 이뤄 엔딩에 닿았어요(${G.durText(S.ended?.at ?? 0)} 플레이). 이 판을 계속하거나 새 지도에서 다시 시작할 수 있어요.`
+      : '로그라이크 규칙: 쓰러지면 이번 판의 자원·기지·동료·무기·레벨이 모두 사라지고, 최고 기록만 남아요.';
   $('#overStats').innerHTML = G.RECORD_KEYS.map((k) => `<div>${REC_LABEL[k]}<b class="${beaten.includes(k) ? 'new' : ''}">${recValue(k, summary[k])}</b></div>`).join('');
   $('#recTitle').textContent = rec ? `최고 기록 · ${rec.runs}판` : '최고 기록 · 아직 없음';
   $('#overRecords').innerHTML = rec ? G.RECORD_KEYS.map((k) => `<div>${REC_LABEL[k]}<b>${recValue(k, rec[k])}</b></div>`).join('') : '';
   $('#overClose').hidden = mode === 'over';
-  $('#audioBox').hidden = mode === 'over';
+  $('#overClose').textContent = mode === 'ending' ? '계속하기' : '닫기';
+  $('#audioBox').hidden = mode !== 'menu';
   syncSoundBtn();
   newArmed = false;
   $('#overNew').textContent = mode === 'over' ? '새로 시작' : '새 게임';
@@ -2003,7 +2042,7 @@ $('#musicVol').addEventListener('change', saveAudio);
 $('#overNew').addEventListener('click', () => {
   const m = $('#overModal');
   // 진행 중인 판을 지울 때는 한 번 더 누르게 한다
-  if (m.dataset.mode === 'menu' && !newArmed) {
+  if ((m.dataset.mode === 'menu' || m.dataset.mode === 'ending') && !newArmed) {
     newArmed = true;
     $('#overNew').textContent = '정말 지울까요? 한 번 더';
     clearTimeout(newTimer);
