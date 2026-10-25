@@ -1,0 +1,239 @@
+<!doctype html>
+<!-- 그림·동작 개선 시제품: 위는 지금 얼룩말(art.js), 아래는 개선안(관절 IK·발 고정 걸음·2차 움직임·외곽선·명암).
+     게임에는 아직 넣지 않았다. 실행 중인 서버(8793)에서 /tools/rig-demo.html 로 연다. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animal World · 그림 개선 시제품</title>
+<style>
+  :root { color-scheme: light; --ink: #3b2f22; --panel: #fffaf0; --line: #e4d5b7; --accent: #ec8a2c; }
+  html, body { margin: 0; height: 100%; background: #cfe9ee; color: var(--ink); font-family: "Apple SD Gothic Neo", system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: calc(100% - 52px); touch-action: none; }
+  .bar { height: 52px; display: flex; gap: 8px; align-items: center; justify-content: center; background: var(--panel); border-top: 1px solid var(--line); }
+  .bar button { font: 15px system-ui; padding: 8px 14px; border-radius: 12px; border: 0; background: #f1e7d3; color: var(--ink); }
+  .bar button.on { background: var(--accent); color: #fff; }
+</style>
+<canvas id="c"></canvas>
+<div class="bar"><button id="walk" class="on">걷기</button><button id="idle">쉬기</button><button id="slow">느리게 0.35×</button></div>
+<script type="module">
+import * as A from '../art.js';
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() { DPR = Math.min(2, devicePixelRatio || 1); const r = cv.getBoundingClientRect(); W = r.width; H = r.height; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); }
+addEventListener('resize', resize); resize();
+const state = { walking: true, slow: false };
+const btn = (id, f) => { document.getElementById(id).onclick = () => { f(); sync(); }; };
+const sync = () => { for (const [id, on] of [['walk', state.walking], ['idle', !state.walking], ['slow', state.slow]]) document.getElementById(id).classList.toggle('on', on); };
+btn('walk', () => { state.walking = true; }); btn('idle', () => { state.walking = false; }); btn('slow', () => { state.slow = !state.slow; });
+
+const TAU = Math.PI * 2;
+const smooth = (t) => t * t * (3 - 2 * t);
+// ---------- 관절 계산(2-bone IK): 뿌리(rx,ry)에서 목표(tx,ty)까지 길이 a·b 두 뼈, bend +1이면 관절이 앞(+x)으로 ----------
+function ik(rx, ry, tx, ty, a, b, bend) {
+  const dx = tx - rx, dy = ty - ry, d = Math.min(a + b - 0.01, Math.max(Math.abs(a - b) + 0.01, Math.hypot(dx, dy)));
+  const base = Math.atan2(dy, dx), A2 = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))));
+  const k1 = [rx + a * Math.cos(base + A2), ry + a * Math.sin(base + A2)], k2 = [rx + a * Math.cos(base - A2), ry + a * Math.sin(base - A2)];
+  return { knee: (k1[0] - k2[0]) * bend > 0 ? k1 : k2, end: [rx + Math.cos(base) * d, ry + Math.sin(base) * d] };
+}
+// ---------- 걸음: 다리마다 위상이 다르고, 디딘 발은 땅에 붙어 있다(몸이 움직인 만큼만 뒤로) ----------
+// walk(4박 걷기): 가까운 뒷다리 → 가까운 앞다리 → 먼 뒷다리 → 먼 앞다리
+const GAIT = { duty: 0.64, offs: { nh: 0, nf: 0.25, fh: 0.5, ff: 0.75 } };
+function footAt(u, stroke, lift) {
+  if (u < GAIT.duty) { const t = u / GAIT.duty; return { x: stroke * (0.5 - t), y: 0, sw: 0, st: t }; }
+  const t = (u - GAIT.duty) / (1 - GAIT.duty);
+  return { x: stroke * (-0.5 + smooth(t)), y: -lift * Math.sin(Math.PI * t), sw: Math.sin(Math.PI * t), st: 1 };
+}
+// ---------- 스프링(2차 움직임): 목표를 따라가되 늦게·출렁이며 ----------
+const spring = (s, target, k, c, dt) => { s.v += (k * (target - s.x) - c * s.v) * dt; s.x += s.v * dt; };
+
+// ---------- 개선안 얼룩말 ----------
+const Z = {
+  col: '#f6f3ec', far: '#d9d4ca', st: '#2b2622', stFar: '#4a443e', hoof: '#2a2420', muzzle: '#3a3532', line: '#3b2f28',
+  hip: [-9.5, -21], sh: [9.5, -21.6],
+  hind: { a: 8.6, b: 8.4, c: 6.8, bend: 1 }, fore: { a: 7.6, b: 7.8, c: 6.6, bend: -1 },
+  stride: 10.5, lift: 3.6,
+};
+const zs = { phase: 0, tail: { x: 0.3, v: 0 }, ear: { x: 0, v: 0 }, head: { x: 0, v: 0 }, blink: 0, nextBlink: 1.5, nextFlick: 2, nextSwish: 3, swish: 0, look: 0 };
+function legPts(root, cfg, foot, front) {
+  // 대롱뼈(발목~발굽)는 내딛을 때 거의 수직, 들어 올릴 때 뒤로 접힌다
+  const theta = front ? 0.95 * foot.sw + (foot.st - 0.4) * 0.35 * (1 - foot.sw) : 0.55 * foot.sw + (foot.st - 0.5) * 0.25 * (1 - foot.sw);
+  const hoof = [foot.x, foot.y], ankle = [hoof[0] + cfg.c * Math.sin(theta), hoof[1] - cfg.c * Math.cos(theta)];
+  const { knee, end } = ik(root[0], root[1], ankle[0], ankle[1], cfg.a, cfg.b, cfg.bend);
+  return [root, knee, end, hoof];
+}
+function limb(g, pts, w0, w1, col, stripe, hoofCol) {
+  // 굵기가 줄어드는 세 마디 + 둥근 관절, 마디마다 가로 줄무늬
+  const ws = [w0, w0 * 0.78, w1 * 1.05, w1];
+  for (let i = 0; i < 3; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[i + 1], dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    g.fillStyle = col; g.beginPath();
+    g.moveTo(ax + nx * ws[i] / 2, ay + ny * ws[i] / 2); g.lineTo(bx + nx * ws[i + 1] / 2, by + ny * ws[i + 1] / 2);
+    g.lineTo(bx - nx * ws[i + 1] / 2, by - ny * ws[i + 1] / 2); g.lineTo(ax - nx * ws[i] / 2, ay - ny * ws[i] / 2); g.closePath(); g.fill();
+    g.beginPath(); g.arc(bx, by, ws[i + 1] / 2, 0, TAU); g.fill();
+    if (stripe) { g.strokeStyle = stripe; g.lineWidth = 0.9; g.lineCap = 'round'; const n = i === 0 ? 2 : 3; for (let k = 1; k <= n; k++) { const t = k / (n + 1), cx = ax + dx * t, cy = ay + dy * t, w = (ws[i] + (ws[i + 1] - ws[i]) * t) / 2; g.beginPath(); g.moveTo(cx + nx * w, cy + ny * w); g.lineTo(cx - nx * w, cy - ny * w); g.stroke(); } }
+  }
+  const [hx, hy] = pts[3]; // 발굽
+  g.fillStyle = hoofCol; g.beginPath(); g.moveTo(hx - w1 * 0.55, hy - 1.6); g.lineTo(hx + w1 * 0.6, hy - 1.6); g.lineTo(hx + w1 * 0.85, hy); g.lineTo(hx - w1 * 0.65, hy); g.closePath(); g.fill();
+}
+function drawZebra2(g, t, dt, moving) {
+  // 위상: 움직인 거리만큼만 걸음이 진행된다(발이 미끄러지지 않는다)
+  const breath = Math.sin(t * TAU / 3.4);
+  const ph = zs.phase;
+  const bob = moving ? Math.sin(ph * TAU * 2) : 0;
+  const hip = [Z.hip[0] + (moving ? 0 : Math.sin(t * 0.6) * 0.4), Z.hip[1] + 0.55 * bob];
+  const sh = [Z.sh[0], Z.sh[1] + 0.55 * (moving ? Math.sin(ph * TAU * 2 + 1.4) : 0)];
+  const stroke = Z.stride * GAIT.duty;
+  const foot = (k, root) => {
+    if (!moving) return { x: root[0] + (k === 'fh' ? -1.2 : k === 'ff' ? 1 : 0), y: 0, sw: 0, st: 0.45 };
+    const f = footAt((ph + GAIT.offs[k]) % 1, stroke, Z.lift);
+    return { ...f, x: f.x + root[0] + 0.6 };
+  };
+  const legs = {
+    fh: legPts([hip[0] + 0.8, hip[1]], Z.hind, foot('fh', hip), false), ff: legPts([sh[0] + 0.8, sh[1]], Z.fore, foot('ff', sh), true),
+    nh: legPts(hip, Z.hind, foot('nh', hip), false), nf: legPts(sh, Z.fore, foot('nf', sh), true),
+  };
+  zs.legs = legs; // 그림자는 외곽선 밖에서 따로 그린다
+  // 먼 쪽 다리
+  limb(g, legs.fh, 4.6, 2.2, Z.far, Z.stFar, Z.hoof);
+  limb(g, legs.ff, 3.9, 2.1, Z.far, Z.stFar, Z.hoof);
+  // 꼬리(스프링): 걸을 때 흔들리고, 가끔 휙 휘두른다
+  const tailRoot = [hip[0] - 7.2, hip[1] - 5.2];
+  spring(zs.tail, 0.32 + (moving ? 0.12 * Math.sin(ph * TAU) : 0) + zs.swish, 40, 6, dt);
+  const ta = zs.tail.x, tl = 12;
+  const tm = [tailRoot[0] - Math.sin(ta * 0.6) * tl * 0.5, tailRoot[1] + Math.cos(ta * 0.6) * tl * 0.5], te = [tailRoot[0] - Math.sin(ta) * tl, tailRoot[1] + Math.cos(ta) * tl];
+  g.strokeStyle = Z.col; g.lineWidth = 1.5; g.lineCap = 'round'; g.beginPath(); g.moveTo(...tailRoot); g.quadraticCurveTo(tm[0] - 1, tm[1], te[0], te[1]); g.stroke();
+  g.fillStyle = Z.st; g.beginPath(); g.ellipse(te[0], te[1] + 1.6, 1.4, 3, -ta * 0.8, 0, TAU); g.fill();
+  // 몸통: 엉덩이·등·어깨·가슴·배로 이어지는 말 모양(숨 쉴 때 배가 살짝 부푼다)
+  const by = 1 + 0.025 * breath;
+  const body = new Path2D();
+  const [hx, hy] = hip, [sx, sy] = sh;
+  body.moveTo(hx - 2.5, hy - 8.2);
+  body.quadraticCurveTo(0, Math.min(hy, sy) - 6.6, sx + 1, sy - 8.8);
+  body.quadraticCurveTo(sx + 6, sy - 8.5, sx + 6.5, sy - 3);
+  body.quadraticCurveTo(sx + 7.8, sy + 2.5, sx + 3.5, sy + 4.6 * by);
+  body.quadraticCurveTo(0, (hy + sy) / 2 + 8.2 * by, hx + 1.5, hy + 4.4 * by);
+  body.quadraticCurveTo(hx - 5.8, hy + 4.8, hx - 7.4, hy - 1.6);
+  body.quadraticCurveTo(hx - 7.6, hy - 7.6, hx - 2.5, hy - 8.2);
+  body.closePath();
+  g.fillStyle = Z.col; g.fill(body);
+  g.save(); g.clip(body);
+  // 줄무늬: 등에서 배로 내려가며 비스듬히, 엉덩이에선 갈매기 모양
+  g.strokeStyle = Z.st; g.lineCap = 'round';
+  for (let i = 0; i < 9; i++) {
+    const x = sx + 3 - i * 2.35, top = sy - 10 + i * 0.1;
+    g.lineWidth = 1.35 - (i % 2) * 0.25; g.beginPath(); g.moveTo(x + 0.6, top); g.quadraticCurveTo(x - 1.5, top + 8, x + 0.8, top + 17); g.stroke();
+  }
+  for (let i = 0; i < 4; i++) { g.lineWidth = 1.2; g.beginPath(); g.moveTo(hx - 8, hy - 6 + i * 2.6); g.quadraticCurveTo(hx - 2, hy - 3.5 + i * 2.6, hx + 2.5, hy - 7 + i * 3.2); g.stroke(); }
+  // 명암: 배 쪽 그늘, 등 위 하이라이트
+  g.fillStyle = 'rgba(70,55,40,0.16)'; g.beginPath(); g.ellipse(0, (hy + sy) / 2 + 7, 16, 6, 0, 0, TAU); g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.45)'; g.beginPath(); g.ellipse(0, Math.min(hy, sy) - 7.6, 11, 1.5, 0, 0, TAU); g.fill();
+  g.restore();
+  // 가까운 쪽 다리
+  limb(g, legs.nh, 4.8, 2.3, Z.col, Z.st, Z.hoof);
+  limb(g, legs.nf, 4.1, 2.2, Z.col, Z.st, Z.hoof);
+  // 목·머리: 걸을 때 고개를 끄덕이고(한 걸음에 두 번), 쉴 땐 천천히 두리번. 머리는 스프링으로 살짝 늦게 따라온다
+  if (!moving) zs.look += dt;
+  const nod = moving ? 0.07 * Math.sin(ph * TAU * 2 - 0.6) : 0.08 * Math.sin(zs.look * 0.5) * Math.sin(zs.look * 0.23);
+  spring(zs.head, nod, 60, 9, dt);
+  const na = 0.62 + zs.head.x, nb = [sx + 4.2, sy - 6.5], nl = 12.5;
+  const tip = [nb[0] + Math.sin(na) * nl, nb[1] - Math.cos(na) * nl];
+  const nx = Math.cos(na), ny = Math.sin(na); // 목에 수직
+  const neck = new Path2D();
+  neck.moveTo(nb[0] - nx * 5.2, nb[1] - ny * 5.2 + 2); neck.quadraticCurveTo((nb[0] + tip[0]) / 2 - nx * 3.6, (nb[1] + tip[1]) / 2 - ny * 3.6, tip[0] - nx * 2.6, tip[1] - ny * 2.6);
+  neck.lineTo(tip[0] + nx * 3, tip[1] + ny * 3); neck.quadraticCurveTo((nb[0] + tip[0]) / 2 + nx * 4, (nb[1] + tip[1]) / 2 + ny * 4.2, nb[0] + nx * 4.6, nb[1] + ny * 4.6 + 3);
+  neck.closePath();
+  g.fillStyle = Z.col; g.fill(neck);
+  g.save(); g.clip(neck); g.strokeStyle = Z.st; g.lineWidth = 1.3;
+  for (let k = 0; k < 5; k++) { const t = 0.12 + k * 0.19, cx = nb[0] + (tip[0] - nb[0]) * t, cy = nb[1] + (tip[1] - nb[1]) * t; g.beginPath(); g.moveTo(cx - nx * 6, cy - ny * 6); g.lineTo(cx + nx * 6, cy + ny * 6); g.stroke(); }
+  g.restore();
+  // 갈기: 목 윗선을 따라 짧게 선 털(흰색·검은색 번갈아)
+  for (let k = 0; k <= 9; k++) {
+    const t = k / 9, cx = nb[0] - nx * 4.6 + (tip[0] - nx * 2.4 - (nb[0] - nx * 4.6)) * t, cy = nb[1] - ny * 4.6 + (tip[1] - ny * 2.4 - (nb[1] - ny * 4.6)) * t;
+    g.strokeStyle = k % 2 ? Z.st : Z.col; g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx - nx * 2.2, cy - ny * 2.2); g.stroke();
+  }
+  // 머리(옆모습): 이마 → 긴 콧등 → 검은 주둥이 → 턱
+  g.save(); g.translate(tip[0], tip[1]); g.rotate(na + 0.95);
+  // 귀(스프링): 가끔 한쪽을 휙 젖힌다
+  const ear = (x, y, ang, col) => { g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = col; g.beginPath(); g.moveTo(-1, 0); g.quadraticCurveTo(-1.4, -3.4, 0, -5); g.quadraticCurveTo(1.4, -3.4, 1, 0); g.closePath(); g.fill(); g.fillStyle = Z.st; g.beginPath(); g.ellipse(0, -4.2, 0.55, 0.9, 0, 0, TAU); g.fill(); g.restore(); };
+  ear(-0.4, -2.2, -1.2 + zs.ear.x * 0.6, Z.far);
+  const head = new Path2D();
+  head.moveTo(-2, -1.6); head.quadraticCurveTo(3, -4.4, 10, -1.7); head.quadraticCurveTo(11.6, 0.6, 9.6, 2.7); head.quadraticCurveTo(4, 4, 0.4, 3.5); head.quadraticCurveTo(-2.6, 2.1, -2, -1.6); head.closePath();
+  g.fillStyle = Z.col; g.fill(head);
+  g.save(); g.clip(head);
+  g.strokeStyle = Z.st; g.lineWidth = 0.95; for (let k = 0; k < 4; k++) { const x = 1.2 + k * 1.6; g.beginPath(); g.moveTo(x - 0.4, -4); g.lineTo(x + 0.5, 4); g.stroke(); }
+  g.fillStyle = Z.muzzle; g.beginPath(); g.ellipse(10.4, 0.6, 3.3, 3.4, 0, 0, TAU); g.fill();
+  g.fillStyle = 'rgba(70,55,40,0.14)'; g.beginPath(); g.ellipse(4, 4.2, 8, 2.2, 0, 0, TAU); g.fill();
+  g.restore();
+  g.fillStyle = '#16120f'; g.beginPath(); g.ellipse(10.5, -0.2, 0.55, 0.38, 0.4, 0, TAU); g.fill();
+  // 눈과 깜빡임
+  const lid = zs.blink > 0 ? 0.15 : 1;
+  g.fillStyle = '#1e1712'; g.beginPath(); g.ellipse(2.5, -0.9, 0.95, 0.95 * lid, 0, 0, TAU); g.fill();
+  if (lid === 1) { g.fillStyle = '#fff'; g.beginPath(); g.arc(2.8, -1.2, 0.32, 0, TAU); g.fill(); }
+  g.strokeStyle = Z.st; g.lineWidth = 0.4; g.beginPath(); g.arc(2.5, -0.9, 1.25, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+  ear(0.6, -2.5, -0.95 + zs.ear.x, Z.col);
+  g.restore();
+}
+function updateZebra2(dt, moving, speed) {
+  if (moving) zs.phase = (zs.phase + (speed * dt) / Z.stride) % 1;
+  zs.blink -= dt; zs.nextBlink -= dt; zs.nextFlick -= dt; zs.nextSwish -= dt;
+  if (zs.nextBlink <= 0) { zs.blink = 0.13; zs.nextBlink = 2 + Math.random() * 4; }
+  if (zs.nextFlick <= 0) { zs.ear.v -= 14; zs.nextFlick = 2.5 + Math.random() * 4; }
+  spring(zs.ear, 0, 120, 10, dt);
+  if (zs.nextSwish <= 0) { zs.swish = 0.9; zs.nextSwish = 2 + Math.random() * 3.5; }
+  zs.swish *= Math.exp(-dt * 4);
+}
+
+// 그림자와 디딘 발의 접지 그림자(외곽선이 붙지 않게 바탕에 직접)
+function zebraShadow(x, y, k) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
+  ctx.fillStyle = 'rgba(40,25,10,0.22)'; ctx.beginPath(); ctx.ellipse(0, 0, 16, 3.2, 0, 0, TAU); ctx.fill();
+  for (const leg of Object.values(zs.legs || {})) { const [hx, hy] = leg[3]; if (hy > -0.3) { ctx.fillStyle = 'rgba(40,25,10,0.3)'; ctx.beginPath(); ctx.ellipse(hx, 0.2, 2.4, 0.7, 0, 0, TAU); ctx.fill(); } }
+  ctx.restore();
+}
+// ---------- 외곽선: 동물을 따로 그린 뒤 실루엣을 사방으로 조금씩 밀어 진한 테두리를 만든다 ----------
+const off = document.createElement('canvas'), og = off.getContext('2d');
+const sil = document.createElement('canvas'), sg = sil.getContext('2d');
+function withOutline(drawFn, x, y, k, color, px) {
+  const w = Math.ceil(70 * k * DPR), h = Math.ceil(56 * k * DPR);
+  if (off.width !== w || off.height !== h) { off.width = sil.width = w; off.height = sil.height = h; }
+  og.setTransform(1, 0, 0, 1, 0, 0); og.clearRect(0, 0, w, h);
+  og.setTransform(k * DPR, 0, 0, k * DPR, w / 2, h - 6 * k * DPR);
+  drawFn(og);
+  sg.globalCompositeOperation = 'source-over'; sg.clearRect(0, 0, w, h); sg.drawImage(off, 0, 0);
+  sg.globalCompositeOperation = 'source-in'; sg.fillStyle = color; sg.fillRect(0, 0, w, h);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const ox = x * DPR - w / 2, oy = y * DPR - (h - 6 * k * DPR), r = px * DPR;
+  for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; ctx.drawImage(sil, ox + Math.cos(a) * r, oy + Math.sin(a) * r); }
+  ctx.drawImage(off, ox, oy);
+  ctx.restore();
+}
+
+// ---------- 무대 ----------
+const lanes = [{ name: '지금 (art.js)', x: 0 }, { name: '개선안: 관절·발 고정 걸음·2차 움직임·외곽선·명암', x: 0 }];
+let last = performance.now(), T0 = 0;
+function frame(now) {
+  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (state.slow) dt *= 0.35;
+  T0 += dt;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#8fcbe6'); g.addColorStop(1, '#f6e7bf');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const k = Math.min(W / 95, H / 2 / 62), speed = state.walking ? 15 : 0;
+  lanes.forEach((L, i) => {
+    const gy = H * (i === 0 ? 0.43 : 0.9);
+    ctx.fillStyle = '#b9c78a'; ctx.fillRect(0, gy, W, H * 0.5 - (H * 0.9 - gy) + 4);
+    ctx.fillStyle = '#c8c467'; ctx.fillRect(0, gy, W, 6);
+    // 땅에 고정된 풀 포기(발이 미끄러지는지 비교용)
+    ctx.strokeStyle = '#7f9a3e'; ctx.lineWidth = 1.5;
+    for (let x = 8; x < W; x += 34) { ctx.beginPath(); ctx.moveTo(x, gy + 3); ctx.lineTo(x - 2, gy - 5); ctx.moveTo(x + 2, gy + 3); ctx.lineTo(x + 4, gy - 6); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(59,47,34,0.8)'; ctx.font = '13px system-ui'; ctx.fillText(L.name, 10, gy - 62 * k * 0.92);
+    L.x = state.walking ? (L.x + speed * k * dt) : L.x;
+    const span = W + 60 * k; if (L.x > span) L.x -= span;
+    const x = L.x - 30 * k + (state.walking ? 0 : 0);
+    const cx = state.walking ? x : W / 2;
+    if (i === 0) A.drawAnimal(ctx, 'zebra', cx, gy + 2, k, { face: 1, st: state.walking ? 'walk' : 'idle', ph: T0, mv: state.walking ? 1 : 0, hd: 0, ly: 0, sp: -1 });
+    else { updateZebra2(dt, state.walking, speed); zebraShadow(cx, gy + 2, k); withOutline((og) => drawZebra2(og, T0, dt, state.walking), cx, gy + 2, k, Z.line, 1.8); }
+  });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>

@@ -454,6 +454,167 @@ function legs4(ctx, o, near) {
   }
 }
 
+// ---------- 리그(관절 계산·발 고정 걸음·몸짓) — 2026-10-25 얼룩말부터 적용 ----------
+// 2-bone IK: 뿌리(rx,ry)에서 목표(tx,ty)까지 길이 a·b 두 뼈. bend +1이면 관절이 앞(+x)으로 굽는다
+function ik(rx, ry, tx, ty, a, b, bend) {
+  const dx = tx - rx, dy = ty - ry, d = Math.min(a + b - 0.01, Math.max(Math.abs(a - b) + 0.01, Math.hypot(dx, dy)));
+  const base = Math.atan2(dy, dx), A2 = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))));
+  const k1 = [rx + a * Math.cos(base + A2), ry + a * Math.sin(base + A2)], k2 = [rx + a * Math.cos(base - A2), ry + a * Math.sin(base - A2)];
+  return { knee: (k1[0] - k2[0]) * bend > 0 ? k1 : k2, end: [rx + Math.cos(base) * d, ry + Math.sin(base) * d] };
+}
+const smooth = (t) => t * t * (3 - 2 * t);
+// 4박 걷기: 가까운 뒷다리 → 가까운 앞다리 → 먼 뒷다리 → 먼 앞다리. 디딘 발(stance)은 몸이 움직인 만큼만 뒤로 가서 땅에 붙어 있다
+export const STRIDE = { zebra: 10.5 }; // 한 걸음 주기 동안 몸이 나아가는 거리(그림 단위). 걸음 위상은 움직인 거리 ÷ STRIDE
+const WALK = { duty: 0.64, offs: { nh: 0, nf: 0.25, fh: 0.5, ff: 0.75 } };
+function footAt(u, stroke, lift) {
+  if (u < WALK.duty) { const t = u / WALK.duty; return { x: stroke * (0.5 - t), y: 0, sw: 0, st: t }; }
+  const t = (u - WALK.duty) / (1 - WALK.duty);
+  return { x: stroke * (-0.5 + smooth(t)), y: -lift * Math.sin(Math.PI * t), sw: Math.sin(Math.PI * t), st: 1 };
+}
+// 스프링: 목표를 늦게, 출렁이며 따라간다(꼬리·귀·머리)
+const springTo = (s, target, k, c, dt) => { s.v += (k * (target - s.x) - c * s.v) * dt; s.x += s.v * dt; };
+// 몸짓 상태(동물마다 하나, 화면 쪽이 들고 있다): 깜빡임·귀 털기·꼬리 휘두르기·두리번
+function rigTick(r, dt) {
+  if (!r.tail) Object.assign(r, { tail: { x: 0.3, v: 0 }, ear: { x: 0, v: 0 }, head: { x: 0, v: 0 }, blink: 0, nextBlink: 1 + Math.random() * 4, nextFlick: 1 + Math.random() * 5, nextSwish: 1 + Math.random() * 4, swish: 0, look: Math.random() * 20 });
+  r.blink -= dt; r.nextBlink -= dt; r.nextFlick -= dt; r.nextSwish -= dt; r.look += dt;
+  if (r.nextBlink <= 0) { r.blink = 0.13; r.nextBlink = 2 + Math.random() * 4; }
+  if (r.nextFlick <= 0) { r.ear.v -= 14; r.nextFlick = 2.5 + Math.random() * 4; }
+  if (r.nextSwish <= 0) { r.swish = 0.9; r.nextSwish = 2 + Math.random() * 3.5; }
+  r.swish *= Math.exp(-dt * 4);
+  springTo(r.ear, 0, 120, 10, dt);
+}
+// 세 마디 다리(굵기가 줄고 관절이 둥글다) + 마디마다 가로 줄무늬 + 발굽
+function limb(g, pts, w0, w1, col, stripe, hoofCol) {
+  const ws = [w0, w0 * 0.78, w1 * 1.05, w1];
+  for (let i = 0; i < 3; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[i + 1], dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    g.fillStyle = C(col); g.beginPath();
+    g.moveTo(ax + nx * ws[i] / 2, ay + ny * ws[i] / 2); g.lineTo(bx + nx * ws[i + 1] / 2, by + ny * ws[i + 1] / 2);
+    g.lineTo(bx - nx * ws[i + 1] / 2, by - ny * ws[i + 1] / 2); g.lineTo(ax - nx * ws[i] / 2, ay - ny * ws[i] / 2); g.closePath(); g.fill();
+    g.beginPath(); g.arc(bx, by, ws[i + 1] / 2, 0, TAU); g.fill();
+    if (stripe && C('#000') === '#000') {
+      g.strokeStyle = stripe; g.lineWidth = 0.9; g.lineCap = 'round';
+      const n = i === 0 ? 2 : 3;
+      for (let k = 1; k <= n; k++) { const t = k / (n + 1), cx = ax + dx * t, cy = ay + dy * t, w = (ws[i] + (ws[i + 1] - ws[i]) * t) / 2; g.beginPath(); g.moveTo(cx + nx * w, cy + ny * w); g.lineTo(cx - nx * w, cy - ny * w); g.stroke(); }
+    }
+  }
+  const [hx, hy] = pts[3];
+  g.fillStyle = C(hoofCol); g.beginPath(); g.moveTo(hx - w1 * 0.55, hy - 1.6); g.lineTo(hx + w1 * 0.6, hy - 1.6); g.lineTo(hx + w1 * 0.85, hy); g.lineTo(hx - w1 * 0.65, hy); g.closePath(); g.fill();
+}
+const ZB = {
+  col: '#f6f3ec', far: '#d9d4ca', st: '#2b2622', stFar: '#4a443e', hoof: '#2a2420', muzzle: '#3a3532',
+  hip: [-9.5, -21], sh: [9.5, -21.6], hind: { a: 8.6, b: 8.4, c: 6.8, bend: 1 }, fore: { a: 7.6, b: 7.8, c: 6.6, bend: -1 }, lift: 3.6,
+};
+// 얼룩말: p.gait(걸음 위상 0~1), p.rig(몸짓 상태), p.dt를 받는다. 아이콘처럼 없으면 서 있는 모습
+function zebraRig(g, p) {
+  const r = p.rig ?? {}, dt = p.dt ?? 0;
+  rigTick(r, dt);
+  const moving = p.mv > 0 && p.sp < 0, roll = p.sp >= 0, ly = roll ? 1 : p.ly, ph = p.gait ?? 0, t = p.ph ?? 0;
+  const breath = Math.sin(t * TAU / 3.4), bob = moving ? Math.sin(ph * TAU * 2) : 0, drop = ly * 12;
+  if (p.shadow !== false) ell(g, 0, 0, 16, 3.2, 0, 'rgba(40,25,10,0.22)');
+  g.save();
+  if (roll) { g.translate(0, -7); g.rotate(Math.sin(p.sp * TAU * 3) * 0.3); g.translate(0, 7); }
+  const hip = [ZB.hip[0] + (moving || ly ? 0 : Math.sin(t * 0.6) * 0.4), ZB.hip[1] + 0.55 * bob + drop];
+  const sh = [ZB.sh[0], ZB.sh[1] + 0.55 * (moving ? Math.sin(ph * TAU * 2 + 1.4) : 0) + drop];
+  // 다리: 서 있으면 IK로 발을 땅에 두고, 누우면 접는다
+  const stroke = STRIDE.zebra * WALK.duty;
+  const legPts = (key, root, cfg, front) => {
+    if (ly > 0.5) { // 접은 다리: 무릎은 앞(앞다리) 또는 뒤(뒷다리)로, 발굽은 몸 밑
+      const kx = root[0] + (front ? 4.5 : 3.5), fx = root[0] + (front ? -1.5 : -4);
+      const kick = roll ? Math.sin(p.sp * TAU * 6 + (front ? 0 : 1.5)) * 2.5 : 0;
+      return [root, [kx, -2.6 - kick * 0.4], [kx - 2, -1.6 - kick], [fx, -1 - kick]];
+    }
+    let f;
+    if (moving) { const u = footAt((ph + WALK.offs[key]) % 1, stroke, ZB.lift); f = { ...u, x: u.x + root[0] + 0.6 }; }
+    else f = { x: root[0] + (key === 'fh' ? -1.2 : key === 'ff' ? 1 : 0), y: 0, sw: 0, st: 0.45 };
+    // 대롱뼈(발목~발굽)는 내딛을 땐 거의 수직, 들어 올릴 땐 뒤로 접힌다
+    const th = front ? 0.95 * f.sw + (f.st - 0.4) * 0.35 * (1 - f.sw) : 0.55 * f.sw + (f.st - 0.5) * 0.25 * (1 - f.sw);
+    const hoof = [f.x, f.y], ankle = [hoof[0] + cfg.c * Math.sin(th), hoof[1] - cfg.c * Math.cos(th)];
+    const { knee, end } = ik(root[0], root[1], ankle[0], ankle[1], cfg.a, cfg.b, cfg.bend);
+    return [root, knee, end, hoof];
+  };
+  const legs = {
+    fh: legPts('fh', [hip[0] + 0.8, hip[1]], ZB.hind, false), ff: legPts('ff', [sh[0] + 0.8, sh[1]], ZB.fore, true),
+    nh: legPts('nh', hip, ZB.hind, false), nf: legPts('nf', sh, ZB.fore, true),
+  };
+  if (p.shadow !== false && ly < 0.5) for (const k of ['nh', 'nf', 'fh', 'ff']) { const [hx, hy] = legs[k][3]; if (hy > -0.3) ell(g, hx, 0.2, 2.4, 0.7, 0, 'rgba(40,25,10,0.3)'); }
+  limb(g, legs.fh, 4.6, 2.2, ZB.far, ZB.stFar, ZB.hoof);
+  limb(g, legs.ff, 3.9, 2.1, ZB.far, ZB.stFar, ZB.hoof);
+  // 꼬리(스프링): 걸을 때 흔들리고 가끔 휙 휘두른다
+  const tailRoot = [hip[0] - 7.2, hip[1] - 5.2];
+  springTo(r.tail, 0.32 + (moving ? 0.12 * Math.sin(ph * TAU) : 0) + r.swish + ly * 0.5, 40, 6, dt);
+  const ta = r.tail.x, tl = 12 - ly * 3;
+  const tm = [tailRoot[0] - Math.sin(ta * 0.6) * tl * 0.5, tailRoot[1] + Math.cos(ta * 0.6) * tl * 0.5], te = [tailRoot[0] - Math.sin(ta) * tl, tailRoot[1] + Math.cos(ta) * tl];
+  g.strokeStyle = C(ZB.col); g.lineWidth = 1.5; g.lineCap = 'round'; g.beginPath(); g.moveTo(tailRoot[0], tailRoot[1]); g.quadraticCurveTo(tm[0] - 1, tm[1], te[0], te[1]); g.stroke();
+  ell(g, te[0], te[1] + 1.6, 1.4, 3, -ta * 0.8, ZB.st);
+  // 몸통: 엉덩이·등·어깨·가슴·배(숨 쉴 때 배가 살짝 부푼다)
+  const by = 1 + 0.025 * breath, [hx, hy] = hip, [sx, sy] = sh;
+  const body = new Path2D();
+  body.moveTo(hx - 2.5, hy - 8.2);
+  body.quadraticCurveTo(0, Math.min(hy, sy) - 6.6, sx + 1, sy - 8.8);
+  body.quadraticCurveTo(sx + 6, sy - 8.5, sx + 6.5, sy - 3);
+  body.quadraticCurveTo(sx + 7.8, sy + 2.5, sx + 3.5, sy + 4.6 * by);
+  body.quadraticCurveTo(0, (hy + sy) / 2 + 8.2 * by, hx + 1.5, hy + 4.4 * by);
+  body.quadraticCurveTo(hx - 5.8, hy + 4.8, hx - 7.4, hy - 1.6);
+  body.quadraticCurveTo(hx - 7.6, hy - 7.6, hx - 2.5, hy - 8.2);
+  body.closePath();
+  g.fillStyle = C(ZB.col); g.fill(body);
+  if (C('#000') === '#000') {
+    g.save(); g.clip(body);
+    g.strokeStyle = ZB.st; g.lineCap = 'round';
+    for (let i = 0; i < 9; i++) { const x = sx + 3 - i * 2.35, top = sy - 10; g.lineWidth = 1.35 - (i % 2) * 0.25; g.beginPath(); g.moveTo(x + 0.6, top); g.quadraticCurveTo(x - 1.5, top + 8, x + 0.8, top + 17); g.stroke(); }
+    for (let i = 0; i < 4; i++) { g.lineWidth = 1.2; g.beginPath(); g.moveTo(hx - 8, hy - 6 + i * 2.6); g.quadraticCurveTo(hx - 2, hy - 3.5 + i * 2.6, hx + 2.5, hy - 7 + i * 3.2); g.stroke(); }
+    g.fillStyle = 'rgba(70,55,40,0.16)'; g.beginPath(); g.ellipse(0, (hy + sy) / 2 + 7, 16, 6, 0, 0, TAU); g.fill(); // 배 쪽 그늘
+    g.fillStyle = 'rgba(255,255,255,0.45)'; g.beginPath(); g.ellipse(0, Math.min(hy, sy) - 7.6, 11, 1.5, 0, 0, TAU); g.fill(); // 등 하이라이트
+    g.restore();
+  }
+  limb(g, legs.nh, 4.8, 2.3, ZB.col, ZB.st, ZB.hoof);
+  limb(g, legs.nf, 4.1, 2.2, ZB.col, ZB.st, ZB.hoof);
+  // 목·머리: 걸을 땐 한 걸음에 두 번 끄덕, 쉴 땐 천천히 두리번, 먹을 땐 땅까지. 머리는 스프링으로 살짝 늦게
+  const nod = moving ? 0.07 * Math.sin(ph * TAU * 2 - 0.6) : 0.08 * Math.sin(r.look * 0.5) * Math.sin(r.look * 0.23);
+  springTo(r.head, nod, 60, 9, dt);
+  const na = 0.62 + r.head.x + p.hd * 1.8 - (roll ? 0.3 : 0), nb = [sx + 4.2, sy - 6.5], nl = 12.5 + p.hd * 6;
+  const tip = [nb[0] + Math.sin(na) * nl, nb[1] - Math.cos(na) * nl], nx = Math.cos(na), ny = Math.sin(na);
+  const neck = new Path2D();
+  neck.moveTo(nb[0] - nx * 5.2, nb[1] - ny * 5.2 + 2); neck.quadraticCurveTo((nb[0] + tip[0]) / 2 - nx * 3.6, (nb[1] + tip[1]) / 2 - ny * 3.6, tip[0] - nx * 2.6, tip[1] - ny * 2.6);
+  neck.lineTo(tip[0] + nx * 3, tip[1] + ny * 3); neck.quadraticCurveTo((nb[0] + tip[0]) / 2 + nx * 4, (nb[1] + tip[1]) / 2 + ny * 4.2, nb[0] + nx * 4.6, nb[1] + ny * 4.6 + 3);
+  neck.closePath();
+  g.fillStyle = C(ZB.col); g.fill(neck);
+  if (C('#000') === '#000') {
+    g.save(); g.clip(neck); g.strokeStyle = ZB.st; g.lineWidth = 1.3;
+    for (let k = 0; k < 5; k++) { const u = 0.12 + k * 0.19, cx = nb[0] + (tip[0] - nb[0]) * u, cy = nb[1] + (tip[1] - nb[1]) * u; g.beginPath(); g.moveTo(cx - nx * 6, cy - ny * 6); g.lineTo(cx + nx * 6, cy + ny * 6); g.stroke(); }
+    g.restore();
+  }
+  // 갈기: 목 윗선을 따라 짧게 선 털(흰색·검은색 번갈아)
+  for (let k = 0; k <= 9; k++) {
+    const u = k / 9, cx = nb[0] - nx * 4.6 + (tip[0] - nx * 2.4 - (nb[0] - nx * 4.6)) * u, cy = nb[1] - ny * 4.6 + (tip[1] - ny * 2.4 - (nb[1] - ny * 4.6)) * u;
+    g.strokeStyle = C(k % 2 ? ZB.st : ZB.col); g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx - nx * 2.2, cy - ny * 2.2); g.stroke();
+  }
+  // 머리(옆모습): 이마 → 긴 콧등 → 검은 주둥이 → 턱. 귀는 스프링으로 가끔 휙
+  g.save(); g.translate(tip[0], tip[1]); g.rotate(na * 0.4 + 1.2);
+  const ear = (x, y, ang, col) => {
+    g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = C(col); g.beginPath(); g.moveTo(-1, 0); g.quadraticCurveTo(-1.4, -3.4, 0, -5); g.quadraticCurveTo(1.4, -3.4, 1, 0); g.closePath(); g.fill();
+    ell(g, 0, -4.2, 0.55, 0.9, 0, ZB.st); g.restore();
+  };
+  ear(-0.4, -2.2, -1.2 + r.ear.x * 0.6, ZB.far);
+  const head = new Path2D();
+  head.moveTo(-2, -1.6); head.quadraticCurveTo(3, -4.4, 10, -1.7); head.quadraticCurveTo(11.6, 0.6, 9.6, 2.7); head.quadraticCurveTo(4, 4, 0.4, 3.5); head.quadraticCurveTo(-2.6, 2.1, -2, -1.6); head.closePath();
+  g.fillStyle = C(ZB.col); g.fill(head);
+  if (C('#000') === '#000') {
+    g.save(); g.clip(head);
+    g.strokeStyle = ZB.st; g.lineWidth = 0.95; for (let k = 0; k < 4; k++) { const x = 1.2 + k * 1.6; g.beginPath(); g.moveTo(x - 0.4, -4); g.lineTo(x + 0.5, 4); g.stroke(); }
+    g.fillStyle = ZB.muzzle; g.beginPath(); g.ellipse(10.4, 0.6, 3.3, 3.4, 0, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(70,55,40,0.14)'; g.beginPath(); g.ellipse(4, 4.2, 8, 2.2, 0, 0, TAU); g.fill();
+    g.restore();
+    ell(g, 10.5, -0.2, 0.55, 0.38, 0.4, '#16120f');
+    const closed = r.blink > 0 || p.st === 'rest';
+    eye(g, 2.5, -0.9, 0.95, closed);
+  }
+  ear(0.6, -2.5, -0.95 + r.ear.x, ZB.col);
+  g.restore();
+  g.restore();
+}
+
 const ANIMAL_ART = {
   rabbit(ctx, p) {
     const col = '#c9a27e', belly = '#efe2cc', ear = '#e8a9a4';
@@ -546,41 +707,7 @@ const ANIMAL_ART = {
     ctx.restore();
     ctx.restore();
   },
-  zebra(ctx, p) {
-    const col = '#f4f1ea', st = '#26221f';
-    const roll = p.sp >= 0;
-    ell(ctx, 0, 0, 15, 3.2, 0, 'rgba(40,25,10,0.25)');
-    ctx.save();
-    let ly = p.ly;
-    if (roll) { ly = 1; ctx.translate(0, -6); ctx.rotate(Math.sin(p.sp * TAU * 3) * 0.32); ctx.translate(0, 6); }
-    const mv = p.mv, ph = p.ph * TAU * 1.4;
-    const o = { hipB: -11, hipF: 11, hipYB: -17, hipYF: -17, L: 17, w: 3.3, col, hoof: '#2a2420', ph, mv, ly };
-    const dy = ly * 13;
-    curve(ctx, -15, -26 + dy, -17, -21 + dy, -17, -15 + dy, 1.4, col);
-    ell(ctx, -17, -14 + dy, 1.2, 2.4, 0, st);
-    legs4(ctx, o, false);
-    ctx.save();
-    ctx.beginPath(); ctx.ellipse(0, -24 + dy, 15, 8.6, 0, 0, TAU); ctx.fillStyle = C(col); ctx.fill(); ctx.clip();
-    for (let i = -6; i <= 6; i++) { const x = i * 2.6; curve(ctx, x + 1.5, -34 + dy, x - 1.5, -26 + dy, x + 1, -17 + dy, 1.25, st); }
-    ctx.restore();
-    const real = C('#000') === '#000'; // 실루엣이면 다리 줄무늬를 그리지 않는다
-    if (ly < 0.5 && real) for (const [hx, far] of [[-9.8, 1], [12.2, 1], [-11, 0], [11, 0]]) for (let k = 0; k < 4; k++) seg(ctx, hx - 1.4, -13 + k * 3.3, hx + 1.4, -12.4 + k * 3.3, 1, far ? shade(st, 1.4) : st);
-    legs4(ctx, o, true);
-    if (ly < 0.5 && real) for (const hx of [-11, 11]) for (let k = 0; k < 4; k++) seg(ctx, hx - 1.5, -13 + k * 3.3, hx + 1.5, -12.4 + k * 3.3, 1, st);
-    const nb = [11, -27 + dy], na = 0.55 + p.hd * 1.75 - (roll ? 0.4 : 0), nl = 12 + p.hd * 8;
-    const tip = [nb[0] + Math.sin(na) * nl, nb[1] - Math.cos(na) * nl];
-    taper(ctx, nb[0], nb[1], tip[0], tip[1], 8, 5, col);
-    for (let k = 1; k < 4; k++) { const t = k / 4, x = nb[0] + (tip[0] - nb[0]) * t, y = nb[1] + (tip[1] - nb[1]) * t; seg(ctx, x - 3 * Math.cos(na), y - 3 * Math.sin(na), x + 3 * Math.cos(na), y + 3 * Math.sin(na), 1.2, st); }
-    curve(ctx, nb[0] - 2, nb[1] - 3, (nb[0] + tip[0]) / 2 - 3, (nb[1] + tip[1]) / 2 - 2, tip[0] - 1.6, tip[1] - 2.6, 2.2, st);
-    ctx.save(); ctx.translate(tip[0], tip[1]); ctx.rotate(na - 0.3);
-    ell(ctx, -1.8, -3.4, 0.9, 2.4, -0.3, col);
-    ell(ctx, 3.4, 1.6, 6, 3, 0.9, col);
-    for (let k = 0; k < 3; k++) seg(ctx, 0.5 + k * 1.8, -1, 1.5 + k * 1.8, 3, 0.9, st);
-    ell(ctx, 6.9, 5.6, 1.9, 1.6, 0.9, '#3a3330');
-    eye(ctx, 1.4, 0.4, 0.75, p.st === 'rest');
-    ctx.restore();
-    ctx.restore();
-  },
+  zebra(ctx, p) { zebraRig(ctx, p); },
   ostrich(ctx, p) {
     const col = '#2f2823', plume = '#f4f0e6', leg = '#d9a79a';
     const dance = p.sp >= 0, ly = p.ly, mv = p.mv;
@@ -724,7 +851,7 @@ export function drawAnimal(ctx, sp, sx, sy, k, pose, sil = null) {
 }
 // 탭 판정·말풍선 위치용 크기(단위): [가로 반폭, 높이]
 export const ANIMAL_BOX = {
-  rabbit: [8, 17], meerkat: [8, 14], gazelle: [13, 32], zebra: [18, 40], ostrich: [13, 56], lion: [18, 32], giraffe: [18, 86], elephant: [26, 54],
+  rabbit: [8, 17], meerkat: [8, 14], gazelle: [13, 32], zebra: [20, 44], ostrich: [13, 56], lion: [18, 32], giraffe: [18, 86], elephant: [26, 54],
 };
 // 반짝이(순간 포착 표시)
 export function sparkle(ctx, x, y, r, t) {
