@@ -1889,3 +1889,19 @@ test('생산 건물: 레벨마다 늘어나는 생산량이 ×1.2씩 커져, 10�
     }
   }
 });
+
+test('날짜: 새 판은 1일차, 게임이 진행된 1분마다 하루, 꺼 둔 시간은 세지 않는다', () => {
+  const s = fresh(209);
+  s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9; s.raidT = 1e9;
+  assert.equal(G.dayOf(s), 1);
+  stepFor(s, 59.9);
+  assert.equal(G.dayOf(s), 1);
+  stepFor(s, 0.2);
+  assert.equal(G.dayOf(s), 2);
+  // 자리 비움 1시간: 작업·리스폰 시계는 흐르지만 날짜는 그대로
+  s.savedAt = Date.now() - 3600 * 1000;
+  G.applyOffline(s);
+  assert.equal(G.dayOf(s), 2);
+  const t = G.deserialize(G.serialize(s));
+  assert.equal(G.dayOf(t), 2, '저장·불러오기 뒤에도 같은 날');
+});

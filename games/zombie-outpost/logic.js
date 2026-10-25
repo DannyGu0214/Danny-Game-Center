@@ -1353,6 +1353,10 @@ function checkEnding(s, ev) {
   ev.push({ t: 'ending', goals: s.ended.goals, summary: runSummary(s) });
 }
 
+// 날짜: 새 판은 1일차, 게임이 실제로 진행된 1분(stats.playTime)마다 하루. 메뉴·생존자 고르기·시작 화면·화면이 숨은 동안·꺼 둔 동안(자리 비움)은 세지 않는다.
+export const DAY_S = 60;
+export const dayOf = (s) => Math.floor(s.stats.playTime / DAY_S) + 1;
+
 // 한 판의 결과(게임 오버 화면·최고 기록용)
 export function runSummary(s) {
   return {

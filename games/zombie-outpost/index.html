@@ -412,6 +412,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
     </div>
     <div class="xpbar" aria-hidden="true"><span id="xpFill"></span></div>
     <div class="stat-row wrap">
+      <div class="zone-tag" id="dayTag" aria-label="오늘 날짜(게임 1분 = 하루)"></div>
       <div class="zone-tag" id="zoneTag"></div>
       <div class="raid-pill" id="raidPill" hidden></div>
     </div>
@@ -1678,6 +1679,8 @@ function hud() {
     ? `<b>${safe.kind === 'hq' ? '본부' : S.sites[safe.site].name}</b> 안전지대`
     : `<b>${G.ZONE_NAMES[G.zoneIndex(d)]}</b>`;
   if (hudCache.zone !== zoneHtml) { hudCache.zone = zoneHtml; $('#zoneTag').innerHTML = zoneHtml; }
+  const day = G.dayOf(S);
+  if (hudCache.day !== day) { hudCache.day = day; $('#dayTag').innerHTML = `<b>${day}일차</b>`; }
   const pill = $('#raidPill');
   const showRaid = G.raidsEnabled(S);
   if (pill.hidden === showRaid) pill.hidden = !showRaid;
@@ -2311,7 +2314,7 @@ function statusHtml() {
     const p = Math.floor(g.progress(S)), done = p >= g.goal;
     return `<div class="goal${done ? ' done' : ''}"><b>${done ? '✓ ' : ''}${g.name}</b><span class="gv">${goalText(g, p)}</span><small>${g.desc}</small><div class="mbar"><span style="width:${Math.min(1, p / g.goal) * 100}%"></span></div></div>`;
   };
-  return `<p class="who"><b>${esc(h?.name ?? '생존자')}</b> ${G.HEROES[h?.id]?.label ?? ''} · Lv ${S.level} · ${sm.playTime < 60 ? `${sm.playTime}초` : fmtDur(sm.playTime)} 생존</p>
+  return `<p class="who"><b>${esc(h?.name ?? '생존자')}</b> ${G.HEROES[h?.id]?.label ?? ''} · Lv ${S.level} · <b>${G.dayOf(S)}일차</b>(${sm.playTime < 60 ? `${sm.playTime}초` : fmtDur(sm.playTime)} 진행)</p>
   <div class="gains">${[
     cell('본부', `${S.hq}레벨`), cell('동료', `${S.survivors.length}/${G.survivorCap(S)}`), cell('전진기지', `${S.outposts.length}/${G.outpostLimit(S)}`),
     cell('처치', G.fmt(sm.kills)), cell('습격 방어', `${S.stats.raidsWon}승 ${S.stats.raidsLost}패`), cell('다음 습격', raid),
