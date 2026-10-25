@@ -1,0 +1,34 @@
+{
+  "name": "Animal World",
+  "short_name": "Animal World",
+  "description": "Danny Soft · 동물을 입양하고 지역을 꾸며 가꾸는 관찰형 게임(초원·바닷가·사막·남극)",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "portrait",
+  "background_color": "#cfe9ee",
+  "theme_color": "#8fcbe6",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

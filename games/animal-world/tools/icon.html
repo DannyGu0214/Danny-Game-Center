@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- 앱 아이콘 그리기: ?s=크기(px)&m=1(마스커블: 가운데 80% 안에만 그림). 헤드리스 Chrome으로 찍어 icons/에 저장한다(README 참고). -->
+<meta charset="utf-8">
+<style>html, body { margin: 0; overflow: hidden; background: #000; } canvas { display: block; }</style>
+<canvas id="c"></canvas>
+<script type="module">
+import * as A from '../art.js';
+const q = new URLSearchParams(location.search), S = Number(q.get('s') || 512), mask = q.get('m') === '1';
+const c = document.getElementById('c');
+c.width = S; c.height = S; c.style.width = S + 'px'; c.style.height = S + 'px';
+const g = c.getContext('2d');
+const u = S / 512;
+// 하늘 → 먼 언덕 → 초원
+const sky = g.createLinearGradient(0, 0, 0, S);
+sky.addColorStop(0, '#8fcbe6'); sky.addColorStop(0.55, '#d6ecee'); sky.addColorStop(0.7, '#f6e7bf');
+g.fillStyle = sky; g.fillRect(0, 0, S, S);
+g.fillStyle = '#fff6d8'; g.beginPath(); g.arc(380 * u, 130 * u, 46 * u, 0, Math.PI * 2); g.fill();
+g.fillStyle = '#b9c98a'; g.beginPath(); g.moveTo(0, 340 * u); g.quadraticCurveTo(160 * u, 300 * u, 300 * u, 330 * u); g.quadraticCurveTo(420 * u, 350 * u, S, 320 * u); g.lineTo(S, S); g.lineTo(0, S); g.fill();
+g.fillStyle = '#a9bd5a'; g.beginPath(); g.moveTo(0, 390 * u); g.quadraticCurveTo(256 * u, 360 * u, S, 395 * u); g.lineTo(S, S); g.lineTo(0, S); g.fill();
+// 먼 아카시아
+g.fillStyle = '#6f8a4a';
+g.fillRect(392 * u, 300 * u, 5 * u, 34 * u);
+g.beginPath(); g.ellipse(395 * u, 298 * u, 46 * u, 11 * u, 0, 0, Math.PI * 2); g.fill();
+// 기린과 토끼(마스커블이면 안쪽으로 줄인다)
+const k = mask ? 0.8 : 1;
+g.save(); g.translate(S / 2, S / 2); g.scale(k, k); g.translate(-S / 2, -S / 2);
+A.drawAnimal(g, 'giraffe', 205 * u, 455 * u, 4.6 * u, { face: 1, st: 'idle', ph: 0.4, mv: 0, hd: 0, ly: 0, sp: -1 });
+A.drawAnimal(g, 'rabbit', 360 * u, 455 * u, 3.4 * u, { face: -1, st: 'idle', ph: 0.4, mv: 0, hd: 0, ly: 0, sp: -1 });
+g.restore();
+document.title = 'ready';
+</script>

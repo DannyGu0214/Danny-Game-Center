@@ -9,6 +9,7 @@
 | 게임 | 장르 | 상태 | 플레이 | 폴더 |
 |---|---|---|---|---|
 | Zombie Outpost (좀비 아웃포스트) | 세로 화면·쿼터뷰 모바일 웹 게임. 좀비 서바이벌, 수동 파밍, 기지 건설, 동료, 전진기지, 로그라이크 | 플레이 가능 | [바로 하기](https://dannygu0214.github.io/Danny-Game-Center/games/zombie-outpost/) | [`games/zombie-outpost`](games/zombie-outpost) |
+| Animal World (애니멀 월드) | 세로 화면·쿼터뷰 관찰형 게임. 동물 입양, 지역 꾸미기, 발전도·티어, 순간 포착 | 초원 지역 플레이 가능(MVP) | [바로 하기](https://dannygu0214.github.io/Danny-Game-Center/games/animal-world/) | [`games/animal-world`](games/animal-world) |
 
 ## 공통 규칙
 
