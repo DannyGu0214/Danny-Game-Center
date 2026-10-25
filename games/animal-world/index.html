@@ -85,7 +85,7 @@ button:disabled { cursor: default; }
 /* 아래 메뉴 위 한 줄: 소리 켜기·끄기(왼쪽), 확대 단계(오른쪽, 1× = 땅 전체가 한 화면) */
 .controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; }
 .zoombar { display: flex; gap: 3px; background: var(--panel-2); border-radius: 12px; padding: 3px; }
-.zoombar button { min-width: 42px; height: 32px; padding: 0 6px; border-radius: 9px; font: 14px var(--f-display); color: var(--muted); }
+.zoombar button { min-width: 40px; height: 32px; padding: 0 5px; border-radius: 9px; font: 14px var(--f-display); color: var(--muted); }
 .zoombar button.on { background: var(--accent); color: var(--accent-ink); }
 #soundbar button { font-size: 17px; }
 #soundbar button.off { opacity: 0.4; }
@@ -201,7 +201,7 @@ button:disabled { cursor: default; }
         <button id="musicBtn" aria-pressed="true" aria-label="배경음악">🎵</button><button id="sfxBtn" aria-pressed="true" aria-label="동물 소리">🔊</button>
       </div>
       <div class="zoombar" id="zoombar" role="group" aria-label="확대">
-        <button data-z="0" class="on">1×</button><button data-z="1">1.3×</button><button data-z="2">1.6×</button><button data-z="3">2×</button>
+        <button data-z="0" class="on">1×</button><button data-z="1">1.5×</button><button data-z="2">2×</button><button data-z="3">3×</button><button data-z="4">4×</button>
       </div>
     </div>
     <div class="menu">
@@ -274,8 +274,8 @@ function resize() {
   horizon = cy - WG * ISO_B * Z0 - 10;
   setZoom(UI.zl);
 }
-// 확대 단계: 1× · 1.3× · 1.6× · 2×(최대). 바꿀 때 화면 가운데 보던 곳을 그대로 둔다
-const ZOOMS = [1, 1.3, 1.6, 2];
+// 확대 단계: 1× · 1.5× · 2× · 3× · 4×(최대). 바꿀 때 화면 가운데 보던 곳을 그대로 둔다
+const ZOOMS = [1, 1.5, 2, 3, 4];
 function setZoom(i) {
   const old = zoom;
   UI.zl = i;
@@ -314,13 +314,15 @@ function freeIsland() {
   island.c.width = island.c.height = 0;
   for (const o of island.occ.values()) o.c.width = o.c.height = 0;
 }
-function canvasOf(w, h) {
+function canvasOf(w, h, sc = DPR) {
   const c = document.createElement('canvas');
-  c.width = Math.ceil(w * DPR); c.height = Math.ceil(h * DPR);
+  c.width = Math.ceil(w * sc); c.height = Math.ceil(h * sc);
   const g = c.getContext('2d');
-  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.setTransform(sc, 0, 0, sc, 0, 0);
   return [c, g];
 }
+// 땅 그림 한 장의 최대 픽셀 수: 4×로 크게 보면 땅 그림이 커져서, 넘으면 해상도를 조금 낮춰 그린다(iOS 캔버스 한도 약 1,670만 픽셀)
+const ISLAND_MAX_PX = 12e6;
 const isoX = (x, y) => (x - y) * ISO_A * zoom, isoY = (x, y) => (x + y) * ISO_B * zoom;
 function itemSprite(id, v) {
   const key = id + '|' + v;
@@ -344,7 +346,7 @@ function islandArt() {
   freeIsland();
   const m = 10, w = 2 * WG * ISO_A * zoom + 2 * m, h = (2 * WG * ISO_B + SLAB * 1.6 + TOPZ) * zoom + 2 * m + 10;
   const ox = WG * ISO_A * zoom + m, oy = m + 8 + TOPZ * zoom;
-  const [c, g] = canvasOf(w, h), IP = (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * zoom];
+  const sc = Math.min(DPR, Math.sqrt(ISLAND_MAX_PX / (w * h))), [c, g] = canvasOf(w, h, sc), IP = (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * zoom];
   // 바닥 물건은 앞 모서리 칸의 대각선까지 땅을 그린 뒤 끼워 그린다(앞쪽 언덕에 가려지게)
   A.drawIsland({ ctx: g, zoom, P: IP }, WG, GRID, A.PAL[S.view] ?? A.PAL.grassland, 3, S.view, (dg) => {
     for (const it of floors) {
@@ -354,7 +356,7 @@ function islandArt() {
       g.drawImage(s.c, sx - s.ax, sy - s.ay, s.w, s.h);
     }
   });
-  island = { c, ox, oy, w, h, rid: S.view, sig, rev: S.rev, occ: new Map() };
+  island = { c, ox, oy, w, h, sc, rid: S.view, sig, rev: S.rev, occ: new Map() };
   return island;
 }
 // ---------- 지형 높이 ----------
@@ -387,11 +389,11 @@ function occArt(o, isl) {
   if (a) return a;
   const IP = (x, y, z = 0) => [isl.ox + isoX(x, y), isl.oy + isoY(x, y) - z * zoom];
   const q = columnOf(S.view, o.x, o.y, IP), xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
-  const l = Math.floor(Math.min(...xs) * DPR) / DPR, t = Math.floor(Math.min(...ys) * DPR) / DPR, w = Math.max(...xs) - l, h = Math.max(...ys) - t;
-  const [c, g] = canvasOf(w, h);
+  const sc = isl.sc, l = Math.floor(Math.min(...xs) * sc) / sc, t = Math.floor(Math.min(...ys) * sc) / sc, w = Math.max(...xs) - l, h = Math.max(...ys) - t;
+  const [c, g] = canvasOf(w, h, sc);
   g.beginPath(); g.moveTo(q[0][0] - l, q[0][1] - t); for (let i = 1; i < 6; i++) g.lineTo(q[i][0] - l, q[i][1] - t); g.closePath(); g.clip();
   g.drawImage(isl.c, -l, -t, isl.w, isl.h);
-  a = { c, l, t, w: c.width / DPR, h: c.height / DPR };
+  a = { c, l, t, w: c.width / sc, h: c.height / sc };
   isl.occ.set(o, a);
   return a;
 }
@@ -1013,7 +1015,7 @@ for (const evt of ['pointerdown', 'keydown']) window.addEventListener(evt, () =>
 function animalSound(a, kind, vol = 1) {
   if (!a) return;
   const [sx] = animalScreen(a);
-  sound.play(a.sp, kind, { vol: vol * (0.75 + 0.25 * (ZOOMS[UI.zl] - 1)), pan: ((sx / VW) * 2 - 1) * 0.7 });
+  sound.play(a.sp, kind, { vol: vol * Math.min(1, 0.75 + 0.25 * (ZOOMS[UI.zl] - 1)), pan: ((sx / VW) * 2 - 1) * 0.7 });
 }
 let lastChance = null, ambientIn = 10;
 // 특수 행동이 시작되면 그 동물의 special 소리, 가끔 보이는 동물 하나가 call 소리를 낸다
