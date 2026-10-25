@@ -1,3 +1,6 @@
+import { VOICES as V_SEASIDE } from './sounds/seaside.js';
+import { VOICES as V_DESERT } from './sounds/desert.js';
+import { VOICES as V_ANTARCTIC } from './sounds/antarctic.js';
 // 동물 소리: 종마다 2가지(call = 탭할 때·가끔 저절로, special = 특수 행동이 시작될 때). 파일 없이 Web Audio로 합성한다.
 // 평화로운 분위기라 모두 짧고 작게 낸다. AudioContext는 첫 터치 때 만들어 배경음악과 함께 쓴다.
 
@@ -152,6 +155,8 @@ export const VOICES = {
   },
 };
 
+Object.assign(VOICES, V_SEASIDE, V_DESERT, V_ANTARCTIC); // 다른 지역 동물 소리(sounds/<지역>.js). 그쪽은 K.tone·K.hiss로 소리를 만든다
+
 export function createSound({ volume = 0.5 } = {}) {
   let ac = null, bus = null, K = null, on = true;
   return {
@@ -164,7 +169,7 @@ export function createSound({ volume = 0.5 } = {}) {
         bus = ac.createGain(); bus.gain.value = volume; bus.connect(ac.destination);
         const noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = noise.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-        K = { ac, noise };
+        K = { ac, noise, tone, hiss };
       }
       if (ac.state === 'suspended') ac.resume().catch(() => {});
     },
@@ -187,7 +192,7 @@ export function createSound({ volume = 0.5 } = {}) {
       const noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = noise.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       const g = ctx.createGain(); g.gain.value = volume; g.connect(ctx.destination);
-      VOICES[sp][kind]({ ac: ctx, noise }, g, 0.02);
+      VOICES[sp][kind]({ ac: ctx, noise, tone, hiss }, g, 0.02);
     },
   };
 }

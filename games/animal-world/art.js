@@ -11,6 +11,33 @@ import * as R_OSTRICH from './rigs/ostrich.js';
 import * as R_LION from './rigs/lion.js';
 import * as R_GIRAFFE from './rigs/giraffe.js';
 import * as R_ELEPHANT from './rigs/elephant.js';
+import * as R_CRAB from './rigs/crab.js';
+import * as R_GULL from './rigs/gull.js';
+import * as R_TURTLE from './rigs/turtle.js';
+import * as R_FLAMINGO from './rigs/flamingo.js';
+import * as R_OTTER from './rigs/otter.js';
+import * as R_SEALION from './rigs/sealion.js';
+import * as R_DOLPHIN from './rigs/dolphin.js';
+import * as R_WALRUS from './rigs/walrus.js';
+import * as R_LIZARD from './rigs/lizard.js';
+import * as R_JERBOA from './rigs/jerboa.js';
+import * as R_FENNEC from './rigs/fennec.js';
+import * as R_SNAKE from './rigs/snake.js';
+import * as R_COYOTE from './rigs/coyote.js';
+import * as R_VULTURE from './rigs/vulture.js';
+import * as R_ORYX from './rigs/oryx.js';
+import * as R_CAMEL from './rigs/camel.js';
+import * as R_ADELIE from './rigs/adelie.js';
+import * as R_SKUA from './rigs/skua.js';
+import * as R_GENTOO from './rigs/gentoo.js';
+import * as R_WEDDELL from './rigs/weddell.js';
+import * as R_KING from './rigs/king.js';
+import * as R_ELEPHANTSEAL from './rigs/elephantseal.js';
+import * as R_EMPEROR from './rigs/emperor.js';
+import * as R_ORCA from './rigs/orca.js';
+import * as I_SEASIDE from './items/seaside.js';
+import * as I_DESERT from './items/desert.js';
+import * as I_ANTARCTIC from './items/antarctic.js';
 
 export const ISO_A = 0.7071, ISO_B = 0.3536;
 export const TILE = 32;
@@ -125,9 +152,19 @@ function tuft(pen, x, y, h, col, R, n = 3) {
 }
 
 // ---------- 하늘과 섬(지역 땅) ----------
+// 지역별 땅: 칸 색, 얼룩(blot), 칸 장식(deco: tuft 풀포기 · shell 조개·모래결 · pebble 자갈·모래결 · snow 눈 반짝임·얼음 금), 단면 색, 가장자리
 export const PAL = {
   grassland: {
-    tiles: ['#c8c467', '#bcc160', '#a9bd5a', '#d2c46e'], tuft: ['#8fa548', '#a3a64a'], dirt: '#9b6a3c', dirt2: '#7d5230', lip: '#93a84d',
+    tiles: ['#c8c467', '#bcc160', '#a9bd5a', '#d2c46e'], blot: ['#e0cf82', '#98b452'], deco: 'tuft', tuft: ['#8fa548', '#a3a64a'], dirt: '#9b6a3c', dirt2: '#7d5230', lip: '#93a84d',
+  },
+  seaside: {
+    tiles: ['#f1dda6', '#ead49a', '#f5e4b6', '#e6cf92'], blot: ['#fff1cc', '#d9bf84'], deco: 'shell', tuft: ['#c9b27a', '#e9e0cf'], dirt: '#c9a46a', dirt2: '#a8854f', lip: '#e2c98d',
+  },
+  desert: {
+    tiles: ['#e7b673', '#dfa864', '#edc085', '#e3ae6b'], blot: ['#f3cf96', '#c98f50'], deco: 'pebble', tuft: ['#a07a46', '#8d9a52'], dirt: '#b8683a', dirt2: '#97522c', lip: '#d89c58',
+  },
+  antarctic: {
+    tiles: ['#eef4f8', '#e4edf3', '#f6fafc', '#dde8f0'], blot: ['#ffffff', '#cfe0ec'], deco: 'snow', tuft: ['#b7cfe0', '#ffffff'], dirt: '#9fc4dc', dirt2: '#7ea9c6', lip: '#d6e8f3',
   },
 };
 // 시간대 빛(아침 · 낮 · 저녁 · 밤). sky = 하늘 위·가운데·지평선, tint = 땅·동물에 덧입히는 색과 세기,
@@ -159,7 +196,7 @@ export function lightAt(time) {
   };
 }
 // 하늘·해·달·별·먼 언덕·구름(화면 좌표, 매 프레임). L = lightAt() 결과
-export function drawSky(ctx, W, H, horizon, t, L) {
+export function drawSky(ctx, W, H, horizon, t, L, region = 'grassland') {
   const g = ctx.createLinearGradient(0, 0, 0, horizon);
   g.addColorStop(0, L.sky[0]); g.addColorStop(0.6, L.sky[1]); g.addColorStop(1, L.sky[2]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -203,21 +240,78 @@ export function drawSky(ctx, W, H, horizon, t, L) {
     ctx.ellipse(x + cw * 0.14, y - 8, cw * 0.26, 11, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  // 먼 언덕 두 겹과 아카시아 그림자
-  for (let layer = 0; layer < 2; layer++) {
-    const base = horizon + layer * 14, amp = 10 + layer * 6;
-    ctx.fillStyle = L.hill[layer];
-    ctx.beginPath(); ctx.moveTo(0, H);
-    for (let i = 0, n = Math.ceil(W / 8); i <= n; i++) { const x = (i / n) * W; ctx.lineTo(x, base - amp * (0.6 + 0.4 * Math.sin(x * 0.013 + layer * 2.1) * Math.sin(x * 0.005 + 1 + layer))); }
-    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
-  }
-  ctx.fillStyle = L.tree;
-  for (let i = 0; i < 5; i++) {
-    const x = (i * 0.23 + 0.07) * W, y = horizon + 6 + (i % 2) * 6, s = 0.7 + (i % 3) * 0.2;
-    ctx.fillRect(x - 0.8 * s, y - 12 * s, 1.6 * s, 12 * s);
-    ctx.beginPath(); ctx.ellipse(x, y - 13 * s, 11 * s, 3.2 * s, 0, 0, Math.PI * 2); ctx.fill();
+  (FAR[region] ?? FAR.grassland)(ctx, W, H, horizon, t, L);
+}
+// 지평선 너머 풍경(지역별). 시간대 빛은 lit()로 덧입힌다(초원은 시간대 색 L.hill을 그대로)
+const lit = (L, col) => mix(col, L.tint[0], Math.min(0.75, L.tint[1] * 1.15));
+function waveBand(ctx, W, y0, y1, t, col, hi) {
+  ctx.fillStyle = col; ctx.fillRect(0, y0, W, y1 - y0);
+  ctx.strokeStyle = hi; ctx.lineWidth = 1.2;
+  for (let row = 0; row < 7; row++) {
+    const y = y0 + 6 + row * ((y1 - y0) / 7), sp = 8 + row * 3, len = 8 + row * 3;
+    for (let x = ((row * 37 + t * sp) % 60) - 60; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + len / 2, y - 2, x + len, y); ctx.stroke(); }
   }
 }
+const FAR = {
+  grassland(ctx, W, H, horizon, t, L) {
+    // 먼 언덕 두 겹과 아카시아 그림자
+    for (let layer = 0; layer < 2; layer++) {
+      const base = horizon + layer * 14, amp = 10 + layer * 6;
+      ctx.fillStyle = L.hill[layer];
+      ctx.beginPath(); ctx.moveTo(0, H);
+      for (let i = 0, n = Math.ceil(W / 8); i <= n; i++) { const x = (i / n) * W; ctx.lineTo(x, base - amp * (0.6 + 0.4 * Math.sin(x * 0.013 + layer * 2.1) * Math.sin(x * 0.005 + 1 + layer))); }
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = L.tree;
+    for (let i = 0; i < 5; i++) {
+      const x = (i * 0.23 + 0.07) * W, y = horizon + 6 + (i % 2) * 6, s = 0.7 + (i % 3) * 0.2;
+      ctx.fillRect(x - 0.8 * s, y - 12 * s, 1.6 * s, 12 * s);
+      ctx.beginPath(); ctx.ellipse(x, y - 13 * s, 11 * s, 3.2 * s, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  },
+  // 바닷가: 섬이 바다 위에 떠 있다. 먼 섬과 반짝이는 물결
+  seaside(ctx, W, H, horizon, t, L) {
+    const g = ctx.createLinearGradient(0, horizon, 0, H);
+    g.addColorStop(0, lit(L, '#5fb2d4')); g.addColorStop(0.35, lit(L, '#4a9fc7')); g.addColorStop(1, lit(L, '#3a86b4'));
+    ctx.fillStyle = g; ctx.fillRect(0, horizon, W, H - horizon);
+    waveBand(ctx, W, horizon + 4, H, t, 'rgba(0,0,0,0)', rgba(lit(L, '#d9f1fa'), 0.55));
+    ctx.fillStyle = lit(L, '#7aa86a'); // 먼 섬과 야자수
+    ctx.beginPath(); ctx.ellipse(W * 0.16, horizon + 2, 46, 9, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = lit(L, '#5d8a4c'); ctx.fillRect(W * 0.16 + 4, horizon - 20, 2, 16);
+    for (const a of [-2.6, -2.1, -1.2, -0.6]) { ctx.beginPath(); ctx.ellipse(W * 0.16 + 5 + Math.cos(a) * 7, horizon - 21 + Math.sin(a) * 3, 8, 2, a, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = lit(L, '#e8edf2'); ctx.beginPath(); ctx.moveTo(W * 0.82, horizon - 1); ctx.lineTo(W * 0.82 + 16, horizon - 1); ctx.lineTo(W * 0.82 + 8, horizon - 14); ctx.closePath(); ctx.fill(); // 먼 돛단배
+    ctx.fillStyle = lit(L, '#c86a4a'); ctx.fillRect(W * 0.82 - 2, horizon - 1, 20, 3);
+  },
+  // 사막: 부드러운 모래언덕 두 겹과 먼 메사(탁상 바위)
+  desert(ctx, W, H, horizon, t, L) {
+    ctx.fillStyle = lit(L, '#c98a58');
+    ctx.beginPath(); ctx.moveTo(W * 0.58, horizon + 4); ctx.lineTo(W * 0.62, horizon - 26); ctx.lineTo(W * 0.78, horizon - 28); ctx.lineTo(W * 0.82, horizon + 4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(W * 0.05, horizon + 4); ctx.lineTo(W * 0.08, horizon - 16); ctx.lineTo(W * 0.17, horizon - 17); ctx.lineTo(W * 0.2, horizon + 4); ctx.closePath(); ctx.fill();
+    for (let layer = 0; layer < 2; layer++) {
+      const base = horizon + layer * 16, amp = 12 + layer * 8;
+      ctx.fillStyle = lit(L, layer ? '#dca462' : '#e8b97a');
+      ctx.beginPath(); ctx.moveTo(0, H);
+      for (let i = 0, n = Math.ceil(W / 8); i <= n; i++) { const x = (i / n) * W; ctx.lineTo(x, base - amp * (0.5 + 0.5 * Math.sin(x * 0.009 + layer * 1.7))); }
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    }
+  },
+  // 남극: 먼 얼음산, 섬은 얼음 조각이 떠다니는 바다 위
+  antarctic(ctx, W, H, horizon, t, L) {
+    ctx.fillStyle = lit(L, '#dbe8f2');
+    ctx.beginPath(); ctx.moveTo(0, horizon + 2);
+    const peaks = [[0.04, 22], [0.12, 36], [0.2, 18], [0.3, 30], [0.42, 14], [0.56, 26], [0.68, 40], [0.8, 20], [0.9, 30], [1, 16]];
+    for (const [fx, hgt] of peaks) ctx.lineTo(fx * W, horizon - hgt);
+    ctx.lineTo(W, horizon + 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = lit(L, '#b8cfe0'); // 산의 그늘진 면
+    for (let i = 1; i < peaks.length - 1; i += 2) { const [fx, hgt] = peaks[i]; ctx.beginPath(); ctx.moveTo(fx * W, horizon - hgt); ctx.lineTo(fx * W + 14, horizon + 2); ctx.lineTo(fx * W - 2, horizon + 2); ctx.closePath(); ctx.fill(); }
+    const g = ctx.createLinearGradient(0, horizon, 0, H);
+    g.addColorStop(0, lit(L, '#3f7fa8')); g.addColorStop(1, lit(L, '#2c6590'));
+    ctx.fillStyle = g; ctx.fillRect(0, horizon + 2, W, H - horizon);
+    waveBand(ctx, W, horizon + 6, H, t * 0.6, 'rgba(0,0,0,0)', rgba(lit(L, '#cfe6f2'), 0.4));
+    ctx.fillStyle = lit(L, '#eef5fa'); // 떠다니는 얼음 조각
+    for (let i = 0; i < 7; i++) { const x = ((hash(i, 3) * W + t * (2 + i)) % (W + 60)) - 30, y = horizon + 14 + hash(i, 5) * (H - horizon - 30), w = 10 + hash(i, 9) * 22; ctx.beginPath(); ctx.ellipse(x, y, w, w * 0.28, 0, 0, Math.PI * 2); ctx.fill(); }
+  },
+};
 // 떠 있는 섬: 칸마다 색이 조금 다른 윗면 + 앞쪽 두 면의 흙 단면. G = 한 변 월드 길이
 export const slabOf = (G) => G * 0.075; // 흙 단면 두께(땅 크기에 비례)
 export function drawIsland(pen, G, n, pal, seed = 1) {
@@ -244,9 +338,19 @@ export function drawIsland(pen, G, n, pal, seed = 1) {
   }
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const r = rng(hash(x, y, seed + 3) + 0.01);
-    if (r() < 0.55) soft(pen, (x + 0.2 + r() * 0.6) * T, (y + 0.2 + r() * 0.6) * T, 10 + r() * 8, r() < 0.5 ? '#e0cf82' : '#98b452', 0.35);
-    const k = 1 + Math.floor(r() * 3);
-    for (let i = 0; i < k; i++) tuft(pen, (x + 0.15 + r() * 0.7) * T, (y + 0.15 + r() * 0.7) * T, 4 + r() * 3, pal.tuft[i % 2], r);
+    if (r() < 0.55) soft(pen, (x + 0.2 + r() * 0.6) * T, (y + 0.2 + r() * 0.6) * T, 10 + r() * 8, r() < 0.5 ? pal.blot[0] : pal.blot[1], 0.35);
+    const k = 1 + Math.floor(r() * 3), px = () => (x + 0.15 + r() * 0.7) * T, py = () => (y + 0.15 + r() * 0.7) * T;
+    if (pal.deco === 'tuft') { for (let i = 0; i < k; i++) tuft(pen, px(), py(), 4 + r() * 3, pal.tuft[i % 2], r); continue; }
+    if (pal.deco === 'shell' || pal.deco === 'pebble') { // 바람에 생긴 모래결 + 조개껍데기·자갈
+      if (r() < 0.6) { const cx = px(), cy = py(); line(pen, [cx - 5, cy - 2, 0.1], [cx + 5, cy + 2, 0.1], shade(pal.tiles[0], 0.9), 0.7); line(pen, [cx - 4, cy + 1, 0.1], [cx + 4, cy + 4, 0.1], shade(pal.tiles[0], 0.92), 0.6); }
+      for (let i = 0; i < k - 1; i++) puff(pen, px(), py(), 0.6, 0.9 + r() * 0.6, pal.tuft[i % 2]);
+      if (pal.deco === 'pebble' && r() < 0.18) tuft(pen, px(), py(), 3.5, '#8d9a52', r, 4); // 드문 마른 덤불
+      if (pal.deco === 'shell' && r() < 0.12) tuft(pen, px(), py(), 5, '#9fae62', r, 3); // 드문 해안 풀
+      continue;
+    }
+    // 눈: 반짝이는 점과 얼음 금
+    for (let i = 0; i < k; i++) puff(pen, px(), py(), 0.4, 0.6 + r() * 0.5, '#ffffff');
+    if (r() < 0.2) { const cx = px(), cy = py(); line(pen, [cx - 4, cy, 0.1], [cx + 1, cy + 3, 0.1], '#c4d8e6', 0.6); line(pen, [cx + 1, cy + 3, 0.1], [cx + 5, cy + 1, 0.1], '#c4d8e6', 0.6); }
   }
   // 가장자리 풀 테두리
   line(pen, [0, G, 0], [G, G, 0], pal.lip, 2.2);
@@ -277,10 +381,12 @@ export const ITEM_BOX = {
   pond: [68, 14], saltlick: [14, 18], baobab: [40, 60], tower: [24, 62],
 };
 const WATER = '#5aa6c9', WATER_HI = '#a6dbe9', WOOD = '#a8743f';
+// 지역 물건 모듈(items/<지역>.js)에 넘기는 도형 도구
+const KIT = { poly, line, box, cyl, disc, soft, splat, puff, shadow, lump, tuft, onY, rng, hash, shade, mix, rgba };
 export function drawItem(pen, id, seed = 1) {
   const R = rng(seed + 0.31);
   const f = ITEM_ART[id];
-  if (f) f(pen, R);
+  if (f) f(pen, R, KIT);
 }
 const ITEM_ART = {
   grass(pen, R) {
@@ -419,6 +525,11 @@ const ITEM_ART = {
     poly(pen, [[0, 0, 66], [0, 0, 62], [6, -6, 64]], '#e0533f');
   },
 };
+
+for (const M of [I_SEASIDE, I_DESERT, I_ANTARCTIC]) { // 다른 지역 물건 그림 합치기
+  Object.assign(ITEM_ART, M.ITEM_ART); Object.assign(ITEM_BOX, M.ITEM_BOX);
+  for (const id of M.FLOOR) FLOOR.add(id);
+}
 
 // ---------- 동물(옆모습) ----------
 // pose = { face, st, ph(초), hd(고개 숙임 0~1), ly(눕기 0~1), sp(특수 행동 진행 0~1, 아니면 -1), seed, sil(실루엣 색) }
@@ -735,7 +846,10 @@ const ANIMAL_ART = {
 // k = 화면 px / 단위. 원점(sx, sy) = 발밑
 // 종별 리그 모듈(rigs/<종>.js): draw(g, p, H)가 있으면 그걸로 그리고, 없으면 위의 예전 그림(ANIMAL_ART)
 // H = 리그가 쓰는 공통 도우미. C는 실루엣(앨범·잠금 아이콘)일 때 색을 바꾸므로 함수로 넘긴다
-const RIGS = { rabbit: R_RABBIT, meerkat: R_MEERKAT, gazelle: R_GAZELLE, zebra: R_ZEBRA, ostrich: R_OSTRICH, lion: R_LION, giraffe: R_GIRAFFE, elephant: R_ELEPHANT };
+const RIGS = {
+  rabbit: R_RABBIT, meerkat: R_MEERKAT, gazelle: R_GAZELLE, zebra: R_ZEBRA, ostrich: R_OSTRICH, lion: R_LION, giraffe: R_GIRAFFE, elephant: R_ELEPHANT,
+  crab: R_CRAB, gull: R_GULL, turtle: R_TURTLE, flamingo: R_FLAMINGO, otter: R_OTTER, sealion: R_SEALION, dolphin: R_DOLPHIN, walrus: R_WALRUS, lizard: R_LIZARD, jerboa: R_JERBOA, fennec: R_FENNEC, snake: R_SNAKE, coyote: R_COYOTE, vulture: R_VULTURE, oryx: R_ORYX, camel: R_CAMEL, adelie: R_ADELIE, skua: R_SKUA, gentoo: R_GENTOO, weddell: R_WEDDELL, king: R_KING, elephantseal: R_ELEPHANTSEAL, emperor: R_EMPEROR, orca: R_ORCA,
+};
 const H = {
   TAU, ik, footAt, smooth, springTo, rigTick, limb, ell, seg, curve, taper, eye, shade, mix, rgba, hash,
   C: (c) => C(c), real: () => C('#000') === '#000',

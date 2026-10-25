@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- 동물 소리 점검: ?region=<지역>. 종마다 call·special을 오프라인으로 렌더해 최대치·RMS·NaN을 표로 보여 준다.
+     헤드리스 Chrome의 --dump-dom으로 읽는다: ... --virtual-time-budget=8000 --dump-dom "http://localhost:8793/tools/sound-check.html?region=seaside" -->
+<meta charset="utf-8">
+<title>소리 점검</title>
+<pre id="out">rendering…</pre>
+<script type="module">
+import { createSound, VOICES } from '../sound.js';
+import { SPECIES, speciesOf } from '../data.js';
+const region = new URLSearchParams(location.search).get('region') || 'grassland';
+const lines = [];
+for (const sp of speciesOf(region)) for (const kind of ['call', 'special']) {
+  if (!VOICES[sp]?.[kind]) { lines.push(`${sp}.${kind}\tMISSING`); continue; }
+  try {
+    const ctx = new OfflineAudioContext(1, 44100 * 2.5, 44100);
+    createSound().renderInto(ctx, sp, kind);
+    const d = (await ctx.startRendering()).getChannelData(0);
+    let peak = 0, sum = 0, nan = 0;
+    for (const v of d) { if (!Number.isFinite(v)) { nan++; continue; } const a = Math.abs(v); if (a > peak) peak = a; sum += v * v; }
+    lines.push(`${sp}.${kind}\tpeak ${peak.toFixed(3)}\trms ${Math.sqrt(sum / d.length).toFixed(4)}\tnan ${nan}\t(${SPECIES[sp].name})`);
+  } catch (e) { lines.push(`${sp}.${kind}\tERROR ${e.message}`); }
+}
+document.getElementById('out').textContent = lines.join('\n') + '\nDONE';
+document.title = 'ready';
+</script>

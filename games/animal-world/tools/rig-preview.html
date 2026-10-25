@@ -8,6 +8,7 @@
 <canvas id="c"></canvas>
 <script type="module">
 import * as A from '../art.js';
+import { SPECIES, REGIONS, speciesOf } from '../data.js';
 const q = new URLSearchParams(location.search), sp = q.get('sp') || 'zebra', live = q.get('live') === '1', lineup = sp === 'all';
 const cv = document.getElementById('c'), W = innerWidth, Hh = innerHeight, DPR = Math.min(2, devicePixelRatio || 1);
 cv.width = W * DPR; cv.height = Hh * DPR; cv.style.width = W + 'px'; cv.style.height = Hh + 'px';
@@ -16,6 +17,7 @@ const [hw, bh] = A.ANIMAL_BOX[sp] ?? [20, 44], stride = A.STRIDE[sp] || 10, rigg
 // 게임과 같은 외곽선(리그 종만): 작은 캔버스에 그린 뒤 실루엣을 사방으로 밀어 테두리
 const oA = document.createElement('canvas'), oa = oA.getContext('2d'), oB = document.createElement('canvas'), ob = oB.getContext('2d');
 function draw(x, y, k, pose, outline = rigged) {
+  if (SPECIES[sp]?.swim) { ctx.fillStyle = '#5aa6c9'; ctx.beginPath(); ctx.ellipse(x, y, (hw + 8) * k, (hw + 8) * 0.38 * k, 0, 0, Math.PI * 2); ctx.fill(); } // 물에 사는 동물은 물 위에서
   if (!outline) { A.drawAnimal(ctx, sp, x, y, k, pose); return; }
   const w = Math.ceil((hw * 2 + 24) * k * DPR), h = Math.ceil((bh + 30) * k * DPR);
   oA.width = oB.width = w; oA.height = oB.height = h;
@@ -32,19 +34,23 @@ function label(t, x, y) { ctx.fillStyle = '#5a4a36'; ctx.font = '12px system-ui'
 function ground(y) { ctx.fillStyle = '#c8c467'; ctx.fillRect(0, y, W, 3); }
 
 if (lineup) {
-  // 8종을 같은 배율로 한 줄에 세워 크기 비율을 본다(위: 예전 그림, 아래: 지금 그림)
+  // 같은 배율로 한 줄에 세워 크기 비율을 본다. &region=<지역>(초원은 위 예전 그림·아래 지금 그림) / &region=every: 4지역을 한 줄씩
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const all = ['rabbit', 'meerkat', 'gazelle', 'zebra', 'ostrich', 'lion', 'giraffe', 'elephant'], k = (Hh / 2 - 40) / 90;
-  let x = 20;
-  for (const s of all) {
-    const [w2] = A.ANIMAL_BOX[s];
-    A.drawAnimal(ctx, s, x + w2 * k, Hh / 2 - 10, k, base({ legacy: true }));
-    A.drawAnimal(ctx, s, x + w2 * k, Hh - 20, k, base({}));
-    label(s + (A.RIGGED.has(s) ? ' ✓' : ''), x, Hh / 2 + 14);
-    x += (w2 * 2 + 10) * k;
-  }
-  ground(Hh / 2 - 10); ground(Hh - 20);
-  label('위: 예전 그림 · 아래: 지금 그림(✓ = 리그) · 같은 배율', 10, 18);
+  const region = q.get('region') || 'grassland', rows = region === 'every' ? REGIONS.map((r) => r.id) : region === 'grassland' ? [region, region] : [region];
+  const rowH = Hh / rows.length, k = (rowH - 30) / Math.max(...rows.flatMap((r) => speciesOf(r).map((s) => (A.ANIMAL_BOX[s] ?? [20, 44])[1])));
+  rows.forEach((rid, ri) => {
+    const gy = rowH * (ri + 1) - 14, legacy = rows.length === 2 && ri === 0; // 예전 그림은 초원 8종에만 있다
+    let x = 20;
+    for (const s of speciesOf(rid)) {
+      const [w2] = A.ANIMAL_BOX[s] ?? [20, 44];
+      if (SPECIES[s].swim) { ctx.fillStyle = '#5aa6c9'; ctx.beginPath(); ctx.ellipse(x + w2 * k, gy, (w2 + 4) * k, (w2 + 4) * 0.3 * k, 0, 0, Math.PI * 2); ctx.fill(); }
+      A.drawAnimal(ctx, s, x + w2 * k, gy, k, base({ legacy }));
+      label(s + (A.RIGGED.has(s) ? ' ✓' : ''), x, gy + 12);
+      x += (w2 * 2 + 6) * k;
+    }
+    ground(gy);
+  });
+  label(rows.length === 2 ? `${region} · 위: 예전 그림 · 아래: 지금 그림(✓ = 리그) · 같은 배율` : `${region === 'every' ? '4지역' : region} · 같은 배율(✓ = 리그)`, 10, 14);
   document.title = 'ready';
 } else if (!live) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);

@@ -151,7 +151,8 @@ test('발전도가 기준을 넘으면 여러 티어도 한 번에, 지역 해�
   assert.ok(S.events.some((e) => e.type === 'region' && e.region === 'seaside'));
   assert.ok(G.isUnlocked(S, 'seaside'));
   assert.equal(G.isUnlocked(S, 'desert'), false);
-  assert.equal(G.setView(S, 'seaside').why, '다음 업데이트에서 열려요');
+  assert.ok(G.setView(S, 'seaside').ok, '열린 지역으로 갈 수 있다');
+  assert.equal(G.setView(S, 'desert').why, '잠긴 지역');
 });
 
 test('길찾기는 막힌 칸을 돌아가고, 물건 위에 선 동물은 빈칸으로 옮긴다', () => {
@@ -266,18 +267,54 @@ test('같은 시드면 같은 결과', () => {
   assert.equal(run(), run());
 });
 
-test('데이터: 지역마다 동물 8종이 티어 1~8에 하나씩, 물건은 티어마다 지형지물·사물 하나씩', () => {
-  const sp = Object.values(SPECIES).filter((s) => s.region === R).map((s) => s.tier).sort();
-  assert.deepEqual(sp, [1, 2, 3, 4, 5, 6, 7, 8]);
-  for (let t = 1; t <= 8; t++) {
-    const its = Object.values(ITEMS).filter((i) => i.region === R && i.tier === t);
-    assert.deepEqual(its.map((i) => i.kind).sort(), ['object', 'terrain'], `T${t}`);
+test('데이터: 지역마다 동물 8종이 티어 1~8에 하나씩, 물건은 티어마다 지형지물·사물 하나씩, 필요는 그 티어까지의 물건으로 채운다', () => {
+  for (const reg of ['grassland', 'seaside', 'desert', 'antarctic']) {
+    const sp = Object.values(SPECIES).filter((s) => s.region === reg).map((s) => s.tier).sort();
+    assert.deepEqual(sp, [1, 2, 3, 4, 5, 6, 7, 8], reg);
+    for (let t = 1; t <= 8; t++) {
+      const its = Object.values(ITEMS).filter((i) => i.region === reg && i.tier === t);
+      assert.deepEqual(its.map((i) => i.kind).sort(), ['object', 'terrain'], `${reg} T${t}`);
+    }
+    for (const s of Object.values(SPECIES).filter((x) => x.region === reg)) {
+      for (const k of s.needs) {
+        if (k === 'herd') continue;
+        assert.ok(Object.values(ITEMS).some((i) => i.region === reg && i.tier <= s.tier && i.give[k]), `${s.name} ${k}`);
+      }
+      if (s.swim) assert.ok(Object.values(ITEMS).some((i) => i.region === reg && i.tier <= s.tier && i.swim), `${s.name} 헤엄칠 물`);
+    }
   }
-  // 각 동물의 필요는 그 티어까지 해금된 물건으로 채울 수 있다
-  for (const s of Object.values(SPECIES)) for (const k of s.needs) {
-    if (k === 'herd') continue;
-    assert.ok(Object.values(ITEMS).some((i) => i.region === s.region && i.tier <= s.tier && i.give[k]), `${s.name} ${k}`);
+});
+
+test('물에 사는 동물: 헤엄칠 물이 있어야 입양, 물 칸에서만 움직이고, 마지막 물은 치울 수 없다', () => {
+  const S = rich();
+  for (const r of ['grassland', 'seaside']) { S.regions[r].tier = 8; }
+  S.rev++;
+  const W = 'seaside';
+  assert.equal(G.canAdopt(S, W, 'otter').why, '헤엄칠 물이 필요해요');
+  const pool = G.placeItem(S, W, 'tidepool', 4, 4).item;
+  assert.ok(G.adopt(S, W, 'otter').ok);
+  const otter = S.regions[W].animals[0];
+  for (let i = 0; i < 30 * 90; i++) {
+    G.step(S, G.STEP);
+    assert.ok(G.walkable(S, W, Math.floor(otter.x), Math.floor(otter.y), true), '해달은 물 칸 안에 있다');
   }
+  assert.equal(G.removeItem(S, W, pool.uid).why, '물에 사는 동물이 있어서 치울 수 없어요');
+  const lagoon = G.placeItem(S, W, 'lagoon', 10, 10).item;
+  assert.ok(G.removeItem(S, W, pool.uid).ok, '다른 물이 있으면 치울 수 있다');
+  assert.ok(G.walkable(S, W, Math.floor(otter.x), Math.floor(otter.y), true), '치운 물에 있던 해달은 남은 물로 옮긴다');
+  assert.ok(lagoon);
+  // 땅 동물은 물 칸을 걷지 않는다
+  G.adopt(S, W, 'crab');
+  const crab = S.regions[W].animals.find((a) => a.sp === 'crab');
+  for (let i = 0; i < 30 * 60; i++) { G.step(S, G.STEP); assert.ok(G.walkable(S, W, Math.floor(crab.x), Math.floor(crab.y))); }
+});
+
+test('지역 해금 사슬: 초원 T4 → 바닷가, 바닷가 T4 → 사막, 사막 T4 → 남극', () => {
+  const S = rich();
+  assert.equal(G.isUnlocked(S, 'seaside'), false);
+  S.regions.grassland.tier = 4; assert.ok(G.isUnlocked(S, 'seaside')); assert.equal(G.isUnlocked(S, 'desert'), false);
+  S.regions.seaside.tier = 4; assert.ok(G.isUnlocked(S, 'desert')); assert.equal(G.isUnlocked(S, 'antarctic'), false);
+  S.regions.desert.tier = 4; assert.ok(G.isUnlocked(S, 'antarctic'));
 });
 
 test('시간대: 1분마다 아침 → 낮 → 저녁 → 밤, 4분 = 하루, 1일차부터(플레이 시간 기준)', () => {

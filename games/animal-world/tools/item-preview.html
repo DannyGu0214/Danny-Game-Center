@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- 지역 점검표: ?region=<지역>. 위는 시간대별(아침·낮·저녁·밤) 하늘과 땅 견본, 아래는 그 지역 물건 16종을 칸 위에 그린다.
+     헤드리스 Chrome으로 찍어 점검한다(window-size 1200,900). -->
+<meta charset="utf-8">
+<title>지역 점검표</title>
+<style>html, body { margin: 0; background: #f3ead6; } canvas { display: block; }</style>
+<canvas id="c"></canvas>
+<script type="module">
+import * as A from '../art.js';
+import { ITEMS, itemsOf } from '../data.js';
+const region = new URLSearchParams(location.search).get('region') || 'grassland';
+const cv = document.getElementById('c'), W = innerWidth, H = innerHeight, DPR = 1;
+cv.width = W; cv.height = H;
+const ctx = cv.getContext('2d');
+const pal = A.PAL[region] ?? A.PAL.grassland;
+const label = (t, x, y) => { ctx.fillStyle = '#4a3b2a'; ctx.font = '12px system-ui'; ctx.fillText(t, x, y); };
+// 1) 시간대 견본: 하늘 + 작은 섬
+const phases = [[20, '아침'], [80, '낮'], [140, '저녁'], [200, '밤']], sw = W / 4, sh = 250;
+phases.forEach(([time, name], i) => {
+  const c = document.createElement('canvas'); c.width = sw; c.height = sh;
+  const g = c.getContext('2d'), L = A.lightAt(time);
+  A.drawSky(g, sw, sh, sh * 0.42, 3, L, region);
+  const zoom = 0.62, G = 128, ox = sw / 2, oy = sh * 0.48;
+  const pen = { ctx: g, zoom, P: (x, y, z = 0) => [ox + (x - y) * A.ISO_A * zoom, oy + (x + y) * A.ISO_B * zoom - z * zoom] };
+  A.drawIsland(pen, G, 4, pal, 3);
+  if (L.tint[1] > 0.004) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = A.rgba(L.tint[0], L.tint[1]); g.fillRect(0, oy - 10, sw, sh); g.globalCompositeOperation = 'source-over'; }
+  ctx.drawImage(c, i * sw, 0);
+  label(`${region} · ${name}`, i * sw + 8, 16);
+});
+// 2) 물건 16종: 크기에 맞는 땅 조각 위에
+const ids = itemsOf(region), cols = 8, cw = W / cols, ch = (H - sh - 10) / 2, zoom = 1.25;
+ids.forEach((id, i) => {
+  const d = ITEMS[id], cx = (i % cols + 0.5) * cw, cy = sh + 10 + (Math.floor(i / cols) + 0.62) * ch;
+  const P = (x, y, z = 0) => [cx + (x - y) * A.ISO_A * zoom, cy + (x + y) * A.ISO_B * zoom - z * zoom];
+  const pen = { ctx, zoom, P }, hw = (d.w * A.TILE) / 2, hd = (d.h * A.TILE) / 2;
+  A.poly(pen, [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]], pal.tiles[0]);
+  A.drawItem(pen, id, 2);
+  label(`${d.name} T${d.tier} ${d.w}×${d.h}${d.swim ? ' 🌊' : ''}${d.walk ? ' 🚶' : ''}`, (i % cols) * cw + 4, sh + 10 + Math.floor(i / cols) * ch + 14);
+  label(`${id}${A.ITEM_BOX[id] ? '' : ' ⚠ 그림 없음'}`, (i % cols) * cw + 4, sh + 10 + Math.floor(i / cols) * ch + 28);
+});
+document.title = 'ready';
+</script>

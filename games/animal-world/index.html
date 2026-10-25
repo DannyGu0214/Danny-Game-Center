@@ -79,13 +79,10 @@ button:disabled { cursor: default; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* 오른쪽 열: 소리 켜기·끄기, 확대 단계(1× = 땅 전체가 한 화면) */
-.side { position: absolute; right: var(--gutter); top: calc(var(--safe-t) + 104px); z-index: 3; display: flex; flex-direction: column; gap: 8px; }
-.zoombar {
-  display: flex; flex-direction: column; gap: 4px;
-  background: rgba(255, 250, 240, 0.85); border: 1px solid rgba(160, 130, 90, 0.25); border-radius: 14px; padding: 4px; box-shadow: 0 2px 6px rgba(80, 60, 30, 0.12);
-}
-.zoombar button { width: 44px; height: 34px; border-radius: 10px; font: 14px var(--f-display); color: var(--muted); }
+/* 아래 메뉴 위 한 줄: 소리 켜기·끄기(왼쪽), 확대 단계(오른쪽, 1× = 땅 전체가 한 화면) */
+.controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; }
+.zoombar { display: flex; gap: 3px; background: var(--panel-2); border-radius: 12px; padding: 3px; }
+.zoombar button { min-width: 42px; height: 32px; padding: 0 6px; border-radius: 9px; font: 14px var(--f-display); color: var(--muted); }
 .zoombar button.on { background: var(--accent); color: var(--accent-ink); }
 #soundbar button { font-size: 17px; }
 #soundbar button.off { opacity: 0.4; }
@@ -194,13 +191,6 @@ button:disabled { cursor: default; }
     <div class="happy"><span class="n" id="happy">-</span><small>행복도</small></div>
   </header>
   <div class="subhud"><span class="clock" id="clock">🌅 1일차 · 아침</span><div class="hint" id="hint" hidden></div></div>
-  <div class="side">
-    <div class="zoombar" id="soundbar" role="group" aria-label="소리">
-      <button id="musicBtn" aria-pressed="true" aria-label="배경음악">🎵</button><button id="sfxBtn" aria-pressed="true" aria-label="동물 소리">🔊</button>
-    </div>
-    <div class="zoombar" id="zoombar" role="group" aria-label="확대">
-      <button data-z="3">2×</button><button data-z="2">1.6×</button><button data-z="1">1.3×</button><button data-z="0" class="on">1×</button>
-    </div>
   </div>
   <div class="float card" id="card" hidden></div>
   <div class="float placebar" id="placebar" hidden>
@@ -208,13 +198,21 @@ button:disabled { cursor: default; }
     <div class="row-btns"><button class="btn" id="placeDone">완료</button><button class="btn main" id="placeGo">놓기</button></div>
   </div>
   <nav class="bar" id="bar">
+    <div class="controls">
+      <div class="zoombar" id="soundbar" role="group" aria-label="소리">
+        <button id="musicBtn" aria-pressed="true" aria-label="배경음악">🎵</button><button id="sfxBtn" aria-pressed="true" aria-label="동물 소리">🔊</button>
+      </div>
+      <div class="zoombar" id="zoombar" role="group" aria-label="확대">
+        <button data-z="0" class="on">1×</button><button data-z="1">1.3×</button><button data-z="2">1.6×</button><button data-z="3">2×</button>
+      </div>
+    </div>
     <div class="menu">
       <button data-open="animals" id="mAnimals">🦒<span>동물</span><i class="dot" hidden>N</i></button>
       <button data-open="decor" id="mDecor">🌳<span>꾸미기</span><i class="dot" hidden>N</i></button>
       <button data-open="requests" id="mRequests">📋<span>요청</span><i class="dot" hidden></i></button>
       <button data-open="album" id="mAlbum">📷<span>앨범</span></button>
     </div>
-    <div class="regions" id="regions"></div>
+    <div class="regions" id="regions" hidden></div><!-- 지역 전환 줄: 다른 지역을 다 만든 뒤 전환 방식을 정할 때까지 숨김 -->
   </nav>
   <section class="sheet" id="sheet" hidden aria-modal="true" role="dialog">
     <header><h2 id="sheetTitle"></h2><span id="sheetSub"></span><button id="sheetClose" aria-label="닫기">✕</button></header>
@@ -339,12 +337,13 @@ function itemSprite(id, v) {
   return s;
 }
 function islandArt() {
-  if (island) return island;
+  if (island && island.rid === S.view) return island;
+  if (island) island.c.width = island.c.height = 0;
   const m = 10, w = 2 * WG * ISO_A * zoom + 2 * m, h = (2 * WG * ISO_B + SLAB * 1.6) * zoom + 2 * m + 10;
   const ox = WG * ISO_A * zoom + m, oy = m + 8;
   const [c, g] = canvasOf(w, h);
-  A.drawIsland({ ctx: g, zoom, P: (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * zoom] }, WG, GRID, A.PAL.grassland, 3);
-  island = { c, ox, oy, w, h };
+  A.drawIsland({ ctx: g, zoom, P: (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * zoom] }, WG, GRID, A.PAL[S.view] ?? A.PAL.grassland, 3);
+  island = { c, ox, oy, w, h, rid: S.view };
   return island;
 }
 const snap = (v) => Math.round(v * DPR) / DPR;
@@ -352,11 +351,11 @@ function blitAt(s, sx, sy) { sctx.drawImage(s.c, snap(sx - s.ax), snap(sy - s.ay
 
 // ---------- 동물 그림 상태(고개 숙임·눕기 부드럽게) ----------
 const mem = new Map();
-const LIES = new Set(['rabbit', 'meerkat', 'gazelle', 'zebra', 'lion', 'giraffe', 'ostrich']);
+const STANDS_TO_REST = new Set(['elephant']); // 쉴 때 눕지 않는 종(물에 사는 동물도 눕지 않는다)
 function poseOf(a, dt) {
   let m = mem.get(a.uid);
   if (!m) { m = { hd: 0, ly: 0, gait: (a.uid * 0.37) % 1, rig: {}, px: a.x, py: a.y }; mem.set(a.uid, m); }
-  const thd = a.st === 'eat' || a.st === 'drink' ? 1 : 0, tly = a.st === 'rest' && LIES.has(a.sp) ? 1 : 0;
+  const thd = a.st === 'eat' || a.st === 'drink' ? 1 : 0, tly = a.st === 'rest' && !STANDS_TO_REST.has(a.sp) && !SPECIES[a.sp].swim ? 1 : 0;
   const k = Math.min(1, dt * 4);
   m.hd += (thd - m.hd) * k; m.ly += (tly - m.ly) * k;
   // 리그 동물(STRIDE가 있는 종)의 걸음 위상: 화면에서 실제로 움직인 거리(그림 단위) ÷ 보폭. 그래서 발이 미끄러지지 않는다
@@ -373,7 +372,10 @@ function drawOutlined(g, sp, sx, sy, k, pose) {
   const [hw, bh] = A.ANIMAL_BOX[sp], w = Math.ceil((hw * 2 + 24) * k * DPR), h = Math.ceil((bh + 30) * k * DPR); // 위로 넉넉히(뛰어오르는 특수 행동)
   if (outA.width < w || outA.height < h) { outA.width = outB.width = Math.max(w, outA.width); outA.height = outB.height = Math.max(h, outA.height); }
   const W2 = outA.width, H2 = outA.height, ox = W2 / 2, oy = H2 - 6 * k * DPR;
-  g.fillStyle = 'rgba(40,25,10,0.22)'; g.beginPath(); g.ellipse(sx, sy, Math.max(6, hw * 0.8) * k, Math.max(1.6, hw * 0.16) * k, 0, 0, Math.PI * 2); g.fill(); // 그림자는 테두리 밖에, 종 크기만큼
+  if (SPECIES[sp].swim) { // 물에 사는 동물: 그림자 대신 물결 고리
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(0.8, k * 0.8);
+    for (const f of [1, 1.35]) { g.beginPath(); g.ellipse(sx, sy, hw * f * k, hw * f * 0.32 * k, 0, 0, Math.PI * 2); g.stroke(); }
+  } else { g.fillStyle = 'rgba(40,25,10,0.22)'; g.beginPath(); g.ellipse(sx, sy, Math.max(6, hw * 0.8) * k, Math.max(1.6, hw * 0.16) * k, 0, 0, Math.PI * 2); g.fill(); } // 그림자는 테두리 밖에, 종 크기만큼
   oa.setTransform(1, 0, 0, 1, 0, 0); oa.clearRect(0, 0, W2, H2); oa.setTransform(DPR, 0, 0, DPR, 0, 0);
   A.drawAnimal(oa, sp, ox / DPR, oy / DPR, k, { ...pose, shadow: false });
   ob.globalCompositeOperation = 'source-over'; ob.clearRect(0, 0, W2, H2); ob.drawImage(outA, 0, 0);
@@ -401,7 +403,7 @@ function draw(dt) {
   if (!scene.width || !scene.height) return; // 화면 크기가 0이면(숨은 탭·전환 중) 그리지 않는다. 크기가 생기면 resize가 다시 잡는다
   const rid = S.view, L = A.lightAt(S.time), g = sctx;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  A.drawSky(ctx, VW, VH, horizon, drawT, L);
+  A.drawSky(ctx, VW, VH, horizon, drawT, L, rid);
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, scene.width, scene.height); g.setTransform(DPR, 0, 0, DPR, 0, 0);
   const isl = islandArt(), [ix, iy] = P(0, 0, 0);
   g.drawImage(isl.c, snap(ix - isl.ox), snap(iy - isl.oy), isl.w, isl.h);
@@ -534,7 +536,7 @@ function hud() {
   setText($('#tier'), `T${R.tier}`);
   const c = G.clock(S);
   setText($('#clock'), `${PHASE_ICON[c.phase]} ${c.day}일차 · ${G.PHASE_NAME[c.phase]}`);
-  if (R.tier >= MAX_TIER) { setText($('#devtxt'), `발전도 ${st.dev} 🏆`); $('#devbar').style.width = '100%'; }
+  if (R.tier >= MAX_TIER) { setText($('#devtxt'), `🏆 ${st.dev}`); $('#devbar').style.width = '100%'; }
   else {
     const lo = TIERS[R.tier - 1], hi = TIERS[R.tier];
     setText($('#devtxt'), `발전도 ${st.dev} / ${hi}`);
@@ -863,7 +865,7 @@ function tierModal(rid, tier) {
   const sp = speciesOf(rid).filter((s) => SPECIES[s].tier === tier).map((s) => `🆕 ${SPECIES[s].name}`);
   const its = itemsOf(rid).filter((i) => ITEMS[i].tier === tier).map((i) => `🆕 ${ITEMS[i].name}`);
   const unlockedRegion = REGIONS.find((r) => r.unlock && r.unlock.region === rid && r.unlock.tier === tier);
-  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${unlockedRegion.ready ? '' : ' (콘텐츠는 다음 업데이트)'}</p>` : ''}`);
+  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${!unlockedRegion.ready ? ' (콘텐츠는 다음 업데이트)' : $('#regions').hidden ? ' (지역 이동은 곧 추가돼요)' : ''}</p>` : ''}`);
 }
 
 // ---------- 변화 뒤 ----------

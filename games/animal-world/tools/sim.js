@@ -1,14 +1,21 @@
-// 밸런스 봇: 초원을 욕심껏 키우는 플레이어를 흉내 내 티어별 도달 시간을 잰다.
-// 사용: node tools/sim.js [분=240] [시드=7] [포착률=0.6] [요청=1]
+// 밸런스 봇: 한 지역을 욕심껏 키우는 플레이어를 흉내 내 티어별 도달 시간을 잰다.
+// 사용: node tools/sim.js [분=240] [시드=7] [포착률=0.6] [요청=1] [지역=grassland]
 //   포착률: 순간 포착 기회 중 탭하는 비율(0이면 방치형). 요청: 1이면 다 된 요청을 받는다.
+//   다른 지역은 앞 지역을 해금 티어로만 맞춰 두고(동물 없음) 그 지역 하나의 수입으로 처음부터 잰다.
 import * as G from '../logic.js';
-import { ECON, SPECIES, ITEMS, SIZE, MAX_TIER, animalValue, itemPoints, speciesOf, itemsOf } from '../data.js';
+import { ECON, SPECIES, ITEMS, SIZE, MAX_TIER, REGIONS, animalValue, itemPoints, speciesOf, itemsOf } from '../data.js';
 
-const [MIN = 240, SEED = 7, CAP = 0.6, REQ = 1] = process.argv.slice(2).map(Number);
-const R = 'grassland', DT = 0.25;
+const args = process.argv.slice(2);
+const [MIN = 240, SEED = 7, CAP = 0.6, REQ = 1] = args.slice(0, 4).map(Number);
+const REGION = args[4] || 'grassland', DT = 0.25;
+let R = REGION;
 
-export function run({ minutes = MIN, seed = SEED, captureRate = CAP, requests = REQ, log = false } = {}) {
+export function run({ minutes = MIN, seed = SEED, captureRate = CAP, requests = REQ, log = false, region = REGION } = {}) {
+  R = region;
   const S = G.newGame(seed, 0);
+  for (const d of REGIONS) if (d.unlock && (d.id === region || REGIONS.findIndex((x) => x.id === d.id) < REGIONS.findIndex((x) => x.id === region))) S.regions[d.unlock.region].tier = Math.max(S.regions[d.unlock.region].tier, d.unlock.tier);
+  S.rev = (S.rev || 0) + 1;
+  if (region !== 'grassland') { const v = G.setView(S, region); if (!v.ok) throw new Error(v.why); S.requests = []; }
   const tierAt = { 1: 0 };
   let botRng = seed * 7919 + 13;
   const coin = () => ((botRng = (botRng * 1103515245 + 12345) % 2147483648) / 2147483648);
@@ -36,6 +43,11 @@ export function run({ minutes = MIN, seed = SEED, captureRate = CAP, requests = 
 function choose(S) {
   const st = G.stats(S, R), tier = S.regions[R].tier;
   const items = itemsOf(R).filter((id) => ITEMS[id].tier <= tier && G.freeSpot(S, R, id));
+  // 0) 해금된 물에 사는 동물이 있는데 헤엄칠 물이 없으면 가장 싼 물부터
+  if (speciesOf(R).some((sp) => SPECIES[sp].swim && SPECIES[sp].tier <= tier) && !G.swimTiles(S, R).length) {
+    const w = items.filter((id) => ITEMS[id].swim).sort((a, b) => G.priceOfItem(a) - G.priceOfItem(b))[0];
+    if (w) return { kind: 'item', id: w, price: G.priceOfItem(w) };
+  }
   // 1) 모자란 필요를 채운다(공급량 ÷ 가격이 좋은 것)
   for (const k of ['food', 'water', 'shelter']) {
     if (st.ratio[k] >= 1) continue;
@@ -45,7 +57,7 @@ function choose(S) {
   const open = speciesOf(R).filter((sp) => SPECIES[sp].tier <= tier);
   // 2) 새 종
   if (st.species < st.caps.species && st.animals < st.caps.animals) {
-    const sp = open.filter((s) => !st.counts[s]).sort((a, b) => SPECIES[a].tier - SPECIES[b].tier)[0];
+    const sp = open.filter((s) => !st.counts[s] && (!SPECIES[s].swim || G.swimTiles(S, R).length)).sort((a, b) => SPECIES[a].tier - SPECIES[b].tier)[0];
     if (sp) return { kind: 'animal', sp, price: G.priceOfAnimal(sp) };
   }
   // 3) 종마다 4마리까지(높은 티어부터)
@@ -65,7 +77,7 @@ function buy(S, w) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { tierAt, S, income } = run({ log: true });
+  const { tierAt, S, income } = run({ log: true, region: REGION });
   const st = G.stats(S, R);
   console.log(`끝: ${(S.time / 60).toFixed(0)}분, T${S.regions[R].tier}, 발전도 ${st.dev}, 행복도 ${(st.H * 100).toFixed(0)}%, 동물 ${st.animals}마리 ${st.species}종, 물건 ${S.regions[R].items.length}개, 남은 인기 ${Math.floor(S.pop)}`);
   const tot = income.view + income.capture + income.request;

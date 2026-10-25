@@ -45,12 +45,13 @@ export const itemPrice = (tier) => round5(ECON.itemBase * ECON.growth ** (tier -
 
 export const REGIONS = [
   { id: 'grassland', name: '초원', icon: '🌾', ready: true, unlock: null },
-  { id: 'seaside', name: '바닷가', icon: '🏖️', ready: false, unlock: { region: 'grassland', tier: 4 } },
-  { id: 'desert', name: '사막', icon: '🏜️', ready: false, unlock: { region: 'seaside', tier: 4 } },
-  { id: 'antarctic', name: '남극', icon: '🐧', ready: false, unlock: { region: 'desert', tier: 4 } },
+  { id: 'seaside', name: '바닷가', icon: '🏖️', ready: true, unlock: { region: 'grassland', tier: 4 } },
+  { id: 'desert', name: '사막', icon: '🏜️', ready: true, unlock: { region: 'seaside', tier: 4 } },
+  { id: 'antarctic', name: '남극', icon: '🐧', ready: true, unlock: { region: 'desert', tier: 4 } },
 ];
 
 // needs: food·water·shelter는 물건 공급량으로, herd는 같은 종 3마리 이상으로 채운다
+// swim: 물에서만 사는 동물(헤엄칠 수 있는 물건의 칸에서만 움직인다. 그 물이 있어야 입양할 수 있다)
 export const SPECIES = {
   rabbit: { name: '토끼', region: 'grassland', tier: 1, size: 'S', needs: ['food', 'shelter'], special: '깡충 높이뛰기' },
   meerkat: { name: '미어캣', region: 'grassland', tier: 2, size: 'S', needs: ['shelter', 'herd'], special: '두 발로 서서 보초' },
@@ -60,9 +61,36 @@ export const SPECIES = {
   lion: { name: '사자', region: 'grassland', tier: 6, size: 'L', needs: ['shelter', 'water'], special: '하품하며 포효' },
   giraffe: { name: '기린', region: 'grassland', tier: 7, size: 'XL', needs: ['food', 'water'], special: '목 뻗어 잎 먹기' },
   elephant: { name: '코끼리', region: 'grassland', tier: 8, size: 'XL', needs: ['food', 'water', 'herd'], special: '코로 물 뿌리기' },
+
+  crab: { name: '게', region: 'seaside', tier: 1, size: 'S', needs: ['food', 'shelter'], special: '집게 들고 옆걸음 춤' },
+  gull: { name: '갈매기', region: 'seaside', tier: 2, size: 'S', needs: ['food', 'herd'], special: '날개 펴고 날아올랐다 내려앉기' },
+  turtle: { name: '바다거북', region: 'seaside', tier: 3, size: 'M', needs: ['water', 'shelter'], special: '앞지느러미로 모래 파기' },
+  flamingo: { name: '홍학', region: 'seaside', tier: 4, size: 'M', needs: ['water', 'food', 'herd'], special: '한 발로 서서 깃털 고르기' },
+  otter: { name: '해달', region: 'seaside', tier: 5, size: 'M', needs: ['water', 'food'], special: '배 위에 조개 올려 깨기', swim: true },
+  sealion: { name: '바다사자', region: 'seaside', tier: 6, size: 'L', needs: ['water', 'shelter', 'herd'], special: '앞지느러미로 박수 치기' },
+  dolphin: { name: '돌고래', region: 'seaside', tier: 7, size: 'L', needs: ['water', 'food'], special: '물 위로 높이 점프', swim: true },
+  walrus: { name: '바다코끼리', region: 'seaside', tier: 8, size: 'XL', needs: ['water', 'shelter', 'herd'], special: '엄니 들고 크게 울기' },
+
+  lizard: { name: '도마뱀', region: 'desert', tier: 1, size: 'S', needs: ['food', 'shelter'], special: '바위 위에서 팔굽혀펴기' },
+  jerboa: { name: '날쥐', region: 'desert', tier: 2, size: 'S', needs: ['food', 'shelter'], special: '긴 뒷다리로 높이 뛰기' },
+  fennec: { name: '사막여우', region: 'desert', tier: 3, size: 'S', needs: ['food', 'shelter'], special: '큰 귀 쫑긋하고 땅 파기' },
+  snake: { name: '방울뱀', region: 'desert', tier: 4, size: 'M', needs: ['shelter', 'food'], special: '똬리 틀고 꼬리 방울 흔들기' },
+  coyote: { name: '코요테', region: 'desert', tier: 5, size: 'M', needs: ['food', 'water', 'herd'], special: '하늘 보고 울부짖기' },
+  vulture: { name: '독수리', region: 'desert', tier: 6, size: 'M', needs: ['shelter', 'food'], special: '날개 활짝 펴고 날아오르기' },
+  oryx: { name: '오릭스', region: 'desert', tier: 7, size: 'L', needs: ['food', 'water', 'herd'], special: '긴 뿔 휘두르며 껑충' },
+  camel: { name: '낙타', region: 'desert', tier: 8, size: 'XL', needs: ['food', 'water'], special: '무릎 꿇고 앉았다 일어나기' },
+
+  adelie: { name: '아델리펭귄', region: 'antarctic', tier: 1, size: 'S', needs: ['water', 'food', 'herd'], special: '배로 미끄러지기' },
+  skua: { name: '도둑갈매기', region: 'antarctic', tier: 2, size: 'S', needs: ['food', 'shelter'], special: '날개 들고 큰 소리로 울기' },
+  gentoo: { name: '젠투펭귄', region: 'antarctic', tier: 3, size: 'M', needs: ['water', 'food', 'herd'], special: '조약돌 물어 와 선물하기' },
+  weddell: { name: '웨델물범', region: 'antarctic', tier: 4, size: 'L', needs: ['water', 'shelter'], special: '옆으로 뒹굴며 기지개' },
+  king: { name: '킹펭귄', region: 'antarctic', tier: 5, size: 'L', needs: ['water', 'food', 'herd'], special: '고개 들고 트럼펫처럼 울기' },
+  elephantseal: { name: '남방코끼리물범', region: 'antarctic', tier: 6, size: 'XL', needs: ['water', 'shelter', 'herd'], special: '코 부풀리며 포효' },
+  emperor: { name: '황제펭귄', region: 'antarctic', tier: 7, size: 'XL', needs: ['water', 'food', 'herd'], special: '고개 숙여 인사하기' },
+  orca: { name: '범고래', region: 'antarctic', tier: 8, size: 'XL', needs: ['water', 'food', 'herd'], special: '물 위로 머리 내밀기', swim: true },
 };
 
-// kind: terrain(지형지물)·object(사물). w×h칸, walk = 동물이 그 위를 걸을 수 있음, give = 공급량
+// kind: terrain(지형지물)·object(사물). w×h칸, walk = 동물이 그 위를 걸을 수 있음, swim = 물에 사는 동물이 헤엄칠 수 있음, give = 공급량
 export const ITEMS = {
   grass: { name: '풀밭', region: 'grassland', tier: 1, kind: 'terrain', w: 1, h: 1, walk: true, give: { food: 2 } },
   hutch: { name: '은신 상자', region: 'grassland', tier: 1, kind: 'object', w: 1, h: 1, walk: false, give: { shelter: 3 } },
@@ -80,6 +108,57 @@ export const ITEMS = {
   saltlick: { name: '소금 핥기돌', region: 'grassland', tier: 7, kind: 'object', w: 1, h: 1, walk: false, give: { food: 4 } },
   baobab: { name: '바오밥 나무', region: 'grassland', tier: 8, kind: 'terrain', w: 2, h: 2, walk: false, give: { shelter: 6 } },
   tower: { name: '관람 망루', region: 'grassland', tier: 8, kind: 'object', w: 1, h: 1, walk: false, give: {} },
+
+  sand: { name: '모래사장', region: 'seaside', tier: 1, kind: 'terrain', w: 1, h: 1, walk: true, give: { shelter: 2 } },
+  shells: { name: '조개 더미', region: 'seaside', tier: 1, kind: 'object', w: 1, h: 1, walk: false, give: { food: 3 } },
+  tiderock: { name: '갯바위', region: 'seaside', tier: 2, kind: 'terrain', w: 1, h: 1, walk: false, give: { shelter: 3 } },
+  fishbasket: { name: '생선 바구니', region: 'seaside', tier: 2, kind: 'object', w: 1, h: 1, walk: false, give: { food: 5 } },
+  tidepool: { name: '얕은 물', region: 'seaside', tier: 3, kind: 'terrain', w: 2, h: 2, walk: false, swim: true, give: { water: 6 } },
+  parasol: { name: '파라솔', region: 'seaside', tier: 3, kind: 'object', w: 1, h: 1, walk: false, give: { shelter: 3 } },
+  mudflat: { name: '갯벌', region: 'seaside', tier: 4, kind: 'terrain', w: 2, h: 2, walk: true, give: { food: 4, water: 3 } },
+  buoy: { name: '부표', region: 'seaside', tier: 4, kind: 'object', w: 1, h: 1, walk: false, give: {} },
+  kelp: { name: '다시마 숲', region: 'seaside', tier: 5, kind: 'terrain', w: 2, h: 2, walk: false, swim: true, give: { water: 4, food: 4 } },
+  fishtub: { name: '물고기 통', region: 'seaside', tier: 5, kind: 'object', w: 1, h: 1, walk: false, give: { food: 8 } },
+  rockyshore: { name: '바위 해안', region: 'seaside', tier: 6, kind: 'terrain', w: 2, h: 2, walk: false, give: { shelter: 6 } },
+  beachball: { name: '비치볼', region: 'seaside', tier: 6, kind: 'object', w: 1, h: 1, walk: false, give: {} },
+  lagoon: { name: '석호', region: 'seaside', tier: 7, kind: 'terrain', w: 3, h: 3, walk: false, swim: true, give: { water: 14 } },
+  fishfeeder: { name: '물고기 먹이대', region: 'seaside', tier: 7, kind: 'object', w: 1, h: 1, walk: false, give: { food: 10 } },
+  reef: { name: '산호초', region: 'seaside', tier: 8, kind: 'terrain', w: 2, h: 2, walk: false, swim: true, give: { water: 6, food: 4 } },
+  lighthouse: { name: '등대', region: 'seaside', tier: 8, kind: 'object', w: 1, h: 1, walk: false, give: {} },
+
+  rockpile: { name: '바위 더미', region: 'desert', tier: 1, kind: 'terrain', w: 1, h: 1, walk: false, give: { shelter: 3 } },
+  fruitbasket: { name: '선인장 열매 바구니', region: 'desert', tier: 1, kind: 'object', w: 1, h: 1, walk: false, give: { food: 3 } },
+  sandburrow: { name: '모래굴', region: 'desert', tier: 2, kind: 'terrain', w: 1, h: 1, walk: false, give: { shelter: 4 } },
+  drygrass: { name: '마른 풀 다발', region: 'desert', tier: 2, kind: 'object', w: 1, h: 1, walk: false, give: { food: 4 } },
+  cactus: { name: '선인장', region: 'desert', tier: 3, kind: 'terrain', w: 1, h: 1, walk: false, give: { water: 2, food: 1 } },
+  waterbowl: { name: '물그릇', region: 'desert', tier: 3, kind: 'object', w: 1, h: 1, walk: false, give: { water: 4 } },
+  redrock: { name: '붉은 바위', region: 'desert', tier: 4, kind: 'terrain', w: 2, h: 2, walk: false, give: { shelter: 5 } },
+  tent: { name: '그늘 천막', region: 'desert', tier: 4, kind: 'object', w: 1, h: 1, walk: false, give: { shelter: 4 } },
+  oasis: { name: '오아시스', region: 'desert', tier: 5, kind: 'terrain', w: 2, h: 2, walk: false, give: { water: 8 } },
+  foodcrate: { name: '먹이 상자', region: 'desert', tier: 5, kind: 'object', w: 1, h: 1, walk: false, give: { food: 7 } },
+  deadtree: { name: '마른 나무', region: 'desert', tier: 6, kind: 'terrain', w: 1, h: 1, walk: false, give: { shelter: 3 } },
+  perch: { name: '새 횃대', region: 'desert', tier: 6, kind: 'object', w: 1, h: 1, walk: false, give: { shelter: 3 } },
+  bigoasis: { name: '큰 오아시스', region: 'desert', tier: 7, kind: 'terrain', w: 3, h: 3, walk: false, give: { water: 14 } },
+  haycart: { name: '건초 수레', region: 'desert', tier: 7, kind: 'object', w: 1, h: 1, walk: false, give: { food: 9 } },
+  arch: { name: '사암 아치', region: 'desert', tier: 8, kind: 'terrain', w: 2, h: 2, walk: false, give: { shelter: 6 } },
+  caravan: { name: '캐러밴 텐트', region: 'desert', tier: 8, kind: 'object', w: 1, h: 1, walk: false, give: { shelter: 5 } },
+
+  icehole: { name: '얼음구멍', region: 'antarctic', tier: 1, kind: 'terrain', w: 1, h: 1, walk: false, give: { water: 3 } },
+  fishbucket: { name: '생선 양동이', region: 'antarctic', tier: 1, kind: 'object', w: 1, h: 1, walk: false, give: { food: 4 } },
+  snowdrift: { name: '눈더미', region: 'antarctic', tier: 2, kind: 'terrain', w: 1, h: 1, walk: false, give: { shelter: 3 } },
+  pebblenest: { name: '조약돌 둥지', region: 'antarctic', tier: 2, kind: 'object', w: 1, h: 1, walk: false, give: { shelter: 3 } },
+  rockshore: { name: '바위 해안', region: 'antarctic', tier: 3, kind: 'terrain', w: 2, h: 2, walk: false, give: { shelter: 5 } },
+  fishcrate: { name: '물고기 통', region: 'antarctic', tier: 3, kind: 'object', w: 1, h: 1, walk: false, give: { food: 6 } },
+  sealead: { name: '얼음 틈 바다', region: 'antarctic', tier: 4, kind: 'terrain', w: 2, h: 2, walk: false, swim: true, give: { water: 7 } },
+  iceslide: { name: '얼음 미끄럼틀', region: 'antarctic', tier: 4, kind: 'object', w: 1, h: 1, walk: false, give: {} },
+  glacier: { name: '빙하 바위', region: 'antarctic', tier: 5, kind: 'terrain', w: 2, h: 2, walk: false, give: { shelter: 6 } },
+  krill: { name: '크릴 통', region: 'antarctic', tier: 5, kind: 'object', w: 1, h: 1, walk: false, give: { food: 8 } },
+  icecave: { name: '얼음 동굴', region: 'antarctic', tier: 6, kind: 'terrain', w: 2, h: 2, walk: false, give: { shelter: 7 } },
+  flag: { name: '관측 깃발', region: 'antarctic', tier: 6, kind: 'object', w: 1, h: 1, walk: false, give: {} },
+  iceberg: { name: '빙산', region: 'antarctic', tier: 7, kind: 'terrain', w: 2, h: 2, walk: false, give: { shelter: 4 } },
+  snowman: { name: '눈사람', region: 'antarctic', tier: 7, kind: 'object', w: 1, h: 1, walk: false, give: {} },
+  southsea: { name: '남극해', region: 'antarctic', tier: 8, kind: 'terrain', w: 3, h: 3, walk: false, swim: true, give: { water: 16, food: 4 } },
+  station: { name: '연구 기지', region: 'antarctic', tier: 8, kind: 'object', w: 1, h: 1, walk: false, give: {} },
 };
 
 export const speciesOf = (region) => Object.keys(SPECIES).filter((k) => SPECIES[k].region === region);

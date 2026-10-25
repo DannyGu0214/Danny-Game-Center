@@ -125,11 +125,13 @@ function occupancy(S, rid) {
   });
 }
 export const itemAt = (S, rid, x, y) => (inGrid(x, y) ? occupancy(S, rid)[y * GRID + x] : null);
-export function walkable(S, rid, x, y) {
+// swim = 물에 사는 동물: 헤엄칠 수 있는 물건(swim)의 칸만 다닌다. 나머지는 빈칸과 걸을 수 있는 물건(walk)
+export function walkable(S, rid, x, y, swim = false) {
   if (!inGrid(x, y)) return false;
   const it = occupancy(S, rid)[y * GRID + x];
-  return !it || ITEMS[it.id].walk;
+  return swim ? !!(it && ITEMS[it.id].swim) : !it || ITEMS[it.id].walk;
 }
+const isSwimmer = (sp) => !!SPECIES[sp].swim;
 export function fits(S, rid, id, x, y) {
   const d = ITEMS[id];
   if (!d || x < 0 || y < 0 || x + d.w > GRID || y + d.h > GRID) return false;
@@ -166,6 +168,7 @@ export function canAdopt(S, rid, sp) {
   if (!r.ok) return r;
   const R = S.regions[rid], st = stats(S, rid);
   if (R.tier < d.tier) return no(`T${d.tier}에서 해금`);
+  if (d.swim && !swimTiles(S, rid).length) return no('헤엄칠 물이 필요해요');
   if (!st.counts[sp] && st.species >= st.caps.species) return no(`종 한도 ${st.caps.species}종`);
   if (st.animals >= st.caps.animals) return no(`개체 한도 ${st.caps.animals}마리`);
   if (S.pop < priceOfAnimal(sp)) return no('인기점수가 모자라요');
@@ -176,7 +179,7 @@ export function adopt(S, rid, sp) {
   if (!c.ok) return c;
   const price = priceOfAnimal(sp);
   S.pop -= price;
-  const spot = spawnTile(S, rid);
+  const spot = spawnTile(S, rid, isSwimmer(sp));
   const a = {
     uid: S.uid++, sp, x: spot[0] + 0.5, y: spot[1] + 0.5, st: 'idle', t: range(S, 0.5, 2), path: null, goal: null,
     face: rnd(S) < 0.5 ? -1 : 1, ph: range(S, 0, 10), jx: range(S, -0.22, 0.22), jy: range(S, -0.22, 0.22), paid: price,
@@ -220,6 +223,7 @@ export function placeItem(S, rid, id, x, y) {
 export function removeItem(S, rid, uid) {
   const R = S.regions[rid], i = R.items.findIndex((it) => it.uid === uid);
   if (i < 0) return no('없는 물건');
+  if (ITEMS[R.items[i].id].swim && R.animals.some((a) => isSwimmer(a.sp)) && !R.items.some((it, j) => j !== i && ITEMS[it.id].swim)) return no('물에 사는 동물이 있어서 치울 수 없어요');
   const [it] = R.items.splice(i, 1);
   gainRefund(S, it.paid);
   refresh(S, rid);
@@ -229,17 +233,18 @@ export function removeItem(S, rid, uid) {
 
 // ---------- 동물 행동 ----------
 const tileOf = (a) => [clamp(Math.floor(a.x), 0, GRID - 1), clamp(Math.floor(a.y), 0, GRID - 1)];
-function walkTiles(S, rid) {
+function walkTiles(S, rid, swim = false) {
   const out = [];
-  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) if (walkable(S, rid, x, y)) out.push([x, y]);
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) if (walkable(S, rid, x, y, swim)) out.push([x, y]);
   return out;
 }
-function spawnTile(S, rid) {
-  const w = walkTiles(S, rid);
+export const swimTiles = (S, rid) => cached(S, 'swim:' + rid, () => walkTiles(S, rid, true));
+function spawnTile(S, rid, swim = false) {
+  const w = swim ? swimTiles(S, rid) : walkTiles(S, rid);
   return w.length ? pick(S, w) : [Math.floor(GRID / 2), Math.floor(GRID / 2)];
 }
 // 걸을 수 있는 칸만 지나 goal(x,y)=true인 가장 가까운 칸까지. 경로는 시작 칸을 뺀 칸 목록
-export function findPath(S, rid, from, goal) {
+export function findPath(S, rid, from, goal, swim = false) {
   const seen = new Int16Array(GRID * GRID).fill(-1), q = [from[1] * GRID + from[0]];
   seen[q[0]] = q[0];
   for (let h = 0; h < q.length; h++) {
@@ -251,7 +256,7 @@ export function findPath(S, rid, from, goal) {
     }
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = cx + dx, ny = cy + dy, n = ny * GRID + nx;
-      if (inGrid(nx, ny) && seen[n] < 0 && walkable(S, rid, nx, ny)) { seen[n] = cur; q.push(n); }
+      if (inGrid(nx, ny) && seen[n] < 0 && walkable(S, rid, nx, ny, swim)) { seen[n] = cur; q.push(n); }
     }
   }
   return null;
@@ -276,8 +281,11 @@ function servesAt(S, rid, k) {
 // 물건이 놓이거나 치워지면: 막힌 칸에 선 동물은 가까운 빈칸으로 옮기고, 가던 길은 다시 정한다
 function reroute(S, rid) {
   for (const a of S.regions[rid].animals) {
-    const [tx, ty] = tileOf(a);
-    if (!walkable(S, rid, tx, ty)) {
+    const [tx, ty] = tileOf(a), swim = isSwimmer(a.sp);
+    if (swim && !walkable(S, rid, tx, ty, true)) { // 가장 가까운 물 칸으로
+      const w = swimTiles(S, rid);
+      if (w.length) { const to = w.reduce((b, c) => (Math.hypot(c[0] - tx, c[1] - ty) < Math.hypot(b[0] - tx, b[1] - ty) ? c : b)); a.x = to[0] + 0.5; a.y = to[1] + 0.5; }
+    } else if (!swim && !walkable(S, rid, tx, ty)) {
       const p = findPath(S, rid, [tx, ty], (x, y) => walkable(S, rid, x, y) && (x !== tx || y !== ty));
       const to = p && p.length ? p[p.length - 1] : spawnTile(S, rid);
       a.x = to[0] + 0.5; a.y = to[1] + 0.5;
@@ -289,6 +297,15 @@ const NEED_STATE = { food: 'eat', water: 'drink', shelter: 'rest' };
 function decide(S, rid, a) {
   const s = SPECIES[a.sp], R = S.regions[rid], r = rnd(S);
   const from = tileOf(a);
+  if (s.swim) {
+    if (r < 0.3) return arrive(a, rnd(S) < 0.5 ? 'eat' : 'rest');
+    if (r < 0.85) {
+      const tx = clamp(from[0] + Math.round(range(S, -3, 3)), 0, GRID - 1), ty = clamp(from[1] + Math.round(range(S, -3, 3)), 0, GRID - 1);
+      const path = findPath(S, rid, from, (x, y) => x === tx && y === ty, true);
+      if (path && path.length) return go(a, path, null);
+    }
+    a.st = 'idle'; a.t = range(S, 1.5, 4); return;
+  }
   const needs = s.needs.filter((k) => k !== 'herd');
   if (r < 0.38 && needs.length) {
     const k = pick(S, needs), set = servesAt(S, rid, k);
@@ -320,7 +337,7 @@ function moveAnimal(S, rid, a, dt) {
   let left = SIZE[SPECIES[a.sp].size].speed * dt;
   while (left > 0 && a.path && a.path.length) {
     const [tx, ty] = a.path[0];
-    if (!walkable(S, rid, tx, ty)) { a.st = 'idle'; a.t = 0.3; a.path = null; return; }
+    if (!walkable(S, rid, tx, ty, isSwimmer(a.sp))) { a.st = 'idle'; a.t = 0.3; a.path = null; return; }
     const wx = tx + 0.5 + (a.path.length === 1 ? a.jx : 0), wy = ty + 0.5 + (a.path.length === 1 ? a.jy : 0);
     const dx = wx - a.x, dy = wy - a.y, d = Math.hypot(dx, dy);
     const sx = dx - dy; // 화면 가로 방향(쿼터뷰)
@@ -393,7 +410,7 @@ function requestCandidates(S, rid) {
   const room = st.caps.animals - st.animals;
   for (const sp of speciesOf(rid)) {
     const have = st.counts[sp] || 0;
-    if (SPECIES[sp].tier > R.tier || room <= 0 || (!have && st.species >= st.caps.species)) continue;
+    if (SPECIES[sp].tier > R.tier || room <= 0 || (!have && st.species >= st.caps.species) || (SPECIES[sp].swim && !swimTiles(S, rid).length)) continue;
     const add = Math.min(room, 1 + Math.floor(rnd(S) * 2));
     out.push({ kind: 'adopt', sp, n: have + add, minutes: 2 + 2 * add });
     if (have) out.push({ kind: 'photo', sp, n: 1, got: 0, minutes: 3 });
