@@ -78,6 +78,10 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .bar > span { position: absolute; inset: 0 auto 0 0; width: 0; transition: width .15s linear; }
 .bar > em { position: relative; display: block; font-style: normal; font-size: 11px; line-height: 18px; padding: 0 7px; font-family: var(--f-num); font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
 #hpBar > span { background: linear-gradient(90deg, #a63a2c, var(--red)); }
+/* 체력 30% 이하: 게이지가 빨갛게 점멸한다 */
+#hpBar.danger { border-color: var(--red); animation: hpDanger .7s ease-in-out infinite; }
+#hpBar.danger > span { background: linear-gradient(90deg, #d83a2a, #ff6a4a); }
+@keyframes hpDanger { 0%, 100% { box-shadow: 0 0 0 0 rgba(224, 83, 63, 0); background-color: rgba(14, 17, 23, 0.82); } 50% { box-shadow: 0 0 10px 2px rgba(224, 83, 63, 0.75); background-color: rgba(120, 24, 16, 0.85); } }
 .lv-badge {
   flex: none; height: 20px; line-height: 18px; padding: 0 7px; border-radius: 6px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   background: #241d33; border: 1px solid #4b3b75; color: var(--xp);
@@ -394,7 +398,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .gains b { display: block; font-family: var(--f-num); font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) {
-  .raid-pill.on, .toast, .reward-card, .reward-line { animation: none; }
+  .raid-pill.on, .toast, .reward-card, .reward-line, #hpBar.danger { animation: none; }
 }
 </style>
 
@@ -895,6 +899,13 @@ const CHIPS = { wood: ['#c9925a', '#8a6a44', '#e0c29a'], scrap: ['#9aa0a6', '#6a
 const DUST = ['#8a7a5a', '#6a7a50', '#8a8a8a', '#7a7060', '#7a7a78', '#5a5a40', '#a08a60']; // 구역별 발밑 먼지 색
 let playerPhase = 0, gatherT = 0, stepT = 0;
 const escPh = {}; // 탐험 동료 걸음 위상
+// 캐릭터 리그 상태(머리·팔 스프링, 깜빡임, 두리번): 프레임을 넘어 이어지는 객체. 좀비는 zmem 기록을 그대로 쓴다.
+const playerRig = {}, crewRig = {}, rescueRig = {};
+const rigOf = (id) => (crewRig[id] ??= {});
+let plLast = null; const escLast = {};
+// 걸음 위상: 화면에서 실제로 움직인 거리 ÷ 걸음 한 주기 거리 → 디딘 발이 미끄러지지 않는다(A.gaitCycle). 순간이동(귀환 등)은 세지 않는다.
+function screenLen(face) { const c = Math.cos(face), s = Math.sin(face); return Math.hypot((c - s) * ISO_A, (c + s) * ISO_B); }
+function stepPhase(ph, moved, face, kind) { return moved > 60 ? ph : ph + (moved * screenLen(face) / (A.gaitCycle(kind) * A.charScale(kind))) * Math.PI * 2; }
 const zmem = new WeakMap(); // 좀비마다 이전 위치·방향·걸음 주기
 let lastKind = 'melee';
 function floatText(x, y, text, color, big = false) {
@@ -1063,8 +1074,14 @@ function updateFx(dt) {
   decals.length = w;
   if (!S) return;
   const Pl = S.player;
-  playerPhase += dt * (Pl.moving ? 11 * (Pl.stim > 0 ? 1.5 : 1) : 2);
-  for (const v of G.escorts(S)) { const c = S.posts[v.id]; if (c) escPh[v.id] = (escPh[v.id] ?? v.id) + dt * (c.moving ? 11 : 2); }
+  if (plLast) playerPhase = stepPhase(playerPhase, Math.hypot(Pl.x - plLast.x, Pl.y - plLast.y), Pl.face, 'player');
+  plLast = { x: Pl.x, y: Pl.y };
+  for (const v of G.escorts(S)) {
+    const c = S.posts[v.id]; if (!c) continue;
+    const l = escLast[v.id];
+    if (l) escPh[v.id] = stepPhase(escPh[v.id] ?? v.id, Math.hypot(c.x - l.x, c.y - l.y), c.face ?? 0, 'defender');
+    escLast[v.id] = { x: c.x, y: c.y };
+  }
   // 파밍 중: 자원에 맞는 조각이 튄다(고철은 불똥도)
   if (S.gather && !Pl.dead && (gatherT -= dt) <= 0) {
     gatherT = 0.11;
@@ -1265,7 +1282,7 @@ function pushBase(list) {
     const c = S.posts[v.id];
     if (!c || c.x === undefined) continue;
     const ranged = G.ROLES[v.role].ranged;
-    list.push({ k: c.x + c.y + 2, draw: () => drawChar(c.x, c.y, { kind: 'defender', role: v.role, seed: v.id, dir: screenDir(c.face ?? 0), phase: performance.now() / 500 + v.id, moving: false, trim: RARITY_COLOR[v.rarity], weapon: ranged ? 'gun' : 'melee', z: 6 }) });
+    list.push({ k: c.x + c.y + 2, draw: () => drawChar(c.x, c.y, { kind: 'defender', role: v.role, seed: v.id, dir: screenDir(c.face ?? 0), phase: v.id, moving: false, trim: RARITY_COLOR[v.rarity], weapon: ranged ? 'gun' : 'melee', z: 6, rig: rigOf(v.id) }) });
   }
 }
 
@@ -1344,10 +1361,9 @@ function drawZombie(z) {
   let m = zmem.get(z);
   if (!m) { m = { x: z.x, y: z.y, face: Math.atan2(S.player.y - z.y, S.player.x - z.x), phase: z.id }; zmem.set(z, m); }
   const mx = z.x - m.x, my = z.y - m.y, moved = Math.hypot(mx, my);
-  if (moved > 0.05) { m.face = Math.atan2(my, mx); m.phase += moved * (ZPHASE[z.type] ?? 0.24); }
-  else m.phase += 0.02;
+  if (moved > 0.05) { m.face = Math.atan2(my, mx); m.phase = stepPhase(m.phase, moved, m.face, z.type); }
   m.x = z.x; m.y = z.y;
-  drawChar(z.x, z.y, { kind: z.type, dir: screenDir(m.face), phase: m.phase, moving: moved > 0.05, hit: z.hit > 0, seed: z.id, eyes: z.raid ? '#ff5a3c' : '#d8e07a' });
+  drawChar(z.x, z.y, { kind: z.type, dir: screenDir(m.face), phase: m.phase, moving: moved > 0.05, hit: z.hit > 0, seed: z.id, eyes: z.raid ? '#ff5a3c' : '#d8e07a', rig: m });
   if (z.hp < z.max) {
     const [sx, sy] = P(z.x, z.y), k = A.charScale(z.type);
     const w = 22 * zoom * k, top = sy - 40 * zoom * k;
@@ -1355,8 +1371,6 @@ function drawZombie(z) {
     ctx.fillStyle = z.raid ? '#e0533f' : '#d9c45a'; ctx.fillRect(sx - w / 2, top, w * Math.max(0, z.hp / z.max), 3.5 * zoom);
   }
 }
-// 좀비 종류별 걸음 주기(움직인 거리당): 다리가 긴 질주자는 성큼, 덩치 큰 종은 느릿하게
-const ZPHASE = { runner: 0.32, bloater: 0.2, sprinter: 0.3, butcher: 0.2, hulk: 0.14, slayer: 0.19 };
 // 쓰러지는 좀비: 0.45초 동안 넘어지고, 잠깐 누워 있다가 사라진다
 function drawCorpse(c) {
   drawChar(c.x, c.y, { kind: c.type, dir: c.dir, phase: 0, moving: false, seed: c.seed, eyes: '#3a3a2a', fall: Math.min(1, c.t / 0.45), fallSide: c.side, alpha: c.t > 1.1 ? Math.max(0, 1 - (c.t - 1.1) / 0.5) : 1 });
@@ -1409,7 +1423,7 @@ function render(t) {
   const R = S.rescue;
   if (R) {
     list.push({ k: R.x + R.y, draw: () => {
-      drawChar(R.x, R.y, { kind: 'survivor', dir: screenDir(Math.atan2(S.player.y - R.y, S.player.x - R.x)), phase: t * 4, moving: false, wave: true });
+      drawChar(R.x, R.y, { kind: 'survivor', dir: screenDir(Math.atan2(S.player.y - R.y, S.player.x - R.x)), phase: t * 4, moving: false, wave: true, rig: rescueRig });
       const [sx, sy] = P(R.x, R.y, 46);
       const pulse = 1 + Math.sin(t * 6) * 0.08;
       ctx.fillStyle = R.kind === 'siege' ? '#e0533f' : '#5bb8a7';
@@ -1430,14 +1444,14 @@ function render(t) {
   for (const c of fx.corpses) list.push({ k: c.x + c.y - 1, draw: () => drawCorpse(c) });
   if (!Pl.dead) {
     const gun = lastKind === 'gun' && G.gunReady(S);
-    list.push({ k: Pl.x + Pl.y + 0.5, draw: () => drawChar(Pl.x, Pl.y, { kind: 'player', hero: S.hero?.id, dir: screenDir(Pl.face), phase: playerPhase, moving: Pl.moving, trim: Pl.stim > 0 ? '#6fd6e0' : null, weapon: gun ? 'gun' : 'melee', weaponId: gun ? S.equip.gun : S.equip.melee, bag: Math.min(1, G.bagTotal(S) / G.bagCap(S)) }) });
+    list.push({ k: Pl.x + Pl.y + 0.5, draw: () => drawChar(Pl.x, Pl.y, { kind: 'player', hero: S.hero?.id, dir: screenDir(Pl.face), phase: playerPhase, moving: Pl.moving, rig: playerRig, trim: Pl.stim > 0 ? '#6fd6e0' : null, weapon: gun ? 'gun' : 'melee', weaponId: gun ? S.equip.gun : S.equip.melee, bag: Math.min(1, G.bagTotal(S) / G.bagCap(S)) }) });
   }
   // 탐험 동행 동료
   for (const v of G.escorts(S)) {
     const c = S.posts[v.id];
     if (!c || Pl.dead) continue;
     const ranged = G.ROLES[v.role].ranged;
-    list.push({ k: c.x + c.y + 0.4, draw: () => drawChar(c.x, c.y, { kind: 'defender', role: v.role, seed: v.id, dir: screenDir(c.face ?? 0), phase: escPh[v.id] ?? 0, moving: c.moving, trim: RARITY_COLOR[v.rarity], weapon: ranged ? 'gun' : 'melee' }) });
+    list.push({ k: c.x + c.y + 0.4, draw: () => drawChar(c.x, c.y, { kind: 'defender', role: v.role, seed: v.id, dir: screenDir(c.face ?? 0), phase: escPh[v.id] ?? 0, moving: c.moving, trim: RARITY_COLOR[v.rarity], weapon: ranged ? 'gun' : 'melee', rig: rigOf(v.id) }) });
   }
   // 바닥 자국(핏자국·그을음): 땅 위, 오브젝트 아래
   for (const d of decals) {
@@ -1672,6 +1686,7 @@ function hud() {
   const mh = G.maxHp(S);
   const buffs = Pl.stim > 0 ? ` · 스팀팩 ${Math.ceil(Pl.stim)}s` : '';
   setBar('hpBar', S.player.hp / mh, `체력 ${Math.ceil(S.player.hp - 1e-6)}/${Math.round(mh)}${buffs}`); // 방어구 배율의 소수 오차로 111/110처럼 보이지 않게
+  $('#hpBar').classList.toggle('danger', !S.player.dead && S.player.hp <= mh * 0.3); // 30% 이하 경고 점멸
   setText('lvBadge', `${S.hero ? `${S.hero.name} · ` : ''}Lv ${S.level}`);
   const xpPct = S.level >= G.LEVEL_MAX ? 100 : Math.round((S.xp / G.xpToNext(S.level)) * 200) / 2;
   if (hudCache.xp !== xpPct) { hudCache.xp = xpPct; $('#xpFill').style.width = `${xpPct}%`; }

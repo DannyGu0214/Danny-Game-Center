@@ -1301,11 +1301,11 @@ const CHAR = {
   survivor: { skin: '#e9cba6', body: '#d7dde3', legs: '#4c5560', hair: '#5a4632', scale: 0.95, w: 13, hunch: 0, arms: 'walk', boots: '#2a2d33' },
   // 좀비 3등급 6종: 강점이 겉모습에 드러난다(체력형은 덩치, 피해형은 무기 같은 손, 속도형은 마르고 긴 다리)
   runner: { skin: '#a7b08a', legs: '#3d3a31', scale: 0.92, w: 11, hunch: 4.5, arms: 'flail', stride: 5.5, shirts: ['#7a4a3a', '#5a5a6a', '#857a5a'], hair: '#3a2e22' }, // 하급 속도형: 마르고 작게, 팔을 휘저으며 달린다
-  bloater: { skin: '#a3b06a', legs: '#3b3f35', scale: 1.12, w: 19, hunch: 1, arms: 'hang', stride: 3.2, head: 5.3, armW: 4.2, feat: 'belly', shirts: ['#6f6450', '#4f5a68', '#6a5050'], hair: '#2e2a22' }, // 하급 체력형: 불룩한 배, 뒤뚱 걸음
-  sprinter: { skin: '#8e9a86', legs: '#2e3036', scale: 1, w: 10, hunch: 6, arms: 'flail', stride: 7, leg: 1.45, head: 5.3, eyes: '#ff4030', hat: 'hood', hatCol: '#4a4c54', shirts: ['#3e4048', '#4a3e3e'] }, // 중급 속도형: 긴 다리, 낮은 질주 자세, 찢어진 후드
-  butcher: { skin: '#94a37c', legs: '#33302c', scale: 1.18, w: 16, hunch: 2, arms: 'reach', stride: 4, armW: 4.4, feat: 'apron', shirts: ['#5a4a40', '#4a4a50'], hair: '#2a2420' }, // 중급 피해형: 피 묻은 앞치마, 식칼 손
-  hulk: { skin: '#7c8d69', legs: '#262a30', scale: 1.6, w: 20, hunch: 1.2, arms: 'hang', stride: 3.4, head: 5, armW: 5, feat: 'armor', hat: 'helmet', hatCol: '#2a2f38', shirts: ['#3a4250'] }, // 상급 체력형: 진압복 갑옷·헬멧·방패
-  slayer: { skin: '#8a6a62', legs: '#2c2624', scale: 1.35, w: 15, hunch: 3.5, arms: 'reach', stride: 4.8, armW: 3.8, head: 5.2, feat: 'claws', eyes: '#ff6a3c', shirts: ['#4a2a28', '#3a2a2a'] }, // 상급 피해형: 뼈 갈퀴, 드러난 갈비뼈, 붉은 기운
+  bloater: { skin: '#a3b06a', legs: '#3b3f35', scale: 1.12, w: 19, hunch: 3.8, arms: 'lunge', stride: 3.2, head: 5.3, armW: 4.2, feat: 'belly', shirts: ['#6f6450', '#4f5a68', '#6a5050'], hair: '#2e2a22' }, // 하급 체력형: 불룩한 배, 뒤뚱 걸음
+  sprinter: { skin: '#8e9a86', legs: '#2e3036', scale: 1, w: 10, hunch: 6, arms: 'trail', stride: 7, leg: 1.45, head: 5.3, eyes: '#ff4030', hat: 'hood', hatCol: '#4a4c54', shirts: ['#3e4048', '#4a3e3e'] }, // 중급 속도형: 긴 다리, 낮은 질주 자세, 찢어진 후드
+  butcher: { skin: '#94a37c', legs: '#33302c', scale: 1.18, w: 16, hunch: 3, arms: 'chop', stride: 4, armW: 4.4, feat: 'apron', shirts: ['#5a4a40', '#4a4a50'], hair: '#2a2420' }, // 중급 피해형: 피 묻은 앞치마, 식칼 손
+  hulk: { skin: '#7c8d69', legs: '#262a30', scale: 1.6, w: 20, hunch: 3.6, arms: 'lunge', stride: 3.4, head: 5, armW: 5, feat: 'armor', hat: 'helmet', hatCol: '#2a2f38', shirts: ['#3a4250'] }, // 상급 체력형: 진압복 갑옷·헬멧·방패
+  slayer: { skin: '#8a6a62', legs: '#2c2624', scale: 1.35, w: 15, hunch: 3.5, arms: 'claw', stride: 4.8, armW: 3.8, head: 5.2, feat: 'claws', eyes: '#ff6a3c', shirts: ['#4a2a28', '#3a2a2a'] }, // 상급 피해형: 뼈 갈퀴, 드러난 갈비뼈, 붉은 기운
 };
 // 무기 모양: len(화면 길이), col, 종류별 머리 모양
 const ARMS_LOOK = {
@@ -1366,6 +1366,44 @@ const SKINS = ['#e3c4a0', '#d2a67e', '#b9875e', '#8d5f3e'], HAIRS = ['#2a221c', 
 
 export const charScale = (kind) => CHAR[kind]?.scale ?? 1;
 
+// ---------- 몸놀림(2026-10-25, Animal World의 리그 방식을 사람·좀비에 맞춤) ----------
+// 걸음: 다리마다 위상이 있고, 디딘 발(stance)은 땅에 붙어 몸이 간 만큼만 뒤로 가며, 드는 발(swing)은 호를 그린다.
+// 위상은 화면에서 실제로 움직인 거리 ÷ 한 주기 거리(gaitCycle)로 진행시킨다(index.html) → 발이 미끄러지지 않는다.
+// duty 디딤 비율 · stroke 보폭(화면 단위, 크기 1 기준) · lift 드는 높이 · off 두 다리 위상 차 · lurch 상체 휘청(rad) · sway 좌우 뒤뚱 · drag 끄는 다리(±1)
+const GAIT = {
+  human: { duty: 0.6, stroke: 6.5, lift: 2.2, off: 0.5 },
+  runner: { duty: 0.42, stroke: 7, lift: 2.8, off: 0.5, lurch: 0.07 }, // 하급 속도형: 허우적 뜀
+  bloater: { duty: 0.68, stroke: 4.6, lift: 1.3, off: 0.5, sway: 1.6 }, // 하급 체력형: 뒤뚱
+  sprinter: { duty: 0.38, stroke: 9, lift: 3.4, off: 0.5, lurch: 0.05 }, // 중급 속도형: 성큼 질주
+  butcher: { duty: 0.62, stroke: 5.6, lift: 1.8, off: 0.4, drag: 1 }, // 중급 피해형: 한 발을 끈다(엇박)
+  hulk: { duty: 0.7, stroke: 5.2, lift: 1.5, off: 0.5, sway: 1.1 }, // 상급 체력형: 무겁게 뒤뚱
+  slayer: { duty: 0.55, stroke: 6.6, lift: 2.4, off: 0.45, lurch: 0.06, drag: -1 }, // 상급 피해형: 휘청이며 한 발을 끈다
+};
+const gaitOf = (kind) => GAIT[kind] ?? GAIT.human;
+export const gaitCycle = (kind) => gaitOf(kind).stroke / gaitOf(kind).duty; // 걸음 한 주기 동안 몸이 가는 화면 거리(크기 1 기준)
+const TAU = Math.PI * 2, frac = (v) => v - Math.floor(v), smooth = (t) => t * t * (3 - 2 * t);
+function footAt(u, duty, stroke, lift) {
+  if (u < duty) return { x: stroke * (0.5 - u / duty), y: 0 };
+  const t = (u - duty) / (1 - duty);
+  return { x: stroke * (-0.5 + smooth(t)), y: lift * Math.sin(Math.PI * t) };
+}
+// 2-bone IK: 뿌리 r에서 끝 t까지 a·b 두 뼈. 관절은 bend 방향으로 굽는 쪽을 고른다(무릎은 앞, 팔꿈치는 뒤).
+function ikJoint(r, t, a, b, bend) {
+  const vx = t[0] - r[0], vy = t[1] - r[1], d = Math.min(a + b - 0.01, Math.max(Math.abs(a - b) + 0.01, Math.hypot(vx, vy)));
+  const base = Math.atan2(vy, vx), A2 = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))));
+  const k1 = [r[0] + a * Math.cos(base + A2), r[1] + a * Math.sin(base + A2)], k2 = [r[0] + a * Math.cos(base - A2), r[1] + a * Math.sin(base - A2)];
+  const mx = (r[0] + t[0]) / 2, my = (r[1] + t[1]) / 2;
+  return (k1[0] - mx) * bend[0] + (k1[1] - my) * bend[1] >= (k2[0] - mx) * bend[0] + (k2[1] - my) * bend[1] ? k1 : k2;
+}
+// 스프링(2차 움직임): 목표를 늦게·출렁이며 따라간다
+const springTo = (sp, target, k, c, dt) => { sp.v += (k * (target - sp.x) - c * sp.v) * dt; sp.x += sp.v * dt; };
+// 외곽선: 부위마다 진한 밑선을 먼저 모두 긋고 색을 얹는다(관절에 줄이 생기지 않게). 좀비가 많아 오프스크린 실루엣 방식은 쓰지 않는다.
+const OL = 'rgba(16,13,12,0.82)';
+function limb(ctx, pts, ws, col, ol) {
+  for (let i = 0; i < pts.length - 1; i++) stroke(ctx, pts[i], pts[i + 1], OL, ws[i] + ol);
+  for (let i = 0; i < pts.length - 1; i++) stroke(ctx, pts[i], pts[i + 1], col, ws[i]);
+}
+
 export function drawCharacter(pen, x, y, o) {
   let L = CHAR[o.kind] ?? CHAR.runner;
   if (o.role && ROLE_LOOK[o.role]) L = { ...L, ...ROLE_LOOK[o.role], helmet: null };
@@ -1387,37 +1425,67 @@ export function drawCharacter(pen, x, y, o) {
   ctx.fillStyle = 'rgba(0,0,0,0.36)'; ctx.beginPath(); ctx.ellipse(sx, sy, (L.w * 0.65) * sc, 4.4 * sc, 0, 0, Math.PI * 2); ctx.fill();
   if (o.fall) { ctx.translate(sx, sy); ctx.rotate((o.fallSide ?? 1) * o.fall * 1.45); ctx.translate(-sx, -sy); }
   const bob = mv ? Math.abs(Math.sin(ph)) * 1.3 * sc : Math.sin(ph * 0.35) * 0.35 * sc;
+  const GT = gaitOf(human ? 'human' : o.kind), now = performance.now();
+  // 리그 상태(o.rig, 캐릭터마다 이어지는 객체): 머리가 몸을 늦게 따라오고, 좀비 팔이 출렁이며, 사람은 깜빡이고 쉴 때 두리번거린다
+  const R = o.rig && !o.fall ? o.rig : null;
+  if (R) {
+    const dt = R.t ? Math.min(0.05, Math.max(0, (now - R.t) / 1000)) : 0; R.t = now;
+    R.hb ??= { x: bob, v: 0 }; R.arm ??= { x: 0, v: 0 }; R.look ??= { x: 0, v: 0 };
+    if (!(R.lookNext > now)) { R.lookTo = Math.random() < 0.35 ? 0 : Math.random() * 2 - 1; R.lookNext = now + 1500 + Math.random() * 3500; }
+    if (!(R.blinkNext > now)) { R.blinkEnd = now + 130; R.blinkNext = now + 2000 + Math.random() * 4000; }
+    springTo(R.hb, bob, 160, 14, dt);
+    springTo(R.arm, zombie && mv ? Math.sin(ph) * 2.4 + (GT.sway ?? 0) * Math.sin(ph) : 0, 60, 6, dt);
+    springTo(R.look, human && !mv ? R.lookTo : 0, 40, 9, dt);
+  }
+  const swayX = mv && GT.sway ? Math.sin(ph) * GT.sway * sc : 0, breath = Math.sin(now / 1000 * 2.4 + (o.seed ?? 0) * 1.7) * (mv ? 0.3 : 1);
   if (L.feat === 'claws' && !o.fall) { // 학살자: 몸 둘레의 붉은 기운
     const rg = ctx.createRadialGradient(sx, sy - 14 * sc, 2 * sc, sx, sy - 14 * sc, 20 * sc);
     rg.addColorStop(0, 'rgba(220,40,20,0.28)'); rg.addColorStop(1, 'rgba(220,40,20,0)');
     ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(sx, sy - 14 * sc, 20 * sc, 0, Math.PI * 2); ctx.fill();
   }
-  const legK = L.leg ?? 1, lean = L.hunch * sc, tx = sx + dx * lean, hipY = sy - 9 * sc * legK, topY = sy - (21 + 9 * (legK - 1)) * sc - bob + (zombie ? L.hunch * 0.3 * sc : 0);
-  // 다리: 진행 방향으로 엇갈려 내딛는다. 먼 쪽(화면 위쪽) 다리부터.
-  const stride = (L.stride ?? 4.5) * sc;
+  const legK = L.leg ?? 1, lean = L.hunch * sc, tx = sx + dx * lean + px * swayX, hipY = sy - 9 * sc * legK, topY = sy - (21 + 9 * (legK - 1)) * sc - bob + (zombie ? L.hunch * 0.3 * sc : 0);
+  // 다리: 발 고정 걸음 + 무릎 IK. 먼 쪽(화면 위쪽) 다리부터.
+  const cyc = ph / TAU, seg = 9 * legK * sc * 0.54;
   const legs = [-1, 1].map((side) => {
-    const sw = mv ? Math.sin(ph + (side > 0 ? 0 : Math.PI)) : 0, lift = mv ? Math.max(0, Math.cos(ph + (side > 0 ? 0 : Math.PI))) * 1.8 * sc : 0;
-    return { side, k: side * py, hip: [sx + px * side * (L.w * 0.17) * sc, hipY], foot: [sx + px * side * (L.w * 0.2) * sc + dx * sw * stride, sy + dy * sw * stride * 0.5 - lift] };
+    const f = mv ? footAt(frac(cyc + (side > 0 ? 0 : GT.off)), GT.duty, GT.stroke * sc, GT.lift * sc * (GT.drag === side ? 0.18 : 1)) : { x: 0, y: 0 };
+    const hip = [sx + px * side * (L.w * 0.17) * sc, hipY], foot = [sx + px * side * (L.w * 0.2) * sc + dx * f.x, sy + dy * f.x - f.y];
+    return { side, k: side * py, hip, foot, knee: ikJoint(hip, foot, seg, seg, [dx + px * side * 0.35, dy + py * side * 0.35]) };
   }).sort((a, b) => a.k - b.k);
   const bootCol = L.boots ?? shade(L.legs, 0.7);
   for (const g of legs) {
-    stroke(ctx, g.hip, g.foot, C(L.legs), 4.2 * sc);
+    limb(ctx, [g.hip, g.knee, g.foot], [4.4 * sc, 3.8 * sc], C(L.legs), 1.4 * sc);
     if (human) {
-      // 바지 주름(안쪽 그늘)과 밑창 있는 부츠
-      stroke(ctx, [g.hip[0] + 0.9 * sc, g.hip[1] + 1 * sc], [g.foot[0] + 0.9 * sc, g.foot[1] - 2 * sc], C(shade(L.legs, 0.72)), 1.1 * sc);
+      // 정강이 안쪽 그늘과 밑창 있는 부츠
+      stroke(ctx, [g.knee[0] + 0.8 * sc, g.knee[1] + 0.6 * sc], [g.foot[0] + 0.8 * sc, g.foot[1] - 2 * sc], C(shade(L.legs, 0.72)), 1 * sc);
       const fx = g.foot[0] + dx * 1.2 * sc, fy = g.foot[1];
       ctx.fillStyle = C('#121416'); ctx.beginPath(); ctx.ellipse(fx, fy + 0.7 * sc, 2.9 * sc, 1.7 * sc, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = C(bootCol); ctx.beginPath(); ctx.ellipse(fx, fy - 0.2 * sc, 2.6 * sc, 1.9 * sc, 0, 0, Math.PI * 2); ctx.fill();
       dot(ctx, fx - 0.8 * sc, fy - 0.9 * sc, 0.7 * sc, C(shade(bootCol, 1.6)));
-    } else dot(ctx, g.foot[0] + dx * 1 * sc, g.foot[1], 2.2 * sc, C(bootCol));
+    } else { dot(ctx, g.foot[0] + dx * 1 * sc, g.foot[1], 2.9 * sc, OL); dot(ctx, g.foot[0] + dx * 1 * sc, g.foot[1], 2.2 * sc, C(bootCol)); }
   }
+  // 상체 휘청(좀비): 엉덩이를 축으로 좌우로 기운다
+  if (mv && GT.lurch) { ctx.translate(sx, hipY); ctx.rotate(Math.sin(ph) * GT.lurch); ctx.translate(-sx, -hipY); }
+  if (L.arms === 'lunge') { const k = 0.1 + (mv ? 0.06 * Math.abs(Math.sin(ph)) : 0); ctx.translate(sx, hipY); ctx.rotate(k * Math.sign(dx || 1) * Math.min(1, Math.abs(dx) * 1.5)); ctx.translate(-sx, -hipY); } // 진행 방향으로 쏠린다
   // 팔: 어깨 → 손
   // 손을 흔들 때는 어깨를 화면 좌우로 벌린다(옆을 봐도 팔이 머리에 가리지 않게)
   const sh = (side) => (o.wave ? [tx + side * (L.w * 0.5 - 1) * sc, topY + 3 * sc] : [tx + px * side * (L.w * 0.5 - 1) * sc, topY + 3 * sc]);
   const hand = (side) => {
+    const h0 = hand0(side);
+    return R && zombie ? [h0[0] + px * R.arm.x * sc, h0[1] + py * R.arm.x * 0.5 * sc + Math.abs(R.arm.x) * 0.3 * sc] : h0;
+  };
+  const hand0 = (side) => {
     const s0 = sh(side), sw = mv ? Math.sin(ph + (side > 0 ? Math.PI : 0)) : 0;
+    // 덮치기(덩치 큰 좀비): 두 팔을 어깨보다 높이 치켜들어 앞으로 뻗고, 걸음에 맞춰 위아래로 출렁인다
+    if (L.arms === 'lunge') return [s0[0] + dx * 10 * sc + px * side * 1.5 * sc, s0[1] + dy * 5 * sc - 6.5 * sc + Math.sin(ph * 2 + side) * 1.6 * sc * (mv || 0.3)];
     if (L.arms === 'reach') return [s0[0] + dx * 9 * sc, s0[1] + dy * 5 * sc + 2 * sc + Math.sin(ph * 0.5 + side) * 1.2 * sc];
-    if (L.arms === 'flail') return [s0[0] - dx * sw * 6 * sc + px * side * 2 * sc, s0[1] + 6 * sc - Math.abs(sw) * 2 * sc];
+    // 러너: 두 팔을 번갈아 머리 위까지 크게 휘젓는다
+    if (L.arms === 'flail') return [s0[0] - dx * sw * 6 * sc + dx * 3 * sc + px * side * 3 * sc, s0[1] + 3 * sc - (0.5 + 0.5 * Math.sin(ph + side * 1.4)) * 10 * sc * (mv || 0.4)];
+    // 질주자: 낮게 숙이고 팔을 뒤로 젖혀 흔든다
+    if (L.arms === 'trail') return [s0[0] - dx * (7 + sw * 3) * sc + px * side * 2 * sc, s0[1] + 5 * sc - dy * 3 * sc];
+    // 도살자: 긴 두 팔을 몸 앞으로 뻗은 채 위아래·좌우로 흔든다(오른손에 식칼)
+    if (L.arms === 'chop') { const a = mv || 0.4; return [s0[0] + dx * 12 * sc + px * side * (1.5 + Math.sin(ph + side) * 1.8 * a) * sc, s0[1] + dy * 6 * sc - 1 * sc + Math.sin(ph * 2 + side * 1.6) * 3.2 * sc * a]; }
+    // 학살자: 뼈 갈퀴 두 팔을 양옆으로 벌리고 위아래로 크게 휘두른다(두 팔이 엇갈려)
+    if (L.arms === 'claw') return [s0[0] + dx * 5 * sc + px * side * 6.5 * sc, s0[1] - 3 * sc + Math.sin(ph * 2 + (side > 0 ? 0 : Math.PI)) * 6 * sc * (mv || 0.4)];
     if (L.arms === 'hang') return [s0[0] + px * side * 2.5 * sc + dx * sw * 2.5 * sc, s0[1] + 11 * sc];
     if (o.wave) return [s0[0] + side * (3 + Math.sin(ph * 2.2 + side) * 2) * sc, s0[1] - 10 * sc];
     if (o.weapon && side === 1) return [s0[0] + dx * 7 * sc, s0[1] + dy * 4 * sc + 4 * sc];
@@ -1428,8 +1496,12 @@ export function drawCharacter(pen, x, y, o) {
   const wo = o.weaponId || !L.weaponId ? o : { ...o, weaponId: L.weaponId };
   const arms = [-1, 1].map((side) => ({ side, k: side * py })).sort((a, b) => a.k - b.k);
   const drawArm = (side) => {
-    const s0 = sh(side), h = hand(side);
-    stroke(ctx, s0, h, C(armCol), (L.armW ?? (bare ? 3.6 : 3.2)) * sc);
+    const s0 = sh(side), h = hand(side), aw = (L.armW ?? (bare ? 3.6 : 3.2)) * sc, ua = 9.5 * sc * 0.52;
+    // 팔꿈치: 사람은 뒤·바깥으로, 좀비는 뻗은 팔이면 아래로, 늘어뜨린 팔이면 바깥으로 굽는다
+    const out = [px * side, py * side];
+    const bend = o.wave ? [side, 0.5] : human ? [-dx + out[0] * 0.4, -dy * 0.6 + 0.35 + out[1] * 0.4] : L.arms === 'reach' || L.arms === 'lunge' ? [out[0] * 0.3, 1] : L.arms === 'hang' ? [out[0], 0.2] : L.arms === 'claw' || L.arms === 'flail' ? [out[0], out[1] + 0.6] : L.arms === 'chop' ? [out[0] * 0.3, 1] : [-dx, 0.4];
+    const el = ikJoint(s0, h, ua, ua, bend);
+    limb(ctx, [s0, el, h], [aw, aw * 0.9], C(armCol), 1.3 * sc);
     if (zombie && !o.hit) {
       if (L.feat === 'claws') for (const k of [-1, 0, 1]) stroke(ctx, h, [h[0] + dx * 5 * sc + px * k * 1.6 * sc, h[1] + dy * 3 * sc + 1.6 * sc + Math.abs(k) * 0.8 * sc], '#e8dcc0', 0.9 * sc); // 뼈 갈퀴
       if (L.feat === 'apron' && side === 1) { // 도살자 식칼
@@ -1443,9 +1515,9 @@ export function drawCharacter(pen, x, y, o) {
       }
     }
     if (human) {
-      const k = 0.78, cx = s0[0] + (h[0] - s0[0]) * k, cy = s0[1] + (h[1] - s0[1]) * k;
-      if (!bare && o.kind !== 'survivor') stroke(ctx, [cx, cy], [s0[0] + (h[0] - s0[0]) * 0.9, s0[1] + (h[1] - s0[1]) * 0.9], C(shade(body, 0.72)), 3.4 * sc); // 소매 끝
-      if (L.gear === 'cross') stroke(ctx, [s0[0] + (h[0] - s0[0]) * 0.3, s0[1] + (h[1] - s0[1]) * 0.3], [s0[0] + (h[0] - s0[0]) * 0.4, s0[1] + (h[1] - s0[1]) * 0.4], C('#d23c34'), 3 * sc); // 적십자 완장(가는 띠)
+      const at = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+      if (!bare && o.kind !== 'survivor') stroke(ctx, at(el, h, 0.6), at(el, h, 0.78), C(shade(body, 0.72)), 3.4 * sc); // 소매 끝
+      if (L.gear === 'cross') stroke(ctx, at(s0, el, 0.45), at(s0, el, 0.7), C('#d23c34'), 3 * sc); // 적십자 완장(가는 띠)
     }
     dot(ctx, h[0], h[1], 1.7 * sc, C(player ? '#3a332c' : skin)); // 플레이어는 장갑
     if (side === 1 && o.weapon) drawWeapon(ctx, h[0], h[1], dx, dy, wo, sc, C);
@@ -1462,7 +1534,7 @@ export function drawCharacter(pen, x, y, o) {
   if (back) { drawArm(arms[0].side); drawArm(arms[1].side); }
   else { if (!back) bag(); drawArm(arms[0].side); }
   // 몸통: 왼쪽이 밝고 오른쪽이 어둡다
-  const w = (L.w) * sc, th = 13 * sc, bx = tx - w / 2, by = topY, cx = tx;
+  const w = (L.w) * sc, th = 13 * sc * (1 + 0.03 * breath), bx = tx - w / 2, by = topY - (th - 13 * sc), cx = tx; // 숨쉬기: 몸통이 살짝 부풀었다 줄어든다
   const g = ctx.createLinearGradient(bx, 0, bx + w, 0);
   g.addColorStop(0, C(shade(body, 1.12))); g.addColorStop(0.55, C(body)); g.addColorStop(1, C(shade(body, 0.7)));
   rrect(ctx, bx, by, w, th, 4 * sc); ctx.fillStyle = g; ctx.fill();
@@ -1517,15 +1589,18 @@ export function drawCharacter(pen, x, y, o) {
   }
   // 테두리: 등급(trim)이 있으면 그 색, 없으면 어두운 외곽선으로 또렷하게
   if (o.trim) { ctx.strokeStyle = o.hit ? '#ffffff' : o.trim; ctx.lineWidth = 1.2 * sc; rrect(ctx, bx, by, w, th, 4 * sc); ctx.stroke(); }
-  else if (human) { ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.7 * sc; rrect(ctx, bx, by, w, th, 4 * sc); ctx.stroke(); }
+  else { ctx.strokeStyle = OL; ctx.lineWidth = 1 * sc; rrect(ctx, bx, by, w, th, 4 * sc); ctx.stroke(); }
   if (o.kind === 'defender' && !o.role && !o.hit) stroke(ctx, [bx + 1 * sc, by + th * 0.55], [bx + w - 1 * sc, by + th * 0.55], 'rgba(0,0,0,0.3)', 1.6 * sc); // 탄띠(직업 정보가 없을 때)
   if (back) bag(); else drawArm(arms[1].side);
   // 머리
-  const hr = (L.head ?? 5.8) * sc, hx = tx + dx * (zombie ? L.hunch * 0.5 * sc : 0), hy = topY - 5.5 * sc + (zombie ? 1 * sc : 0);
+  const look = R ? R.look.x : 0;
+  const hr = (L.head ?? 5.8) * sc, hx = tx + dx * (zombie ? L.hunch * 0.5 * sc : 0) + (mv ? dx * Math.sin(ph * 2) * 0.35 * sc : 0) + px * look * 0.6 * sc;
+  const hy = topY - 5.5 * sc + (zombie ? 1 * sc : 0) + (R ? bob - R.hb.x : 0); // 머리는 몸 오르내림을 살짝 늦게 따라온다
   const hat = L.hat;
   if (hat === 'hood') dot(ctx, hx - dx * 0.8 * sc, hy - 0.6 * sc, hr * 1.3, C(shade(L.hatCol, 0.85))); // 후드 뒤판
   if (L.hairStyle === 'long' && !back) { rrect(ctx, hx - hr * 1.08, hy - hr * 0.7, hr * 2.16, hr * 2.05, hr * 0.85); ctx.fillStyle = C(hairCol); ctx.fill(); } // 얼굴 뒤로 내려오는 긴 머리
   if (human && hat !== 'hood' && !back) for (const s of [-1, 1]) dot(ctx, hx + px * s * hr * 0.92, hy + 0.6 * sc, 1.3 * sc, C(shade(skin, 0.88))); // 귀
+  if (hat !== 'hood') dot(ctx, hx, hy, hr + 0.75 * sc, OL); // 머리 외곽선
   if (human && !o.hit) { // 얼굴 명암: 왼쪽 위가 밝다
     const rg = ctx.createRadialGradient(hx - hr * 0.35, hy - hr * 0.4, hr * 0.15, hx, hy, hr * 1.05);
     rg.addColorStop(0, shade(skin, 1.1)); rg.addColorStop(0.6, skin); rg.addColorStop(1, shade(skin, 0.78));
@@ -1568,8 +1643,12 @@ export function drawCharacter(pen, x, y, o) {
   if (o.kind === 'slayer' && !o.hit) stroke(ctx, [hx - 2 * sc, hy - 3 * sc], [hx + 2.5 * sc, hy - 1 * sc], 'rgba(60,20,20,0.6)', 0.8 * sc); // 흉터
   if (L.feat === 'armor' && !back && !o.hit) stroke(ctx, [hx - hr * 0.85, hy - 0.2 * sc], [hx + hr * 0.85, hy - 0.2 * sc], 'rgba(20,24,30,0.85)', 2 * sc); // 헬멧 가리개
   if (!back) {
-    const ex = hx + dx * 2.2 * sc, ey = hy - 0.5 * sc + dy * 1 * sc, ew = (zombie ? 1.3 : 0.9) * sc;
-    for (const s of [-1, 1]) dot(ctx, ex + px * s * 2 * sc, ey, ew, o.hit ? '#ffffff' : (L.eyes ?? o.eyes ?? '#2a2018'));
+    const ex = hx + dx * 2.2 * sc + px * look * 1.1 * sc, ey = hy - 0.5 * sc + dy * 1 * sc, ew = (zombie ? 1.3 : 0.9) * sc;
+    const shut = human && R && now < R.blinkEnd; // 사람은 2~6초마다 눈을 깜빡인다
+    for (const s of [-1, 1]) {
+      if (shut) stroke(ctx, [ex + px * s * 2 * sc - 0.9 * sc, ey], [ex + px * s * 2 * sc + 0.9 * sc, ey], '#2a2018', 0.6 * sc);
+      else dot(ctx, ex + px * s * 2 * sc, ey, ew, o.hit ? '#ffffff' : (L.eyes ?? o.eyes ?? '#2a2018'));
+    }
     if (zombie && !o.hit) dot(ctx, ex, ey + 2.6 * sc, 1 * sc, 'rgba(30,10,10,0.8)'); // 벌린 입
     if (human && !o.hit) {
       for (const s of [-1, 1]) stroke(ctx, [ex + px * s * 2.9 * sc, ey - 1.5 * sc], [ex + px * s * 1.2 * sc, ey - 1.7 * sc], hat === 'hood' || !hairCol ? '#3a2a20' : hairCol, 0.6 * sc); // 눈썹
