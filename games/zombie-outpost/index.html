@@ -2,7 +2,7 @@
 <html lang="ko">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Survival Outpost</title>
+<title>Zombie Outpost</title>
 <!-- 독립 실행(PWA): 홈 화면에 추가하면 주소창 없는 세로 전체 화면 앱. claude.ai Artifact 안에서는 아래 파일이 없어도 그대로 돈다. -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0e1117">
@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Survival Outpost">
+<meta name="apple-mobile-web-app-title" content="Zombie Outpost">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -293,7 +293,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 }
 #overModal { z-index: 10; background: rgba(20, 4, 6, 0.82); }
 #overModal.menu { background: rgba(5, 7, 11, 0.72); }
-/* 시작 화면(Danny Soft 로고 → Survival Outpost 타이틀): 픽셀 그림은 title.js, 글자 버튼만 여기 */
+/* 시작 화면(Danny Soft 로고 → Zombie Outpost 타이틀): 픽셀 그림은 title.js, 글자 버튼만 여기 */
 #titleScreen { position: fixed; inset: 0; z-index: 30; background: #05060a; touch-action: manipulation; }
 #titleCanvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
 #titleScreen .title-tag { position: absolute; left: 0; right: 0; margin: 0; text-align: center; color: #e8d9b8; font-family: var(--f-display); font-size: 15px; letter-spacing: .06em; text-shadow: 0 2px 0 #000, 0 0 8px rgba(242, 137, 43, .35); opacity: 0; transition: opacity .6s; pointer-events: none; }
@@ -468,7 +468,7 @@ const cam = { x: 0, y: 0, ready: false };
 
 // ---------- 저장 ----------
 function save() {
-  if (!S) return;
+  if (!S || !S.hero) return; // 생존자를 고르기 전(첫 실행의 시작 화면·고르기 창)에는 저장하지 않는다: 다시 열어도 '시작하기'부터
   try { localStorage.setItem(SAVE_KEY, G.serialize(S)); } catch { /* 저장 불가 환경에서도 게임은 계속 */ }
   S.savedAt = Date.now();
 }
@@ -514,7 +514,7 @@ async function initCloud() {
   } catch { cloud.ref = null; }
 }
 async function pushCloud() {
-  if (!cloud.ref || cloud.busy || !S) return;
+  if (!cloud.ref || cloud.busy || !S || !S.hero) return;
   cloud.busy = true;
   try {
     await cloud.ref.set({ save: G.serialize(S), savedAt: Date.now() });
@@ -2264,7 +2264,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', save);
 
 // ---------- 시작 화면 ----------
-// 켤 때마다 Danny Soft 로고 → Survival Outpost 타이틀. 화면을 누르면 로고를 건너뛰고, 타이틀에서는 주 버튼과 같다.
+// 켤 때마다 Danny Soft 로고 → Zombie Outpost 타이틀. 화면을 누르면 로고를 건너뛰고, 타이틀에서는 주 버튼과 같다.
 // 버튼: 처음이면 '시작하기'(생존자 고르기), 하던 판이 있으면 '이어하기' + '새 게임'(두 번 눌러 확인), 쓰러진 판이면 '새 게임'.
 let titleOn = false, titleRun = null, titleFresh = false, titleNewArmed = 0;
 function showTitle(fresh) {

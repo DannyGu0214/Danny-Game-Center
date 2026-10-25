@@ -6,7 +6,7 @@
 
 | 게임 | 장르 | 상태 | 폴더 |
 |---|---|---|---|
-| Survival Outpost (좀비 아웃포스트) | 세로 화면·쿼터뷰 모바일 웹 게임. 좀비 서바이벌, 수동 파밍, 기지 건설, 동료, 전진기지, 로그라이크 | 플레이 가능 | [`games/zombie-outpost`](games/zombie-outpost) |
+| Zombie Outpost (좀비 아웃포스트) | 세로 화면·쿼터뷰 모바일 웹 게임. 좀비 서바이벌, 수동 파밍, 기지 건설, 동료, 전진기지, 로그라이크 | 플레이 가능 | [`games/zombie-outpost`](games/zombie-outpost) |
 
 ## 공통 규칙
 

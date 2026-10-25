@@ -1,4 +1,4 @@
-// 시작 화면(독립 실행 앱): Danny Soft 로고 → 픽셀 아트 쿼터뷰 타이틀 "Survival Outpost".
+// 시작 화면(독립 실행 앱): Danny Soft 로고 → 픽셀 아트 쿼터뷰 타이틀 "Zombie Outpost".
 // 테마: 붕괴 뒤의 밤, 무너진 도시 끝의 전초기지. 모닥불과 탐조등만이 빛이고, 안개 속 도로로 좀비가 다가온다.
 // 그리는 법: 가로 약 200칸짜리 낮은 해상도 화면에 한 칸(픽셀)씩 그리고, 실제 화면에는 정수 배로 키워 또렷한 픽셀로 보인다.
 //   모양은 스캔라인으로 채워 가장자리가 흐려지지 않고, 반투명(빛·안개·노을)은 4×4 바이어 디더링으로 낸다.
@@ -452,7 +452,7 @@ export function runTitle(canvas, { onLayout, onPhase } = {}) {
   }
 
   function logoMetrics(w, h) {
-    const s1 = 'SURVIVAL', sc1 = Math.max(2, Math.floor((w - 24) / (8 * 6))), w1 = textW(s1, sc1, sc1);
+    const s1 = 'ZOMBIE', sc1 = Math.max(2, Math.floor((w - 24) / (8 * 6))), w1 = textW(s1, sc1, sc1);
     const s2 = 'OUTPOST', sc2 = Math.max(3, Math.floor((w - 16) / (7 * 6))), w2 = textW(s2, sc2, sc2);
     const y1 = Math.round(h * 0.075), y2 = y1 + 7 * sc1 + sc1 + 4;
     return { s1, sc1, w1, s2, sc2, w2, y1, y2, lineY: y2 + 7 * sc2 + 6 };
