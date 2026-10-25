@@ -1,6 +1,6 @@
 # 좀비 아웃포스트 — 분석과 설계
 
-2026-10-24 · macbook-15 `~/Danny-Game-Center/games/zombie-outpost/` (GitHub `DannyGu0214/Danny-Game-Center`, 2026-10-25 `~/danny-agent/zombie-outpost/`에서 옮김)
+2026-10-24 시작 · GitHub `DannyGu0214/Danny-Game-Center`의 `games/zombie-outpost/`
 
 세로 화면·쿼터뷰 모바일 웹 게임. 필드를 혼자 돌며 근접무기와 총기로 싸우고 자원을 모아 기지를 키운다. 구출한 동료에게 방어·생산·탐험 임무를 맡기고(탐험은 필드 동행), 본부 레벨에 따라 전진기지를 늘린다.
 
@@ -228,6 +228,17 @@ The Last Spark는 가로 화면 전용이고(시작 화면에 "Rotate your phone
 | 스팀팩 | 최대 체력 20%를 잃고 60초간 이동·파밍 속도 +50%(체력 20% 이하면 사용 불가) | 약국 진열대, 플라스틱 상자 |
 
 포위된 생존자를 구하면 아이템을 하나 더 준다.
+
+### 독립 실행(PWA)·배포(2026-10-25)
+
+claude.ai Artifact 없이도 정적 파일 그대로 돈다(빌드 없음). GitHub Pages로 배포하고, 휴대폰에서 "홈 화면에 추가"하면 주소창 없는 세로 전체 화면 앱이 된다.
+
+- `manifest.webmanifest`: 이름·세로 고정·전체 화면(standalone, 가능하면 fullscreen)·어두운 배경색·아이콘 192/512/마스크용 512.
+- `sw.js`(서비스 워커): 게임 파일은 네트워크 우선(온라인이면 늘 새 파일이라 저장소를 고치면 바로 반영, 4초 안에 응답이 없거나 오프라인이면 캐시), Google Fonts는 캐시 우선. 설치할 때 게임 파일·아이콘을 미리 담아 인터넷 없이도 실행된다.
+- 서비스 워커는 독립 실행(HTTPS 또는 localhost)에서만 등록하고, claude.ai Artifact 안(`window.claude`)에서는 등록하지 않는다. Artifact도 같은 코드로 계속 돈다.
+- 아이콘(`icons/`)은 게임 그림 코드(art.js)로 그렸다: 달밤·모닥불빛 앞의 생존자와 좀비 둘.
+- 저장: 기기마다 그 브라우저(설치한 앱 포함)의 저장소에 따로 남는다(대니님 결정). claude.ai에서 열 때만 계정 클라우드에도 저장된다.
+- 저장소 루트 `index.html`은 게임 목록 첫 화면, `.nojekyll`은 GitHub Pages가 파일을 그대로 내보내게 한다.
 
 ### 생존자(플레이어 캐릭터)와 기록(2026-10-25)
 

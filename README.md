@@ -6,7 +6,7 @@
 
 | 게임 | 장르 | 상태 | 폴더 |
 |---|---|---|---|
-| 좀비 전초기지 (Zombie Outpost) | 세로 화면·쿼터뷰 모바일 웹 게임. 좀비 서바이벌, 수동 파밍, 기지 건설, 동료, 전진기지, 로그라이크 | 플레이 가능 | [`games/zombie-outpost`](games/zombie-outpost) |
+| 좀비 아웃포스트 (Zombie Outpost) | 세로 화면·쿼터뷰 모바일 웹 게임. 좀비 서바이벌, 수동 파밍, 기지 건설, 동료, 전진기지, 로그라이크 | 플레이 가능 | [`games/zombie-outpost`](games/zombie-outpost) |
 
 ## 공통 규칙
 
@@ -19,6 +19,8 @@ cd games/zombie-outpost && python3 -m http.server 8791
 ```
 
 - 테스트: 각 게임 폴더에서 `npm test`(Node 20 이상).
+- 배포: GitHub Pages(main 브랜치 루트). `main`에 올리면 몇 분 안에 반영돼요. 게임은 PWA라 휴대폰에서 **홈 화면에 추가**하면 앱처럼 설치되고 인터넷 없이도 돌아가요. 저장은 기기마다 그 브라우저에 따로 남아요.
+- 루트 `index.html`은 게임 목록 첫 화면이에요. 새 게임을 추가하면 여기에도 한 칸 넣어요.
 
 ## 새 게임 추가
 

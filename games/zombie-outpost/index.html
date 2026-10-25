@@ -1,6 +1,17 @@
+<!doctype html>
+<html lang="ko">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>좀비 아웃포스트</title>
+<!-- 독립 실행(PWA): 홈 화면에 추가하면 주소창 없는 세로 전체 화면 앱. claude.ai Artifact 안에서는 아래 파일이 없어도 그대로 돈다. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0e1117">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="좀비 아웃포스트">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2251,6 +2262,8 @@ function start(data) {
   requestAnimationFrame(frame);
   initCloud();
 }
+// 독립 실행에서만 오프라인 캐시(서비스 워커)를 켠다. claude.ai Artifact 안(window.claude)에서는 쓰지 않는다.
+if ('serviceWorker' in navigator && !window.claude && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
 window.claude?.hot?.snapshot?.(() => ({ save: S ? G.serialize(S) : null }));
 if (window.claude?.hot?.ready) window.claude.hot.ready(start);
 else start(window.claude?.hot?.data ?? {});
