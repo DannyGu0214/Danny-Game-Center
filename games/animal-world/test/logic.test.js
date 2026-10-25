@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../logic.js';
+import * as T from '../terrain.js';
 import { ECON, TIERS, SPECIES, ITEMS, GRID, animalPrice, itemPrice } from '../data.js';
 
 const R = 'grassland';
@@ -132,9 +133,9 @@ test('물건 놓기: 칸 밖·겹침은 막고, 치우면 50% 환급', () => {
   const S = rich();
   setTier(S, 7);
   assert.equal(G.canPlace(S, R, 'pond', GRID - 2, GRID - 2).why, '놓을 수 없는 자리예요'); // 3×3이 칸 밖으로 나간다
-  assert.ok(G.placeItem(S, R, 'pond', 0, 0).ok);
-  assert.equal(G.canPlace(S, R, 'grass', 2, 2).why, '놓을 수 없는 자리예요');
-  assert.ok(G.canPlace(S, R, 'grass', 3, 0).ok);
+  assert.ok(G.placeItem(S, R, 'pond', 7, 6).ok); // 초원 가운데 저지대
+  assert.equal(G.canPlace(S, R, 'grass', 8, 7).why, '놓을 수 없는 자리예요');
+  assert.ok(G.canPlace(S, R, 'grass', 11, 6).ok);
   assert.equal(G.canPlace(S, R, 'baobab', 0, 5).why, 'T8에서 해금');
   const it = S.regions[R].items[0], before = S.pop;
   assert.ok(G.removeItem(S, R, it.uid).ok);
@@ -158,14 +159,15 @@ test('발전도가 기준을 넘으면 여러 티어도 한 번에, 지역 해�
 test('길찾기는 막힌 칸을 돌아가고, 물건 위에 선 동물은 빈칸으로 옮긴다', () => {
   const S = rich();
   setTier(S, 7);
-  G.placeItem(S, R, 'pond', 3, 3);
-  const p = G.findPath(S, R, [2, 4], (x, y) => x === 6 && y === 4);
+  G.placeItem(S, R, 'pond', 7, 6);
+  const p = G.findPath(S, R, [6, 7], (x, y) => x === 10 && y === 7);
   assert.ok(p && p.length > 4);
   for (const [x, y] of p) assert.ok(G.walkable(S, R, x, y));
   G.adopt(S, R, 'rabbit');
   const a = S.regions[R].animals[0];
-  a.x = 1.5; a.y = 1.5;
-  G.placeItem(S, R, 'rocks', 1, 1);
+  a.x = 16.5; a.y = 3.5;
+  assert.ok(G.placeItem(S, R, 'rocks', 16, 3).ok); // 오른쪽 바위 구릉
+  assert.equal(G.walkable(S, R, 16, 3), false);
   assert.ok(G.walkable(S, R, Math.floor(a.x), Math.floor(a.y)));
 });
 
@@ -285,24 +287,22 @@ test('데이터: 지역마다 동물 8종이 티어 1~8에 하나씩, 물건은 
   }
 });
 
-test('물에 사는 동물: 헤엄칠 물이 있어야 입양, 물 칸에서만 움직이고, 마지막 물은 치울 수 없다', () => {
+test('물에 사는 동물: 바다 지형이나 헤엄칠 물건 칸에서만 움직이고, 바다가 있으면 물건 없이도 입양', () => {
   const S = rich();
   for (const r of ['grassland', 'seaside']) { S.regions[r].tier = 8; }
   S.rev++;
   const W = 'seaside';
-  assert.equal(G.canAdopt(S, W, 'otter').why, '헤엄칠 물이 필요해요');
-  const pool = G.placeItem(S, W, 'tidepool', 4, 4).item;
+  assert.ok(G.canAdopt(S, W, 'otter').ok, '바닷가에는 바다가 있다');
+  const pool = G.placeItem(S, W, 'tidepool', 5, 4).item; // 바닷가 모래 저지대
+  assert.ok(pool);
   assert.ok(G.adopt(S, W, 'otter').ok);
   const otter = S.regions[W].animals[0];
   for (let i = 0; i < 30 * 90; i++) {
     G.step(S, G.STEP);
     assert.ok(G.walkable(S, W, Math.floor(otter.x), Math.floor(otter.y), true), '해달은 물 칸 안에 있다');
   }
-  assert.equal(G.removeItem(S, W, pool.uid).why, '물에 사는 동물이 있어서 치울 수 없어요');
-  const lagoon = G.placeItem(S, W, 'lagoon', 10, 10).item;
-  assert.ok(G.removeItem(S, W, pool.uid).ok, '다른 물이 있으면 치울 수 있다');
-  assert.ok(G.walkable(S, W, Math.floor(otter.x), Math.floor(otter.y), true), '치운 물에 있던 해달은 남은 물로 옮긴다');
-  assert.ok(lagoon);
+  assert.ok(G.removeItem(S, W, pool.uid).ok, '바다가 있으면 마지막 물건 물도 치울 수 있다');
+  assert.ok(G.walkable(S, W, Math.floor(otter.x), Math.floor(otter.y), true), '치운 물에 있던 해달은 바다로 옮긴다');
   // 땅 동물은 물 칸을 걷지 않는다
   G.adopt(S, W, 'crab');
   const crab = S.regions[W].animals.find((a) => a.sp === 'crab');
@@ -334,4 +334,62 @@ test('시간대: 1분마다 아침 → 낮 → 저녁 → 밤, 4분 = 하루, 1�
   assert.equal(G.clock(T).phase, 1);
   T.savedAt = 0; G.settleOffline(T, 3600 * 1000);
   assert.equal(G.clock(T).day, 1);
+});
+
+test('지형: 지도 4장은 20×20이고 걷는 칸이 모두 이어지며, 물건마다 놓을 자리가 있다', () => {
+  for (const rid of ['grassland', 'seaside', 'desert', 'antarctic']) {
+    assert.equal(T.MAPS[rid].length, GRID, rid);
+    for (const row of T.MAPS[rid]) assert.equal(row.length, GRID, rid);
+    const S = rich();
+    const land = [];
+    for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) if (G.walkable(S, rid, x, y)) land.push([x, y]);
+    const [sx, sy] = land[0], p = new Set(), q = [[sx, sy]];
+    p.add(sy * GRID + sx);
+    while (q.length) { const [x, y] = q.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (!p.has(ny * GRID + nx) && G.walkable(S, rid, nx, ny)) { p.add(ny * GRID + nx); q.push([nx, ny]); } } }
+    assert.equal(p.size, land.length, `${rid} 걷는 칸 연결`);
+    for (const id of Object.keys(ITEMS).filter((k) => ITEMS[k].region === rid)) assert.ok(G.freeSpot(S, rid, id), `${rid} ${id} 놓을 자리`);
+  }
+});
+
+test('지형: 봉우리·물은 못 걷고, 물건은 정해진 지형에만, 권하는 지형부터 자리를 고른다', () => {
+  const S = rich();
+  setTier(S, 8);
+  assert.equal(T.kindAt(R, 0, 0), 'peak');
+  assert.equal(G.walkable(S, R, 0, 0), false, '봉우리');
+  assert.equal(G.walkable(S, 'seaside', 10, 1), false, '땅 동물은 바다를 못 걷는다');
+  assert.ok(G.walkable(S, 'seaside', 10, 1, true), '헤엄치는 동물은 바다를 다닌다');
+  assert.equal(G.canPlace(S, R, 'pond', 12, 10).why, '저지대에 놓아요', '연못은 저지대에만');
+  assert.equal(G.canPlace(S, R, 'hutch', 2, 1).why, '낮은 언덕·평지에 놓아요', '은신처는 높은 언덕에 못 놓는다');
+  assert.ok(G.canPlace(S, R, 'tower', 2, 1).ok, '망루는 높은 언덕에');
+  assert.equal(G.canPlace(S, R, 'feeder', 0, 9).why, '낮은 언덕·평지에 놓아요', '길은 비워 둔다');
+  assert.equal(T.kindAt(R, ...G.freeSpot(S, R, 'hutch')), 'hill', '은신처는 낮은 언덕부터');
+  assert.equal(T.kindAt(R, ...G.freeSpot(S, R, 'tower')), 'high', '망루는 높은 언덕부터');
+  assert.equal(T.kindAt(R, ...G.freeSpot(S, R, 'puddle')), 'low');
+  // 여러 칸 물건은 높이가 같은 칸에만(낮은 언덕과 평지에 걸치면 안 된다)
+  assert.equal(T.terrainFits(R, 'rocks', 15, 4), false);
+});
+
+test('지형 이전: 지형 전 세이브의 맞지 않는 물건은 맞는 자리로 옮기고, 자리가 없으면 전액 환불', () => {
+  const S = rich(1000);
+  setTier(S, 7);
+  const Rg = S.regions[R];
+  Rg.items.push({ uid: 900, id: 'pond', x: 0, y: 0, paid: 50 }, { uid: 901, id: 'hutch', x: 9, y: 10, paid: 10 }, { uid: 902, id: 'tower', x: 5, y: 5, paid: 99 });
+  for (let i = 0; i < 4; i++) Rg.items.push({ uid: 910 + i, id: 'pond', x: 0, y: 0, paid: 50 }); // 저지대 자리보다 많은 연못
+  G.adopt(S, R, 'rabbit');
+  const a = Rg.animals[0]; a.x = 0.5; a.y = 0.5; // 봉우리 위
+  const raw = G.serialize(S, 0), L = G.deserialize(raw);
+  const items = L.regions[R].items;
+  for (const it of items) assert.ok(T.terrainFits(R, it.id, it.x, it.y), it.id);
+  assert.ok(items.some((it) => it.uid === 901 && it.x === 9 && it.y === 10), '맞는 물건은 그대로');
+  const ponds = items.filter((it) => it.id === 'pond').length, refunded = 5 - ponds;
+  assert.ok(ponds >= 1 && refunded >= 1, `연못 ${ponds}개 남고 ${refunded}개 환불`);
+  assert.equal(L.pop, S.pop + refunded * 50);
+  const ev = L.events.find((e) => e.type === 'terrain');
+  assert.ok(ev && ev.refunded === refunded);
+  const b = L.regions[R].animals[0];
+  assert.ok(G.walkable(L, R, Math.floor(b.x), Math.floor(b.y)), '봉우리 위 동물은 걷는 칸으로');
+  // 이미 맞는 세이브는 손대지 않는다
+  const again = G.deserialize(G.serialize(L, 0));
+  assert.deepEqual(again.regions, L.regions);
+  assert.equal(again.events.length, 0);
 });

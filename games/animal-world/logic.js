@@ -4,6 +4,7 @@ import {
   GRID, MAX_TIER, TIERS, caps, SIZE, ECON, REGIONS, SPECIES, ITEMS,
   animalValue, itemPoints, animalPrice, itemPrice, speciesOf, itemsOf,
 } from './data.js';
+import { TERRAIN, kindAt, terrainFits, allowedOn, hasWater, terrainOf } from './terrain.js';
 
 export const STEP = 1 / 30;
 export const SAVE_VERSION = 1;
@@ -125,24 +126,30 @@ function occupancy(S, rid) {
   });
 }
 export const itemAt = (S, rid, x, y) => (inGrid(x, y) ? occupancy(S, rid)[y * GRID + x] : null);
-// swim = 물에 사는 동물: 헤엄칠 수 있는 물건(swim)의 칸만 다닌다. 나머지는 빈칸과 걸을 수 있는 물건(walk)
+// swim = 물에 사는 동물: 물 지형(바다·호수)과 헤엄칠 수 있는 물건(swim)의 칸만 다닌다.
+// 나머지는 걸을 수 있는 지형(봉우리·물 제외)의 빈칸과 걸을 수 있는 물건(walk)
 export function walkable(S, rid, x, y, swim = false) {
   if (!inGrid(x, y)) return false;
-  const it = occupancy(S, rid)[y * GRID + x];
-  return swim ? !!(it && ITEMS[it.id].swim) : !it || ITEMS[it.id].walk;
+  const it = occupancy(S, rid)[y * GRID + x], t = TERRAIN[kindAt(rid, x, y)];
+  if (swim) return !!t.swim || !!(it && ITEMS[it.id].swim);
+  return t.walk && (!it || ITEMS[it.id].walk);
 }
 const isSwimmer = (sp) => !!SPECIES[sp].swim;
 export function fits(S, rid, id, x, y) {
   const d = ITEMS[id];
   if (!d || x < 0 || y < 0 || x + d.w > GRID || y + d.h > GRID) return false;
+  if (!terrainFits(rid, id, x, y)) return false; // 지형마다 놓을 수 있는 물건이 정해져 있다(terrain.js)
   const occ = occupancy(S, rid);
   for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GRID + xx]) return false;
   return true;
 }
-// 물건이 들어갈 자리(가운데에 가까운 순서). 없으면 null
+// 물건이 들어갈 자리: 그 물건에 권하는 지형(은신처·먹이 → 낮은 언덕, 놀이 → 높은 언덕) 먼저, 그다음 가운데에 가까운 순서. 없으면 null
 export function freeSpot(S, rid, id) {
-  const d = ITEMS[id], c = (GRID - 1) / 2, cand = [];
-  for (let y = 0; y + d.h <= GRID; y++) for (let x = 0; x + d.w <= GRID; x++) cand.push([x, y, Math.hypot(x + (d.w - 1) / 2 - c, y + (d.h - 1) / 2 - c)]);
+  const d = ITEMS[id], c = (GRID - 1) / 2, cand = [], on = allowedOn(id);
+  for (let y = 0; y + d.h <= GRID; y++) for (let x = 0; x + d.w <= GRID; x++) {
+    const pref = on.indexOf(kindAt(rid, x, y));
+    if (pref >= 0) cand.push([x, y, pref * 100 + Math.hypot(x + (d.w - 1) / 2 - c, y + (d.h - 1) / 2 - c)]);
+  }
   cand.sort((a, b) => a[2] - b[2]);
   for (const [x, y] of cand) if (fits(S, rid, id, x, y)) return [x, y];
   return null;
@@ -199,12 +206,15 @@ export function release(S, rid, uid) {
 }
 const gainRefund = (S, paid) => { S.pop += Math.floor(paid * ECON.refund); };
 
+// 물건을 놓을 수 있는 지형 이름(예: '낮은 언덕·평지')
+export const terrainNames = (id) => allowedOn(id).map((k) => TERRAIN[k].name).join('·');
 export function canPlace(S, rid, id, x, y) {
   const d = ITEMS[id];
   if (!d || d.region !== rid) return no('이 지역 물건이 아니에요');
   const r = regionOpen(S, rid);
   if (!r.ok) return r;
   if (S.regions[rid].tier < d.tier) return no(`T${d.tier}에서 해금`);
+  if (x >= 0 && y >= 0 && x + d.w <= GRID && y + d.h <= GRID && !terrainFits(rid, id, x, y)) return no(`${terrainNames(id)}에 놓아요`);
   if (!fits(S, rid, id, x, y)) return no('놓을 수 없는 자리예요');
   if (S.pop < priceOfItem(id)) return no('인기점수가 모자라요');
   return ok;
@@ -223,7 +233,7 @@ export function placeItem(S, rid, id, x, y) {
 export function removeItem(S, rid, uid) {
   const R = S.regions[rid], i = R.items.findIndex((it) => it.uid === uid);
   if (i < 0) return no('없는 물건');
-  if (ITEMS[R.items[i].id].swim && R.animals.some((a) => isSwimmer(a.sp)) && !R.items.some((it, j) => j !== i && ITEMS[it.id].swim)) return no('물에 사는 동물이 있어서 치울 수 없어요');
+  if (ITEMS[R.items[i].id].swim && !hasWater(rid) && R.animals.some((a) => isSwimmer(a.sp)) && !R.items.some((it, j) => j !== i && ITEMS[it.id].swim)) return no('물에 사는 동물이 있어서 치울 수 없어요');
   const [it] = R.items.splice(i, 1);
   gainRefund(S, it.paid);
   refresh(S, rid);
@@ -312,6 +322,14 @@ function decide(S, rid, a) {
     const path = findPath(S, rid, from, (x, y) => set[y * GRID + x] === 1);
     if (path) return go(a, path, NEED_STATE[k]);
   }
+  if (r < 0.5) {
+    // 높은 언덕에 올라가 쉬거나(전망), 가까운 길로 나선다(길을 조금 더 좋아하지만 길로만 다니지는 않는다)
+    const want = r < 0.44 ? 'high' : 'path', near = terrainTiles(rid, want).filter(([x, y]) => Math.abs(x - from[0]) + Math.abs(y - from[1]) <= (want === 'high' ? 12 : 6));
+    if (near.length) {
+      const [tx, ty] = pick(S, near), path = findPath(S, rid, from, (x, y) => x === tx && y === ty);
+      if (path && path.length) return go(a, path, want === 'high' ? 'rest' : null);
+    }
+  }
   if (r < 0.8) {
     // 배회: 무리 동물은 같은 종 근처로
     let cx = from[0], cy = from[1], rad = 5;
@@ -324,6 +342,12 @@ function decide(S, rid, a) {
     if (path && path.length) return go(a, path, null);
   }
   a.st = 'idle'; a.t = range(S, 1.5, 4.5);
+}
+const tTiles = {};
+function terrainTiles(rid, kind) {
+  const key = rid + ':' + kind;
+  if (!tTiles[key]) { tTiles[key] = []; terrainOf(rid).forEach((k, i) => { if (k === kind) tTiles[key].push([i % GRID, (i - (i % GRID)) / GRID]); }); }
+  return tTiles[key];
 }
 function go(a, path, then) {
   if (!path.length) return arrive(a, then);
@@ -514,7 +538,31 @@ export function deserialize(raw) {
     R.animals = R.animals.filter((a) => SPECIES[a.sp]);
   }
   touch(S);
+  fitTerrain(S);
   return S;
+}
+
+// 지형이 생기기 전 세이브: 지형에 맞지 않는 물건은 가까운 맞는 자리로 옮기고, 자리가 없으면 낸 값을 모두 돌려준다.
+// 동물은 걸을 수 없는 칸(봉우리·물, 헤엄치는 동물은 물 밖)에 서 있으면 가까운 칸으로 옮긴다
+export function fitTerrain(S) {
+  const out = { moved: 0, refunded: 0 };
+  for (const r of REGIONS) {
+    const R = S.regions[r.id], bad = R.items.filter((it) => !terrainFits(r.id, it.id, it.x, it.y));
+    if (!bad.length) continue;
+    R.items = R.items.filter((it) => !bad.includes(it));
+    touch(S);
+    for (const it of bad) {
+      const at = freeSpot(S, r.id, it.id);
+      if (at) { it.x = at[0]; it.y = at[1]; R.items.push(it); out.moved++; } else { S.pop += it.paid; out.refunded++; }
+      touch(S);
+    }
+  }
+  for (const r of REGIONS) {
+    const off = (a) => { const [x, y] = tileOf(a); return !walkable(S, r.id, x, y, isSwimmer(a.sp)); };
+    if (S.regions[r.id].animals.some(off)) reroute(S, r.id);
+  }
+  if (out.moved || out.refunded) S.events.push({ type: 'terrain', ...out });
+  return out;
 }
 
 export { GRID, MAX_TIER, TIERS };

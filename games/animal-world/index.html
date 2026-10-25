@@ -228,6 +228,7 @@ button:disabled { cursor: default; }
 import * as G from './logic.js';
 import { GRID, MAX_TIER, TIERS, ECON, SIZE, SPECIES, ITEMS, REGIONS, NEED_NAME, NEED_ICON, caps, speciesOf, itemsOf, itemPrice, animalPrice } from './data.js';
 import * as A from './art.js';
+import { LEVEL, heightAt, kindAt, allowedOn } from './terrain.js';
 import { createMusic } from './music.js';
 import { createSound } from './sound.js';
 
@@ -235,7 +236,7 @@ const $ = (s) => document.querySelector(s);
 const view = $('#view'), ctx = view.getContext('2d');
 // 땅·물건·동물은 따로 그려 시간대 빛을 입힌 뒤 하늘 위에 얹는다
 const scene = document.createElement('canvas'), sctx = scene.getContext('2d');
-const T = A.TILE, WG = GRID * T, ISO_A = A.ISO_A, ISO_B = A.ISO_B, SLAB = A.slabOf(WG);
+const T = A.TILE, WG = GRID * T, ISO_A = A.ISO_A, ISO_B = A.ISO_B, SLAB = A.slabOf(WG), TOPZ = 3 * LEVEL + A.PEAK_EXTRA; // TOPZ = 가장 높은 지형(봉우리 꼭대기)
 const SAVE_KEY = 'animal-world.save';
 
 let S = null;
@@ -299,10 +300,6 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--bar-h', `
 function P(x, y, z = 0) {
   return [cx - UI.cam.x + (x - y) * ISO_A * zoom, cy - UI.cam.y + (x + y - WG) * ISO_B * zoom - z * zoom];
 }
-function toWorld(sx, sy) {
-  const u = (sx - cx + UI.cam.x) / (ISO_A * zoom), v = (sy - cy + UI.cam.y) / (ISO_B * zoom) + WG;
-  return [(u + v) / 2, (v - u) / 2];
-}
 const pen = { ctx: sctx, zoom: 1, P };
 
 // ---------- 미리 그려 두는 그림 ----------
@@ -312,8 +309,13 @@ let island = null;
 function clearArt() {
   for (const v of sprites.values()) v.c.width = v.c.height = 0;
   sprites.clear();
-  if (island) island.c.width = island.c.height = 0;
+  freeIsland();
   island = null;
+}
+function freeIsland() {
+  if (!island) return;
+  island.c.width = island.c.height = 0;
+  for (const o of island.occ.values()) o.c.width = o.c.height = 0;
 }
 function canvasOf(w, h) {
   const c = document.createElement('canvas');
@@ -336,15 +338,86 @@ function itemSprite(id, v) {
   sprites.set(key, s);
   return s;
 }
+// 땅(지형)과 바닥 물건(풀밭·연못 등)을 한 장으로. 바닥 물건이 바뀌거나 배율·지역이 바뀌면 새로 그린다
 function islandArt() {
-  if (island && island.rid === S.view) return island;
-  if (island) island.c.width = island.c.height = 0;
-  const m = 10, w = 2 * WG * ISO_A * zoom + 2 * m, h = (2 * WG * ISO_B + SLAB * 1.6) * zoom + 2 * m + 10;
-  const ox = WG * ISO_A * zoom + m, oy = m + 8;
-  const [c, g] = canvasOf(w, h);
-  A.drawIsland({ ctx: g, zoom, P: (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * zoom] }, WG, GRID, A.PAL[S.view] ?? A.PAL.grassland, 3);
-  island = { c, ox, oy, w, h, rid: S.view };
+  const R = S.regions[S.view];
+  if (island && island.rid === S.view && island.rev === S.rev) return island;
+  const floors = R.items.filter((it) => A.FLOOR.has(it.id)), sig = floors.map((it) => `${it.uid}:${it.x}:${it.y}`).join(',');
+  if (island && island.rid === S.view && island.sig === sig) { island.rev = S.rev; return island; }
+  freeIsland();
+  const m = 10, w = 2 * WG * ISO_A * zoom + 2 * m, h = (2 * WG * ISO_B + SLAB * 1.6 + TOPZ) * zoom + 2 * m + 10;
+  const ox = WG * ISO_A * zoom + m, oy = m + 8 + TOPZ * zoom;
+  const [c, g] = canvasOf(w, h), IP = (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * zoom];
+  // 바닥 물건은 앞 모서리 칸의 대각선까지 땅을 그린 뒤 끼워 그린다(앞쪽 언덕에 가려지게)
+  A.drawIsland({ ctx: g, zoom, P: IP }, WG, GRID, A.PAL[S.view] ?? A.PAL.grassland, 3, S.view, (dg) => {
+    for (const it of floors) {
+      const d = ITEMS[it.id];
+      if (it.x + d.w - 1 + it.y + d.h - 1 !== dg) continue;
+      const s = itemSprite(it.id, it.uid % 3), [sx, sy] = IP((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it));
+      g.drawImage(s.c, sx - s.ax, sy - s.ay, s.w, s.h);
+    }
+  });
+  island = { c, ox, oy, w, h, rid: S.view, sig, rev: S.rev, occ: new Map() };
   return island;
+}
+// ---------- 지형 높이 ----------
+const itemZ = (it) => heightAt(S.view, it.x, it.y) * LEVEL;
+const groundZ = (a) => (SPECIES[a.sp].swim ? -LEVEL : heightAt(S.view, Math.min(GRID - 1, Math.max(0, Math.floor(a.x))), Math.min(GRID - 1, Math.max(0, Math.floor(a.y)))) * LEVEL);
+// 칸 기둥(윗면 + 앞쪽 옆면)의 화면 육각형. 앞 칸이 낮으면 옆면이 그만큼 내려간다(가장자리는 섬 바닥까지)
+function columnOf(rid, x, y, proj = P) {
+  const h = (xx, yy) => (xx >= GRID || yy >= GRID ? -SLAB / LEVEL : heightAt(rid, xx, yy));
+  const z = heightAt(rid, x, y) * LEVEL, zb = Math.min(z, h(x + 1, y) * LEVEL, h(x, y + 1) * LEVEL), zt = z + (kindAt(rid, x, y) === 'peak' ? A.PEAK_EXTRA : 0);
+  const x0 = x * T, x1 = x0 + T, y0 = y * T, y1 = y0 + T;
+  return [proj(x0, y0, zt), proj(x1, y0, zt), proj(x1, y0, zb), proj(x1, y1, zb), proj(x0, y1, zb), proj(x0, y1, zt)];
+}
+// 뒤에 있는 동물·물건을 가릴 수 있는 칸: 뒤쪽(2칸 안) 칸보다 높은 칸과 봉우리. 지역마다 한 번 계산
+const occCache = {};
+function occludersOf(rid) {
+  if (occCache[rid]) return occCache[rid];
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    const z = heightAt(rid, x, y);
+    let low = Infinity;
+    for (let dy = 0; dy <= 2; dy++) for (let dx = 0; dx <= 2; dx++) if ((dx || dy) && x - dx >= 0 && y - dy >= 0) low = Math.min(low, heightAt(rid, x - dx, y - dy));
+    if (kindAt(rid, x, y) === 'peak' || z > low) out.push({ x, y, key: x + y });
+  }
+  return (occCache[rid] = out);
+}
+const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+// 가리는 칸의 그림: 땅 그림에서 그 칸 기둥 모양으로 한 번 오려 둔다(땅 그림을 새로 그리면 버린다)
+function occArt(o, isl) {
+  let a = isl.occ.get(o);
+  if (a) return a;
+  const IP = (x, y, z = 0) => [isl.ox + isoX(x, y), isl.oy + isoY(x, y) - z * zoom];
+  const q = columnOf(S.view, o.x, o.y, IP), xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
+  const l = Math.floor(Math.min(...xs) * DPR) / DPR, t = Math.floor(Math.min(...ys) * DPR) / DPR, w = Math.max(...xs) - l, h = Math.max(...ys) - t;
+  const [c, g] = canvasOf(w, h);
+  g.beginPath(); g.moveTo(q[0][0] - l, q[0][1] - t); for (let i = 1; i < 6; i++) g.lineTo(q[i][0] - l, q[i][1] - t); g.closePath(); g.clip();
+  g.drawImage(isl.c, -l, -t, isl.w, isl.h);
+  a = { c, l, t, w: c.width / DPR, h: c.height / DPR };
+  isl.occ.set(o, a);
+  return a;
+}
+// 가리는 칸을 다시 찍는다(그 칸에 겹친, 먼저 그린 동물·물건이 있을 때만)
+function stampColumn(o, boxes, isl, ix, iy) {
+  const a = occArt(o, isl), bb = [ix + a.l, iy + a.t, ix + a.l + a.w, iy + a.t + a.h];
+  if (!boxes.some((b) => overlaps(b, bb))) return;
+  sctx.drawImage(a.c, bb[0], bb[1], a.w, a.h);
+}
+function inPoly(q, x, y) {
+  let s = 0;
+  for (let i = 0; i < q.length; i++) {
+    const [ax, ay] = q[i], [bx, by] = q[(i + 1) % q.length], c = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+    if (c !== 0) { if (s && Math.sign(c) !== s) return false; s = Math.sign(c); }
+  }
+  return true;
+}
+// 화면 좌표 → 칸: 앞쪽 칸부터 기둥 육각형에 들어가는 첫 칸(높은 지형이 뒤 칸을 가린다)
+function tileAtScreen(sx, sy) {
+  for (let dg = 2 * (GRID - 1); dg >= 0; dg--) for (let x = Math.min(GRID - 1, dg); x >= Math.max(0, dg - GRID + 1); x--) {
+    if (inPoly(columnOf(S.view, x, dg - x), sx, sy)) return [x, dg - x];
+  }
+  return null;
 }
 const snap = (v) => Math.round(v * DPR) / DPR;
 function blitAt(s, sx, sy) { sctx.drawImage(s.c, snap(sx - s.ax), snap(sy - s.ay), s.w, s.h); }
@@ -354,7 +427,8 @@ const mem = new Map();
 const STANDS_TO_REST = new Set(['elephant']); // 쉴 때 눕지 않는 종(물에 사는 동물도 눕지 않는다)
 function poseOf(a, dt) {
   let m = mem.get(a.uid);
-  if (!m) { m = { hd: 0, ly: 0, gait: (a.uid * 0.37) % 1, rig: {}, px: a.x, py: a.y }; mem.set(a.uid, m); }
+  if (!m) { m = { hd: 0, ly: 0, gait: (a.uid * 0.37) % 1, rig: {}, px: a.x, py: a.y, z: groundZ(a) }; mem.set(a.uid, m); }
+  m.z += (groundZ(a) - m.z) * Math.min(1, dt * 10); // 언덕을 오르내릴 때 높이를 부드럽게
   const thd = a.st === 'eat' || a.st === 'drink' ? 1 : 0, tly = a.st === 'rest' && !STANDS_TO_REST.has(a.sp) && !SPECIES[a.sp].swim ? 1 : 0;
   const k = Math.min(1, dt * 4);
   m.hd += (thd - m.hd) * k; m.ly += (tly - m.ly) * k;
@@ -386,14 +460,15 @@ function drawOutlined(g, sp, sx, sy, k, pose) {
   g.drawImage(outA, x0, y0);
   g.restore();
 }
-function animalScreen(a) { return P(a.x * T, a.y * T); }
+function animalScreen(a) { return P(a.x * T, a.y * T, mem.get(a.uid)?.z ?? groundZ(a)); }
 
 // ---------- 효과(물방울·흙먼지) ----------
 const parts = [];
 function emit(a, kind) {
   const f = a.face;
-  if (kind === 'spray') parts.push({ wx: a.x, wy: a.y, dx: 32 * f, dy: -58, vx: (8 + Math.random() * 14) * f, vy: -10 - Math.random() * 18, g: 60, life: 1.1, t: 0, col: '#7cc3e6', r: 1.4 + Math.random() });
-  if (kind === 'dust') parts.push({ wx: a.x, wy: a.y, dx: (Math.random() - 0.5) * 24, dy: -2, vx: (Math.random() - 0.5) * 10, vy: -6 - Math.random() * 8, g: 4, life: 1, t: 0, col: '#d9bf8a', r: 2.5 + Math.random() * 2 });
+  const wz = mem.get(a.uid)?.z ?? 0;
+  if (kind === 'spray') parts.push({ wx: a.x, wy: a.y, wz, dx: 32 * f, dy: -58, vx: (8 + Math.random() * 14) * f, vy: -10 - Math.random() * 18, g: 60, life: 1.1, t: 0, col: '#7cc3e6', r: 1.4 + Math.random() });
+  if (kind === 'dust') parts.push({ wx: a.x, wy: a.y, wz, dx: (Math.random() - 0.5) * 24, dy: -2, vx: (Math.random() - 0.5) * 10, vy: -6 - Math.random() * 8, g: 4, life: 1, t: 0, col: '#d9bf8a', r: 2.5 + Math.random() * 2 });
 }
 
 // ---------- 그리기 ----------
@@ -405,48 +480,50 @@ function draw(dt) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   A.drawSky(ctx, VW, VH, horizon, drawT, L, rid);
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, scene.width, scene.height); g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const isl = islandArt(), [ix, iy] = P(0, 0, 0);
-  g.drawImage(isl.c, snap(ix - isl.ox), snap(iy - isl.oy), isl.w, isl.h);
+  const isl = islandArt(), [i0x, i0y] = P(0, 0, 0), ix = snap(i0x - isl.ox), iy = snap(i0y - isl.oy);
+  g.drawImage(isl.c, ix, iy, isl.w, isl.h);
   pen.zoom = zoom;
-  if (UI.place) A.drawGrid(pen, WG, GRID);
   const R = S.regions[rid], st = G.stats(S, rid);
-  // 바닥 물건 → 선택 표시 → 서 있는 물건·동물(깊이 순서)
-  const floor = [], stand = [];
-  for (const it of R.items) {
-    const d = ITEMS[it.id], key = it.x + d.w / 2 + it.y + d.h / 2;
-    (A.FLOOR.has(it.id) ? floor : stand).push({ key, it, d });
-  }
-  floor.sort((a, b) => a.key - b.key);
-  for (const o of floor) drawItemAt(o.it, o.d);
-  if (UI.sel?.type === 'item') { const it = R.items.find((i) => i.uid === UI.sel.uid); if (it) A.footprint(pen, it.x, it.y, ITEMS[it.id].w, ITEMS[it.id].h, 'rgba(255,255,255,0.18)', '#ffffff'); }
-  if (UI.place) {
-    const d = ITEMS[UI.place.id], okSpot = G.fits(S, rid, UI.place.id, UI.place.x, UI.place.y), cash = S.pop >= itemPrice(d.tier);
-    A.footprint(pen, UI.place.x, UI.place.y, d.w, d.h, okSpot && cash ? 'rgba(120,220,90,0.35)' : 'rgba(230,80,60,0.35)', okSpot && cash ? '#e8ffd8' : '#ffd2c8');
-  }
-  for (const a of R.animals) stand.push({ key: a.x + a.y + 0.01, a });
+  // 서 있는 물건·동물·가리는 지형 칸을 깊이(칸 x+y) 순서로. 바닥 물건은 땅 그림에 들어 있다
+  const stand = [];
+  for (const it of R.items) { if (A.FLOOR.has(it.id)) continue; const d = ITEMS[it.id]; stand.push({ key: it.x + d.w - 1 + it.y + d.h - 1 + 0.5, it, d }); }
+  for (const a of R.animals) { const tx = Math.floor(a.x), ty = Math.floor(a.y); stand.push({ key: tx + ty + 0.25 + (a.x + a.y - tx - ty) * 0.25, a }); }
+  for (const o of occludersOf(rid)) stand.push(o);
   stand.sort((p, q) => p.key - q.key);
-  const k = animalK();
+  const k = animalK(), boxes = [];
   for (const o of stand) {
-    if (o.it) { drawItemAt(o.it, o.d); continue; }
-    const a = o.a, [sx, sy] = animalScreen(a), pose = poseOf(a, dt);
+    if (o.it) { boxes.push(drawItemAt(o.it, o.d)); continue; }
+    if (!o.a) { if (boxes.length) stampColumn(o, boxes, isl, ix, iy); continue; }
+    const a = o.a, pose = poseOf(a, dt), [sx, sy] = animalScreen(a);
     if (UI.sel?.type === 'animal' && UI.sel.uid === a.uid) {
       const [hw] = A.ANIMAL_BOX[a.sp];
       g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.beginPath(); g.ellipse(sx, sy, hw * k + 4, (hw * k + 4) * 0.42, 0, 0, Math.PI * 2); g.stroke();
     }
-    const kk = k * (0.96 + (a.uid % 5) * 0.02);
+    const kk = k * (0.96 + (a.uid % 5) * 0.02), [bw, bh] = A.ANIMAL_BOX[a.sp];
     if (A.RIGGED.has(a.sp)) drawOutlined(g, a.sp, sx, sy, kk, pose); else A.drawAnimal(g, a.sp, sx, sy, kk, pose);
+    boxes.push([sx - (bw + 4) * kk, sy - (bh + 8) * kk, sx + (bw + 4) * kk, sy + 2 * kk]);
     if (a.st === 'special' && a.sp === 'elephant' && Math.random() < dt * 30) emit(a, 'spray');
     if (a.st === 'special' && a.sp === 'zebra' && Math.random() < dt * 8) emit(a, 'dust');
   }
+  // 선택한 물건 · 놓을 자리(놓을 수 있는 지형 칸을 밝게, 고른 자리는 초록/빨강)
+  if (UI.sel?.type === 'item') { const it = R.items.find((i) => i.uid === UI.sel.uid); if (it) A.footprint(pen, it.x, it.y, ITEMS[it.id].w, ITEMS[it.id].h, 'rgba(255,255,255,0.18)', '#ffffff', itemZ(it)); }
   if (UI.place) {
-    const d = ITEMS[UI.place.id], s = itemSprite(UI.place.id, 0), [gx, gy] = P((UI.place.x + d.w / 2) * T, (UI.place.y + d.h / 2) * T);
+    const id = UI.place.id, d = ITEMS[id], on = allowedOn(id), z = heightAt(rid, UI.place.x, UI.place.y) * LEVEL;
+    for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+      if (!on.includes(kindAt(rid, x, y)) || G.itemAt(S, rid, x, y)) continue;
+      const zz = heightAt(rid, x, y) * LEVEL + 0.3;
+      A.poly(pen, [[x * T + 1, y * T + 1, zz], [(x + 1) * T - 1, y * T + 1, zz], [(x + 1) * T - 1, (y + 1) * T - 1, zz], [x * T + 1, (y + 1) * T - 1, zz]], 'rgba(255,255,255,0.22)');
+    }
+    const okSpot = G.fits(S, rid, id, UI.place.x, UI.place.y), cash = S.pop >= itemPrice(d.tier);
+    A.footprint(pen, UI.place.x, UI.place.y, d.w, d.h, okSpot && cash ? 'rgba(120,220,90,0.35)' : 'rgba(230,80,60,0.35)', okSpot && cash ? '#e8ffd8' : '#ffd2c8', z);
+    const s = itemSprite(id, 0), [gx, gy] = P((UI.place.x + d.w / 2) * T, (UI.place.y + d.h / 2) * T, z);
     g.globalAlpha = 0.6; blitAt(s, gx, gy); g.globalAlpha = 1;
   }
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i];
     p.t += dt; if (p.t > p.life) { parts.splice(i, 1); continue; }
     p.vy += p.g * dt; p.dx += p.vx * dt; p.dy += p.vy * dt;
-    const [sx, sy] = P(p.wx * T, p.wy * T);
+    const [sx, sy] = P(p.wx * T, p.wy * T, p.wz);
     g.globalAlpha = 1 - p.t / p.life; g.fillStyle = p.col;
     g.beginPath(); g.arc(sx + p.dx * k, sy + p.dy * k, p.r * k, 0, Math.PI * 2); g.fill();
   }
@@ -462,8 +539,9 @@ function draw(dt) {
   }
 }
 function drawItemAt(it, d) {
-  const [sx, sy] = P((it.x + d.w / 2) * T, (it.y + d.h / 2) * T);
-  blitAt(itemSprite(it.id, it.uid % 3), sx, sy);
+  const [sx, sy] = P((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it)), s = itemSprite(it.id, it.uid % 3);
+  blitAt(s, sx, sy);
+  return [sx - s.ax, sy - s.ay, sx - s.ax + s.w, sy - s.ay + s.h];
 }
 
 // ---------- 입력: 탭(선택·포착·놓을 자리), 확대 중에는 끌어서 둘러보기 ----------
@@ -498,9 +576,9 @@ function animalAt(x, y) {
 function tap(x, y) {
   const rid = S.view;
   if (UI.place) {
-    const [wx, wy] = toWorld(x, y), d = ITEMS[UI.place.id];
-    const tx = Math.floor(wx / T), ty = Math.floor(wy / T);
-    if (tx < -1 || ty < -1 || tx > GRID || ty > GRID) return;
+    const hit = tileAtScreen(x, y), d = ITEMS[UI.place.id];
+    if (!hit) return;
+    const [tx, ty] = hit;
     UI.place.x = Math.max(0, Math.min(GRID - d.w, tx - Math.floor((d.w - 1) / 2)));
     UI.place.y = Math.max(0, Math.min(GRID - d.h, ty - Math.floor((d.h - 1) / 2)));
     updatePlacebar();
@@ -517,7 +595,7 @@ function tap(x, y) {
   }
   const a = animalAt(x, y);
   if (a) { animalSound(a, 'call'); select({ type: 'animal', uid: a.uid }); return; }
-  const [wx, wy] = toWorld(x, y), it = G.itemAt(S, rid, Math.floor(wx / T), Math.floor(wy / T));
+  const hit = tileAtScreen(x, y), it = hit && G.itemAt(S, rid, hit[0], hit[1]);
   if (it) { select({ type: 'item', uid: it.uid }); return; }
   select(null);
 }
@@ -685,7 +763,7 @@ function sheetDecor(body, tabs) {
   for (const id of itemsOf(rid).filter((i) => ITEMS[i].kind === UI.tab)) {
     const d = ITEMS[id], row = el('div', 'item');
     const cv = el('canvas'); row.appendChild(cv);
-    const info = el('div', null, `<h4>${d.name} <span class="tag">${d.w}×${d.h}</span><span class="tag new" hidden>NEW</span></h4><p>${giveText(id)}${d.walk ? ' · 동물이 걸을 수 있어요' : ''}</p><p class="have"></p>`);
+    const info = el('div', null, `<h4>${d.name} <span class="tag">${d.w}×${d.h}</span><span class="tag new" hidden>NEW</span></h4><p>${giveText(id)}${d.walk ? ' · 동물이 걸을 수 있어요' : ''}</p><p class="where">📍 ${G.terrainNames(id)}</p><p class="have"></p>`);
     row.appendChild(info);
     const side = el('div'), btn = el('button', 'buy'), why = el('small', 'why');
     side.append(btn, why); row.appendChild(side);
@@ -704,7 +782,7 @@ function sheetDecor(body, tabs) {
       setText(o.info.querySelector('.have'), `${n ? `${n}개 놓음 · ` : ''}점수 ${4 + 2 * o.d.tier}${n >= ECON.itemFull ? ' (3개째부터 절반)' : ''}`);
       setText(o.btn, locked ? `🔒 T${o.d.tier}` : `놓기 ⭐${price}`);
       o.btn.disabled = locked || S.pop < price || !room;
-      setText(o.why, locked ? '' : !room ? '빈자리가 없어요' : S.pop < price ? '인기점수가 모자라요' : '');
+      setText(o.why, locked ? '' : !room ? `${G.terrainNames(o.id)}에 빈자리가 없어요` : S.pop < price ? '인기점수가 모자라요' : '');
     }
   };
 }
@@ -822,7 +900,7 @@ function updatePlacebar() {
   if (!UI.place) return;
   const d = ITEMS[UI.place.id], price = itemPrice(d.tier), c = G.canPlace(S, S.view, UI.place.id, UI.place.x, UI.place.y);
   setText($('#placeName'), `${d.name} ⭐${price}`);
-  setText($('#placeInfo'), c.ok ? `${giveText(UI.place.id)} · 칸을 탭해 옮겨요` : c.why);
+  setText($('#placeInfo'), c.ok ? `${giveText(UI.place.id)} · ${G.terrainNames(UI.place.id)} · 칸을 탭해 옮겨요` : c.why);
   $('#placeGo').disabled = !c.ok;
 }
 $('#placeDone').onclick = exitPlace;
@@ -837,10 +915,10 @@ $('#placeGo').onclick = () => {
 };
 
 // ---------- 알림 ----------
-function toast(msg) {
+function toast(msg, ms = 2500) {
   const t = el('div', 'toast', ''); t.textContent = msg;
   $('#toasts').appendChild(t);
-  setTimeout(() => t.remove(), 2500);
+  setTimeout(() => t.remove(), ms);
   while ($('#toasts').children.length > 3) $('#toasts').firstChild.remove();
 }
 function floatNum(x, y, s) {
@@ -879,7 +957,10 @@ function afterChange() {
 }
 function drainEvents() {
   const ev = S.events.splice(0);
-  for (const e of ev) if (e.type === 'tier') tierModal(e.region, e.tier);
+  for (const e of ev) {
+    if (e.type === 'tier') tierModal(e.region, e.tier);
+    if (e.type === 'terrain') toast(`땅에 언덕·저지대·길이 생겼어요 — 물건 ${e.moved}개를 맞는 자리로 옮겼어요${e.refunded ? ` · ${e.refunded}개는 낸 값을 모두 돌려받았어요` : ''}`, 7000);
+  }
   if (ev.length) renderRegions();
 }
 
