@@ -279,3 +279,22 @@ test('데이터: 지역마다 동물 8종이 티어 1~8에 하나씩, 물건은 
     assert.ok(Object.values(ITEMS).some((i) => i.region === s.region && i.tier <= s.tier && i.give[k]), `${s.name} ${k}`);
   }
 });
+
+test('시간대: 1분마다 아침 → 낮 → 저녁 → 밤, 4분 = 하루, 1일차부터(플레이 시간 기준)', () => {
+  const S = G.newGame(1, 0);
+  const at = (sec) => { S.time = sec; return G.clock(S); };
+  assert.deepEqual(at(0), { day: 1, phase: 0, sec: 0 });
+  assert.equal(at(59.9).phase, 0);
+  assert.equal(at(60).phase, 1);
+  assert.equal(at(130).phase, 2);
+  assert.equal(at(239).phase, 3);
+  assert.deepEqual(at(240), { day: 2, phase: 0, sec: 0 });
+  assert.equal(at(240 * 9 + 200).day, 10);
+  assert.equal(G.PHASE_NAME[at(200).phase], '밤');
+  // 플레이 시간(step)으로만 흐르고, 자리를 비운 시간(오프라인 정산)으로는 흐르지 않는다
+  const T = G.newGame(1, 0);
+  for (let i = 0; i < 30 * 61; i++) G.step(T, G.STEP);
+  assert.equal(G.clock(T).phase, 1);
+  T.savedAt = 0; G.settleOffline(T, 3600 * 1000);
+  assert.equal(G.clock(T).day, 1);
+});

@@ -118,25 +118,76 @@ function tuft(pen, x, y, h, col, R, n = 3) {
 // ---------- 하늘과 섬(지역 땅) ----------
 export const PAL = {
   grassland: {
-    sky: ['#8fcbe6', '#cfe9ee', '#f6e7bf'], hill: ['#b9c98a', '#9fb46e'], tree: '#6f8a4a',
     tiles: ['#c8c467', '#bcc160', '#a9bd5a', '#d2c46e'], tuft: ['#8fa548', '#a3a64a'], dirt: '#9b6a3c', dirt2: '#7d5230', lip: '#93a84d',
   },
 };
-// 하늘·먼 언덕·구름(화면 좌표, 매 프레임)
-export function drawSky(ctx, W, H, horizon, t, pal) {
+// 시간대 빛(아침 · 낮 · 저녁 · 밤). sky = 하늘 위·가운데·지평선, tint = 땅·동물에 덧입히는 색과 세기,
+// sun·moon = 화면 비율 위치(x, 지평선 대비 y), stars = 별 밝기, cloud = 구름 색과 투명도
+const LIGHTS = [
+  { sky: ['#a7c6e6', '#f4d4c6', '#ffd9a4'], hill: ['#c4c690', '#a9b578'], tree: '#7c8650', tint: ['#ff9a5a', 0.1], sun: { x: 0.18, y: 0.66, col: '#fff0c4' }, moon: null, stars: 0, cloud: ['#fff2ea', 0.75] },
+  { sky: ['#8fcbe6', '#cfe9ee', '#f6e7bf'], hill: ['#b9c98a', '#9fb46e'], tree: '#6f8a4a', tint: ['#ffffff', 0], sun: { x: 0.78, y: 0.32, col: '#fff6d8' }, moon: null, stars: 0, cloud: ['#ffffff', 0.72] },
+  { sky: ['#7470b2', '#e9a088', '#ffc477'], hill: ['#b19a72', '#93835c'], tree: '#5a553a', tint: ['#ff7a3c', 0.17], sun: { x: 0.62, y: 0.74, col: '#ffb25e' }, moon: null, stars: 0.15, cloud: ['#ffc8ae', 0.7] },
+  { sky: ['#0d1634', '#1c2a56', '#33447a'], hill: ['#2c3b52', '#223148'], tree: '#1a2537', tint: ['#0f1a44', 0.48], sun: null, moon: { x: 0.3, y: 0.46, col: '#f3f0dc' }, stars: 1, cloud: ['#8b96c4', 0.22] },
+];
+const lerp = (a, b, k) => a + (b - a) * k;
+function blendBody(a, b, k) {
+  if (a && b) return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), col: mix(a.col, b.col, k), a: 1 };
+  if (a) return { ...a, a: 1 - k };
+  if (b) return { ...b, a: k };
+  return null;
+}
+// 플레이 시간(초) → 그 순간의 빛. 1분짜리 시간대의 마지막 8초 동안 다음 시간대로 부드럽게 넘어간다
+export function lightAt(time) {
+  const t = Math.max(0, time) % 240, p = Math.floor(t / 60), f = t - p * 60;
+  const k0 = f > 52 ? (f - 52) / 8 : 0, k = k0 * k0 * (3 - 2 * k0);
+  const a = LIGHTS[p], b = LIGHTS[(p + 1) % 4];
+  return {
+    phase: p,
+    sky: a.sky.map((c, i) => mix(c, b.sky[i], k)), hill: a.hill.map((c, i) => mix(c, b.hill[i], k)), tree: mix(a.tree, b.tree, k),
+    tint: [mix(a.tint[0], b.tint[0], k), lerp(a.tint[1], b.tint[1], k)],
+    sun: blendBody(a.sun, b.sun, k), moon: blendBody(a.moon, b.moon, k), stars: lerp(a.stars, b.stars, k),
+    cloud: [mix(a.cloud[0], b.cloud[0], k), lerp(a.cloud[1], b.cloud[1], k)],
+  };
+}
+// 하늘·해·달·별·먼 언덕·구름(화면 좌표, 매 프레임). L = lightAt() 결과
+export function drawSky(ctx, W, H, horizon, t, L) {
   const g = ctx.createLinearGradient(0, 0, 0, horizon);
-  g.addColorStop(0, pal.sky[0]); g.addColorStop(0.6, pal.sky[1]); g.addColorStop(1, pal.sky[2]);
+  g.addColorStop(0, L.sky[0]); g.addColorStop(0.6, L.sky[1]); g.addColorStop(1, L.sky[2]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // 별: 자리는 고정, 조금씩 반짝인다
+  if (L.stars > 0.01) {
+    for (let i = 0; i < 70; i++) {
+      const x = hash(i, 7) * W, y = hash(i, 11) * horizon * 0.85, r = 0.5 + hash(i, 13) * 1.1;
+      ctx.globalAlpha = L.stars * (0.45 + 0.55 * Math.abs(Math.sin(t * (0.6 + hash(i, 17)) + i)));
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
   // 해
-  const sx = W * 0.78, sy = horizon * 0.32;
-  const sg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 60);
-  sg.addColorStop(0, 'rgba(255,248,214,0.95)'); sg.addColorStop(0.3, 'rgba(255,236,170,0.5)'); sg.addColorStop(1, 'rgba(255,236,170,0)');
-  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 60, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff6d8'; ctx.beginPath(); ctx.arc(sx, sy, 15, 0, Math.PI * 2); ctx.fill();
+  if (L.sun && L.sun.a > 0.01) {
+    const sx = W * L.sun.x, sy = horizon * L.sun.y;
+    ctx.globalAlpha = L.sun.a;
+    const sg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 64);
+    sg.addColorStop(0, rgba(L.sun.col, 0.95)); sg.addColorStop(0.3, rgba(L.sun.col, 0.45)); sg.addColorStop(1, rgba(L.sun.col, 0));
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 64, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = L.sun.col; ctx.beginPath(); ctx.arc(sx, sy, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // 달(초승달 모양: 밝은 원에 하늘색 원을 겹친다)
+  if (L.moon && L.moon.a > 0.01) {
+    const mx = W * L.moon.x, my = horizon * L.moon.y;
+    ctx.globalAlpha = L.moon.a;
+    const mg = ctx.createRadialGradient(mx, my, 6, mx, my, 50);
+    mg.addColorStop(0, 'rgba(240,236,210,0.35)'); mg.addColorStop(1, 'rgba(240,236,210,0)');
+    ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, 50, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = L.moon.col; ctx.beginPath(); ctx.arc(mx, my, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = L.sky[0]; ctx.beginPath(); ctx.arc(mx + 6, my - 4, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   // 구름
   for (let i = 0; i < 4; i++) {
     const cw = 70 + i * 18, x = ((i * 157 + t * (5 + i * 2)) % (W + cw * 2)) - cw, y = horizon * (0.16 + i * 0.13);
-    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.fillStyle = rgba(L.cloud[0], L.cloud[1]);
     ctx.beginPath();
     ctx.ellipse(x, y, cw * 0.5, 9, 0, 0, Math.PI * 2);
     ctx.ellipse(x - cw * 0.18, y - 6, cw * 0.22, 9, 0, 0, Math.PI * 2);
@@ -146,12 +197,12 @@ export function drawSky(ctx, W, H, horizon, t, pal) {
   // 먼 언덕 두 겹과 아카시아 그림자
   for (let layer = 0; layer < 2; layer++) {
     const base = horizon + layer * 14, amp = 10 + layer * 6;
-    ctx.fillStyle = pal.hill[layer];
+    ctx.fillStyle = L.hill[layer];
     ctx.beginPath(); ctx.moveTo(0, H);
     for (let i = 0, n = Math.ceil(W / 8); i <= n; i++) { const x = (i / n) * W; ctx.lineTo(x, base - amp * (0.6 + 0.4 * Math.sin(x * 0.013 + layer * 2.1) * Math.sin(x * 0.005 + 1 + layer))); }
     ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
   }
-  ctx.fillStyle = pal.tree;
+  ctx.fillStyle = L.tree;
   for (let i = 0; i < 5; i++) {
     const x = (i * 0.23 + 0.07) * W, y = horizon + 6 + (i % 2) * 6, s = 0.7 + (i % 3) * 0.2;
     ctx.fillRect(x - 0.8 * s, y - 12 * s, 1.6 * s, 12 * s);

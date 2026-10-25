@@ -68,19 +68,27 @@ button:disabled { cursor: default; }
 .happy { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .happy .n { font-family: var(--f-display); font-size: 15px; line-height: 1.1; }
 .happy small { font-size: 10px; color: var(--muted); }
+/* HUD 아래 한 줄: 진행일수·시간대 + 힌트 */
+.subhud { position: absolute; left: var(--gutter); right: var(--gutter); top: calc(var(--safe-t) + 66px); display: flex; gap: 6px; align-items: center; pointer-events: none; }
+.clock {
+  flex: none; background: rgba(255, 250, 240, 0.9); border: 1px solid rgba(160, 130, 90, 0.25); border-radius: 12px; padding: 4px 10px;
+  font: 13px var(--f-display); white-space: nowrap; box-shadow: 0 2px 6px rgba(80, 60, 30, 0.12);
+}
 .hint {
-  position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--safe-t) + 66px); max-width: calc(100% - 2 * var(--gutter));
-  background: rgba(59, 47, 34, 0.78); color: #fff8ea; border-radius: 12px; padding: 5px 11px; font-size: 12.5px; pointer-events: none;
+  min-width: 0; background: rgba(59, 47, 34, 0.78); color: #fff8ea; border-radius: 12px; padding: 5px 11px; font-size: 12.5px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* 확대 단계(1× = 땅 전체가 한 화면) */
+/* 오른쪽 열: 소리 켜기·끄기, 확대 단계(1× = 땅 전체가 한 화면) */
+.side { position: absolute; right: var(--gutter); top: calc(var(--safe-t) + 104px); z-index: 3; display: flex; flex-direction: column; gap: 8px; }
 .zoombar {
-  position: absolute; right: var(--gutter); top: calc(var(--safe-t) + 104px); z-index: 3; display: flex; flex-direction: column; gap: 4px;
+  display: flex; flex-direction: column; gap: 4px;
   background: rgba(255, 250, 240, 0.85); border: 1px solid rgba(160, 130, 90, 0.25); border-radius: 14px; padding: 4px; box-shadow: 0 2px 6px rgba(80, 60, 30, 0.12);
 }
 .zoombar button { width: 44px; height: 34px; border-radius: 10px; font: 14px var(--f-display); color: var(--muted); }
 .zoombar button.on { background: var(--accent); color: var(--accent-ink); }
+#soundbar button { font-size: 17px; }
+#soundbar button.off { opacity: 0.4; }
 
 /* 아래 메뉴 */
 .bar {
@@ -185,9 +193,14 @@ button:disabled { cursor: default; }
     </div>
     <div class="happy"><span class="n" id="happy">-</span><small>행복도</small></div>
   </header>
-  <div class="hint" id="hint" hidden></div>
-  <div class="zoombar" id="zoombar" role="group" aria-label="확대">
-    <button data-z="3">2×</button><button data-z="2">1.6×</button><button data-z="1">1.3×</button><button data-z="0" class="on">1×</button>
+  <div class="subhud"><span class="clock" id="clock">🌅 1일차 · 아침</span><div class="hint" id="hint" hidden></div></div>
+  <div class="side">
+    <div class="zoombar" id="soundbar" role="group" aria-label="소리">
+      <button id="musicBtn" aria-pressed="true" aria-label="배경음악">🎵</button><button id="sfxBtn" aria-pressed="true" aria-label="동물 소리">🔊</button>
+    </div>
+    <div class="zoombar" id="zoombar" role="group" aria-label="확대">
+      <button data-z="3">2×</button><button data-z="2">1.6×</button><button data-z="1">1.3×</button><button data-z="0" class="on">1×</button>
+    </div>
   </div>
   <div class="float card" id="card" hidden></div>
   <div class="float placebar" id="placebar" hidden>
@@ -217,9 +230,13 @@ button:disabled { cursor: default; }
 import * as G from './logic.js';
 import { GRID, MAX_TIER, TIERS, ECON, SIZE, SPECIES, ITEMS, REGIONS, NEED_NAME, NEED_ICON, caps, speciesOf, itemsOf, itemPrice, animalPrice } from './data.js';
 import * as A from './art.js';
+import { createMusic } from './music.js';
+import { createSound } from './sound.js';
 
 const $ = (s) => document.querySelector(s);
 const view = $('#view'), ctx = view.getContext('2d');
+// 땅·물건·동물은 따로 그려 시간대 빛을 입힌 뒤 하늘 위에 얹는다
+const scene = document.createElement('canvas'), sctx = scene.getContext('2d');
 const T = A.TILE, WG = GRID * T, ISO_A = A.ISO_A, ISO_B = A.ISO_B, SLAB = A.slabOf(WG);
 const SAVE_KEY = 'animal-world.save';
 
@@ -251,6 +268,7 @@ function resize() {
   const r = view.getBoundingClientRect();
   VW = r.width; VH = r.height;
   view.width = Math.round(VW * DPR); view.height = Math.round(VH * DPR);
+  scene.width = view.width; scene.height = view.height;
   const top = $('#hud').getBoundingClientRect().bottom + 24, bar = $('#bar').getBoundingClientRect();
   document.documentElement.style.setProperty('--bar-h', `${Math.round(bar.height)}px`);
   const availH = bar.top - top;
@@ -286,7 +304,7 @@ function toWorld(sx, sy) {
   const u = (sx - cx + UI.cam.x) / (ISO_A * zoom), v = (sy - cy + UI.cam.y) / (ISO_B * zoom) + WG;
   return [(u + v) / 2, (v - u) / 2];
 }
-const pen = { ctx, zoom: 1, P };
+const pen = { ctx: sctx, zoom: 1, P };
 
 // ---------- 미리 그려 두는 그림 ----------
 // 정적인 그림은 한 번만 그려 두고 찍는다(MDN "Optimizing canvas"). 배율이 바뀌면 새로 그린다.
@@ -329,7 +347,7 @@ function islandArt() {
   return island;
 }
 const snap = (v) => Math.round(v * DPR) / DPR;
-function blitAt(s, sx, sy) { ctx.drawImage(s.c, snap(sx - s.ax), snap(sy - s.ay), s.w, s.h); }
+function blitAt(s, sx, sy) { sctx.drawImage(s.c, snap(sx - s.ax), snap(sy - s.ay), s.w, s.h); }
 
 // ---------- 동물 그림 상태(고개 숙임·눕기 부드럽게) ----------
 const mem = new Map();
@@ -357,11 +375,12 @@ function emit(a, kind) {
 let lastT = performance.now(), drawT = 0;
 function draw(dt) {
   drawT += dt;
-  const rid = S.view;
+  const rid = S.view, L = A.lightAt(S.time), g = sctx;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  A.drawSky(ctx, VW, VH, horizon, drawT, A.PAL.grassland);
+  A.drawSky(ctx, VW, VH, horizon, drawT, L);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, scene.width, scene.height); g.setTransform(DPR, 0, 0, DPR, 0, 0);
   const isl = islandArt(), [ix, iy] = P(0, 0, 0);
-  ctx.drawImage(isl.c, snap(ix - isl.ox), snap(iy - isl.oy), isl.w, isl.h);
+  g.drawImage(isl.c, snap(ix - isl.ox), snap(iy - isl.oy), isl.w, isl.h);
   pen.zoom = zoom;
   if (UI.place) A.drawGrid(pen, WG, GRID);
   const R = S.regions[rid], st = G.stats(S, rid);
@@ -386,31 +405,34 @@ function draw(dt) {
     const a = o.a, [sx, sy] = animalScreen(a), pose = poseOf(a, dt);
     if (UI.sel?.type === 'animal' && UI.sel.uid === a.uid) {
       const [hw] = A.ANIMAL_BOX[a.sp];
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(sx, sy, hw * k + 4, (hw * k + 4) * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+      g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.beginPath(); g.ellipse(sx, sy, hw * k + 4, (hw * k + 4) * 0.42, 0, 0, Math.PI * 2); g.stroke();
     }
-    A.drawAnimal(ctx, a.sp, sx, sy, k * (0.96 + (a.uid % 5) * 0.02), pose);
+    A.drawAnimal(g, a.sp, sx, sy, k * (0.96 + (a.uid % 5) * 0.02), pose);
     if (a.st === 'special' && a.sp === 'elephant' && Math.random() < dt * 30) emit(a, 'spray');
     if (a.st === 'special' && a.sp === 'zebra' && Math.random() < dt * 8) emit(a, 'dust');
   }
   if (UI.place) {
     const d = ITEMS[UI.place.id], s = itemSprite(UI.place.id, 0), [gx, gy] = P((UI.place.x + d.w / 2) * T, (UI.place.y + d.h / 2) * T);
-    ctx.globalAlpha = 0.6; blitAt(s, gx, gy); ctx.globalAlpha = 1;
-  }
-  // 위에 뜨는 표시: 순간 포착 반짝이, 행복도 낮음 물방울
-  for (const a of R.animals) {
-    const [sx, sy] = animalScreen(a), [, bh] = A.ANIMAL_BOX[a.sp], top = sy - bh * k - 6;
-    if (S.chance && S.chance.uid === a.uid && S.chance.region === rid) A.sparkle(ctx, sx, top - 4, Math.max(5, 7 * zoom), drawT);
-    else if ((st.happy[a.sp] ?? 1) < 0.5 && ((S.time + a.uid * 1.37) % 6) < 1.6) A.sadDrop(ctx, sx + 6, top, Math.max(0.7, zoom));
+    g.globalAlpha = 0.6; blitAt(s, gx, gy); g.globalAlpha = 1;
   }
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i];
     p.t += dt; if (p.t > p.life) { parts.splice(i, 1); continue; }
     p.vy += p.g * dt; p.dx += p.vx * dt; p.dy += p.vy * dt;
     const [sx, sy] = P(p.wx * T, p.wy * T);
-    ctx.globalAlpha = 1 - p.t / p.life; ctx.fillStyle = p.col;
-    ctx.beginPath(); ctx.arc(sx + p.dx * k, sy + p.dy * k, p.r * k, 0, Math.PI * 2); ctx.fill();
+    g.globalAlpha = 1 - p.t / p.life; g.fillStyle = p.col;
+    g.beginPath(); g.arc(sx + p.dx * k, sy + p.dy * k, p.r * k, 0, Math.PI * 2); g.fill();
   }
-  ctx.globalAlpha = 1;
+  g.globalAlpha = 1;
+  // 시간대 빛: 그려진 땅·물건·동물에만 색을 덧입힌다(source-atop). 하늘은 drawSky가 시간대 색으로 그린다
+  if (L.tint[1] > 0.004) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = A.rgba(L.tint[0], L.tint[1]); g.fillRect(0, 0, VW, VH); g.globalCompositeOperation = 'source-over'; }
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(scene, 0, 0); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // 위에 뜨는 표시: 순간 포착 반짝이, 행복도 낮음 물방울(빛을 입히지 않아 밤에도 잘 보인다)
+  for (const a of R.animals) {
+    const [sx, sy] = animalScreen(a), [, bh] = A.ANIMAL_BOX[a.sp], top = sy - bh * k - 6;
+    if (S.chance && S.chance.uid === a.uid && S.chance.region === rid) A.sparkle(ctx, sx, top - 4, Math.max(5, 7 * zoom), drawT);
+    else if ((st.happy[a.sp] ?? 1) < 0.5 && ((S.time + a.uid * 1.37) % 6) < 1.6) A.sadDrop(ctx, sx + 6, top, Math.max(0.7, zoom));
+  }
 }
 function drawItemAt(it, d) {
   const [sx, sy] = P((it.x + d.w / 2) * T, (it.y + d.h / 2) * T);
@@ -467,7 +489,7 @@ function tap(x, y) {
     }
   }
   const a = animalAt(x, y);
-  if (a) { select({ type: 'animal', uid: a.uid }); return; }
+  if (a) { animalSound(a, 'call'); select({ type: 'animal', uid: a.uid }); return; }
   const [wx, wy] = toWorld(x, y), it = G.itemAt(S, rid, Math.floor(wx / T), Math.floor(wy / T));
   if (it) { select({ type: 'item', uid: it.uid }); return; }
   select(null);
@@ -475,6 +497,7 @@ function tap(x, y) {
 
 // ---------- HUD ----------
 const fmt = (n) => Math.floor(n).toLocaleString('ko-KR');
+const PHASE_ICON = ['🌅', '☀️', '🌇', '🌙'];
 // 받침 있으면 a, 없으면 b(을/를, 은/는, 이/가)
 const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return w + (c >= 0 && c <= 11171 && c % 28 ? a : b); };
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
@@ -484,6 +507,8 @@ function hud() {
   setText($('#rate'), `+${(G.incomePerMin(S)).toFixed(1)}/분`);
   setText($('#rname'), def.name);
   setText($('#tier'), `T${R.tier}`);
+  const c = G.clock(S);
+  setText($('#clock'), `${PHASE_ICON[c.phase]} ${c.day}일차 · ${G.PHASE_NAME[c.phase]}`);
   if (R.tier >= MAX_TIER) { setText($('#devtxt'), `발전도 ${st.dev} 🏆`); $('#devbar').style.width = '100%'; }
   else {
     const lo = TIERS[R.tier - 1], hi = TIERS[R.tier];
@@ -596,7 +621,7 @@ function sheetAnimals(body) {
     btn.onclick = () => {
       const r = G.adopt(S, rid, sp);
       if (!r.ok) return toast(r.why);
-      toast(`${d.name} 입양! ⭐-${animalPrice(d.tier)}`); afterChange();
+      toast(`${d.name} 입양! ⭐-${animalPrice(d.tier)}`); animalSound(r.animal, 'call', 0.8); afterChange();
     };
     body.appendChild(row);
     requestAnimationFrame(() => animalIcon(cv, sp, R.tier < d.tier));
@@ -831,6 +856,41 @@ function drainEvents() {
   if (ev.length) renderRegions();
 }
 
+// ---------- 소리 ----------
+const sound = createSound(), music = createMusic();
+const AUDIO_KEY = SAVE_KEY + '.audio', audio = { music: true, sfx: true };
+try { Object.assign(audio, JSON.parse(localStorage.getItem(AUDIO_KEY) || '{}')); } catch { /* 저장 불가 */ }
+const saveAudio = () => { try { localStorage.setItem(AUDIO_KEY, JSON.stringify(audio)); } catch { /* 저장 불가 */ } };
+sound.setOn(audio.sfx);
+function syncSoundBtns() {
+  for (const [id, on, ico] of [['#musicBtn', audio.music, '🎵'], ['#sfxBtn', audio.sfx, audio.sfx ? '🔊' : '🔇']]) {
+    const b = $(id); b.classList.toggle('off', !on); b.setAttribute('aria-pressed', String(on)); b.textContent = ico;
+  }
+}
+$('#musicBtn').onclick = () => { audio.music = !audio.music; music.setOn(audio.music); saveAudio(); syncSoundBtns(); toast(audio.music ? '배경음악을 켰어요' : '배경음악을 껐어요'); };
+$('#sfxBtn').onclick = () => { audio.sfx = !audio.sfx; sound.setOn(audio.sfx); saveAudio(); syncSoundBtns(); toast(audio.sfx ? '동물 소리를 켰어요' : '동물 소리를 껐어요'); };
+// 첫 터치 때 소리를 켠다(모바일 자동재생 정책)
+for (const evt of ['pointerdown', 'keydown']) window.addEventListener(evt, () => { sound.unlock(); music.start(sound.ctx); music.setOn(audio.music); }, { capture: true });
+// 동물 소리: 화면 위치에 따라 좌우로, 확대할수록 조금 크게
+function animalSound(a, kind, vol = 1) {
+  if (!a) return;
+  const [sx] = animalScreen(a);
+  sound.play(a.sp, kind, { vol: vol * (0.75 + 0.25 * (ZOOMS[UI.zl] - 1)), pan: ((sx / VW) * 2 - 1) * 0.7 });
+}
+let lastChance = null, ambientIn = 10;
+// 특수 행동이 시작되면 그 동물의 special 소리, 가끔 보이는 동물 하나가 call 소리를 낸다
+function soundTick(dt) {
+  const R = S.regions[S.view];
+  if (S.chance && S.chance.uid !== lastChance) { lastChance = S.chance.uid; animalSound(R.animals.find((b) => b.uid === S.chance.uid), 'special', 0.8); }
+  else if (!S.chance) lastChance = null;
+  if ((ambientIn -= dt) <= 0) {
+    ambientIn = 15 + Math.random() * 20;
+    const quiet = R.animals.filter((b) => b.st !== 'special');
+    if (quiet.length) animalSound(quiet[Math.floor(Math.random() * quiet.length)], 'call', 0.35);
+  }
+  music.setBirds(G.clock(S).phase !== 3); // 밤에는 새소리를 끈다
+}
+
 // ---------- 시간 ----------
 let acc = 0, lastSave = 0, lastUi = 0, hiddenAt = null;
 function frame(now) {
@@ -841,6 +901,7 @@ function frame(now) {
   while (acc >= G.STEP && n < 10) { G.step(S, G.STEP); acc -= G.STEP; n++; }
   if (n === 10) acc = 0;
   if (S.events.length) drainEvents();
+  soundTick(dt);
   // 따라보기: 카메라가 그 동물을 부드럽게 따라간다
   if (UI.follow != null) {
     const a = S.regions[S.view].animals.find((b) => b.uid === UI.follow);
@@ -864,7 +925,8 @@ function updateCardLive() {
 }
 // 화면을 떠났다 돌아오면 그동안의 관람 수익을 정산한다(최대 4시간)
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { hiddenAt = Date.now(); save(); return; }
+  if (document.hidden) { hiddenAt = Date.now(); save(); music.pause(); return; }
+  music.resume();
   if (hiddenAt && S) {
     const r = G.settleOffline(S, Date.now()), sec = (Date.now() - hiddenAt) / 1000;
     if (sec > 30 && r.gain >= 1) toast(`자리를 비운 동안 ⭐+${fmt(r.gain)}`);
@@ -881,6 +943,7 @@ function start() {
   const fresh = !S;
   if (fresh) S = G.newGame((Date.now() % 1e9) | 0, Date.now());
   UI.seen = loadSeen();
+  syncSoundBtns();
   resize();
   renderRegions();
   if (fresh) welcome();

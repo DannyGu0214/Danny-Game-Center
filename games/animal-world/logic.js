@@ -446,6 +446,13 @@ export function swapRequest(S, uid) {
 }
 
 // ---------- 시간 ----------
+// 하루 = 플레이 4분: 아침 → 낮 → 저녁 → 밤이 1분씩. 진행일수는 1일차부터
+export const DAY_SEC = 240, PHASE_SEC = 60;
+export const PHASE_NAME = ['아침', '낮', '저녁', '밤'];
+export function clock(S) {
+  const t = Math.max(0, S.time) % DAY_SEC;
+  return { day: Math.floor(Math.max(0, S.time) / DAY_SEC) + 1, phase: Math.floor(t / PHASE_SEC), sec: t % PHASE_SEC };
+}
 export function step(S, dt) {
   S.time += dt;
   gain(S, (incomePerMin(S) / 60) * dt);
