@@ -27,8 +27,10 @@ export const HQ_MAX = 10;
 export const MAX_SURVIVOR_LV = 15;
 export const RES_KEYS = ['wood', 'scrap', 'plastic'];
 export const RES_NAMES = { wood: '목재', scrap: '고철', plastic: '플라스틱' };
-export const CRIT_CHANCE = 0.1; // 기본 치명타 확률 10%
-export const CRIT_MULT = 2; // 치명타 피해 = 평타의 2배
+export const CRIT_MULT = 2; // 치명타 피해 = 평타의 2배. 치명타 확률은 플레이어는 무기마다, 동료는 COMPANION_CRIT
+export const COMPANION_CRIT = 0.1; // 방어·탐험 동료의 치명타 확률
+// 탐험 동료 사격 명중률: 붙어 있으면 100%, 사거리 끝에서 20%까지 거리에 비례해 떨어진다(플레이어 무기는 무기 명중률만 쓴다)
+export const escortAccuracy = (d, range) => 1 - 0.8 * Math.min(1, Math.max(0, d / range));
 // 성장: 플레이어가 직접 잡은 좀비만 경험치를 준다.
 export const LEVEL_MAX = 99;
 export const XP_BASE = 50; // 레벨 n → n+1 요구 경험치 = 50 × n (레벨에 비례해 늘어난다)
@@ -65,36 +67,36 @@ export const zoneIndex = (d) => clamp(Math.floor(d), 0, ZONE_NAMES.length - 1);
 // 자원마다 원천이 다르다: 목재는 나무·목재 잔해, 고철은 차량·금속, 플라스틱은 상가 쓰레기·용기.
 // zones는 구역(0 기지 주변 ~ 6 군사 구역)별 출현 가중치, time은 줍는 데 걸리는 초.
 export const LOOT_TYPES = {
-  fallenTree: { name: '쓰러진 나무', res: 'wood', amt: 9, time: 1.6, respawn: RESPAWN_BY_SIZE.large, zones: [0, 6, 2, 1, 1, 8, 3], items: ['flare'] },
-  pallets: { name: '나무 팔레트 더미', res: 'wood', amt: 6, time: 1.0, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 3, 4, 4, 3, 2, 1], items: ['toolbox'] },
-  furniture: { name: '부서진 가구', res: 'wood', amt: 5, time: 0.9, respawn: RESPAWN_BY_SIZE.small, zones: [0, 5, 3, 1, 4, 2, 0], items: ['medkit'] },
-  fence: { name: '나무 울타리 잔해', res: 'wood', amt: 4, time: 0.7, respawn: RESPAWN_BY_SIZE.small, zones: [0, 6, 1, 1, 1, 5, 1], items: ['toolbox'] },
-  wreck: { name: '폐차', res: 'scrap', amt: 10, time: 1.8, respawn: RESPAWN_BY_SIZE.large, zones: [0, 2, 3, 4, 4, 2, 3], items: ['toolbox', 'flare'] },
-  drums: { name: '철제 드럼통', res: 'scrap', amt: 6, time: 1.1, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 1, 1, 5, 2, 2, 4], items: ['molotov'] },
-  vending: { name: '고장 난 자판기', res: 'scrap', amt: 7, time: 1.3, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 1, 4, 1, 4, 0, 0], items: ['energy'] },
-  rebar: { name: '철근 더미', res: 'scrap', amt: 8, time: 1.4, respawn: RESPAWN_BY_SIZE.large, zones: [0, 0, 1, 5, 4, 0, 4], items: ['toolbox'] },
-  garbage: { name: '쓰레기 봉투 더미', res: 'plastic', amt: 3, time: 0.7, respawn: RESPAWN_BY_SIZE.small, zones: [0, 4, 5, 2, 5, 1, 0], items: ['medkit', 'molotov'] },
-  bluedrum: { name: '플라스틱 물통', res: 'plastic', amt: 5, time: 1.0, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 2, 3, 3, 2, 2, 2], items: ['molotov'] },
-  crates: { name: '플라스틱 상자', res: 'plastic', amt: 4, time: 0.9, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 1, 4, 3, 3, 1, 1], items: ['medkit', 'energy', 'stim'] },
-  cones: { name: '교통 콘 무더기', res: 'plastic', amt: 4, time: 0.8, respawn: RESPAWN_BY_SIZE.small, zones: [0, 2, 3, 2, 3, 0, 1], items: ['flare'] },
-  mannequin: { name: '마네킹', res: 'plastic', amt: 6, time: 1.2, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 0, 4, 0, 3, 0, 0], items: ['energy', 'medkit'] },
+  fallenTree: { name: '쓰러진 나무', res: 'wood', amt: 9, time: 1.6, respawn: RESPAWN_BY_SIZE.large, zones: [0, 6, 2, 1, 1, 8, 3] },
+  pallets: { name: '나무 팔레트 더미', res: 'wood', amt: 6, time: 1.0, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 3, 4, 4, 3, 2, 1] },
+  furniture: { name: '부서진 가구', res: 'wood', amt: 5, time: 0.9, respawn: RESPAWN_BY_SIZE.small, zones: [0, 5, 3, 1, 4, 2, 0] },
+  fence: { name: '나무 울타리 잔해', res: 'wood', amt: 4, time: 0.7, respawn: RESPAWN_BY_SIZE.small, zones: [0, 6, 1, 1, 1, 5, 1] },
+  wreck: { name: '폐차', res: 'scrap', amt: 10, time: 1.8, respawn: RESPAWN_BY_SIZE.large, zones: [0, 2, 3, 4, 4, 2, 3] },
+  drums: { name: '철제 드럼통', res: 'scrap', amt: 6, time: 1.1, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 1, 1, 5, 2, 2, 4] },
+  vending: { name: '고장 난 자판기', res: 'scrap', amt: 7, time: 1.3, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 1, 4, 1, 4, 0, 0] },
+  rebar: { name: '철근 더미', res: 'scrap', amt: 8, time: 1.4, respawn: RESPAWN_BY_SIZE.large, zones: [0, 0, 1, 5, 4, 0, 4] },
+  garbage: { name: '쓰레기 봉투 더미', res: 'plastic', amt: 3, time: 0.7, respawn: RESPAWN_BY_SIZE.small, zones: [0, 4, 5, 2, 5, 1, 0] },
+  bluedrum: { name: '플라스틱 물통', res: 'plastic', amt: 5, time: 1.0, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 2, 3, 3, 2, 2, 2] },
+  crates: { name: '플라스틱 상자', res: 'plastic', amt: 4, time: 0.9, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 1, 4, 3, 3, 1, 1] },
+  cones: { name: '교통 콘 무더기', res: 'plastic', amt: 4, time: 0.8, respawn: RESPAWN_BY_SIZE.small, zones: [0, 2, 3, 2, 3, 0, 1] },
+  mannequin: { name: '마네킹', res: 'plastic', amt: 6, time: 1.2, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 0, 4, 0, 3, 0, 0] },
   // 원천을 자원마다 6종으로(목재·고철 2종씩, 이미 5종이던 플라스틱은 1종 추가)
-  pole: { name: '쓰러진 전봇대', res: 'wood', amt: 10, time: 1.8, respawn: RESPAWN_BY_SIZE.large, zones: [0, 2, 3, 2, 2, 4, 3], items: ['flare'] },
-  shed: { name: '무너진 헛간', res: 'wood', amt: 7, time: 1.2, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 4, 1, 2, 0, 5, 1], items: ['toolbox', 'medkit'] },
-  cart: { name: '쇼핑 카트', res: 'scrap', amt: 4, time: 0.8, respawn: RESPAWN_BY_SIZE.small, zones: [0, 2, 5, 1, 4, 0, 0], items: ['energy'] },
-  fridge: { name: '버려진 냉장고', res: 'scrap', amt: 7, time: 1.3, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 3, 2, 2, 3, 1, 1], items: ['molotov', 'energy'] },
-  pharmacy: { name: '약국 진열대', res: 'plastic', amt: 5, time: 1.1, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 1, 3, 1, 3, 0, 2], items: ['stim', 'medkit'] },
+  pole: { name: '쓰러진 전봇대', res: 'wood', amt: 10, time: 1.8, respawn: RESPAWN_BY_SIZE.large, zones: [0, 2, 3, 2, 2, 4, 3] },
+  shed: { name: '무너진 헛간', res: 'wood', amt: 7, time: 1.2, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 4, 1, 2, 0, 5, 1] },
+  cart: { name: '쇼핑 카트', res: 'scrap', amt: 4, time: 0.8, respawn: RESPAWN_BY_SIZE.small, zones: [0, 2, 5, 1, 4, 0, 0] },
+  fridge: { name: '버려진 냉장고', res: 'scrap', amt: 7, time: 1.3, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 3, 2, 2, 3, 1, 1] },
+  pharmacy: { name: '약국 진열대', res: 'plastic', amt: 5, time: 1.1, respawn: RESPAWN_BY_SIZE.medium, zones: [0, 1, 3, 1, 3, 0, 2] },
 };
 
 // ---------- 특별 아이템 ----------
-// 대상물마다 나오는 아이템이 다르다(LOOT_TYPES.items). 포위 구출·습격 방어 보상으로도 받는다.
+// 5종. 파밍할 때 아이템이 나오면(확률은 멀수록 높다) 대상물 종류와 상관없이 5종 중 하나가 같은 확률로 나온다.
+// 습격을 막으면 공구 상자 1~3개, 구출한 생존자(포위·조난)는 5종 중 무작위로 1개 또는 2개(반반)를 답례로 준다.
 export const ITEMS = {
   medkit: { name: '구급상자', desc: '체력 60% 즉시 회복. 자동사냥 중 체력 35% 아래면 알아서 쓴다' },
   molotov: { name: '화염병', desc: '가까운 좀비 무리에 큰 범위 피해' },
   toolbox: { name: '공구 상자', desc: '본부 방벽을 즉시 완전 수리(무전으로 지시)' },
   flare: { name: '구조 신호탄', desc: '근처에 조난자를 불러낸다' },
-  energy: { name: '에너지 드링크', desc: '30초 동안 이동·공격 속도 +40%' },
-  stim: { name: '스팀팩', desc: '최대 체력의 20%를 잃는 대신 1분 동안 이동·파밍 속도 +50%' },
+  stim: { name: '스팀팩', desc: '1분 동안 이동·파밍·공격 속도 +50%' },
 };
 export const ITEM_KEYS = Object.keys(ITEMS);
 export const ITEM_MAX = 9;
@@ -114,10 +116,7 @@ export const ZOMBIES_PER_DANGER = 4;
 export const SPAWN_INTERVAL_S = 1.17;
 export const spawnInterval = (d) => SPAWN_INTERVAL_S / Math.max(1, zoneIndex(d));
 export const fieldPopulation = (d) => clamp(Math.ceil(ZOMBIES_PER_DANGER * d), 1, 30);
-export const ENERGY_S = 30;
-export const STIM_S = 60, STIM_HP = 0.2, STIM_MULT = 1.5; // 스팀팩: 1분, 최대 체력 20% 소모, 이동·파밍 +50%
-// 명중률(플레이어 총): 붙어 있으면 100%, 사거리 끝에서 20%까지 거리에 비례해 떨어진다
-export const gunAccuracy = (d, range) => 1 - 0.8 * clamp(d / range, 0, 1);
+export const STIM_S = 60, STIM_MULT = 1.5; // 스팀팩: 1분 동안 이동·파밍·공격 속도 ×1.5
 
 // ---------- 좀비 ----------
 // 3등급 6종(2026-10-25). 능력치(체력·공격·속도) 중 강점 하나, 약점 하나를 가진다. 기준(×1)은 예전 워커.
@@ -171,37 +170,60 @@ export function pickZombieType(s, d) {
 }
 
 // ---------- 무기 ----------
-// source: craft(공방 제작) / loot(파밍으로만 발견) / unique(미션 보상).
-// tier는 제작에 필요한 공방 레벨. 근접은 제한 없이 휘두르고, 총기는 탄창을 다 쓰면 재장전한다(그동안은 근접).
-// 특수 효과: crit(치명타 확률 추가), guard(받는 피해 감소), leech(준 피해의 일부만큼 체력 회복).
-export const WEAPONS = {
-  fist: { name: '맨주먹', kind: 'melee', dmg: 6, cd: 0.5, range: 34, tier: 0, cost: { scrap: 20 } },
-  pipe: { name: '쇠파이프', kind: 'melee', dmg: 14, cd: 0.6, range: 42, tier: 1, cost: { scrap: 40 }, dur: 120 },
-  bat: { name: '못 박은 방망이', kind: 'melee', dmg: 26, cd: 0.65, range: 46, cleave: 40, tier: 2, cost: { wood: 60, scrap: 60 }, dur: 160 },
-  machete: { name: '마체테', kind: 'melee', dmg: 45, cd: 0.5, range: 44, tier: 3, cost: { wood: 100, scrap: 300 }, dur: 200 },
-  axe: { name: '소방 도끼', kind: 'melee', dmg: 90, cd: 0.8, range: 52, cleave: 55, tier: 4, cost: { wood: 400, scrap: 900 }, dur: 240 },
-  pistol: { name: '권총', kind: 'gun', dmg: 18, cd: 0.45, range: 250, mag: 8, reload: 1.4, tier: 1, cost: { scrap: 70, plastic: 30 } },
-  shotgun: { name: '산탄총', kind: 'gun', dmg: 40, cd: 0.9, range: 170, splash: 45, mag: 4, reload: 2.0, tier: 2, cost: { scrap: 250, plastic: 120 } },
-  rifle: { name: '사냥 소총', kind: 'gun', dmg: 70, cd: 0.6, range: 340, mag: 5, reload: 2.2, tier: 3, cost: { wood: 200, scrap: 700, plastic: 250 } },
-  carbine: { name: '자동 소총', kind: 'gun', dmg: 45, cd: 0.18, range: 300, mag: 24, reload: 2.6, tier: 4, cost: { scrap: 2000, plastic: 900 } },
-  // 파밍 전용: find에 적힌 대상물을 minZone 이상 구역에서 주울 때만 chance 확률로 발견
-  chainsaw: { name: '전기톱', kind: 'melee', source: 'loot', dmg: 16, cd: 0.12, range: 44, cleave: 30, value: 600, find: ['fallenTree', 'pallets'], minZone: 2, chance: 0.03, dur: 500 },
-  sledge: { name: '대형 해머', kind: 'melee', source: 'loot', dmg: 150, cd: 1.2, range: 52, cleave: 65, value: 800, find: ['rebar', 'wreck'], minZone: 3, chance: 0.03, dur: 150 },
-  crossbow: { name: '석궁', kind: 'gun', source: 'loot', dmg: 95, cd: 0.9, range: 380, mag: 1, reload: 0.9, value: 500, find: ['furniture', 'fence'], minZone: 1, chance: 0.03 },
-  nailgun: { name: '네일건', kind: 'gun', source: 'loot', dmg: 14, cd: 0.12, range: 170, mag: 30, reload: 2.0, value: 450, find: ['crates', 'vending'], minZone: 2, chance: 0.03 },
-  flamer: { name: '화염방사기', kind: 'gun', source: 'loot', dmg: 11, cd: 0.08, range: 120, splash: 50, mag: 60, reload: 3.0, value: 900, find: ['drums', 'bluedrum'], minZone: 3, chance: 0.03 },
-  // 유니크: 미션 보상으로만
-  homerun: { name: '홈런왕', kind: 'melee', source: 'unique', dmg: 60, cd: 0.55, range: 50, cleave: 50, crit: 0.25, value: 1500, desc: '치명타 확률 +25%', dur: 260 },
-  savior: { name: '구원자', kind: 'gun', source: 'unique', dmg: 75, cd: 0.75, range: 200, splash: 60, mag: 6, reload: 1.5, value: 1800, desc: '넓은 산탄, 빠른 재장전' },
-  bulwark: { name: '철벽', kind: 'melee', source: 'unique', dmg: 120, cd: 0.75, range: 56, cleave: 60, guard: 0.3, value: 2200, desc: '장착 중 받는 피해 -30%', dur: 320 },
-  milestone: { name: '이정표', kind: 'gun', source: 'unique', dmg: 280, cd: 1.1, range: 480, mag: 5, reload: 2.2, value: 2600, desc: '아주 긴 사거리' },
-  prometheus: { name: '프로메테우스', kind: 'gun', source: 'unique', dmg: 26, cd: 0.08, range: 150, splash: 60, mag: 90, reload: 2.4, leech: 0.03, value: 3200, desc: '불길로 준 피해의 3%만큼 체력 회복' },
+// 근접 8종 · 원거리 8종: 제작 3(T1~T3, 필요한 공방 레벨 = 티어) · 드랍 3(T4~T6, 파밍으로만) · 유니크 2(T7~T8, 미션 보상). 맨주먹은 T0.
+// 능력치 4종을 곱한 '무기 점수'가 초당 피해의 기댓값이다. 치명타는 평타의 2배라 기댓값 배율은 (1 + 치명타율).
+//   무기 점수 = 공격력 × 공격속도 × 명중률 × (1 + 치명타율), 티어 목표 = 24 × 티어^1.25 (T1 24 · T3 95 · T6 225 · T8 323)
+// 무기마다 강점 하나: 강타(공격력) · 속사(공격속도) · 정밀(명중률) · 치명(치명타율). 같은 출처 묶음 안에서는 강점이 겹치지 않는다.
+// 점수 밖의 변수는 두지 않는다: 사거리는 계열마다 하나(근접 48 · 원거리 260), 범위 공격·고유 효과·거리에 따른 명중 감소는 없다.
+// 원거리의 공격속도는 재장전까지 넣은 지속 속도다. 탄창(mag)·재장전(reload)을 정하고 발사 간격(cd)은 그 속도에 맞춰 계산한다.
+// 탄약: 어떤 총이든 쉬지 않고 쏘면 초당 AMMO_PER_SEC개를 쓴다(발당 탄약 = AMMO_PER_SEC ÷ 공격속도). 같은 티어면 탄약 1개당 피해가 같다.
+// 내구도(근접): 쉬지 않고 휘두르면 DUR_SECONDS초 버틴다(타격 수 = DUR_SECONDS × 공격속도). 빗나가면 닳지 않는다.
+export const tierScore = (t) => 24 * t ** 1.25;
+export const MELEE_RANGE = 48, GUN_RANGE = 260;
+export const AMMO_PER_SEC = 1.6, DUR_SECONDS = 100;
+export const DROP_ZONE = { 4: 3, 5: 4, 6: 5 }; // 드랍 무기가 나오기 시작하는 구역: T4 공단 · T5 폐허 도심 · T6 검은 숲
+const RAW_WEAPONS = {
+  fist: { name: '맨주먹', str: 'acc', kind: 'melee', tier: 0, atk: 6, spd: 2, acc: 1, crit: 0.1, cost: { scrap: 20 }, mix: [1.1, 1, 0.9] },
+  // 제작 · 근접: 정밀 · 강타 · 속사
+  pipe: { name: '쇠파이프', str: 'acc', kind: 'melee', tier: 1, atk: 14, spd: 1.6, acc: 1, crit: 0.1, cost: { scrap: 40 }, mix: [0.8, 1.4, 0.8] },
+  bat: { name: '못 박은 방망이', str: 'atk', kind: 'melee', tier: 2, atk: 61, spd: 1, acc: 0.85, crit: 0.1, cost: { wood: 60, scrap: 60 }, mix: [1.4, 0.9, 0.7] },
+  machete: { name: '마체테', str: 'spd', kind: 'melee', tier: 3, atk: 45, spd: 2.5, acc: 0.8, crit: 0.05, cost: { wood: 100, scrap: 300 }, mix: [0.9, 1.3, 0.8] },
+  // 제작 · 원거리: 정밀 · 강타 · 치명
+  pistol: { name: '권총', str: 'acc', kind: 'gun', tier: 1, atk: 14, spd: 1.6, acc: 1, crit: 0.1, mag: 8, reload: 1.4, cost: { scrap: 70, plastic: 30 }, mix: [0.6, 1.3, 1.1] },
+  shotgun: { name: '산탄총', str: 'atk', kind: 'gun', tier: 2, atk: 68, spd: 0.9, acc: 0.85, crit: 0.1, mag: 4, reload: 2.0, cost: { scrap: 250, plastic: 120 }, mix: [1, 1.2, 0.8] },
+  rifle: { name: '사냥 소총', str: 'crit', kind: 'gun', tier: 3, atk: 78, spd: 1, acc: 0.9, crit: 0.35, mag: 5, reload: 2.2, cost: { wood: 200, scrap: 700, plastic: 250 }, mix: [1.2, 1.1, 0.7] },
+  // 드랍 · 근접: 치명 · 속사 · 강타
+  axe: { name: '소방 도끼', str: 'crit', kind: 'melee', source: 'drop', tier: 4, atk: 95, spd: 1.2, acc: 0.85, crit: 0.4, value: 1000, mix: [1.2, 1.2, 0.6] },
+  chainsaw: { name: '전기톱', str: 'spd', kind: 'melee', source: 'drop', tier: 5, atk: 46, spd: 5, acc: 0.75, crit: 0.05, value: 1300, mix: [0.7, 1.2, 1.1] },
+  sledge: { name: '대형 해머', str: 'atk', kind: 'melee', source: 'drop', tier: 6, atk: 301, spd: 0.8, acc: 0.85, crit: 0.1, value: 1700, mix: [1.1, 1.4, 0.5] },
+  // 드랍 · 원거리: 강타 · 속사 · 정밀
+  crossbow: { name: '석궁', str: 'atk', kind: 'gun', source: 'drop', tier: 4, atk: 183, spd: 0.75, acc: 0.9, crit: 0.1, mag: 1, value: 1000, mix: [1.4, 0.8, 0.8] },
+  flamer: { name: '화염방사기', str: 'spd', kind: 'gun', source: 'drop', tier: 5, atk: 27, spd: 8, acc: 0.8, crit: 0.05, mag: 60, reload: 3.0, value: 1300, mix: [0.6, 1.1, 1.3] },
+  carbine: { name: '자동 소총', str: 'acc', kind: 'gun', source: 'drop', tier: 6, atk: 56, spd: 3.5, acc: 1, crit: 0.15, mag: 24, reload: 2.6, value: 1700, mix: [0.5, 1.4, 1.1] },
+  // 유니크(미션 보상) · 근접: 치명 · 정밀, 원거리: 강타 · 속사
+  homerun: { name: '홈런왕', str: 'crit', kind: 'melee', source: 'unique', tier: 7, atk: 139, spd: 1.6, acc: 0.85, crit: 0.45, value: 2400, mix: [1.3, 1, 0.7] },
+  bulwark: { name: '철벽', str: 'acc', kind: 'melee', source: 'unique', tier: 8, atk: 201, spd: 1.4, acc: 1, crit: 0.15, value: 3200, mix: [0.7, 1.4, 0.9] },
+  milestone: { name: '이정표', str: 'atk', kind: 'gun', source: 'unique', tier: 7, atk: 300, spd: 0.7, acc: 1, crit: 0.3, mag: 5, reload: 2.2, value: 2400, mix: [1.1, 1.3, 0.6] },
+  prometheus: { name: '프로메테우스', str: 'spd', kind: 'gun', source: 'unique', tier: 8, atk: 38, spd: 9, acc: 0.85, crit: 0.1, mag: 90, reload: 2.4, value: 3200, mix: [0.5, 1.1, 1.4] },
 };
-export const weaponSource = (id) => WEAPONS[id].source ?? 'craft';
-export const WEAPON_MAX_LV = 10;
-// 근접 무기 내구도: 한 번 때릴 때마다 1 줄고, 0이면 파손(맨주먹으로 싸운다). 맨주먹은 부서지지 않는다.
-// 최대 내구도는 강화할 때 공격력과 같은 비율(+15%/강화)로 늘어난다.
-export const maxDurability = (s, id) => (WEAPONS[id].dur ? Math.round(WEAPONS[id].dur * (1 + 0.15 * ((s.weapons[id] || 1) - 1))) : Infinity);
+// 파생값: 출처, 사거리, 공격 간격(근접 1/공격속도, 총은 지속 속도에 맞춘 발사 간격), 근접 내구도, 드랍 구역
+export const WEAPONS = Object.fromEntries(Object.entries(RAW_WEAPONS).map(([id, w]) => {
+  const d = { ...w, source: w.source ?? 'craft', range: w.kind === 'gun' ? GUN_RANGE : MELEE_RANGE };
+  // 총: 탄창을 다 쓰면 마지막 발의 간격과 재장전이 겹쳐 흐른다 → 한 바퀴 = (탄창 − 1) × 발사 간격 + 재장전
+  if (w.kind === 'gun') { if (w.mag > 1) d.cd = (w.mag / w.spd - w.reload) / (w.mag - 1); else d.cd = d.reload = 1 / w.spd; } // 한 발짜리(석궁)는 재장전이 곧 공격 간격
+  else { d.cd = 1 / w.spd; if (id !== 'fist') d.dur = Math.round(DUR_SECONDS * w.spd); }
+  if (d.source === 'drop') d.minZone = DROP_ZONE[w.tier];
+  return [id, d];
+}));
+export const WEAPON_STRENGTH = { atk: '강타', spd: '속사', acc: '정밀', crit: '치명' }; // 무기마다 str에 적힌 강점
+export const weaponSource = (id) => WEAPONS[id].source;
+export const weaponScore = (id) => { const w = WEAPONS[id]; return w.atk * w.spd * w.acc * (1 + w.crit); };
+export const ammoPerShot = (id) => AMMO_PER_SEC / WEAPONS[id].spd;
+// 강화: 한 단계마다 기본값의 10%씩 더한다(+1 110% · +2 120% · … · +5 150%가 최대). 공격력과 최대 내구도에 함께 붙는다.
+export const WEAPON_MAX_LV = 6; // 1 = 강화 전, 6 = +5
+export const upgradeMult = (lv) => 1 + 0.1 * ((lv || 1) - 1);
+// 근접 무기 내구도: 맞힐 때마다 1 줄고, 0이면 파손(맨주먹으로 싸운다). 맨주먹은 부서지지 않는다.
+export const maxDurability = (s, id) => (WEAPONS[id].dur ? Math.round(WEAPONS[id].dur * upgradeMult(s.weapons[id])) : Infinity);
 export const isBroken = (s, id) => !!WEAPONS[id].dur && (s.dur[id] ?? 0) <= 0;
 export const meleeId = (s) => (isBroken(s, s.equip.melee) ? 'fist' : s.equip.melee); // 실제로 휘두르는 근접 무기
 // 무기를 얻을 때: 근접은 내구도 가득, 총은 탄창 1개분 탄약이 같이 온다
@@ -210,26 +232,79 @@ export function gainWeapon(s, id) {
   if (w.kind === 'gun' && !Object.keys(s.weapons).some((k) => WEAPONS[k].kind === 'gun')) s.gunOn = true; // 첫 총을 얻으면 총기 사용을 켠다
   s.weapons[id] ||= 1;
   if (w.dur) s.dur[id] = maxDurability(s, id);
-  if (w.mag) s.ammo = Math.min(AMMO_MAX, s.ammo + w.mag);
+  if (w.mag) s.ammo = Math.min(AMMO_MAX, s.ammo + w.mag * ammoPerShot(id));
 }
+
+// ---------- 방어구 ----------
+// 부위마다 하나씩, 얻으면 바로 효과가 붙는 패시브(갈아 끼우지 않는다). 드랍 5종은 능력치 하나, 유니크 3종은 같은 부위 드랍 방어구의 강화판으로 능력치 둘.
+// 같은 부위에 유니크가 있으면 유니크만 효과를 준다(겹치지 않는다). 증강은 모든 능력치 공통 기본 10%, 강화는 무기와 같이 기본값의 10%씩(1강 11% · 2강 12%).
+// 이동·공격·파밍 속도와 최대 체력은 ×(1 + 증강), 받는 피해는 ×(1 − 증강). 여러 부위가 같은 능력치를 주면 곱해서 겹친다(피해 감소 상한 60%).
+export const ARMOR_STATS = { move: '이동 속도', atkSpd: '공격 속도', guard: '받는 피해 감소', hp: '최대 체력', farm: '파밍 속도' };
+export const ARMOR_SLOTS = { head: '머리', hands: '손', feet: '발', chest: '가슴', shield: '방패' };
+export const ARMORS = {
+  helmet: { name: '헬멧', slot: 'head', source: 'drop', stats: ['farm'], minZone: 2, desc: '헤드랜턴이 달려 뒤지는 손이 빨라요', mix: [0.6, 1.2, 1.2] },
+  gloves: { name: '안전장갑', slot: 'hands', source: 'drop', stats: ['atkSpd'], minZone: 1, mix: [0.8, 0.8, 1.4] },
+  boots: { name: '가죽부츠', slot: 'feet', source: 'drop', stats: ['move'], minZone: 1, mix: [1.1, 0.6, 1.3] },
+  vest: { name: '방탄조끼', slot: 'chest', source: 'drop', stats: ['hp'], minZone: 2, mix: [0.6, 1.1, 1.3] },
+  shield: { name: '진압방패', slot: 'shield', source: 'drop', stats: ['guard'], minZone: 3, mix: [0.6, 0.9, 1.5] },
+  tacHelmet: { name: '전술 헬멧', slot: 'head', source: 'unique', stats: ['farm', 'hp'], mix: [0.5, 1.3, 1.2] },
+  milVest: { name: '군용 방탄복', slot: 'chest', source: 'unique', stats: ['hp', 'guard'], mix: [0.5, 1.2, 1.3] },
+  combatBoots: { name: '전투화', slot: 'feet', source: 'unique', stats: ['move', 'farm'], mix: [1, 0.8, 1.2] },
+};
+export const ARMOR_MAX_LV = 3; // 1 = 기본, 3 = 2강
+export const armorBonus = (lv) => 0.1 * upgradeMult(lv);
+// 부위마다 효과를 주는 방어구(유니크 우선)
+export function wornArmor(s) {
+  const worn = {};
+  for (const [id, a] of Object.entries(ARMORS)) {
+    if (!s.armor[id]) continue;
+    const cur = worn[a.slot];
+    if (!cur || (a.source === 'unique' && ARMORS[cur].source !== 'unique')) worn[a.slot] = id;
+  }
+  return worn;
+}
+// 능력치별 증강(여러 부위면 곱해서 겹친 값): 속도·체력은 +n, 피해 감소는 n
+export function armorStat(s, stat) {
+  let m = 1;
+  for (const id of Object.values(wornArmor(s))) {
+    if (ARMORS[id].stats.includes(stat)) m *= stat === 'guard' ? 1 - armorBonus(s.armor[id]) : 1 + armorBonus(s.armor[id]);
+  }
+  return stat === 'guard' ? 1 - m : m - 1;
+}
+export function gainArmor(s, id) { s.armor[id] ||= 1; }
+// 공격속도 배율: 안전장갑 × 스팀팩. 근접 간격·총 발사 간격·재장전에 함께 붙는다.
+export const atkSpeedMult = (s) => (1 + armorStat(s, 'atkSpd')) * (s.player.stim > 0 ? STIM_MULT : 1);
+// 지금 실제로 내는 초당 피해(기댓값): 무기 점수 × 강화 × 레벨 × 공격속도 배율
+export const attackDps = (s, id) => weaponScore(id) * upgradeMult(s.weapons[id]) * levelAtkMult(s) * atkSpeedMult(s);
 
 export const xpToNext = (lv) => XP_BASE * lv;
 // 레벨업 때 뽑은 상승치를 누적해 둔다(s.growth). 같은 레벨이라도 사람마다 조금씩 다르다.
 export const levelAtkMult = (s) => 1 + s.growth.atk;
 export const rollGrowth = (s, base, spread = GROWTH_SPREAD) => base * (1 - spread + 2 * spread * rand(s));
 export const zombieXp = (z) => Math.round(ZTYPES[z.type].xp * (1 + 0.5 * z.d));
-// 무기 강화(+15%/강화)와 레벨 보너스(+4%/레벨)가 곱해진다. 플레이어 무기에만 쓴다.
-export const weaponDamage = (s, id) => WEAPONS[id].dmg * (1 + 0.15 * ((s.weapons[id] || 1) - 1)) * levelAtkMult(s);
-export function weaponUpgradeCost(s, id) {
-  const w = WEAPONS[id], base = w.cost?.scrap ?? w.value;
-  return scaleCost({ scrap: base * 0.8, [w.kind === 'gun' ? 'plastic' : 'wood']: base * 0.6 }, 0.6 * 1.45 ** (s.weapons[id] || 1));
+// 한 번 맞힐 때의 피해: 공격력 × 강화(+10%/강화) × 레벨 보너스. 플레이어 무기에만 쓴다.
+export const weaponDamage = (s, id) => WEAPONS[id].atk * upgradeMult(s.weapons[id]) * levelAtkMult(s);
+// 강화 비용(무기·방어구 공통): 총량 = 3 × 40 × 티어^1.25 × 목표 단계(+1 ×1 · +2 ×2 · … · +5 ×5). 실패는 없다.
+// 총량을 장비마다의 배합(mix: 목재·고철·플라스틱, 합 3)으로 나누고 10 단위로 맞춘다(남는 10은 소수 부분이 큰 자원부터).
+export const UPGRADE_COST_BASE = 40;
+export function upgradeCostFor(tier, next, mix = [1, 1, 1]) {
+  const units = Math.round((UPGRADE_COST_BASE * Math.max(0.5, tier) ** 1.25 * (next - 1) * 3) / 10); // 총량(10 단위)
+  const raw = mix.map((m) => (units * m) / 3), out = raw.map(Math.floor);
+  let left = units - out.reduce((a, v) => a + v, 0);
+  for (const i of [0, 1, 2].sort((a, b) => raw[b] - out[b] - (raw[a] - out[a]))) if (left-- > 0) out[i]++;
+  const c = {};
+  RES_KEYS.forEach((k, i) => { if (out[i]) c[k] = out[i] * 10; });
+  return c;
 }
+export const weaponUpgradeCost = (s, id) => upgradeCostFor(WEAPONS[id].tier, (s.weapons[id] || 1) + 1, WEAPONS[id].mix);
+export const ARMOR_TIER = { drop: 3, unique: 6 }; // 방어구 강화 비용에 쓰는 티어
+export const armorUpgradeCost = (s, id) => upgradeCostFor(ARMOR_TIER[ARMORS[id].source], (s.armor[id] || 1) + 1, ARMORS[id].mix);
 
 // ---------- 기지 건물 ----------
 export const BUILDINGS = {
   barricade: { name: '바리케이드', desc: '방벽 체력 ×1.5', base: { wood: 40, scrap: 20 }, unlockHq: 1 },
   watchtower: { name: '감시탑', desc: '방어 배치 +1, 방어 피해 +10%', base: { wood: 50, scrap: 30 }, unlockHq: 1 },
-  workbench: { name: '공방', desc: '무기 제작 등급 +1', base: { wood: 20, scrap: 30 }, unlockHq: 1, max: 4 },
+  workbench: { name: '공방', desc: '무기 제작 등급 +1', base: { wood: 20, scrap: 30 }, unlockHq: 1, max: 3 },
   dorm: { name: '숙소', desc: '동료 정원 +2', base: { wood: 40, plastic: 20 }, unlockHq: 1 },
   sawmill: { name: '제재소', desc: '목재 생산', prod: { wood: 0.25 }, base: { scrap: 30, plastic: 15 }, unlockHq: 1 },
   scrapyard: { name: '고철 작업장', desc: '고철 생산', prod: { scrap: 0.2 }, base: { wood: 35, plastic: 15 }, unlockHq: 1 },
@@ -280,7 +355,7 @@ export const outpostLimit = (s) => Math.floor(s.hq / 2);
 export const PACK_BONUS = 0.25;
 export const ESCORT_CARRY = 25; // 탐험 동료 1명이 드는 짐 = 25 × 전투력
 export const bagCap = (s) => Math.floor((60 + s.growth.bag + escorts(s).reduce((a, v) => a + survivorCarry(v), 0)) * (1 + PACK_BONUS * s.bld.pack));
-export const maxHp = (s) => 100 + 25 * s.bld.clinic + s.growth.hp;
+export const maxHp = (s) => (100 + 25 * s.bld.clinic + s.growth.hp) * (1 + armorStat(s, 'hp'));
 export const hqSafeRadius = (s) => 140 + 22 * s.hq;
 
 // ---------- 전진기지 후보지 ----------
@@ -406,10 +481,14 @@ function pay(res, cost) {
 }
 export const bagTotal = (s) => RES_KEYS.reduce((a, k) => a + s.bag[k], 0);
 
+// 생산 건물: 레벨마다 늘어나는 생산량도 ×1.2씩 커진다(1레벨 +1 · 2레벨 +1.2 · … · 10레벨 +5.16배분).
+// 건물 생산 = 기본 × (1.2^레벨 − 1) ÷ 0.2(10레벨이면 기본의 약 26배). 레벨업 비용(×1.55)을 따라가 한 단계 회수 시간이 30분 안팎을 넘지 않는다.
+export const PROD_GROWTH = 1.2;
+export const prodLevelMult = (lv) => (PROD_GROWTH ** lv - 1) / (PROD_GROWTH - 1);
 export function productionPerSec(s) {
   const p = { wood: 0, scrap: 0, plastic: 0 };
   for (const [id, b] of Object.entries(BUILDINGS)) {
-    if (b.prod) for (const [r, v] of Object.entries(b.prod)) p[r] += v * s.bld[id];
+    if (b.prod) for (const [r, v] of Object.entries(b.prod)) p[r] += v * prodLevelMult(s.bld[id]);
   }
   for (const o of s.outposts) for (const [r, v] of Object.entries(outpostProd(s, o.site, o.lv))) p[r] += v;
   // 근무 배치 동료가 생산을 돕는다. 기술자는 보너스가 더 크다.
@@ -606,8 +685,9 @@ export function newGame(seed = (Date.now() & 0x7fffffff) || 1) {
     jobs: [], // 진행 중인 건설·강화·제작·훈련
     wall: 150,
     raidT: RAID_FIRST_S,
-    player: { x: CENTER.x, y: CENTER.y + 20, hp: 100, dead: 0, cd: 0, face: 0, mag: 0, reload: 0, buff: 0, stim: 0 },
-    ammo: 0, // 예비 탄약(모든 총 공용)
+    player: { x: CENTER.x, y: CENTER.y + 20, hp: 100, dead: 0, cd: 0, face: 0, mag: 0, reload: 0, stim: 0 },
+    armor: {}, // 얻은 방어구 { id: 강화 단계(1 = 기본) }
+    ammo: 0, // 예비 탄약(모든 총 공용, 발당 쓰는 양은 총마다 다르다)
     ammoOn: true, // 총알 제작소 가동 여부
     gunOn: false, // 총기 사용 여부(끄면 근접 무기만 써서 탄약을 아낀다). 처음엔 총이 없어 꺼 두고, 첫 총을 얻으면 켠다
     dur: {}, // 근접 무기 내구도
@@ -648,17 +728,19 @@ function resetTransient(s) {
   return s;
 }
 
-// 예비 탄약에서 탄창을 채운다(무한 재장전 없음)
+// 예비 탄약에서 탄창을 채운다(무한 재장전 없음). 탄창은 발 수, 예비는 탄약 수(발당 ammoPerShot개)
 function loadMag(s) {
-  const g = s.equip.gun && WEAPONS[s.equip.gun], P = s.player;
+  const id = s.equip.gun, P = s.player;
   P.reload = 0;
-  if (!g) return;
-  const take = Math.min(g.mag - P.mag, s.ammo);
-  if (take > 0) { P.mag += take; s.ammo -= take; }
+  if (!id) return;
+  const aps = ammoPerShot(id), take = Math.min(WEAPONS[id].mag - P.mag, Math.floor(s.ammo / aps + 1e-9));
+  if (take > 0) { P.mag += take; s.ammo = Math.max(0, s.ammo - take * aps); }
 }
+export const canReload = (s) => !!s.equip.gun && s.ammo + 1e-9 >= ammoPerShot(s.equip.gun);
 // 총을 바꾸면 탄창에 남은 탄은 예비로 돌려놓고 새 총을 채운다
 function swapGun(s, id) {
-  s.ammo += s.player.mag; s.player.mag = 0;
+  if (s.equip.gun) s.ammo += s.player.mag * ammoPerShot(s.equip.gun);
+  s.player.mag = 0;
   s.equip.gun = id;
   loadMag(s);
 }
@@ -689,12 +771,12 @@ function nearestSafe(s, x, y) {
 // 걸리는 시간 = 5분 × (목표 레벨 ÷ 그 항목의 최고 레벨): 높은 등급일수록 비례해서 길고, 최고 등급이 딱 5분이다.
 // 줄마다 한 번에 하나만 진행한다. 다른 줄끼리는 동시에 돌아간다.
 export const JOB_MAX_S = 300;
-export const JOB_LANES = { base: '기지 건설', forge: '무기 작업', train: '훈련', outpost: '전진기지 공사' };
-const JOB_KINDS = { hq: 'base', bld: 'base', craft: 'forge', wup: 'forge', lvl: 'train', obuild: 'outpost', oup: 'outpost', odemo: 'outpost' };
+export const JOB_LANES = { base: '기지 건설', forge: '장비 작업', train: '훈련', outpost: '전진기지 공사' };
+const JOB_KINDS = { hq: 'base', bld: 'base', craft: 'forge', wup: 'forge', aup: 'forge', lvl: 'train', obuild: 'outpost', oup: 'outpost', odemo: 'outpost' };
 // 전진기지 철거: 자원은 돌려받지 못하고, 그 레벨까지 지은 시간의 절반이 걸린다(1레벨 50초 · 2레벨 1분 40초 · 3레벨 2분 30초).
 // 다 헐릴 때까지는 안전지대·생산이 그대로이고, 끝나면 그 자리는 다시 후보지가 된다.
 export const DEMOLISH_SHARE = 0.5;
-export const CRAFT_MAX_TIER = Math.max(...Object.values(WEAPONS).map((w) => w.tier ?? 0));
+export const CRAFT_MAX_TIER = Math.max(...Object.values(WEAPONS).filter((w) => w.source === 'craft').map((w) => w.tier));
 export const jobTime = (next, max) => Math.round(JOB_MAX_S * Math.min(1, next / max));
 export const durText = (sec) => {
   const t = Math.max(0, Math.ceil(sec)), m = Math.floor(t / 60), r = t % 60;
@@ -707,6 +789,7 @@ export function jobDuration(kind, key, next) {
     case 'bld': return jobTime(next, BUILDINGS[key].max ?? HQ_MAX);
     case 'craft': return jobTime(WEAPONS[key].tier, CRAFT_MAX_TIER);
     case 'wup': return jobTime(next, WEAPON_MAX_LV);
+    case 'aup': return jobTime(next, ARMOR_MAX_LV);
     case 'lvl': return jobTime(next, MAX_SURVIVOR_LV);
     case 'odemo': return Math.round(jobTime(next, OUTPOST_MAX_LV) * DEMOLISH_SHARE); // next = 헐리는 전진기지의 레벨
     default: return jobTime(next, OUTPOST_MAX_LV); // obuild(1레벨)·oup
@@ -720,6 +803,7 @@ function jobLevel(s, kind, key) {
     case 'bld': return Object.hasOwn(BUILDINGS, key) ? s.bld[key] : null;
     case 'craft': return Object.hasOwn(WEAPONS, key) && weaponSource(key) === 'craft' ? (s.weapons[key] ? 1 : 0) : null;
     case 'wup': return Object.hasOwn(WEAPONS, key) && s.weapons[key] ? s.weapons[key] : null;
+    case 'aup': return Object.hasOwn(ARMORS, key) && s.armor[key] ? s.armor[key] : null;
     case 'lvl': return s.survivors.find((v) => v.id === key)?.lv ?? null;
     case 'obuild': return site ? (s.outposts.some((o) => o.site === key) ? 1 : 0) : null;
     case 'oup': case 'odemo': return site ? s.outposts.find((o) => o.site === key)?.lv ?? null : null;
@@ -732,6 +816,7 @@ function jobMax(s, kind, key) {
     case 'bld': return buildingMax(s, key);
     case 'craft': return s.bld.workbench >= WEAPONS[key].tier ? 1 : 0;
     case 'wup': return WEAPON_MAX_LV;
+    case 'aup': return ARMOR_MAX_LV;
     case 'lvl': return MAX_SURVIVOR_LV;
     case 'obuild': return s.outposts.length < outpostLimit(s) ? 1 : 0;
     default: return OUTPOST_MAX_LV;
@@ -745,6 +830,7 @@ export function jobName(s, j) {
     case 'bld': return `${BUILDINGS[j.key].name} ${j.next}레벨`;
     case 'craft': return `${WEAPONS[j.key].name} 제작`;
     case 'wup': return `${WEAPONS[j.key].name} +${j.next - 1}`;
+    case 'aup': return `${ARMORS[j.key].name} +${j.next - 1}`;
     case 'lvl': return `${s.survivors.find((v) => v.id === j.key)?.name ?? '동료'} ${j.next}레벨`;
     case 'obuild': return `${s.sites[j.key].name} 전진기지`;
     case 'odemo': return `${s.sites[j.key].name} 철거`;
@@ -784,6 +870,7 @@ function finishJob(s, j) {
       if (before) s.dur[j.key] = Math.min(maxDurability(s, j.key), (s.dur[j.key] ?? 0) + maxDurability(s, j.key) - before); // 늘어난 만큼 함께 찬다
       break;
     }
+    case 'aup': s.armor[j.key] = Math.max(s.armor[j.key] || 1, j.next); break;
     case 'lvl': { const v = s.survivors.find((x) => x.id === j.key); if (v) v.lv = Math.max(v.lv, j.next); break; }
     case 'obuild': if (!s.outposts.some((o) => o.site === j.key)) s.outposts.push({ site: j.key, lv: 1 }); break;
     case 'odemo': s.outposts = s.outposts.filter((o) => o.site !== j.key); break;
@@ -810,6 +897,7 @@ export function jobCost(s, j) {
     case 'bld': return buildCost(j.key, j.next);
     case 'craft': return WEAPONS[j.key].cost;
     case 'wup': return weaponUpgradeCost(s, j.key);
+    case 'aup': return armorUpgradeCost(s, j.key);
     case 'lvl': { const v = s.survivors.find((x) => x.id === j.key); return v ? levelUpCost(v) : {}; }
     case 'obuild': return outpostCost(s, j.key);
     case 'oup': { const o = s.outposts.find((x) => x.site === j.key); return o ? outpostUpgradeCost(s, j.key, o.lv) : {}; }
@@ -855,7 +943,7 @@ export function craftWeapon(s, id) {
   const w = WEAPONS[id];
   if (!w) return fail('없는 무기예요');
   if (s.weapons[id]) return fail('이미 가진 무기예요');
-  if (weaponSource(id) !== 'craft') return fail(weaponSource(id) === 'loot' ? '파밍으로만 구할 수 있어요' : '미션 보상으로만 받을 수 있어요');
+  if (weaponSource(id) !== 'craft') return fail(weaponSource(id) === 'drop' ? '파밍으로만 구할 수 있어요' : '미션 보상으로만 받을 수 있어요');
   if (s.bld.workbench < w.tier) return fail(`공방 ${w.tier}레벨이 필요해요`);
   const wait = busy(s, 'forge'); if (wait) return wait;
   if (!canAfford(s.res, w.cost)) return fail('자원이 부족해요');
@@ -871,6 +959,16 @@ export function upgradeWeapon(s, id) {
   return startJob(s, 'wup', id, s.weapons[id] + 1, c);
 }
 
+export function upgradeArmor(s, id) {
+  if (!ARMORS[id]) return fail('없는 방어구예요');
+  if (!s.armor[id]) return fail('아직 얻지 못한 방어구예요');
+  if (s.armor[id] >= ARMOR_MAX_LV) return fail('최고 강화예요');
+  const wait = busy(s, 'forge'); if (wait) return wait;
+  const c = armorUpgradeCost(s, id);
+  if (!canAfford(s.res, c)) return fail('자원이 부족해요');
+  return startJob(s, 'aup', id, s.armor[id] + 1, c);
+}
+
 export function equipWeapon(s, id) {
   if (!s.weapons[id]) return fail('먼저 제작해야 해요');
   if (WEAPONS[id].kind === 'gun') swapGun(s, id); else s.equip.melee = id;
@@ -880,7 +978,7 @@ export function equipWeapon(s, id) {
 // 근접 무기 수리: 본부 안전지대에서, 수리점이 있을 때만. 시간은 걸리지 않고 고철을 낸다(잃은 내구도에 비례).
 export function repairCost(s, id) {
   const w = WEAPONS[id], max = maxDurability(s, id), missing = 1 - (s.dur[id] ?? 0) / max;
-  const base = (w.cost?.scrap ?? w.value * 0.5) * (1 + 0.15 * ((s.weapons[id] || 1) - 1));
+  const base = (w.cost?.scrap ?? w.value * 0.5) * upgradeMult(s.weapons[id]);
   return { scrap: Math.max(1, Math.ceil(base * 0.6 * missing * (1 - 0.25 * Math.max(0, s.bld.repair - 1)))) };
 }
 export function repairWeapon(s, id) {
@@ -989,14 +1087,21 @@ export function returnToBase(s) {
 export const roParticle = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00, j = c % 28; return c >= 0 && c < 11172 && j && j !== 8 ? '으로' : '로'; };
 
 // ---------- 미션 ----------
+// 미션 하나에 유니크 하나(무기 4 · 방어구 3)
+export const dropFound = (s) => Object.keys(WEAPONS).filter((k) => WEAPONS[k].source === 'drop' && s.weapons[k]).length + Object.keys(ARMORS).filter((k) => ARMORS[k].source === 'drop' && s.armor[k]).length;
 export const MISSIONS = [
   { id: 'hunter', name: '좀비 사냥꾼', desc: '좀비 1,000마리 처치', goal: 1000, reward: 'homerun', progress: (s) => s.stats.kills },
-  { id: 'rescuer', name: '구조대장', desc: '생존자 10명 구출', goal: 10, reward: 'savior', progress: (s) => s.stats.rescued },
+  { id: 'rescuer', name: '구조대장', desc: '생존자 10명 구출', goal: 10, reward: 'tacHelmet', progress: (s) => s.stats.rescued },
   { id: 'wall', name: '철벽 수비', desc: '기지 습격 10회 방어', goal: 10, reward: 'bulwark', progress: (s) => s.stats.raidsWon },
   { id: 'pioneer', name: '개척자', desc: '전진기지 3곳 건설', goal: 3, reward: 'milestone', progress: (s) => s.outposts.length },
   { id: 'raider', name: '군사 구역 약탈자', desc: '군사 구역에서 50번 파밍', goal: 50, reward: 'prometheus', progress: (s) => s.stats.militaryLoot },
+  { id: 'collector', name: '수집가', desc: '드랍 장비(무기·방어구) 8종 발견', goal: 8, reward: 'milVest', progress: dropFound },
+  { id: 'forger', name: '단련', desc: '방어구 3개를 2강까지 강화', goal: 3, reward: 'combatBoots', progress: (s) => Object.values(s.armor).filter((lv) => lv >= ARMOR_MAX_LV).length },
 ];
 export const missionDone = (s, m) => m.progress(s) >= m.goal;
+// 미션 보상 받기(무기면 무기, 방어구면 방어구)
+function gainReward(s, id) { if (WEAPONS[id]) gainWeapon(s, id); else gainArmor(s, id); }
+export const rewardName = (id) => (WEAPONS[id] ?? ARMORS[id]).name;
 
 export function claimMission(s, id) {
   const m = MISSIONS.find((x) => x.id === id);
@@ -1004,8 +1109,8 @@ export function claimMission(s, id) {
   if (s.claimed[id]) return fail('이미 받은 보상이에요');
   if (!missionDone(s, m)) return fail(`아직 ${Math.floor(m.progress(s))}/${m.goal}이에요`);
   s.claimed[id] = true;
-  gainWeapon(s, m.reward);
-  return ok(`미션 달성! 유니크 무기 「${WEAPONS[m.reward].name}」 획득`);
+  gainReward(s, m.reward);
+  return ok(`미션 달성! 유니크 ${WEAPONS[m.reward] ? '무기' : '방어구'} 「${rewardName(m.reward)}」 획득`);
 }
 
 // ---------- 아이템 사용 ----------
@@ -1036,11 +1141,7 @@ export function useItem(s, id, ev = []) {
     if (s.rescue) return fail('이미 구조 신호가 떠 있어요');
     if (dormFull(s)) return fail(`숙소가 가득 찼어요(${s.survivors.length}/${survivorCap(s)}). 숙소를 먼저 올리세요`);
     if (!spawnRescueNear(s, P.x, P.y, ev)) return fail('여기서는 신호가 닿지 않아요. 조금 움직여 보세요');
-  } else if (id === 'energy') {
-    P.buff = ENERGY_S;
   } else if (id === 'stim') {
-    if (P.hp <= maxHp(s) * STIM_HP + 1) return fail('체력이 너무 낮아서 쓸 수 없어요');
-    P.hp -= maxHp(s) * STIM_HP;
     P.stim = STIM_S;
   }
   s.items[id]--;
@@ -1108,8 +1209,8 @@ function updateRaid(s, dt, ev) {
     const reward = { scrap: Math.round(R.hpTotal / 8), wood: Math.round(R.hpTotal / 14), plastic: Math.round(R.hpTotal / 14) };
     for (const k of RES_KEYS) s.res[k] += reward[k];
     reward.item = 'toolbox';
-    addItem(s, 'toolbox');
-    reward.ammo = Math.min(AMMO_MAX - s.ammo, raidAmmo(s));
+    reward.itemN = addItem(s, 'toolbox', 1 + Math.floor(rand(s) * 3)); // 공구 상자 1~3개(같은 확률, 9개까지만 든다)
+    reward.ammo = Math.max(0, Math.floor(Math.min(AMMO_MAX - s.ammo, raidAmmo(s))));
     s.ammo += reward.ammo;
     s.raid = null;
     s.raidT = 300 + rand(s) * 180;
@@ -1138,7 +1239,6 @@ export function step(s, dt, input = null) {
   updateRaid(s, dt, ev);
 
   const P = s.player;
-  if (P.buff > 0) P.buff = Math.max(0, P.buff - dt);
   if (P.stim > 0) P.stim = Math.max(0, P.stim - dt);
   // 재장전은 예비 탄약이 있을 때만. 탄창도 예비도 비면 총을 못 쓴다(한 번 알린다). 총기 사용을 끄면 새로 재장전하지 않는다.
   const gun = s.gunOn && s.equip.gun && WEAPONS[s.equip.gun];
@@ -1146,7 +1246,7 @@ export function step(s, dt, input = null) {
     P.reload -= dt;
     if (P.reload <= 0) { loadMag(s); ev.push({ t: 'reloaded' }); }
   } else if (gun && P.mag <= 0) {
-    if (s.ammo > 0) { P.reload = gun.reload; ev.push({ t: 'reload' }); s.noAmmo = false; }
+    if (canReload(s)) { P.reload = gun.reload / atkSpeedMult(s); ev.push({ t: 'reload' }); s.noAmmo = false; }
     else if (!s.noAmmo) { s.noAmmo = true; ev.push({ t: 'no-ammo' }); }
   }
   // 1) 이동: 손가락 입력이 자동사냥·목적지 이동보다 우선
@@ -1162,7 +1262,7 @@ export function step(s, dt, input = null) {
   if (mag > 1) { mx /= mag; my /= mag; }
   P.moving = mag > 0.05;
   if (P.moving) P.face = Math.atan2(my, mx);
-  const speed = PLAYER_SPEED * (P.buff > 0 ? 1.4 : 1) * (P.stim > 0 ? STIM_MULT : 1);
+  const speed = PLAYER_SPEED * (1 + armorStat(s, 'move')) * (P.stim > 0 ? STIM_MULT : 1);
   P.x = clamp(P.x + mx * speed * dt, 20, WORLD.w - 20);
   P.y = clamp(P.y + my * speed * dt, 20, WORLD.h - 20);
   pushOutOfObstacles(s, P, 10);
@@ -1228,15 +1328,16 @@ export function setHero(s, id, name) {
 // ---------- 엔딩 ----------
 // 목표 8개 중 3개 이상을 달성하고 그중 필수 목표(기지·동료·전진기지)가 하나 이상이면 엔딩이다. 한 판에 한 번 뜨고, 이어서 계속할 수 있다.
 // 목표: 사람 기준 2~3시간에 엔딩. 사람은 손으로 파밍하고 멈춰 고르므로 봇의 약 1.2~1.8배가 걸린다고 보고, 봇이 100~110분쯤 닿게 맞췄다.
+// 2026-10-25 장비 개편(방어구 파밍·이동 속도, 강해진 총)으로 봇이 75~81분으로 빨라져 필수 목표를 본부 8 · 동료 16 · 거점망 4로 올렸다(봇 102~109분).
 export const ENDING_NEED = 3;
 export const ENDING_GOALS = [
-  { id: 'hq', req: true, name: '재건된 거점', desc: '본부 7레벨', goal: 7, progress: (s) => s.hq },
-  { id: 'crew', req: true, name: '생존자 공동체', desc: '동료 14명', goal: 14, progress: (s) => s.survivors.length },
-  { id: 'network', req: true, name: '개척 거점망', desc: '전진기지 3곳, 모두 3레벨', goal: 3, progress: (s) => s.outposts.filter((o) => o.lv >= OUTPOST_MAX_LV).length },
+  { id: 'hq', req: true, name: '재건된 거점', desc: '본부 8레벨', goal: 8, progress: (s) => s.hq },
+  { id: 'crew', req: true, name: '생존자 공동체', desc: '동료 16명', goal: 16, progress: (s) => s.survivors.length },
+  { id: 'network', req: true, name: '개척 거점망', desc: '전진기지 4곳, 모두 3레벨', goal: 4, progress: (s) => s.outposts.filter((o) => o.lv >= OUTPOST_MAX_LV).length },
   { id: 'elite', name: '학살자 사냥꾼', desc: '상급 좀비(거구·학살자) 100마리 처치', goal: 100, progress: (s) => s.stats.eliteKills },
   { id: 'military', name: '군사 구역 정복', desc: '군사 구역에서 100번 파밍', goal: 100, progress: (s) => s.stats.militaryLoot },
   { id: 'fortress', name: '난공불락', desc: '기지 습격 12회 방어', goal: 12, progress: (s) => s.stats.raidsWon },
-  { id: 'master', name: '명장', desc: '무기 하나를 +6까지 강화', goal: 7, progress: (s) => Math.max(1, ...Object.values(s.weapons)) },
+  { id: 'master', name: '명장', desc: '무기 하나를 +5(최대)까지 강화', goal: 6, progress: (s) => Math.max(1, ...Object.values(s.weapons)) },
   { id: 'veteran', name: '베테랑', desc: '플레이어 레벨 30', goal: 30, progress: (s) => s.level },
 ];
 export const goalDone = (s, g) => g.progress(s) >= g.goal;
@@ -1289,7 +1390,7 @@ function gatherNodes(s, dt, ev) {
   }
   if (!node) { s.gather = null; return; }
   if (!s.gather || s.gather.node !== node) s.gather = { node, prog: 0 };
-  s.gather.prog += (dt / LOOT_TYPES[node.type].time) * (P.stim > 0 ? STIM_MULT : 1);
+  s.gather.prog += (dt / LOOT_TYPES[node.type].time) * (1 + armorStat(s, 'farm')) * (P.stim > 0 ? STIM_MULT : 1);
   if (s.gather.prog < 1) return;
 
   const room = bagCap(s) - bagTotal(s);
@@ -1308,23 +1409,33 @@ function gatherNodes(s, dt, ev) {
   if (zone === ZONE_NAMES.length - 1) s.stats.militaryLoot++;
   ev.push({ t: 'loot', type: node.type, res: node.res, amt: got, x: node.x, y: node.y });
   if (s.ammo < AMMO_MAX && rand(s) < ammoChance(node.d)) {
-    const n = Math.min(AMMO_MAX - s.ammo, ammoDrop(node.d));
+    const n = Math.max(0, Math.floor(Math.min(AMMO_MAX - s.ammo, ammoDrop(node.d))));
     s.ammo += n;
     ev.push({ t: 'ammo', n, x: node.x, y: node.y });
   }
-  const pool = LOOT_TYPES[node.type].items;
   if (rand(s) < itemDropChance(node.d)) {
-    const id = pool[Math.floor(rand(s) * pool.length)];
+    const id = ITEM_KEYS[Math.floor(rand(s) * ITEM_KEYS.length)];
     if (addItem(s, id)) ev.push({ t: 'item', id, x: node.x, y: node.y });
   }
-  for (const [id, w] of Object.entries(WEAPONS)) {
-    if (w.source !== 'loot' || s.weapons[id] || !w.find.includes(node.type) || zone < w.minZone) continue;
-    if (rand(s) < w.chance) { gainWeapon(s, id); ev.push({ t: 'weapon-found', id, x: node.x, y: node.y }); break; }
+  // 드랍 장비: 대상물 종류와 상관없이 EQUIP_DROP_CHANCE 확률로, 이 구역에서 나오는 장비 중 아직 없는 것 하나
+  if (rand(s) < EQUIP_DROP_CHANCE) {
+    const pool = dropPool(s, zone);
+    if (pool.length) {
+      const id = pool[Math.floor(rand(s) * pool.length)];
+      if (WEAPONS[id]) { gainWeapon(s, id); ev.push({ t: 'weapon-found', id, x: node.x, y: node.y }); }
+      else { gainArmor(s, id); ev.push({ t: 'armor-found', id, x: node.x, y: node.y }); }
+    }
   }
   // 리스폰은 같은 구역 안 무작위 자리에서(옮긴 자리 기준 리스폰 시간)
   relocateNode(s, node);
   node.readyAt = s.time + node.respawn;
 }
+
+export const EQUIP_DROP_CHANCE = 0.02;
+export const dropPool = (s, zone) => [
+  ...Object.keys(WEAPONS).filter((k) => WEAPONS[k].source === 'drop' && !s.weapons[k] && zone >= WEAPONS[k].minZone),
+  ...Object.keys(ARMORS).filter((k) => ARMORS[k].source === 'drop' && !s.armor[k] && zone >= ARMORS[k].minZone),
+];
 
 // 구출 이벤트: 'stranded'(조난자, 다가가면 합류) 또는 'siege'(좀비에 포위, 주변 좀비를 모두 잡아야 합류).
 export const dormFull = (s) => s.survivors.length >= survivorCap(s);
@@ -1333,9 +1444,9 @@ export const dormFull = (s) => s.survivors.length >= survivorCap(s);
 export function canBreakSiege(s) {
   const zs = s.zombies.filter((z) => z.siege && z.hp > 0);
   if (!zs.length) return true;
-  const mel = meleeId(s), dps = weaponDamage(s, mel) / WEAPONS[mel].cd * (1 + CRIT_CHANCE * (CRIT_MULT - 1));
-  const gunDps = s.equip.gun && (s.player.mag > 0 || s.ammo > 0) ? weaponDamage(s, s.equip.gun) / WEAPONS[s.equip.gun].cd * 0.6 : 0; // 명중률 감안
-  const hpTotal = zs.reduce((a, z) => a + z.hp, 0), clearTime = hpTotal / Math.max(dps, gunDps * 0.7);
+  const dps = attackDps(s, meleeId(s));
+  const gunDps = s.gunOn && s.equip.gun && (s.player.mag > 0 || canReload(s)) ? attackDps(s, s.equip.gun) : 0;
+  const hpTotal = zs.reduce((a, z) => a + z.hp, 0), clearTime = hpTotal / Math.max(dps, gunDps);
   // 한꺼번에 붙는 좀비는 절반쯤으로 본다
   const incoming = zs.reduce((a, z) => a + z.dmg / (z.atkCd ?? ZOMBIE_ATK_CD), 0) * 0.5 * (1 - playerGuard(s));
   return clearTime * incoming < s.player.hp * 0.6;
@@ -1391,10 +1502,10 @@ function updateRescue(s, dt, ev) {
   s.survivors.push(v);
   s.stats.rescued++;
   s.rescue = null;
-  // 포위에서 구한 생존자는 감사의 뜻으로 아이템을 하나 준다
-  const gift = R.kind === 'siege' ? ITEM_KEYS[Math.floor(rand(s) * ITEM_KEYS.length)] : null;
-  if (gift) addItem(s, gift);
-  ev.push({ t: 'rescued', name: v.name, role: v.role, rarity: v.rarity, post: v.post, kind: R.kind, gift });
+  // 구한 생존자(포위·조난)는 감사의 뜻으로 아이템 5종 중 무작위로 1개 또는 2개(반반)를 준다
+  const gifts = [];
+  for (let k = rand(s) < 0.5 ? 1 : 2; k > 0; k--) { const id = ITEM_KEYS[Math.floor(rand(s) * ITEM_KEYS.length)]; addItem(s, id); gifts.push(id); }
+  ev.push({ t: 'rescued', name: v.name, role: v.role, rarity: v.rarity, post: v.post, kind: R.kind, gifts });
 }
 
 function placeRescue(s, x, y, kind, ev) {
@@ -1503,22 +1614,17 @@ function nearestZombie(s, x, y, range) {
   return best;
 }
 
-export const playerGuard = (s) => Math.min(0.6, (WEAPONS[meleeId(s)].guard ?? 0) + (s.equip.gun ? WEAPONS[s.equip.gun].guard ?? 0 : 0));
+export const playerGuard = (s) => Math.min(0.6, armorStat(s, 'guard')); // 받는 피해 감소(방어구, 상한 60%)
 
 // by: 'player', 'post'(방어 동료), 'escort'(탐험 동료). 마지막으로 때린 쪽이 처치로 친다.
-function hit(s, z, dmg, ev, splash = 0, critBonus = 0, by = 'player') {
-  const crit = rand(s) < CRIT_CHANCE + critBonus;
+function hit(s, z, dmg, ev, critChance, by = 'player') {
+  const crit = rand(s) < critChance;
   if (crit) dmg *= CRIT_MULT;
   z.hp -= dmg;
   z.hit = 0.12;
   z.by = by;
   ev.push({ t: 'dmg', x: z.x, y: z.y, dmg, crit });
-  if (!splash) return dmg;
-  let total = dmg;
-  for (const o of s.zombies) {
-    if (o !== z && o.hp > 0 && dist(o.x, o.y, z.x, z.y) < splash) { o.hp -= dmg * 0.6; o.hit = 0.12; o.by = by; total += dmg * 0.6; }
-  }
-  return total;
+  return dmg;
 }
 
 export function gainXp(s, xp, ev = []) {
@@ -1555,29 +1661,25 @@ function playerAttack(s, dt, ev) {
   P.cd -= dt;
   if (P.cd > 0) return;
   // 공격 반경 = 쏠 수 있으면 총 사거리, 아니면 근접 사거리(좀비 전략과 상관없이 같다)
-  const melee = WEAPONS[meleeId(s)].range;
-  const reach = gunReady(s) ? WEAPONS[s.equip.gun].range : melee;
+  const reach = gunReady(s) ? GUN_RANGE : MELEE_RANGE;
   const z = nearestZombie(s, P.x, P.y, reach);
-  if (!z) return;
-  const a = chooseAttack(s, z);
-  if (!a) return;
+  const a = z && chooseAttack(s, z);
+  if (!a) { P.cd = 0; return; }
   P.face = Math.atan2(z.y - P.y, z.x - P.x);
-  P.cd = a.w.cd * (P.buff > 0 ? 0.7 : 1);
-  if (a.w.kind === 'gun') {
-    P.mag--;
-    // 명중률: 멀수록 빗나간다. 빗나가도 탄은 쓴다.
-    if (rand(s) >= gunAccuracy(dist(P.x, P.y, z.x, z.y) - z.r, a.w.range)) {
-      const o = (rand(s) < 0.5 ? -1 : 1) * (z.r + 8 + rand(s) * 14);
-      ev.push({ t: 'shot', x1: P.x, y1: P.y, x2: z.x + o, y2: z.y - o, who: 'player', weapon: a.id, miss: true });
-      ev.push({ t: 'miss', x: z.x, y: z.y });
-      return;
-    }
-  } else if (a.w.dur) {
+  // 공격 간격: 1/30초 단계에서 남은 시간을 다음 공격으로 넘긴다(한 단계까지). 버리면 빠른 무기가 최대 30% 손해를 본다.
+  P.cd = Math.max(P.cd, -dt) + a.w.cd / atkSpeedMult(s);
+  if (a.w.kind === 'gun') P.mag--; // 빗나가도 탄은 쓴다
+  if (rand(s) >= a.w.acc) {
+    const o = (rand(s) < 0.5 ? -1 : 1) * (z.r + 8 + rand(s) * 14);
+    ev.push({ t: a.w.kind === 'gun' ? 'shot' : 'swing', x1: P.x, y1: P.y, x2: z.x + o, y2: z.y - o, who: 'player', weapon: a.id, miss: true });
+    ev.push({ t: 'miss', x: z.x, y: z.y });
+    return;
+  }
+  if (a.w.dur) { // 근접 내구도는 맞힐 때만 닳는다
     s.dur[a.id] = Math.max(0, (s.dur[a.id] ?? 0) - 1);
     if (s.dur[a.id] === 0) ev.push({ t: 'broken', id: a.id });
   }
-  const dealt = hit(s, z, weaponDamage(s, a.id), ev, a.w.cleave || a.w.splash || 0, a.w.crit ?? 0);
-  if (a.w.leech) P.hp = Math.min(maxHp(s), P.hp + dealt * a.w.leech);
+  hit(s, z, weaponDamage(s, a.id), ev, a.w.crit);
   ev.push({ t: a.w.kind === 'gun' ? 'shot' : 'swing', x1: P.x, y1: P.y, x2: z.x, y2: z.y, who: 'player', weapon: a.id });
 }
 
@@ -1601,7 +1703,7 @@ function defend(s, dt, ev) {
     if (!z) return;
     c.cd = 1 / survivorRate(v);
     c.face = Math.atan2(z.y - c.y, z.x - c.x);
-    hit(s, z, survivorHit(v) * mult, ev, 0, 0, 'post');
+    hit(s, z, survivorHit(v) * mult, ev, COMPANION_CRIT, 'post');
     ev.push({ t: R.ranged ? 'shot' : 'swing', x1: c.x, y1: c.y, x2: z.x, y2: z.y, who: 'post' });
   });
 }
@@ -1609,7 +1711,7 @@ function defend(s, dt, ev) {
 // 탐험 동행 동료는 플레이어를 따라다니며 직업 사거리 안의 좀비를 공격한다.
 // 원거리 직업은 명중률을 따르고, 탄약·내구도는 쓰지 않는다. 좀비는 동료를 노리지 않는다.
 export const ESCORT_XP = 0.5; // 동료가 잡은 좀비 경험치 중 플레이어가 받는 몫
-export const ESCORT_SPEED = PLAYER_SPEED * 2.2; // 자극제·음료를 쓴 플레이어도 따라잡는다
+export const ESCORT_SPEED = PLAYER_SPEED * 2.2; // 스팀팩·부츠를 갖춘 플레이어도 따라잡는다
 export const ESCORT_GAP = 36; // 플레이어와 유지하는 거리(두 번째 동료는 더 뒤)
 export const ESCORT_LEASH = 520; // 이보다 멀어지면 플레이어 곁으로 합류
 function escort(s, dt, ev) {
@@ -1648,12 +1750,12 @@ function escort(s, dt, ev) {
     if (!z) return;
     c.cd = 1 / survivorRate(v);
     c.face = Math.atan2(z.y - c.y, z.x - c.x);
-    if (R.ranged && rand(s) >= gunAccuracy(dist(c.x, c.y, z.x, z.y) - z.r, R.range)) {
+    if (R.ranged && rand(s) >= escortAccuracy(dist(c.x, c.y, z.x, z.y) - z.r, R.range)) {
       const o = (rand(s) < 0.5 ? -1 : 1) * (z.r + 8 + rand(s) * 14);
       ev.push({ t: 'shot', x1: c.x, y1: c.y, x2: z.x + o, y2: z.y - o, who: 'escort', miss: true });
       return;
     }
-    hit(s, z, survivorHit(v), ev, 0, 0, 'escort');
+    hit(s, z, survivorHit(v), ev, COMPANION_CRIT, 'escort');
     ev.push({ t: R.ranged ? 'shot' : 'swing', x1: c.x, y1: c.y, x2: z.x, y2: z.y, who: 'escort' });
   });
 }
@@ -1805,7 +1907,7 @@ export function serialize(s) {
     raidT: s.raid ? 20 : s.raidT, // 진행 중이던 습격은 다시 열면 20초 뒤 새로 온다
     nodes: s.nodes.map((n) => Math.max(0, Math.round(n.readyAt - s.time))),
     nodeMoves: s.nodes.flatMap((n, i) => (n.moved ? [[i, n.x, n.y]] : [])), // 옮겨진 대상물 자리(나머지는 시드로 다시 만든다)
-    player: { x: s.player.x, y: s.player.y, hp: s.player.hp, mag: s.player.mag }, ammo: s.ammo, ammoOn: s.ammoOn, gunOn: s.gunOn, dur: s.dur,
+    player: { x: s.player.x, y: s.player.y, hp: s.player.hp, mag: s.player.mag }, ammo: Math.round(s.ammo * 100) / 100, ammoOn: s.ammoOn, gunOn: s.gunOn, dur: s.dur, armor: s.armor,
     autoHunt: s.autoHunt, autoZone: s.autoZone, stance: s.stance, stats: s.stats, nextId: s.nextId,
     items: s.items, claimed: s.claimed, over: s.over, ended: s.ended, hero: s.hero,
   });
@@ -1838,10 +1940,17 @@ export function deserialize(text) {
     if (lv) s.weapons[k] = lv;
   }
   s.weapons.fist ||= 1;
+  for (const k of Object.keys(ARMORS)) {
+    const lv = Math.floor(num(o.armor?.[k], 0, 0, ARMOR_MAX_LV));
+    if (lv) s.armor[k] = lv;
+  }
+  // 없어진 무기(네일건·구원자 등)를 들고 있던 세이브는 가진 것 중 티어가 가장 높은 무기로 바꿔 든다
+  const best = (kind) => Object.keys(s.weapons).filter((k) => WEAPONS[k].kind === kind).sort((a, b) => WEAPONS[b].tier - WEAPONS[a].tier)[0] ?? null;
   for (const kind of ['melee', 'gun']) {
     const id = o.equip?.[kind];
-    if (id && s.weapons[id] && WEAPONS[id].kind === kind) s.equip[kind] = id;
+    s.equip[kind] = id && s.weapons[id] && WEAPONS[id].kind === kind ? id : o.equip?.[kind] ? best(kind) : s.equip[kind];
   }
+  s.equip.melee ||= 'fist';
   s.survivors = (Array.isArray(o.survivors) ? o.survivors : [])
     .filter((v) => v && ROLES[v.role] && RARITIES[v.rarity])
     .slice(0, survivorCap(s))
@@ -1905,7 +2014,9 @@ export function deserialize(text) {
   if (o.hero && Object.hasOwn(HEROES, o.hero.id) && cleanName(o.hero.name)) s.hero = { id: o.hero.id, name: cleanName(o.hero.name), runId: String(o.hero.runId ?? s.seed) };
   if (o.ended && Number.isFinite(o.ended.at)) s.ended = { at: Math.floor(num(o.ended.at, 0)), goals: (Array.isArray(o.ended.goals) ? o.ended.goals : []).filter((id) => ENDING_GOALS.some((g) => g.id === id)) };
   for (const k of ITEM_KEYS) s.items[k] = Math.floor(num(o.items?.[k], 0, 0, ITEM_MAX));
-  for (const m of MISSIONS) if (o.claimed?.[m.id] === true) s.claimed[m.id] = true;
+  s.items.stim = Math.min(ITEM_MAX, s.items.stim + Math.floor(num(o.items?.energy, 0, 0, ITEM_MAX))); // 없어진 에너지 드링크는 스팀팩으로
+  // 받은 미션 보상이 바뀌었으면(구조대장: 구원자 → 전술 헬멧) 새 보상을 준다
+  for (const m of MISSIONS) if (o.claimed?.[m.id] === true) { s.claimed[m.id] = true; if (!s.weapons[m.reward] && !s.armor[m.reward]) gainReward(s, m.reward); }
   // 게임 오버로 끝난 판이면 결과 화면을 다시 보여 주도록 그대로 둔다
   if (o.over && typeof o.over === 'object') {
     const sum = runSummary(s);
@@ -1917,7 +2028,7 @@ export function deserialize(text) {
   s.nextId = Math.max(Math.floor(num(o.nextId, 1)), ...s.survivors.map((v) => v.id + 1), 1);
   // 탄약·내구도: 예전 세이브(무한 탄창 시절)는 총이 있으면 예비 30발, 근접 무기는 내구도 가득으로 시작
   const ownsGun = Object.keys(s.weapons).some((k) => WEAPONS[k].kind === 'gun');
-  s.ammo = Math.floor(num(o.ammo, ownsGun ? 30 : 0, 0, AMMO_MAX));
+  s.ammo = num(o.ammo, ownsGun ? 30 : 0, 0, AMMO_MAX);
   s.ammoOn = o.ammoOn !== false;
   s.gunOn = o.gunOn !== false;
   const g = s.equip.gun && WEAPONS[s.equip.gun];

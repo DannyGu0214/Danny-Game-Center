@@ -9,11 +9,11 @@ export function greedyBuy(s) {
     // 1) 가까운 후보지에 전진기지
     for (let i = 0; i < s.sites.length; i++) if (G.nearSite(s, i)) bought ||= tryDo(G.buildOutpost(s, i));
     // 2) 무기: 가장 좋은 걸 제작
-    for (const id of ['carbine', 'rifle', 'axe', 'shotgun', 'machete', 'bat', 'pistol', 'pipe']) if (!s.weapons[id]) bought ||= tryDo(G.craftWeapon(s, id));
-    // 가진 무기 중 초당 피해가 가장 큰 것을 장착
+    for (const id of ['rifle', 'shotgun', 'machete', 'bat', 'pistol', 'pipe']) if (!s.weapons[id]) bought ||= tryDo(G.craftWeapon(s, id));
+    // 가진 무기 중 초당 피해(무기 점수 × 강화 × 레벨)가 가장 큰 것을 장착
     for (const kind of ['melee', 'gun']) {
       const own = Object.keys(s.weapons).filter((id) => G.WEAPONS[id].kind === kind && !G.isBroken(s, id));
-      const best = own.sort((a, b) => G.weaponDamage(s, b) / G.WEAPONS[b].cd - G.weaponDamage(s, a) / G.WEAPONS[a].cd)[0];
+      const best = own.sort((a, b) => G.attackDps(s, b) - G.attackDps(s, a))[0];
       if (best && s.equip[kind] !== best) G.equipWeapon(s, best);
     }
     for (const m of G.MISSIONS) if (!s.claimed[m.id] && G.missionDone(s, m)) tryDo(G.claimMission(s, m.id));
@@ -30,6 +30,7 @@ export function greedyBuy(s) {
     // 강화는 본부 확장 비용의 2배 넘게 남을 때만(사람처럼 확장 자금을 모은다)
     const hq = G.hqCost(s.hq + 1), spare = s.hq >= G.HQ_MAX || G.RES_KEYS.every((k) => !hq[k] || s.res[k] > hq[k] * 2);
     if (spare) for (const id of [s.equip.gun, s.equip.melee]) if (id) bought ||= tryDo(G.upgradeWeapon(s, id));
+    if (spare) for (const id of Object.keys(s.armor)) bought ||= tryDo(G.upgradeArmor(s, id));
     if (spare) for (const v of G.defenders(s)) bought ||= tryDo(G.levelSurvivor(s, v.id));
     for (const o of s.outposts) bought ||= tryDo(G.upgradeOutpost(s, o.site));
     if (!bought) break;
@@ -39,7 +40,7 @@ export function greedyBuy(s) {
 
 // 파밍은 수동이라 봇이 사람 대신 목적지를 정한다('이동' 버튼과 같은 길찾기로 걸어간다).
 // 가방이 차면 가까운 기지로, 구조 신호가 있으면 구하러, 아니면 활동 반경 안에서 가장 가까운 대상물로.
-function manualFarm(s) {
+export function manualFarm(s) {
   const P = s.player;
   if (s.waypoint || s.gather || s.autoRetreat || s.raid || G.needsRepairTrip(s)) return;
   const here = G.safeZoneAt(s, P.x, P.y), maxD = s.autoZone + 1;
@@ -94,5 +95,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const minutes = Number(process.argv[2] || 30), seed = Number(process.argv[3] || 7);
   const { s, marks } = run(minutes, seed, true);
   console.log(marks.slice(-40).join('\n'));
-  console.log(JSON.stringify({ items: s.items, claimed: s.claimed, hq: s.hq, bld: s.bld, weapons: s.weapons, equip: s.equip, res: Object.fromEntries(Object.entries(s.res).map(([k, v]) => [k, Math.round(v)])), survivors: s.survivors.length, defense: G.defenders(s).length, wall: Math.round(s.wall) + '/' + G.wallMax(s), outposts: s.outposts, stats: s.stats, autoZone: s.autoZone }, null, 1));
+  console.log(JSON.stringify({ items: s.items, claimed: s.claimed, hq: s.hq, bld: s.bld, weapons: s.weapons, armor: s.armor, equip: s.equip, ended: s.ended, res: Object.fromEntries(Object.entries(s.res).map(([k, v]) => [k, Math.round(v)])), survivors: s.survivors.length, defense: G.defenders(s).length, wall: Math.round(s.wall) + '/' + G.wallMax(s), outposts: s.outposts, stats: s.stats, autoZone: s.autoZone }, null, 1));
 }

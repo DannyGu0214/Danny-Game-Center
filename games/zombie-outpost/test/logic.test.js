@@ -143,9 +143,7 @@ test('특별 아이템: 대상물을 주우면 가끔 나오고, 쓰면 효과�
   s.player.x = 900; s.player.y = 900;
   assert.equal(G.useItem(s, 'flare').ok, true);
   assert.ok(s.rescue && G.dist(s.rescue.x, s.rescue.y, 900, 900) <= 400);
-  s.items.energy = 1;
-  assert.equal(G.useItem(s, 'energy').ok, true);
-  assert.ok(s.player.buff > 0);
+  assert.deepEqual(G.ITEM_KEYS, ['medkit', 'molotov', 'toolbox', 'flare', 'stim'], '에너지 드링크는 없다');
   s.items.molotov = 1;
   const z = zombieAt(s, 950, 900, 50);
   assert.equal(G.useItem(s, 'molotov').ok, true);
@@ -153,46 +151,74 @@ test('특별 아이템: 대상물을 주우면 가끔 나오고, 쓰면 효과�
   assert.equal(G.useItem(s, 'molotov').ok, false, '다 쓰면 못 쓴다');
 });
 
-test('파밍 전용 무기는 제작할 수 없고, 정해진 대상물에서만 발견된다', () => {
+test('드랍 장비(무기 6 · 방어구 5)는 제작할 수 없고, 대상물 종류와 상관없이 구역 조건에 맞는 것 중 아직 없는 것만 나온다', () => {
   const s = rich(fresh(32));
-  s.bld.workbench = 4; s.hq = 4;
-  const loot = Object.keys(G.WEAPONS).filter((id) => G.weaponSource(id) === 'loot');
-  assert.equal(loot.length, 5);
-  assert.ok(loot.some((id) => G.WEAPONS[id].kind === 'melee') && loot.some((id) => G.WEAPONS[id].kind === 'gun'));
-  for (const id of loot) assert.equal(G.craftWeapon(s, id).ok, false);
+  s.bld.workbench = 3; s.hq = 4;
+  const drops = Object.keys(G.WEAPONS).filter((id) => G.weaponSource(id) === 'drop');
+  assert.equal(drops.length, 6);
+  assert.equal(drops.filter((id) => G.WEAPONS[id].kind === 'melee').length, 3);
+  for (const id of drops) assert.equal(G.craftWeapon(s, id).ok, false);
+  assert.equal(Object.keys(G.ARMORS).filter((k) => G.ARMORS[k].source === 'drop').length, 5);
+  // 구역 조건: 주택가는 장갑·부츠만, 공단부터 T4 무기, 검은 숲이면 11종 모두
+  assert.deepEqual(G.dropPool(s, 1).sort(), ['boots', 'gloves']);
+  const p3 = G.dropPool(s, 3);
+  assert.ok(p3.includes('axe') && p3.includes('crossbow') && p3.includes('shield') && !p3.includes('chainsaw'));
+  assert.equal(G.dropPool(s, 5).length, 11);
+  s.armor.gloves = 1;
+  assert.ok(!G.dropPool(s, 1).includes('gloves'), '이미 가진 건 다시 나오지 않는다');
+  // 실제로 주워 보면(어떤 대상물이든) 2% 안팎으로 나온다
   s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9;
-  G.WEAPONS.crossbow.chance = 1; // 발견 경로만 확인
-  try {
-    const wrong = s.nodes.find((n) => !G.WEAPONS.crossbow.find.includes(n.type));
-    s.player.x = wrong.x; s.player.y = wrong.y; stepFor(s, 2);
-    assert.equal(s.weapons.crossbow, undefined);
-    s.bag.wood = s.bag.scrap = s.bag.plastic = 0;
-    const right = s.nodes.find((n) => G.WEAPONS.crossbow.find.includes(n.type) && G.zoneIndex(n.d) >= G.WEAPONS.crossbow.minZone);
-    s.player.x = right.x; s.player.y = right.y;
-    // 줍기는 허탕이 날 수 있으니 성공할 때까지 같은 대상물을 다시 줍는다
-    for (let i = 0; i < 30 && !s.weapons.crossbow; i++) { right.readyAt = 0; s.bag.wood = s.bag.scrap = s.bag.plastic = 0; stepFor(s, 2); }
-    assert.equal(s.weapons.crossbow, 1);
-  } finally {
-    G.WEAPONS.crossbow.chance = 0.03;
+  const nodes = s.nodes.filter((n) => G.zoneIndex(n.d) >= 3);
+  const found = [];
+  for (let i = 0; i < 900 && found.length < 3; i++) {
+    const n = nodes[i % nodes.length];
+    n.readyAt = 0; s.player.x = n.x; s.player.y = n.y; s.gather = null; s.bag.wood = s.bag.scrap = s.bag.plastic = 0;
+    for (let t = 0; t < 2.2; t += DT) for (const e of G.step(s, DT)) if (e.t === 'weapon-found' || e.t === 'armor-found') found.push(e.id);
   }
+  assert.ok(found.length >= 1, `발견 ${found}`);
+  for (const id of found) assert.ok(s.weapons[id] === 1 || s.armor[id] === 1, id);
 });
 
-test('미션을 달성해야 유니크 무기를 받고, 한 번만 받는다', () => {
+test('미션 7개가 유니크 7종(무기 4 · 방어구 3)을 하나씩 주고, 한 번만 받는다', () => {
   const s = fresh(33);
-  const uniques = Object.keys(G.WEAPONS).filter((id) => G.weaponSource(id) === 'unique');
-  assert.equal(uniques.length, 5);
-  assert.deepEqual(G.MISSIONS.map((m) => m.reward).sort(), uniques.sort());
+  const uw = Object.keys(G.WEAPONS).filter((id) => G.weaponSource(id) === 'unique');
+  const ua = Object.keys(G.ARMORS).filter((id) => G.ARMORS[id].source === 'unique');
+  assert.equal(uw.length, 4); assert.equal(ua.length, 3);
+  assert.equal(uw.filter((id) => G.WEAPONS[id].kind === 'melee').length, 2);
+  assert.deepEqual(G.MISSIONS.map((m) => m.reward).sort(), [...uw, ...ua].sort());
   assert.equal(G.claimMission(s, 'hunter').ok, false);
   s.stats.kills = 1000;
   assert.equal(G.claimMission(s, 'hunter').ok, true);
   assert.equal(s.weapons.homerun, 1);
   assert.equal(G.claimMission(s, 'hunter').ok, false);
-  G.equipWeapon(s, 'homerun');
-  G.gainWeapon(s, 'bulwark'); G.equipWeapon(s, 'bulwark');
-  assert.equal(G.playerGuard(s), 0.3);
+  s.stats.rescued = 10;
+  assert.equal(G.claimMission(s, 'rescuer').ok, true);
+  assert.equal(s.armor.tacHelmet, 1);
+  // 수집가: 드랍 장비 8종
+  for (const id of ['axe', 'chainsaw', 'sledge', 'crossbow']) G.gainWeapon(s, id);
+  for (const id of ['helmet', 'gloves', 'boots']) G.gainArmor(s, id);
+  assert.equal(G.dropFound(s), 7);
+  assert.equal(G.claimMission(s, 'collector').ok, false);
+  G.gainArmor(s, 'vest');
+  assert.equal(G.claimMission(s, 'collector').ok, true);
+  assert.equal(s.armor.milVest, 1);
+  // 단련: 방어구 3개를 2강까지
+  s.armor.helmet = s.armor.gloves = G.ARMOR_MAX_LV;
+  assert.equal(G.claimMission(s, 'forger').ok, false);
+  s.armor.boots = G.ARMOR_MAX_LV;
+  assert.equal(G.claimMission(s, 'forger').ok, true);
+  assert.equal(s.armor.combatBoots, 1);
   const t = G.deserialize(G.serialize(s));
   assert.equal(t.claimed.hunter, true);
-  assert.equal(t.equip.melee, 'bulwark');
+  assert.deepEqual(t.armor, s.armor);
+  // 예전 세이브: 없어진 무기는 빠지고, 받은 미션의 보상이 바뀌었으면 새 보상을 준다
+  const o = JSON.parse(G.serialize(fresh(34)));
+  Object.assign(o, { claimed: { rescuer: true }, weapons: { fist: 1, savior: 1, nailgun: 1, pistol: 1 }, equip: { melee: 'fist', gun: 'savior' }, items: { energy: 3, stim: 7 } });
+  const u = G.deserialize(JSON.stringify(o));
+  assert.equal(u.armor.tacHelmet, 1);
+  assert.equal(u.weapons.savior, undefined); assert.equal(u.weapons.nailgun, undefined);
+  assert.equal(u.equip.gun, 'pistol', '없어진 총 대신 가진 총');
+  assert.equal(u.items.stim, 9, '에너지 드링크는 스팀팩으로(9개까지)');
 });
 
 test('파밍한 자원은 가방 용량까지만 담기고, 안전지대에 들어가면 창고로 옮겨진다', () => {
@@ -813,7 +839,7 @@ test('성장: 요구 경험치는 레벨에 비례하고, 레벨업하면 체력
   assert.ok(Math.abs(G.maxHp(s) - 100 - (ups[0].hp + ups[1].hp)) < 1e-9, '최대 체력 = 기본 + 뽑은 상승치 합');
   assert.ok(Math.abs(G.levelAtkMult(s) - 1 - (ups[0].atk + ups[1].atk)) < 1e-9);
   s.weapons.pipe = 1;
-  assert.ok(Math.abs(G.weaponDamage(s, 'pipe') - G.WEAPONS.pipe.dmg * G.levelAtkMult(s)) < 1e-9, '공격력에 반영');
+  assert.ok(Math.abs(G.weaponDamage(s, 'pipe') - G.WEAPONS.pipe.atk * G.levelAtkMult(s)) < 1e-9, '공격력에 반영');
 });
 
 test('성장: 레벨당 상승치는 기준치 ±40% 안에서 균일 분포로 뽑힌다', () => {
@@ -854,22 +880,24 @@ test('성장: 플레이어가 잡은 좀비만 경험치를 주고, 방어 동�
   assert.equal(t.xp, 0);
 });
 
-test('치명타: 기본 확률 10%, 피해는 평타의 2배', () => {
-  assert.equal(G.CRIT_CHANCE, 0.1);
+test('치명타: 확률은 무기마다(동료는 10%), 피해는 평타의 2배', () => {
   assert.equal(G.CRIT_MULT, 2);
-  const s = fresh(63);
-  s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9;
-  s.player.x = 900; s.player.y = 900;
-  G.gainWeapon(s, 'chainsaw'); G.equipWeapon(s, 'chainsaw'); s.dur.chainsaw = 1e9; // 빨리 때려서 표본을 늘린다(내구도는 넉넉히)
-  zombieAt(s, 920, 900, 1e12);
-  const dmg = [];
-  for (let i = 0; i < 6000; i++) {
-    for (const e of G.step(s, DT)) if (e.t === 'dmg') dmg.push(e);
-  }
-  const crits = dmg.filter((e) => e.crit), normal = dmg.find((e) => !e.crit);
-  const rate = crits.length / dmg.length;
-  assert.ok(dmg.length > 1200 && Math.abs(rate - 0.1) < 0.025, `치명타 비율 ${rate.toFixed(3)} (${dmg.length}회)`);
-  assert.ok(Math.abs(crits[0].dmg - normal.dmg * 2) < 1e-9);
+  assert.equal(G.COMPANION_CRIT, 0.1);
+  const rateOf = (id, seed) => {
+    const s = fresh(seed);
+    s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9;
+    s.player.x = 900; s.player.y = 900;
+    G.gainWeapon(s, id); G.equipWeapon(s, id); s.dur[id] = 1e9; // 내구도는 넉넉히
+    zombieAt(s, 920, 900, 1e12);
+    const dmg = [];
+    for (let i = 0; i < 6000; i++) for (const e of G.step(s, DT)) if (e.t === 'dmg') dmg.push(e);
+    const crits = dmg.filter((e) => e.crit), normal = dmg.find((e) => !e.crit);
+    assert.ok(Math.abs(crits[0].dmg - normal.dmg * 2) < 1e-9);
+    return { rate: crits.length / dmg.length, n: dmg.length };
+  };
+  const saw = rateOf('chainsaw', 63), axe = rateOf('axe', 64);
+  assert.ok(saw.n > 600 && Math.abs(saw.rate - G.WEAPONS.chainsaw.crit) < 0.02, `전기톱 ${saw.rate.toFixed(3)} (${saw.n}회)`);
+  assert.ok(axe.n > 150 && Math.abs(axe.rate - G.WEAPONS.axe.crit) < 0.08, `소방 도끼 ${axe.rate.toFixed(3)} (${axe.n}회)`);
 });
 
 test('성장 상태(누적 상승치 포함)는 저장되고, 예전 세이브는 기준치로 채운다', () => {
@@ -1085,9 +1113,10 @@ test('작업 시간: 등급에 비례해 늘고, 어떤 작업도 5분을 넘지
   const tracks = {
     hq: [2, G.HQ_MAX].map((n) => G.jobDuration('hq', 0, n)),
     barricade: [1, 5, 10].map((n) => G.jobDuration('bld', 'barricade', n)),
-    workbench: [1, 2, 3, 4].map((n) => G.jobDuration('bld', 'workbench', n)),
-    craft: ['pipe', 'bat', 'machete', 'axe'].map((id) => G.jobDuration('craft', id, 1)),
-    wup: [2, 6, G.WEAPON_MAX_LV].map((n) => G.jobDuration('wup', 'pistol', n)),
+    workbench: [1, 2, 3].map((n) => G.jobDuration('bld', 'workbench', n)),
+    craft: ['pipe', 'bat', 'machete'].map((id) => G.jobDuration('craft', id, 1)),
+    wup: [2, 4, G.WEAPON_MAX_LV].map((n) => G.jobDuration('wup', 'pistol', n)),
+    aup: [2, G.ARMOR_MAX_LV].map((n) => G.jobDuration('aup', 'gloves', n)),
     lvl: [2, 8, G.MAX_SURVIVOR_LV].map((n) => G.jobDuration('lvl', 1, n)),
     outpost: [1, 2, 3].map((n) => G.jobDuration(n === 1 ? 'obuild' : 'oup', 0, n)),
   };
@@ -1321,25 +1350,23 @@ test('리스폰: 주택가는 예전보다 30% 느리고, 바깥 구역일수록
   for (const z of [2, 3, 4]) assert.ok(Math.abs(G.spawnInterval(z + 0.5) - G.SPAWN_INTERVAL_S / z) < 1e-9);
 });
 
-test('명중률: 붙어 있으면 100%, 사거리 끝에서 20%, 그 사이는 거리에 비례', () => {
-  assert.equal(G.gunAccuracy(0, 300), 1);
-  assert.ok(Math.abs(G.gunAccuracy(300, 300) - 0.2) < 1e-9);
-  assert.ok(Math.abs(G.gunAccuracy(150, 300) - 0.6) < 1e-9);
-  assert.ok(Math.abs(G.gunAccuracy(999, 300) - 0.2) < 1e-9);
-  // 실제로 쏴 보면 멀리서는 많이 빗나간다(빗나가도 탄은 쓴다)
-  const rate = (dx) => {
+test('명중률: 무기 명중률대로 맞고(거리와 상관없음), 빗나가도 총은 탄을 쓰고 근접은 내구도가 닳지 않는다', () => {
+  const run = (id, dx) => {
     const s = fresh(102);
     s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9;
-    G.gainWeapon(s, 'rifle'); G.equipWeapon(s, 'rifle'); s.ammo = 200;
+    G.gainWeapon(s, id); G.equipWeapon(s, id); s.ammo = 240;
     s.player.x = 600; s.player.y = 600;
-    zombieAt(s, 600 + dx, 600, 1e9);
+    zombieAt(s, 600 + dx, 600, 1e12);
     let hit = 0, miss = 0;
-    for (let i = 0; i < 2400; i++) for (const e of G.step(s, DT)) { if (e.t === 'dmg') hit++; if (e.t === 'miss') miss++; }
-    return hit / (hit + miss);
+    for (let i = 0; i < 3000; i++) for (const e of G.step(s, DT)) { if (e.t === 'dmg') hit++; if (e.t === 'miss') miss++; }
+    return { s, hit, miss, rate: hit / (hit + miss) };
   };
-  const near = rate(40), far = rate(330);
-  assert.ok(near > 0.85, `가까이 ${near}`);
-  assert.ok(far < 0.4 && far > 0.12, `멀리 ${far}`);
+  const near = run('carbine', 40), far = run('carbine', 240);
+  assert.equal(near.rate, 1, '자동 소총은 명중 100%');
+  assert.equal(far.rate, 1, '멀어도 같다');
+  const saw = run('chainsaw', 20);
+  assert.ok(Math.abs(saw.rate - G.WEAPONS.chainsaw.acc) < 0.03, `전기톱 ${saw.rate.toFixed(3)}`);
+  assert.equal(G.maxDurability(saw.s, 'chainsaw') - saw.s.dur.chainsaw, saw.hit, '내구도는 맞힌 만큼만 닳는다');
 });
 
 test('총기 사용 끄기: 근접 무기만 쓰고 탄약을 쓰지 않아 제작소 탄약이 쌓인다', () => {
@@ -1433,10 +1460,10 @@ test('근접 내구도: 때릴 때마다 줄고 0이면 파손(맨주먹), 강�
   assert.equal(r.ok, true); assert.equal(s.dur.pipe, max); assert.equal(s.res.scrap, scrap - cost);
   assert.equal(s.jobs.length, 0, '수리는 시간이 걸리지 않는다');
   assert.equal(G.meleeId(s), 'pipe');
-  // 강화: 최대 내구도도 공격력과 같은 비율로 늘고, 늘어난 만큼 현재 내구도도 찬다
+  // 강화: 최대 내구도도 공격력과 같은 비율(기본의 +10%)로 늘고, 늘어난 만큼 현재 내구도도 찬다
   s.dur.pipe = max - 10;
   assert.equal(G.upgradeWeapon(s, 'pipe').ok, true); finish(s);
-  assert.equal(G.maxDurability(s, 'pipe'), Math.round(G.WEAPONS.pipe.dur * 1.15));
+  assert.equal(G.maxDurability(s, 'pipe'), Math.round(G.WEAPONS.pipe.dur * 1.1));
   assert.equal(s.dur.pipe, G.maxDurability(s, 'pipe') - 10);
   // 수리점 2·3레벨은 수리비가 싸진다
   s.dur.pipe = 0; const c1 = G.repairCost(s, 'pipe').scrap; s.bld.repair = 3;
@@ -1446,14 +1473,16 @@ test('근접 내구도: 때릴 때마다 줄고 0이면 파손(맨주먹), 강�
   assert.equal(t.dur.pipe, 0);
 });
 
-test('스팀팩: 최대 체력 20%를 잃고 1분 동안 이동·파밍 속도 +50%, 체력이 낮으면 못 쓴다', () => {
+test('스팀팩: 1분 동안 이동·파밍·공격 속도 +50%, 체력은 들지 않는다', () => {
   const s = fresh(106);
   s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9;
   s.items.stim = 2;
   s.player.x = 900; s.player.y = 900; s.player.hp = G.maxHp(s);
+  assert.equal(G.atkSpeedMult(s), 1);
   assert.equal(G.useItem(s, 'stim').ok, true);
-  assert.equal(s.player.hp, G.maxHp(s) * 0.8);
+  assert.equal(s.player.hp, G.maxHp(s), '체력 대가 없음');
   assert.equal(s.player.stim, 60);
+  assert.equal(G.atkSpeedMult(s), 1.5, '공격 속도 +50%');
   const x0 = s.player.x; G.step(s, 1, { x: 1, y: 0 });
   assert.ok(Math.abs(s.player.x - x0 - 91 * 1.5) < 1, '이동 +50%');
   // 파밍 속도
@@ -1463,9 +1492,8 @@ test('스팀팩: 최대 체력 20%를 잃고 1분 동안 이동·파밍 속도 +
   assert.ok(node.readyAt > s.time, '1.5배 빨리 줍는다');
   stepFor(s, 60);
   assert.equal(s.player.stim, 0, '1분 뒤 끝난다');
-  s.player.hp = G.maxHp(s) * 0.15;
-  assert.equal(G.useItem(s, 'stim').ok, false);
-  assert.ok(G.LOOT_TYPES.pharmacy.items.includes('stim'));
+  s.player.hp = 5;
+  assert.equal(G.useItem(s, 'stim').ok, true, '체력이 낮아도 쓸 수 있다');
 });
 
 test('습격 완화: 습격 좀비의 구역 보너스는 나타난 자리(기지 근처) 기준, 막으면 탄약도 받는다', () => {
@@ -1690,4 +1718,174 @@ test('전진기지 후보지: 고정 9곳이던 예전 세이브는 세운 기�
   // 새 세이브는 그대로
   const u = G.deserialize(G.serialize(t));
   assert.deepEqual(u.outposts, t.outposts);
+});
+
+// ---------- 장비 개편(2026-10-25): 무기 16종 · 강화 · 방어구 · 아이템 ----------
+test('무기: 계열마다 8종(제작 3 · 드랍 3 · 유니크 2), 점수 = 공격력 × 공격속도 × 명중률 × (1 + 치명타율)이 티어 목표의 ±3%', () => {
+  for (const kind of ['melee', 'gun']) {
+    const ids = Object.keys(G.WEAPONS).filter((k) => k !== 'fist' && G.WEAPONS[k].kind === kind);
+    assert.equal(ids.length, 8, kind);
+    assert.deepEqual(ids.map((k) => G.WEAPONS[k].tier).sort(), [1, 2, 3, 4, 5, 6, 7, 8], kind);
+    for (const src of ['craft', 'drop', 'unique']) {
+      const g = ids.filter((k) => G.weaponSource(k) === src), str = g.map((k) => G.WEAPONS[k].str);
+      assert.equal(new Set(str).size, str.length, `${kind}·${src}: 강점이 겹치지 않는다 ${str}`);
+    }
+  }
+  for (const [id, w] of Object.entries(G.WEAPONS)) {
+    if (id === 'fist') continue;
+    const sc = G.weaponScore(id);
+    assert.ok(Math.abs(sc / G.tierScore(w.tier) - 1) < 0.03, `${id}: ${sc.toFixed(1)} / ${G.tierScore(w.tier).toFixed(1)}`);
+    assert.equal(w.range, w.kind === 'gun' ? G.GUN_RANGE : G.MELEE_RANGE, `${id}: 사거리는 계열마다 하나`);
+    if (w.kind === 'gun') assert.ok(Math.abs(w.mag / ((w.mag - 1) * w.cd + w.reload) - w.spd) < 1e-9 && w.cd > 0, `${id}: 재장전 포함 지속 속도`);
+    assert.ok(!('cleave' in w) && !('splash' in w) && !('guard' in w) && !('leech' in w), `${id}: 점수 밖 변수 없음`);
+  }
+  // 티어가 오를수록 점수가 커진다(간격은 점점 줄어든다)
+  const t = [1, 2, 3, 4, 5, 6, 7, 8].map(G.tierScore);
+  for (let i = 1; i < 8; i++) assert.ok(t[i] > t[i - 1] && (i < 2 || t[i] / t[i - 1] < t[i - 1] / t[i - 2]));
+});
+
+test('강화: 한 단계마다 기본의 10%씩(최대 +5 = 150%), 비용은 장비마다 배합이 다르고(끝자리 0) 높은 티어일수록·단계에 비례해 비싸다', () => {
+  assert.deepEqual([1, 2, 3, 4, 6].map((lv) => Math.round(G.upgradeMult(lv) * 100)), [100, 110, 120, 130, 150]);
+  assert.equal(G.WEAPON_MAX_LV, 6);
+  const s = rich(fresh(201));
+  G.gainWeapon(s, 'pipe');
+  for (let i = 0; i < 5; i++) { assert.equal(G.upgradeWeapon(s, 'pipe').ok, true); finish(s); }
+  assert.equal(s.weapons.pipe, 6);
+  assert.equal(G.upgradeWeapon(s, 'pipe').ok, false, '+5가 최대');
+  assert.ok(Math.abs(G.weaponDamage(s, 'pipe') - G.WEAPONS.pipe.atk * 1.5) < 1e-9);
+  // 총량 = 3 × 40 × 티어^1.25 × 목표 단계(10 단위), 장비마다 배합(합 3)으로 나눠 자원마다 끝자리 0
+  const total = (c) => Object.values(c).reduce((a, v) => a + v, 0);
+  for (const [id, w] of [...Object.entries(G.WEAPONS), ...Object.entries(G.ARMORS)]) {
+    assert.ok(Math.abs(w.mix.reduce((a, v) => a + v, 0) - 3) < 1e-9 && new Set(w.mix).size > 1, `${id}: 배합 합 3, 셋이 다 같지 않다`);
+    const tier = G.WEAPONS[id] ? w.tier : G.ARMOR_TIER[w.source];
+    for (let next = 2; next <= (G.WEAPONS[id] ? G.WEAPON_MAX_LV : G.ARMOR_MAX_LV); next++) {
+      const c = G.upgradeCostFor(tier, next, w.mix), want = 3 * 40 * Math.max(0.5, tier) ** 1.25 * (next - 1);
+      assert.ok(Object.values(c).every((v) => v > 0 && v % 10 === 0), `${id} +${next - 1}: ${JSON.stringify(c)}`);
+      assert.ok(Math.abs(total(c) - want) <= 5, `${id} +${next - 1}: 총량 ${total(c)} / ${want.toFixed(1)}`);
+    }
+  }
+  const c = (tier, next) => total(G.upgradeCostFor(tier, next, G.WEAPONS.machete.mix));
+  assert.ok(Math.abs(c(3, 6) - c(3, 2) * 5) <= 30, '+5는 +1의 5배(10 단위 반올림 오차 안)');
+  assert.ok(c(8, 2) > c(4, 2) && c(4, 2) > c(1, 2), '높은 티어일수록 비싸다');
+  assert.deepEqual(G.weaponUpgradeCost({ weapons: { pipe: 1 } }, 'pipe'), { wood: 30, scrap: 60, plastic: 30 }, '쇠파이프는 고철이 많다');
+  // 예전 세이브의 +6 이상은 +5로 잘린다
+  const o = JSON.parse(G.serialize(s)); o.weapons.pipe = 10;
+  assert.equal(G.deserialize(JSON.stringify(o)).weapons.pipe, 6);
+});
+
+test('방어구: 얻으면 바로 효과(10% · 1강 11% · 2강 12%), 같은 부위는 유니크가 대신하고, 여러 부위는 곱해서 겹친다', () => {
+  const s = rich(fresh(202));
+  s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9; s.hq = 5;
+  assert.deepEqual([1, 2, 3].map((lv) => Math.round(G.armorBonus(lv) * 1000) / 10), [10, 11, 12]);
+  const hp0 = G.maxHp(s);
+  G.gainArmor(s, 'vest');
+  assert.ok(Math.abs(G.maxHp(s) - hp0 * 1.1) < 1e-9, '방탄조끼: 최대 체력 +10%');
+  G.gainArmor(s, 'gloves');
+  assert.ok(Math.abs(G.atkSpeedMult(s) - 1.1) < 1e-9, '안전장갑: 공격 속도 +10%');
+  G.gainArmor(s, 'shield'); G.gainArmor(s, 'milVest');
+  assert.ok(Math.abs(G.playerGuard(s) - (1 - 0.9 * 0.9)) < 1e-9, '방패 10% × 군용 방탄복 10% = 19%');
+  assert.ok(Math.abs(G.maxHp(s) - hp0 * 1.1) < 1e-9, '가슴은 군용 방탄복이 방탄조끼를 대신한다(겹치지 않음)');
+  G.gainArmor(s, 'boots');
+  s.player.x = 900; s.player.y = 900;
+  const x0 = s.player.x; G.step(s, 1, { x: 1, y: 0 });
+  assert.ok(Math.abs(s.player.x - x0 - 91 * 1.1) < 1, '가죽부츠: 이동 +10%');
+  // 강화: 2강까지, 강화하면 증강이 커진다
+  assert.equal(G.upgradeArmor(s, 'gloves').ok, true); finish(s);
+  assert.equal(G.upgradeArmor(s, 'gloves').ok, true); finish(s);
+  assert.equal(s.armor.gloves, G.ARMOR_MAX_LV);
+  assert.equal(G.upgradeArmor(s, 'gloves').ok, false, '2강이 최대');
+  assert.ok(Math.abs(G.atkSpeedMult(s) - 1.12) < 1e-9);
+  assert.equal(G.upgradeArmor(s, 'helmet').ok, false, '얻지 못한 방어구는 강화할 수 없다');
+  const t = G.deserialize(G.serialize(s));
+  assert.deepEqual(t.armor, s.armor);
+});
+
+test('공격 간격: 1/30초 단계에서도 남은 시간을 넘겨 빠른 무기·공격속도 증강이 그대로 반영된다', () => {
+  const swings = (setup) => {
+    const s = fresh(203);
+    s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9;
+    G.gainWeapon(s, 'chainsaw'); G.equipWeapon(s, 'chainsaw'); s.dur.chainsaw = 1e9;
+    setup(s);
+    s.player.x = 900; s.player.y = 900;
+    zombieAt(s, 920, 900, 1e12);
+    let n = 0;
+    for (let i = 0; i < 300; i++) for (const e of G.step(s, DT)) if (e.t === 'swing') n++; // 10초
+    return n;
+  };
+  assert.ok(Math.abs(swings(() => {}) - 50) <= 1, '전기톱 초당 5회');
+  const fast = swings((s) => { G.gainArmor(s, 'gloves'); s.player.stim = 30; });
+  assert.ok(Math.abs(fast - 50 * 1.1 * 1.5) <= 1.5, `장갑 + 스팀팩 ${fast}회`);
+});
+
+test('탄약: 어떤 총이든 쉬지 않고 쏘면 초당 1.6개를 쓴다(빠른 총은 탄약 1개로 여러 발)', () => {
+  for (const id of ['flamer', 'crossbow', 'carbine']) {
+    const s = fresh(204);
+    s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9; s.ammoOn = false;
+    G.gainWeapon(s, id); G.equipWeapon(s, id); s.ammo = 200;
+    s.player.x = 600; s.player.y = 600;
+    zombieAt(s, 800, 600, 1e12);
+    const a0 = s.ammo + s.player.mag * G.ammoPerShot(id);
+    stepFor(s, 30);
+    const used = a0 - (s.ammo + s.player.mag * G.ammoPerShot(id));
+    assert.ok(Math.abs(used / 30 - G.AMMO_PER_SEC) < 0.15, `${id}: 초당 ${(used / 30).toFixed(2)}개`);
+  }
+});
+
+test('아이템: 파밍 드랍은 5종이 같은 확률, 습격 방어는 공구 상자 1~3개, 구출한 생존자는 1~2개를 답례로 준다', () => {
+  // 파밍 드랍
+  const s = fresh(205);
+  s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9;
+  const far = s.nodes.filter((n) => G.zoneIndex(n.d) >= 5);
+  const got = Object.fromEntries(G.ITEM_KEYS.map((k) => [k, 0]));
+  for (let i = 0; i < 900; i++) {
+    const n = far[i % far.length];
+    n.readyAt = 0; n.amt = 1; s.player.x = n.x; s.player.y = n.y; s.gather = null; s.bag.wood = s.bag.scrap = s.bag.plastic = 0;
+    for (const k of G.ITEM_KEYS) s.items[k] = 0;
+    for (let t = 0; t < 2.2; t += DT) for (const e of G.step(s, DT)) if (e.t === 'item') got[e.id]++;
+  }
+  const total = Object.values(got).reduce((a, v) => a + v, 0);
+  for (const k of G.ITEM_KEYS) assert.ok(got[k] > total / 5 * 0.5, `${k} ${got[k]}/${total}`);
+  // 습격 방어 보상
+  const t = fresh(206);
+  t.autoHunt = false; t.spawnT = 1e9; t.rescueT = 1e9; t.hq = 2;
+  const ns = [0, 0, 0, 0];
+  for (let i = 0; i < 300; i++) {
+    t.items.toolbox = 0; t.raid = { queue: [], spawnT: 9, ang: 0, total: 1, hpTotal: 100 };
+    const e = G.step(t, DT).find((x) => x.t === 'raid-won');
+    ns[e.reward.itemN]++;
+  }
+  assert.equal(ns[0], 0);
+  for (const n of [1, 2, 3]) assert.ok(ns[n] > 60, `공구 상자 ${ns}`);
+  // 구출 답례(포위·조난 모두)
+  const u = fresh(207);
+  u.autoHunt = false; u.spawnT = 1e9; u.bld.dorm = 9;
+  const cnt = [0, 0, 0];
+  for (let i = 0; i < 300; i++) {
+    u.survivors = []; u.rescueT = 1e9; for (const k of G.ITEM_KEYS) u.items[k] = 0;
+    u.rescue = { kind: i % 2 ? 'siege' : 'stranded', x: u.player.x, y: u.player.y, d: 1, ttl: 100 };
+    const e = G.step(u, DT).find((x) => x.t === 'rescued');
+    cnt[e.gifts.length]++;
+    for (const id of e.gifts) assert.ok(G.ITEM_KEYS.includes(id));
+  }
+  assert.equal(cnt[0], 0);
+  assert.ok(cnt[1] > 110 && cnt[2] > 110, `답례 ${cnt}`);
+});
+
+test('생산 건물: 레벨마다 늘어나는 생산량이 ×1.2씩 커져, 10레벨 한 단계 회수 시간이 예전의 1/5로 준다(제재소 30분 · 고철 42분 · 재활용 56분)', () => {
+  assert.equal(G.prodLevelMult(0), 0);
+  assert.equal(G.prodLevelMult(1), 1);
+  assert.ok(Math.abs(G.prodLevelMult(2) - 2.2) < 1e-9);
+  assert.ok(Math.abs(G.prodLevelMult(10) - 25.9587) < 1e-3);
+  const s = fresh(208);
+  s.bld.sawmill = 3;
+  assert.ok(Math.abs(G.productionPerSec(s).wood - G.BUILDINGS.sawmill.prod.wood * 3.64) < 1e-9);
+  for (const id of ['sawmill', 'scrapyard', 'recycler']) {
+    const v = Object.values(G.BUILDINGS[id].prod)[0] * 60;
+    for (let lv = 1; lv <= 10; lv++) {
+      const gain = v * (G.prodLevelMult(lv) - G.prodLevelMult(lv - 1));
+      const cost = Object.values(G.buildCost(id, lv)).reduce((a, x) => a + x, 0);
+      const before = cost / v; // 예전: 레벨마다 같은 양(기본)만 늘었다
+      assert.ok(cost / gain < 60 && cost / gain <= before + 1e-9, `${id} ${lv}레벨: 회수 ${(cost / gain).toFixed(0)}분(예전 ${before.toFixed(0)}분)`);
+    }
+  }
 });

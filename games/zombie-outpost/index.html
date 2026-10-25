@@ -172,6 +172,9 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .mbar.dur.low span { background: var(--red); }
 .tagline.uq { background: #3a2216; color: var(--unique); }
 .tagline.lt { background: #1d2c3a; color: var(--plastic); }
+.tagline.tr { background: #2a2a1c; color: #d8cf8a; }
+.row p b.str { color: var(--amber); }
+.row p .score { color: var(--text); }
 
 /* 설정·스위치 변경 안내: 아래쪽, 오른쪽 조작 열 옆 남은 폭에 하나만(몰입 방해 최소화) */
 #hints {
@@ -534,7 +537,7 @@ const view = $('#view'), ctx = view.getContext('2d');
 const mini = $('#mini'), mctx = mini.getContext('2d');
 const shade = document.createElement('canvas'), sctx = shade.getContext('2d');
 const RES_COLOR = { wood: '#c9925a', scrap: '#b9c0ca', plastic: '#5aa9dc' };
-const ITEM_COLOR = { medkit: '#e0533f', molotov: '#f08a3a', toolbox: '#b9c0ca', flare: '#ff5d8f', energy: '#8fd14f', stim: '#6fd6e0' };
+const ITEM_COLOR = { medkit: '#e0533f', molotov: '#f08a3a', toolbox: '#b9c0ca', flare: '#ff5d8f', stim: '#6fd6e0' };
 // 보상 아이콘(16×16 SVG): 자원 3종·탄약·아이템
 const REWARD_ICON = {
   wood: '<rect x="1" y="5" width="12" height="7" rx="1.5" fill="#c9925a"/><path d="M3 7.6h6M4.5 10h5" stroke="#8a5a32" stroke-width=".9"/><ellipse cx="13" cy="8.5" rx="2.4" ry="3.5" fill="#e3bf92"/><ellipse cx="13" cy="8.5" rx="1.1" ry="1.7" fill="none" stroke="#8a5a32" stroke-width=".8"/>',
@@ -544,7 +547,7 @@ const REWARD_ICON = {
   toolbox: '<path d="M5.5 5.2V3.3h5v1.9" fill="none" stroke="#c9ced6" stroke-width="1.4"/><rect x="1.3" y="5" width="13.4" height="8.8" rx="1.2" fill="#c8573f"/><rect x="1.3" y="8" width="13.4" height="1.3" fill="#8c3828"/><rect x="7" y="7.3" width="2" height="2.6" rx=".4" fill="#e6e9ee"/>',
 };
 const rewardIcon = (k) => `<svg viewBox="0 0 16 16" aria-hidden="true">${REWARD_ICON[k] ?? `<rect x="2" y="2" width="12" height="12" rx="2" fill="${ITEM_COLOR[k] ?? '#98a1ac'}"/>`}</svg>`;
-const ITEM_SHORT = { medkit: '구급상자', molotov: '화염병', toolbox: '공구', flare: '신호탄', energy: '드링크', stim: '스팀팩' };
+const ITEM_SHORT = { medkit: '구급상자', molotov: '화염병', toolbox: '공구', flare: '신호탄', stim: '스팀팩' };
 const RARITY_COLOR = ['#9aa3ad', '#6fa8ff', '#f2c14e'];
 
 let S = null;
@@ -763,7 +766,7 @@ const sfx = (() => {
     nail: (d, t) => { noise(d, t, { dur: 0.06, peak: 1, type: 'bandpass', f: 2600, q: 1.5 }); tone(d, t, { dur: 0.05, peak: 0.6, type: 'square', f: 700, f2: 300 }); },
     flame: (d, t) => { noise(d, t, { dur: 0.24, peak: 1, type: 'lowpass', f: 900, f2: 1800, attack: 0.02 }); },
   };
-  const GUN_OF = { pistol: 'pistol', shotgun: 'shotgun', rifle: 'rifle', carbine: 'auto', crossbow: 'bow', nailgun: 'nail', flamer: 'flame', savior: 'shotgun', milestone: 'rifle', prometheus: 'flame' };
+  const GUN_OF = { pistol: 'pistol', shotgun: 'shotgun', rifle: 'rifle', carbine: 'auto', crossbow: 'bow', flamer: 'flame', milestone: 'rifle', prometheus: 'flame' };
 
   // 자원별 파밍 완료음
   const LOOT = {
@@ -816,7 +819,6 @@ const sfx = (() => {
   const USE = {
     medkit: (d, t) => { noise(d, t, { dur: 0.35, peak: 0.5, type: 'bandpass', f: 1800, f2: 3200, q: 0.9, attack: 0.03 }); noise(d, t + 0.4, { dur: 0.2, peak: 0.35, type: 'bandpass', f: 2600, q: 0.9 }); }, // 붕대 감기 "치익"
     stim: (d, t) => { noise(d, t, { dur: 0.09, peak: 0.6, type: 'highpass', f: 4500 }); tone(d, t, { dur: 0.05, peak: 0.25, f: 1100, f2: 700 }); glide(d, t + 0.1, { dur: 0.35, peak: 0.12, fs: [[0, 300], [0.35, 900]] }); }, // 주사 "칙" + 기운이 오름
-    energy: (d, t) => { tone(d, t, { dur: 0.06, peak: 0.6, f: 700, f2: 250 }); noise(d, t + 0.02, { dur: 0.18, peak: 0.3, type: 'highpass', f: 3000 }); for (const dt of [0.3, 0.52]) tone(d, t + dt, { dur: 0.08, peak: 0.45, f: 170, f2: 110 }); }, // 캔 "뽁" + 꿀꺽꿀꺽
     flare: (d, t) => { glide(d, t, { dur: 0.7, peak: 0.25, fs: [[0, 500], [0.7, 2600]], attack: 0.03, release: 0.1 }); noise(d, t, { dur: 0.7, peak: 0.2, type: 'highpass', f: 2500 }); noise(d, t + 0.72, { dur: 0.12, peak: 0.6, type: 'lowpass', f: 900 }); }, // "슝" + 펑
     toolbox: (d, t) => { for (const dt of [0, 0.16]) { tone(d, t + dt, { dur: 0.18, peak: 0.4, f: 420 }); tone(d, t + dt, { dur: 0.25, peak: 0.15, f: 1130 }); noise(d, t + dt, { dur: 0.03, peak: 0.5, type: 'highpass', f: 2500 }); } }, // 망치 "탕탕"
   };
@@ -918,7 +920,7 @@ function handleEvents(list) {
       case 'swing':
         fx.swings.push({ ...e, t: 0 });
         burst(e.x2, e.y2, 12, 3, { kind: 'spark', add: true, col: '#fff2c8', sp: [60, 120], up: [10, 50], life: [0.1, 0.18], size: [1, 1], g: 100 });
-        if (e.who === 'player') { lastKind = 'melee'; sfx.play('melee', { dmg: G.WEAPONS[e.weapon]?.dmg }); }
+        if (e.who === 'player') { lastKind = 'melee'; sfx.play('melee', { dmg: G.WEAPONS[e.weapon]?.atk }); }
         break;
       case 'kill':
         fx.corpses.push({ x: e.x, y: e.y, type: e.type, raid: e.raid, seed: Math.floor(Math.random() * 12), side: Math.random() < 0.5 ? -1 : 1, dir: screenDir(Math.atan2(e.y - S.player.y, e.x - S.player.x)), t: 0 });
@@ -944,11 +946,20 @@ function handleEvents(list) {
         toast(`${G.ITEMS[e.id].name}을(를) 주웠어요 · ${G.ITEMS[e.id].desc}`, 'good');
         sfx.play('item');
         break;
-      case 'weapon-found':
-        toast(`파밍 전용 무기 「${G.WEAPONS[e.id].name}」 발견! 무기 탭에서 장착하세요`, 'good');
-        floatText(e.x, e.y - 30, G.WEAPONS[e.id].name, '#ffd257', true);
+      case 'weapon-found': {
+        const w = G.WEAPONS[e.id];
+        toast(`드랍 무기 「${w.name}」(T${w.tier} · ${G.WEAPON_STRENGTH[w.str]}) 발견! 무기 탭에서 장착하세요`, 'good');
+        floatText(e.x, e.y - 30, w.name, '#ffd257', true);
         markTab('arms'); sfx.play('weapon');
         break;
+      }
+      case 'armor-found': {
+        const a = G.ARMORS[e.id];
+        toast(`방어구 「${a.name}」 발견! 바로 효과가 붙어요 · ${armorStatText(e.id)}`, 'good');
+        floatText(e.x, e.y - 30, a.name, '#ffd257', true);
+        markTab('arms'); sfx.play('weapon');
+        break;
+      }
       case 'reload': floatText(S.player.x, S.player.y - 10, '재장전', '#e6c95c'); sfx.play('reload'); break;
       case 'reloaded': sfx.play('rack'); break;
       case 'miss': floatText(e.x, e.y, '빗나감', '#9aa0a6'); break;
@@ -995,7 +1006,7 @@ function handleEvents(list) {
         toast(e.kind === 'siege' ? `포위된 생존자 신호! ${G.SIEGE_HOLD_S}초 안에 주변 좀비를 정리하세요` : '조난자 신호가 잡혔어요. 화살표를 따라가세요', 'warn');
         break;
       case 'rescued':
-        toast(`${e.name}(${G.ROLES[e.role].name} · ${G.RARITIES[e.rarity].name}) 구출! ${e.post === 'defense' ? '방벽에 배치했어요' : '생산 근무로 보냈어요'}${e.gift ? ` · 답례로 ${G.ITEMS[e.gift].name}` : ''}`, 'good');
+        toast(`${e.name}(${G.ROLES[e.role].name} · ${G.RARITIES[e.rarity].name}) 구출! ${e.post === 'defense' ? '방벽에 배치했어요' : '생산 근무로 보냈어요'}${e.gifts?.length ? ` · 답례로 ${e.gifts.map((id) => G.ITEMS[id].name).join(' · ')}` : ''}`, 'good');
         markTab('crew');
         break;
       case 'rescue-failed': toast(e.kind === 'siege' ? '생존자를 구하지 못했어요' : '조난자 신호가 끊겼어요', 'bad'); break;
@@ -1003,7 +1014,7 @@ function handleEvents(list) {
       case 'raid-start': toast(`기지 습격! 좀비 ${e.count}마리가 몰려와요`, 'bad'); sfx.play('siren'); break;
       case 'raid-won': {
         const r = e.reward, lines = G.RES_KEYS.filter((k) => r[k] > 0).map((k) => [k, r[k], G.RES_NAMES[k]]);
-        if (r.item) lines.push([r.item, 1, G.ITEMS[r.item].name]);
+        if (r.item && r.itemN > 0) lines.push([r.item, r.itemN, G.ITEMS[r.item].name]);
         if (r.ammo > 0) lines.push(['ammo', r.ammo, '탄약']);
         showReward('습격 방어 성공', lines);
         sfx.play('win');
@@ -1047,7 +1058,7 @@ function updateFx(dt) {
   decals.length = w;
   if (!S) return;
   const Pl = S.player;
-  playerPhase += dt * (Pl.moving ? 11 * (Pl.buff > 0 ? 1.4 : 1) : 2);
+  playerPhase += dt * (Pl.moving ? 11 * (Pl.stim > 0 ? 1.5 : 1) : 2);
   for (const v of G.escorts(S)) { const c = S.posts[v.id]; if (c) escPh[v.id] = (escPh[v.id] ?? v.id) + dt * (c.moving ? 11 : 2); }
   // 파밍 중: 자원에 맞는 조각이 튄다(고철은 불똥도)
   if (S.gather && !Pl.dead && (gatherT -= dt) <= 0) {
@@ -1414,7 +1425,7 @@ function render(t) {
   for (const c of fx.corpses) list.push({ k: c.x + c.y - 1, draw: () => drawCorpse(c) });
   if (!Pl.dead) {
     const gun = lastKind === 'gun' && G.gunReady(S);
-    list.push({ k: Pl.x + Pl.y + 0.5, draw: () => drawChar(Pl.x, Pl.y, { kind: 'player', hero: S.hero?.id, dir: screenDir(Pl.face), phase: playerPhase, moving: Pl.moving, trim: Pl.stim > 0 ? '#6fd6e0' : Pl.buff > 0 ? '#8fd14f' : null, weapon: gun ? 'gun' : 'melee', weaponId: gun ? S.equip.gun : S.equip.melee, bag: Math.min(1, G.bagTotal(S) / G.bagCap(S)) }) });
+    list.push({ k: Pl.x + Pl.y + 0.5, draw: () => drawChar(Pl.x, Pl.y, { kind: 'player', hero: S.hero?.id, dir: screenDir(Pl.face), phase: playerPhase, moving: Pl.moving, trim: Pl.stim > 0 ? '#6fd6e0' : null, weapon: gun ? 'gun' : 'melee', weaponId: gun ? S.equip.gun : S.equip.melee, bag: Math.min(1, G.bagTotal(S) / G.bagCap(S)) }) });
   }
   // 탐험 동행 동료
   for (const v of G.escorts(S)) {
@@ -1649,12 +1660,13 @@ function hud() {
   // 총이 있으면 탄창·예비 탄약, 없으면 근접 무기 내구도
   const mel = S.equip.melee, broken = G.isBroken(S, mel);
   setText('w-gun', gid ? G.WEAPONS[gid].name : G.WEAPONS[mel].name);
-  setText('w-mag', gid ? (!S.gunOn ? `끔 · 탄 ${Pl.mag}/${S.ammo}` : Pl.reload > 0 ? `재장전 ${Pl.reload.toFixed(1)}s` : Pl.mag + S.ammo <= 0 ? '탄약 없음' : `탄 ${Pl.mag}/${S.ammo}`)
+  const spare = gid ? Math.floor(S.ammo / G.ammoPerShot(gid) + 1e-9) : 0; // 예비 탄약으로 더 쏠 수 있는 발 수
+  setText('w-mag', gid ? (!S.gunOn ? `끔 · 탄 ${Pl.mag}/${spare}` : Pl.reload > 0 ? `재장전 ${Pl.reload.toFixed(1)}s` : Pl.mag + spare <= 0 ? '탄약 없음' : `탄 ${Pl.mag}/${spare}`)
     : mel === 'fist' ? '맨주먹' : broken ? '파손 · 수리 필요' : `내구 ${Math.ceil((S.dur[mel] / G.maxDurability(S, mel)) * 100)}%`);
   renderItems();
   const mh = G.maxHp(S);
-  const buffs = (Pl.stim > 0 ? ` · 스팀팩 ${Math.ceil(Pl.stim)}s` : '') + (Pl.buff > 0 ? ` · 드링크 ${Math.ceil(Pl.buff)}s` : '');
-  setBar('hpBar', S.player.hp / mh, `체력 ${Math.ceil(S.player.hp)}/${Math.round(mh)}${buffs}`);
+  const buffs = Pl.stim > 0 ? ` · 스팀팩 ${Math.ceil(Pl.stim)}s` : '';
+  setBar('hpBar', S.player.hp / mh, `체력 ${Math.ceil(S.player.hp - 1e-6)}/${Math.round(mh)}${buffs}`); // 방어구 배율의 소수 오차로 111/110처럼 보이지 않게
   setText('lvBadge', `${S.hero ? `${S.hero.name} · ` : ''}Lv ${S.level}`);
   const xpPct = S.level >= G.LEVEL_MAX ? 100 : Math.round((S.xp / G.xpToNext(S.level)) * 200) / 2;
   if (hudCache.xp !== xpPct) { hudCache.xp = xpPct; $('#xpFill').style.width = `${xpPct}%`; }
@@ -1864,7 +1876,7 @@ function costText(c) {
 function costHtml(c, sec = 0) {
   return `<div class="cost">${Object.entries(c).map(([k, v]) => `<span class="${S.res[k] < v ? 'lack' : ''}" style="${S.res[k] < v ? '' : `color:${RES_COLOR[k]}`}">${G.RES_NAMES[k]} ${G.fmt(v)}</span>`).join('')}${sec ? `<span class="dur">⏱ ${G.durText(sec)}</span>` : ''}</div>`;
 }
-const KIND_TAB = { hq: 'base', bld: 'base', craft: 'arms', wup: 'arms', lvl: 'crew', obuild: 'outposts', oup: 'outposts', odemo: 'outposts' };
+const KIND_TAB = { hq: 'base', bld: 'base', craft: 'arms', wup: 'arms', aup: 'arms', lvl: 'crew', obuild: 'outposts', oup: 'outposts', odemo: 'outposts' };
 // 진행 중인 작업 안내. 남은 시간·막대는 tickJobs가 매 프레임 채운다(시트 HTML이 매초 바뀌어 버튼 누름이 끊기지 않게).
 function jobBanner(lane) {
   const j = G.laneJob(S, lane);
@@ -1895,7 +1907,7 @@ function bldEffect(id, lv) {
     case 'ammo': { const b = G.ammoCrewMult(S), m = G.ammoRate(lv) * b * 60; return `${lv === S.bld.ammo && !S.ammoOn ? '[멈춤] ' : ''}탄약 분당 ${m.toFixed(0)}발${b > 1.001 ? `(근무 동료 +${Math.round((b - 1) * 100)}%)` : ''} · 고철 ${(G.AMMO_COST.scrap * m).toFixed(0)}·플라스틱 ${(G.AMMO_COST.plastic * m).toFixed(0)}/분 소모`; }
     default: {
       const [r, v] = Object.entries(G.BUILDINGS[id].prod)[0];
-      return `${G.RES_NAMES[r]} +${(v * lv * 60).toFixed(0)}/분`;
+      return `${G.RES_NAMES[r]} +${(v * G.prodLevelMult(lv) * 60).toFixed(0)}/분`;
     }
   }
 }
@@ -1932,20 +1944,22 @@ function renderBase() {
   return { sub: `분당 생산 · ${G.RES_KEYS.map((k) => `${G.RES_NAMES[k]} ${(prod[k] * 60).toFixed(0)}`).join(' · ')}${am ? ` · 총알 제작에 고철 −${(am * G.AMMO_COST.scrap).toFixed(0)}·플라스틱 −${(am * G.AMMO_COST.plastic).toFixed(0)}` : ''}`, html: h };
 }
 
+// 무기 능력치 4종(강점은 굵게) · 점수(= 공격력 × 속도 × 명중 × (1 + 치명), 강화 포함)
 function weaponStats(id) {
-  const w = G.WEAPONS[id], lv = S.weapons[id] || 1;
-  const parts = [`피해 ${Math.round(G.weaponDamage(S, id))}`, `${(1 / w.cd).toFixed(1)}회/초`, `사거리 ${w.range}`];
-  if (w.kind === 'gun') parts.push(`탄창 ${w.mag} · 재장전 ${w.reload}초`);
-  if (w.cleave || w.splash) parts.push('범위');
-  if (w.desc) parts.push(w.desc);
-  return parts.join(' · ') + (lv ? '' : '');
+  const w = G.WEAPONS[id], up = G.upgradeMult(S.weapons[id]);
+  const st = (k, txt) => (k === w.str ? `<b class="str">${txt}</b>` : txt);
+  let t = [st('atk', `공격력 ${Math.round(w.atk * up)}`), st('spd', `속도 ${w.spd}회/초`), st('acc', `명중 ${Math.round(w.acc * 100)}%`), st('crit', `치명 ${Math.round(w.crit * 100)}%`)].join(' · ');
+  t += ` · <span class="score">점수 ${Math.round(G.weaponScore(id) * up)}</span>`;
+  if (w.kind === 'gun') t += ` · 탄창 ${w.mag}발 · 발당 탄약 ${G.ammoPerShot(id).toFixed(2)}`;
+  return t;
 }
-const FIND_HINT = (w) => `${w.find.map((t) => G.LOOT_TYPES[t].name).join(' · ')}에서 드물게 (${G.ZONE_NAMES[w.minZone]} 이상)`;
+const armorStatText = (id, lv = S.armor[id] || 1) => G.ARMORS[id].stats.map((k) => (k === 'guard' ? `받는 피해 −${Math.round(G.armorBonus(lv) * 100)}%` : `${G.ARMOR_STATS[k]} +${Math.round(G.armorBonus(lv) * 100)}%`)).join(' · ');
+const missionOf = (id) => G.MISSIONS.find((x) => x.reward === id);
 
 const forgeBusy = () => !!G.laneJob(S, 'forge');
 function weaponRow(id) {
   const w = G.WEAPONS[id], src = G.weaponSource(id), lv = S.weapons[id] || 0, equipped = S.equip[w.kind] === id;
-  const tag = src === 'unique' ? '<span class="tagline uq">유니크</span>' : src === 'loot' ? '<span class="tagline lt">파밍</span>' : '';
+  const tag = `<span class="tagline tr">T${w.tier} ${G.WEAPON_STRENGTH[w.str]}</span>${src === 'unique' ? ' <span class="tagline uq">유니크</span>' : src === 'drop' ? ' <span class="tagline lt">드랍</span>' : ''}`;
   let acts = '', cost = '', p;
   if (!lv) {
     if (src === 'craft') {
@@ -1953,11 +1967,11 @@ function weaponRow(id) {
       acts = jobBtn('craft', id, locked ? `공방 ${w.tier}` : '제작', 'craft', { disabled: forgeBusy() || locked || !G.canAfford(S.res, w.cost) });
       if (!locked) cost = costHtml(w.cost, G.jobDuration('craft', id, 1));
       p = weaponStats(id);
-    } else if (src === 'loot') {
-      p = `아직 못 찾았어요 · ${FIND_HINT(w)}`;
+    } else if (src === 'drop') {
+      p = `아직 못 찾았어요 · ${G.ZONE_NAMES[w.minZone]}부터 파밍하면 드물게 나와요`;
     } else {
-      const m = G.MISSIONS.find((x) => x.reward === id);
-      p = `미션 「${m.name}」(${m.desc}) 보상 · ${w.desc}`;
+      const m = missionOf(id);
+      p = `미션 「${m.name}」(${m.desc}) 보상 · ${weaponStats(id)}`;
     }
   } else {
     const up = G.weaponUpgradeCost(S, id), maxed = lv >= G.WEAPON_MAX_LV;
@@ -1972,38 +1986,61 @@ function weaponRow(id) {
     }
   }
   return `<div class="row${equipped ? ' hero' : ''}">
-    <h3>${lv || src === 'craft' ? w.name : '???'} ${lv ? `<span class="lv">+${lv - 1}</span>` : ''} ${tag} ${equipped ? '<span class="tagline def">장착</span>' : ''}</h3>
+    <h3>${lv || src !== 'drop' ? w.name : '???'} ${lv ? `<span class="lv">+${lv - 1}</span>` : ''} ${tag} ${equipped ? '<span class="tagline def">장착</span>' : ''}</h3>
+    <p>${p}</p>${cost}<div class="acts">${acts}</div>
+  </div>`;
+}
+// 방어구: 얻으면 바로 효과. 같은 부위는 유니크가 대신한다.
+function armorRow(id) {
+  const a = G.ARMORS[id], lv = S.armor[id] || 0, worn = G.wornArmor(S)[a.slot] === id, uq = a.source === 'unique';
+  const tag = `<span class="tagline tr">${G.ARMOR_SLOTS[a.slot]}</span>${uq ? ' <span class="tagline uq">유니크</span>' : ''}`;
+  let acts = '', cost = '', p;
+  if (!lv) {
+    p = uq ? `미션 「${missionOf(id).name}」(${missionOf(id).desc}) 보상 · ${armorStatText(id, 1)}` : `아직 못 찾았어요 · ${G.ZONE_NAMES[a.minZone]}부터 파밍하면 드물게 나와요`;
+  } else {
+    const up = G.armorUpgradeCost(S, id), maxed = lv >= G.ARMOR_MAX_LV;
+    acts = jobBtn('aup', id, maxed ? '최고' : '강화', 'aup', { disabled: forgeBusy() || maxed || !G.canAfford(S.res, up) });
+    if (!maxed) cost = costHtml(up, G.jobDuration('aup', id, lv + 1));
+    p = armorStatText(id) + (worn ? '' : ' · 같은 부위 유니크가 대신해요(효과 없음)');
+  }
+  return `<div class="row${worn ? ' hero' : ''}">
+    <h3>${lv || uq ? a.name : '???'} ${lv ? `<span class="lv">+${lv - 1}</span>` : ''} ${tag} ${worn ? '<span class="tagline def">착용</span>' : ''}</h3>
     <p>${p}</p>${cost}<div class="acts">${acts}</div>
   </div>`;
 }
 
 function statsHtml() {
-  const melee = G.WEAPONS[S.equip.melee], bonus = (melee.crit ?? 0) * 100;
+  const melee = G.WEAPONS[G.meleeId(S)], gun = S.equip.gun && G.WEAPONS[S.equip.gun], pct = (x) => Math.round(x * 100);
   return `<div class="limits">
     ${S.hero ? `<div class="limit">생존자<b>${esc(S.hero.name)} · ${G.HEROES[S.hero.id].label}</b></div>` : ''}
     <div class="limit">레벨<b>Lv ${S.level}</b></div>
     <div class="limit">경험치<b>${S.level >= G.LEVEL_MAX ? '최대' : `${Math.floor(S.xp)} / ${G.xpToNext(S.level)}`}</b></div>
     <div class="limit">최대 체력<b>${Math.round(G.maxHp(S))}</b></div>
     <div class="limit">공격력 보너스<b>+${((G.levelAtkMult(S) - 1) * 100).toFixed(1)}%</b></div>
-    <div class="limit">치명타 확률<b>${G.CRIT_CHANCE * 100}%${bonus ? ` (근접 +${bonus}%p)` : ''}</b></div>
+    <div class="limit">치명타 확률<b>근접 ${pct(melee.crit)}%${gun ? ` · 총 ${pct(gun.crit)}%` : ''}</b></div>
     <div class="limit">치명타 피해<b>평타의 ${G.CRIT_MULT}배</b></div>
     <div class="limit">가방 용량<b>${G.bagCap(S)}</b></div>
-    <div class="limit">예비 탄약${S.bld.ammo ? (S.ammoOn ? ` (분당 +${(G.ammoRateOf(S) * 60).toFixed(0)})` : ' (제작 멈춤)') : ''}<b>${S.ammo}발</b></div>
-    <div class="limit">총 명중률(가까이→끝)<b>100% → 20%</b></div>
+    <div class="limit">예비 탄약${S.bld.ammo ? (S.ammoOn ? ` (분당 +${(G.ammoRateOf(S) * 60).toFixed(0)})` : ' (제작 멈춤)') : ''}<b>${Math.floor(S.ammo)}개</b></div>
+    <div class="limit">공격 속도(방어구·스팀팩)<b>×${G.atkSpeedMult(S).toFixed(2)}</b></div>
+    <div class="limit">이동 · 파밍 속도<b>+${pct(G.armorStat(S, 'move'))}% · +${pct(G.armorStat(S, 'farm'))}%</b></div>
+    <div class="limit">받는 피해<b>−${pct(G.playerGuard(S))}%</b></div>
   </div>`;
 }
 
 function renderArms() {
   const ids = Object.keys(G.WEAPONS);
   const group = (src, kind) => ids.filter((id) => G.weaponSource(id) === src && (!kind || G.WEAPONS[id].kind === kind));
-  const found = group('loot').filter((id) => S.weapons[id]).length, uq = group('unique').filter((id) => S.weapons[id]).length;
+  const found = group('drop').filter((id) => S.weapons[id]).length, uq = group('unique').filter((id) => S.weapons[id]).length;
+  const armors = Object.keys(G.ARMORS), ownA = armors.filter((id) => S.armor[id]).length;
   const lo = 1 - G.GROWTH_SPREAD, hi = 1 + G.GROWTH_SPREAD;
   let h = `${jobBanner('forge')}<div class="section-label">능력치 · 좀비를 직접 잡으면 경험치. 레벨마다 체력 +${(G.HP_PER_LEVEL * lo).toFixed(1)}~${(G.HP_PER_LEVEL * hi).toFixed(1)}, 공격력 +${(G.ATK_PER_LEVEL * lo * 100).toFixed(1)}~${(G.ATK_PER_LEVEL * hi * 100).toFixed(1)}%, 가방 +${G.BAG_PER_LEVEL * (1 - G.BAG_SPREAD)}~${G.BAG_PER_LEVEL * (1 + G.BAG_SPREAD)} 무작위, 체력 모두 회복</div>${statsHtml()}`;
-  h += `<div class="section-label">제작 · 타격 무기 (때릴 때마다 내구도가 닳고, 0이면 파손 → 본부 수리점에서 수리)</div>${group('craft', 'melee').map(weaponRow).join('')}`;
-  h += `<div class="section-label">제작 · 총기 (예비 탄약으로만 재장전 · 탄약은 파밍에서 가끔 나온다)</div>${group('craft', 'gun').map(weaponRow).join('')}`;
-  h += `<div class="section-label">파밍 전용 · ${found}/5 발견</div>${group('loot').map(weaponRow).join('')}`;
-  h += `<div class="section-label">유니크 · 미션 보상 ${uq}/5</div>${group('unique').map(weaponRow).join('')}`;
-  return { sub: '가까우면 타격 무기, 멀면 총으로 자동 공격해요', html: h };
+  h += `<div class="section-label">무기 점수 = 공격력 × 속도 × 명중 × (1 + 치명) · 굵은 글씨가 그 무기의 강점 · 강화는 단계마다 기본의 +10%(최대 +5)</div>`;
+  h += `<div class="section-label">제작 · 근접 (공방 레벨 = 티어 · 맞힐 때마다 내구도가 닳고 0이면 파손 → 본부 수리점)</div>${group('craft', 'melee').map(weaponRow).join('')}`;
+  h += `<div class="section-label">제작 · 원거리 (예비 탄약으로 재장전 · 쉬지 않고 쏘면 초당 탄약 ${G.AMMO_PER_SEC}개)</div>${group('craft', 'gun').map(weaponRow).join('')}`;
+  h += `<div class="section-label">드랍 · 파밍으로만 · ${found}/6 발견</div>${[...group('drop', 'melee'), ...group('drop', 'gun')].map(weaponRow).join('')}`;
+  h += `<div class="section-label">유니크 · 미션 보상 · ${uq}/4</div>${[...group('unique', 'melee'), ...group('unique', 'gun')].map(weaponRow).join('')}`;
+  h += `<div class="section-label">방어구 · 얻으면 바로 효과(갈아 끼우지 않음) · 기본 10%, 강화마다 +1%p(최대 2강) · ${ownA}/${armors.length}</div>${armors.map(armorRow).join('')}`;
+  return { sub: '가까우면 근접 무기, 멀면 총으로 자동 공격해요 · 방어구는 얻으면 바로 효과', html: h };
 }
 
 // 엔딩 목표: 진행도 글자(명장은 +강화 수, 거점망은 곳 수)
@@ -2021,18 +2058,19 @@ function renderMissions() {
       <div class="mbar"><span style="width:${Math.min(1, p / g.goal) * 100}%"></span></div>
     </div>`;
   }
-  h += `<div class="section-label">미션 · 유니크 무기 보상</div>`;
+  h += `<div class="section-label">미션 · 유니크 보상(무기 4 · 방어구 3)</div>`;
   for (const m of G.MISSIONS) {
     const prog = Math.min(m.goal, Math.floor(m.progress(S))), done = prog >= m.goal, got = !!S.claimed[m.id];
-    const w = G.WEAPONS[m.reward];
+    const w = G.WEAPONS[m.reward], a = G.ARMORS[m.reward];
+    const reward = w ? `유니크 ${w.kind === 'gun' ? '원거리' : '근접'} 「${w.name}」 · T${w.tier} ${G.WEAPON_STRENGTH[w.str]} · 점수 ${Math.round(G.weaponScore(m.reward))}` : `유니크 방어구 「${a.name}」 · ${armorStatText(m.reward, 1)}`;
     h += `<div class="row${done && !got ? ' hero' : ''}">
       <h3>${m.name} <span class="lv">${prog}/${m.goal}</span> ${got ? '<span class="tagline def">완료</span>' : ''}</h3>
-      <p>${m.desc} → 유니크 ${w.kind === 'gun' ? '총기' : '근접'} 「${w.name}」 · ${w.desc}</p>
+      <p>${m.desc} → ${reward}</p>
       <div class="mbar"><span style="width:${(prog / m.goal) * 100}%"></span></div>
       <div class="acts">${got ? btn('받음', 'claim', m.id, { disabled: true, cls: 'ghost' }) : btn('보상 받기', 'claim', m.id, { disabled: !done })}</div>
     </div>`;
   }
-  return { sub: `엔딩 목표 ${st.count}/${G.ENDING_NEED} · 미션을 달성하면 유니크 무기를 받아요`, html: h };
+  return { sub: `엔딩 목표 ${st.count}/${G.ENDING_NEED} · 미션을 달성하면 유니크 장비를 받아요`, html: h };
 }
 
 const POST_TAG = { defense: ['방어', 'def'], work: ['생산', ''], explore: ['탐험', 'exp'] };
@@ -2130,6 +2168,7 @@ $('#sheetBody').addEventListener('click', (e) => {
     case 'bld': r = G.buyBuilding(S, id); break;
     case 'craft': r = G.craftWeapon(S, id); break;
     case 'wup': r = G.upgradeWeapon(S, id); break;
+    case 'aup': r = G.upgradeArmor(S, id); break;
     case 'equip': r = G.equipWeapon(S, id); break;
     case 'repair': r = G.repairWeapon(S, id); break;
     case 'ammoToggle': r = G.setAmmoOn(S, !S.ammoOn); break;
@@ -2306,7 +2345,7 @@ const flowHtml = () => `<p class="rec-title">한 바퀴</p>
     <div class="arrow">↓</div>
     <div class="step"><i>4</i><b>건설</b><span>본부와 건물을 올려요. 본부 레벨이 건물 레벨·전진기지 수 같은 한도를 열고, 생산 건물은 자원을 저절로 쌓아요.</span></div>
     <div class="arrow">↓</div>
-    <div class="step"><i>5</i><b>개발</b><span>공방에서 무기를 만들고 강화해요. 총은 탄약을 쓰고, 총알 제작소가 탄약을 만들어요.</span></div>
+    <div class="step"><i>5</i><b>개발</b><span>공방에서 무기를 만들고 강화해요(최대 +5). 멀리 파밍하면 더 좋은 드랍 무기와 방어구가 드물게 나와요. 총은 탄약을 쓰고, 총알 제작소가 탄약을 만들어요.</span></div>
     <div class="loop">↺ 더 강해졌으면 더 먼 구역으로 · 다시 1번부터</div>
   </div>
   <p class="rec-title">함께 돌아가는 것</p>
@@ -2314,7 +2353,7 @@ const flowHtml = () => `<p class="rec-title">한 바퀴</p>
     <li><b>동료</b> · 구조 신호를 따라가 생존자를 구해요. 방어(방벽)·생산(생산 보너스)·탐험(함께 싸우고 짐을 나눠 듦)에 배치하고 훈련으로 키워요. 숙소가 정원을 정해요.</li>
     <li><b>습격</b> · 5~8분마다 좀비 무리가 기지를 덮쳐요. 막으면 자원·공구 상자·탄약을 받아요.</li>
     <li><b>전진기지</b> · 먼 구역에 짓는 작은 기지예요(본부 레벨 ÷ 2곳). 창고로 쓰고 자원도 만들어요.</li>
-    <li><b>미션 · 엔딩</b> · 미션을 이루면 유니크 무기를 받아요. 엔딩 목표 ${G.ENDING_NEED}개(필수 1개 이상)를 이루면 엔딩이에요.</li>
+    <li><b>미션 · 엔딩</b> · 미션을 이루면 유니크 장비(무기·방어구)를 받아요. 엔딩 목표 ${G.ENDING_NEED}개(필수 1개 이상)를 이루면 엔딩이에요.</li>
   </ul>`;
 function histHtml() {
   const rec = loadRecords(), h = historyRows();
