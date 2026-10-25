@@ -207,6 +207,7 @@ export const meleeId = (s) => (isBroken(s, s.equip.melee) ? 'fist' : s.equip.mel
 // 무기를 얻을 때: 근접은 내구도 가득, 총은 탄창 1개분 탄약이 같이 온다
 export function gainWeapon(s, id) {
   const w = WEAPONS[id];
+  if (w.kind === 'gun' && !Object.keys(s.weapons).some((k) => WEAPONS[k].kind === 'gun')) s.gunOn = true; // 첫 총을 얻으면 총기 사용을 켠다
   s.weapons[id] ||= 1;
   if (w.dur) s.dur[id] = maxDurability(s, id);
   if (w.mag) s.ammo = Math.min(AMMO_MAX, s.ammo + w.mag);
@@ -608,13 +609,13 @@ export function newGame(seed = (Date.now() & 0x7fffffff) || 1) {
     player: { x: CENTER.x, y: CENTER.y + 20, hp: 100, dead: 0, cd: 0, face: 0, mag: 0, reload: 0, buff: 0, stim: 0 },
     ammo: 0, // 예비 탄약(모든 총 공용)
     ammoOn: true, // 총알 제작소 가동 여부
-    gunOn: true, // 총기 사용 여부(끄면 근접 무기만 써서 탄약을 아낀다)
+    gunOn: false, // 총기 사용 여부(끄면 근접 무기만 써서 탄약을 아낀다). 처음엔 총이 없어 꺼 두고, 첫 총을 얻으면 켠다
     dur: {}, // 근접 무기 내구도
     items: { ...Object.fromEntries(ITEM_KEYS.map((k) => [k, 0])), medkit: 2 }, // 로그라이크 시작 지원
     claimed: {},
     autoHunt: true,
     autoZone: 1, // 활동 반경: 자동사냥이 쫓아가는 구역(0 기지 주변 ~ 4 군사 구역까지)
-    stance: 'aggressive',
+    stance: 'neutral',
     level: 1,
     xp: 0,
     growth: { hp: 0, atk: 0, bag: 0 },
@@ -1899,7 +1900,7 @@ export function deserialize(text) {
   // 예전 세이브의 단일 '자동' 값은 자동사냥으로 옮긴다(파밍 스위치·자원 파밍 설정은 없어졌다)
   s.autoHunt = typeof o.autoHunt === 'boolean' ? o.autoHunt : o.auto !== false;
   s.autoZone = Math.floor(num(o.autoZone, 1, 0, ZONE_NAMES.length - 1));
-  s.stance = STANCES[o.stance] ? o.stance : 'aggressive';
+  s.stance = STANCES[o.stance] ? o.stance : 'neutral';
   for (const k of Object.keys(s.stats)) s.stats[k] = Math.floor(num(o.stats?.[k], 0));
   if (o.hero && Object.hasOwn(HEROES, o.hero.id) && cleanName(o.hero.name)) s.hero = { id: o.hero.id, name: cleanName(o.hero.name), runId: String(o.hero.runId ?? s.seed) };
   if (o.ended && Number.isFinite(o.ended.at)) s.ended = { at: Math.floor(num(o.ended.at, 0)), goals: (Array.isArray(o.ended.goals) ? o.ended.goals : []).filter((id) => ENDING_GOALS.some((g) => g.id === id)) };

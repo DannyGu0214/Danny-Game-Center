@@ -631,7 +631,8 @@ test('좀비 전략(자동사냥): 공격적만 반경 안 좀비를 찾아가�
   s.spawnT = 1e9; s.rescueT = 1e9;
   s.player.x = G.CENTER.x + 500; s.player.y = G.CENTER.y; // 주택가(위험도 1.3)
   const z = zombieAt(s, G.CENTER.x + 600, G.CENTER.y);
-  assert.equal(s.stance, 'aggressive', '기본은 공격적');
+  assert.equal(s.stance, 'neutral', '새 게임은 중립적');
+  G.setStance(s, 'aggressive');
   assert.equal(s.autoZone, 1, '기본 활동 반경은 주택가까지');
   assert.equal(G.inActivityRadius(s, z.x, z.y), true);
   assert.equal(G.chooseAutoTarget(s).ref, z);
@@ -644,6 +645,18 @@ test('좀비 전략(자동사냥): 공격적만 반경 안 좀비를 찾아가�
   assert.equal(G.chooseAutoTarget(s), null, '중립적이면 제자리');
   assert.equal(G.setStance(s, 'nope').ok, false);
   assert.deepEqual([1, 2, 3].map(() => (G.cycleStance(s), s.stance)), ['evasive', 'aggressive', 'neutral']);
+});
+
+test('새 게임 기본값: 자동사냥 켬 · 좀비 전략 중립적 · 총기 끔, 첫 총을 얻으면 총기 켬', () => {
+  const s = rich(fresh(42));
+  assert.deepEqual([s.autoHunt, s.stance, s.gunOn], [true, 'neutral', false]);
+  const gun = Object.keys(G.WEAPONS).find((k) => G.WEAPONS[k].kind === 'gun');
+  G.gainWeapon(s, gun);
+  assert.equal(s.gunOn, true, '첫 총');
+  G.setSwitch(s, 'gunOn', false);
+  const gun2 = Object.keys(G.WEAPONS).filter((k) => G.WEAPONS[k].kind === 'gun')[1];
+  G.gainWeapon(s, gun2);
+  assert.equal(s.gunOn, false, '이미 총이 있으면 직접 끈 설정을 바꾸지 않는다');
 });
 
 test('좀비 전략: 회피는 다가오는 좀비를 피하면서 공격 반경 안 좀비를 공격, 중립은 제자리에서 공격', () => {
@@ -731,8 +744,8 @@ test('스위치: 자동사냥을 끄면 저절로 움직이지 않고 손가락 
   assert.ok(G.dist(s.player.x, s.player.y, x0, y0) < 1, '수동이면 서 있다');
   G.step(s, DT, { x: 0, y: -1 });
   assert.ok(s.player.y < y0, '손가락 입력으로는 움직인다');
-  G.setSwitch(s, 'autoHunt', true);
-  assert.equal(G.chooseAutoTarget(s).ref, z, '자동사냥을 켜면 반경 안 좀비에게 반응한다');
+  G.setSwitch(s, 'autoHunt', true); G.setStance(s, 'aggressive');
+  assert.equal(G.chooseAutoTarget(s).ref, z, '자동사냥을 켜면(공격적) 반경 안 좀비에게 반응한다');
 });
 
 test('장애물: 겹치지 않게 배치되고, 통과할 수 없으며, 자동 이동은 돌아간다', () => {
@@ -779,7 +792,7 @@ test('자동사냥·좀비 전략·활동 반경은 저장되고, 예전 세이�
   const bad = JSON.parse(G.serialize(s)); bad.stance = 'berserk'; bad.farm = 'passive'; bad.autoFarm = true;
   delete bad.autoHunt; bad.auto = false;
   const u = G.deserialize(JSON.stringify(bad));
-  assert.equal(u.stance, 'aggressive');
+  assert.equal(u.stance, 'neutral', '알 수 없는 전략은 새 게임 기본값(중립적)으로');
   assert.equal(u.autoHunt, false);
   assert.equal(u.autoFarm, undefined);
   assert.equal(u.farm, undefined);
