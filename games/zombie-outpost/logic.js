@@ -1057,7 +1057,7 @@ export function raidComposition(L) {
   // 예전 워커·러너·브루트 수를 하급·중급·상급 수로 그대로 옮겼다
   return [Math.round(4 + 21 * ((L - 1) / 59) ** 1.35), Math.floor(10 * r ** 1.65), Math.floor(10 * r * r)];
 }
-const RAID_LOSS = 0.2; // 방벽이 뚫리면 창고 자원의 20%를 잃는다
+export const RAID_LOSS = 0.2; // 방벽이 뚫리면 창고 자원의 20%를 잃는다
 export const raidAmmo = (s) => 10 + 3 * s.hq; // 습격을 막으면 탄약도 받는다
 export const DEFENDER_DMG = 1.3; // 방어 동료 공격력: 좀비 체력 ×1.3만큼 함께 올려 습격 난이도만 되돌린다
 
