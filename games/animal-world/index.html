@@ -511,7 +511,7 @@ function draw(dt) {
       const zz = heightAt(rid, x, y) * LEVEL + 0.3;
       A.poly(pen, [[x * T + 1, y * T + 1, zz], [(x + 1) * T - 1, y * T + 1, zz], [(x + 1) * T - 1, (y + 1) * T - 1, zz], [x * T + 1, (y + 1) * T - 1, zz]], 'rgba(255,255,255,0.22)');
     }
-    const okSpot = G.fits(S, rid, id, UI.place.x, UI.place.y), cash = S.pop >= itemPrice(d.tier);
+    const okSpot = G.fits(S, rid, id, UI.place.x, UI.place.y), cash = G.popOf(S) >= itemPrice(d.tier);
     A.footprint(pen, UI.place.x, UI.place.y, d.w, d.h, okSpot && cash ? 'rgba(120,220,90,0.35)' : 'rgba(230,80,60,0.35)', okSpot && cash ? '#e8ffd8' : '#ffd2c8', z);
     const s = itemSprite(id, 0), [gx, gy] = P((UI.place.x + d.w / 2) * T, (UI.place.y + d.h / 2) * T, z);
     g.globalAlpha = 0.6; blitAt(s, gx, gy); g.globalAlpha = 1;
@@ -605,7 +605,7 @@ const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1) - 0xac00; retur
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
 function hud() {
   const rid = S.view, R = S.regions[rid], st = G.stats(S, rid), def = G.regionDef(rid);
-  setText($('#pop'), fmt(S.pop));
+  setText($('#pop'), fmt(G.popOf(S)));
   setText($('#rate'), `+${(G.incomePerMin(S)).toFixed(1)}/분`);
   setText($('#rname'), def.name);
   setText($('#tier'), `T${R.tier}`);
@@ -656,7 +656,7 @@ function goRegion(rid) {
   const def = G.regionDef(rid);
   UI.seen.regions[rid] = true; saveSeen();
   closeSheet(); exitPlace(); select(null); setZoom(0);
-  toast(`${def.icon} ${def.name}에 왔어요`);
+  toast(`${def.icon} ${def.name}에 왔어요${r.rest.gain >= 1 ? ` · 쉬는 동안 ⭐+${fmt(r.rest.gain)}` : ''}`);
   afterChange();
 }
 $('#regionBtn').onclick = () => (UI.sheet === 'regions' ? closeSheet() : openSheet('regions'));
@@ -675,13 +675,13 @@ function sheetRegions(body) {
     rows.push({ r, row, info, btn, why });
   }
   sheetUpdate = () => {
-    $('#sheetSub').textContent = `열린 지역 ${REGIONS.filter((r) => G.isUnlocked(S, r.id)).length}/${REGIONS.length}`;
+    $('#sheetSub').textContent = `열린 지역 ${REGIONS.filter((r) => G.isUnlocked(S, r.id)).length}/${REGIONS.length} · 인기점수는 지역마다 따로`;
     for (const o of rows) {
       const { r } = o, open = G.isUnlocked(S, r.id), here = r.id === S.view, R = S.regions[r.id], st = G.stats(S, r.id);
       o.row.classList.toggle('locked', !open); o.row.classList.toggle('here', here);
       setText(o.info.querySelector('.tierTag'), open ? `T${R.tier}` : '🔒');
       o.info.querySelector('.new').hidden = !newRegions().includes(r);
-      setText(o.info.querySelector('.have'), !open ? `${G.regionDef(r.unlock.region).name} T${r.unlock.tier}에서 열려요` : `동물 ${st.animals}마리 · 발전도 ${st.dev}`);
+      setText(o.info.querySelector('.have'), !open ? `${G.regionDef(r.unlock.region).name} T${r.unlock.tier}에서 열려요` : `⭐${fmt(R.pop)} · 동물 ${st.animals} · 발전도 ${st.dev}`);
       setText(o.btn, here ? '지금 여기' : open ? '가 보기' : '🔒');
       o.btn.disabled = here || !open || !r.ready;
       setText(o.why, open && !r.ready ? '준비 중' : '');
@@ -812,8 +812,8 @@ function sheetDecor(body, tabs) {
       o.info.querySelector('.new').hidden = locked || n > 0 || o.d.tier !== R.tier || R.tier === 1;
       setText(o.info.querySelector('.have'), `${n ? `${n}개 놓음 · ` : ''}점수 ${4 + 2 * o.d.tier}${n >= ECON.itemFull ? ' (3개째부터 절반)' : ''}`);
       setText(o.btn, locked ? `🔒 T${o.d.tier}` : `놓기 ⭐${price}`);
-      o.btn.disabled = locked || S.pop < price || !room;
-      setText(o.why, locked ? '' : !room ? `${G.terrainNames(o.id)}에 빈자리가 없어요` : S.pop < price ? '인기점수가 모자라요' : '');
+      o.btn.disabled = locked || G.popOf(S) < price || !room;
+      setText(o.why, locked ? '' : !room ? `${G.terrainNames(o.id)}에 빈자리가 없어요` : G.popOf(S) < price ? '인기점수가 모자라요' : '');
     }
   };
 }
@@ -1061,7 +1061,7 @@ function updateCardLive() {
   const st = G.stats(S, S.view), d = SPECIES[a.sp];
   setText(p, `${d.size} ${SIZE[d.size].name} · 행복도 ${Math.round(st.happy[a.sp] * 100)}% · ${stateText(a)}`);
 }
-// 화면을 떠났다 돌아오면 그동안의 관람 수익을 정산한다(최대 4시간)
+// 화면을 떠났다 돌아오면 그동안의 관람 수익을 정산한다(보던 지역, 최대 30분치)
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); save(); music.pause(); return; }
   music.resume();
@@ -1087,7 +1087,7 @@ function start() {
   if (fresh) welcome();
   else {
     const r = G.settleOffline(S, Date.now());
-    if (r.sec >= 60 && r.gain >= 1) modal(`<h2>다시 오셨네요!</h2><p>자리를 비운 ${Math.round(r.sec / 60)}분 동안 관람객이 다녀갔어요.</p><p style="font-size:22px">⭐ +${fmt(r.gain)}</p>${r.sec >= ECON.offlineCapSec ? '<p style="color:var(--muted);font-size:12px">최대 4시간까지 쌓여요</p>' : ''}`);
+    if (r.sec >= 60 && r.gain >= 1) modal(`<h2>다시 오셨네요!</h2><p>자리를 비운 ${r.sec >= 5400 ? `${Math.round(r.sec / 3600)}시간` : `${Math.round(r.sec / 60)}분`} 동안 ${G.regionDef(S.view).name}에 관람객이 다녀갔어요.</p><p style="font-size:22px">⭐ +${fmt(r.gain)}</p>${r.capped ? '<p style="color:var(--muted);font-size:12px">쉬는 동안은 지역마다 최대 30분치까지 쌓여요</p>' : ''}`);
   }
   hud();
   save();

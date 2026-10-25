@@ -22,16 +22,16 @@ export function run({ minutes = MIN, seed = SEED, captureRate = CAP, requests = 
   let tapAt = null, lastChance = null;
   const income = { view: 0, capture: 0, request: 0 };
   for (let t = 0; t < minutes * 60; t += DT) {
-    const p0 = S.pop;
+    const p0 = G.popOf(S, R);
     G.step(S, DT);
-    income.view += S.pop - p0;
+    income.view += G.popOf(S, R) - p0;
     // 순간 포착: 기회마다 한 번 탭할지 정하고, 1.5초 뒤에 탭한다
     if (S.chance && S.chance !== lastChance) { lastChance = S.chance; tapAt = coin() < captureRate ? S.time + 1.5 : null; }
     if (S.chance && tapAt != null && S.time >= tapAt) { const r = G.capture(S, S.chance.uid); if (r.ok) income.capture += r.reward; tapAt = null; }
     if (requests) for (const q of [...S.requests]) if (G.requestDone(S, q)) { const r = G.claim(S, q.uid); if (r.ok) income.request += r.reward; }
     // 1초마다 살 것을 정한다
     if (Math.abs(t % 1) < 1e-9) {
-      for (let k = 0; k < 4; k++) { const want = choose(S); if (!want || S.pop < want.price) break; buy(S, want); }
+      for (let k = 0; k < 4; k++) { const want = choose(S); if (!want || G.popOf(S, R) < want.price) break; buy(S, want); }
     }
     const tier = S.regions[R].tier;
     if (!tierAt[tier]) { tierAt[tier] = S.time / 60; if (log) console.log(`T${tier} ${(S.time / 60).toFixed(1)}분`); }
@@ -79,7 +79,7 @@ function buy(S, w) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { tierAt, S, income } = run({ log: true, region: REGION });
   const st = G.stats(S, R);
-  console.log(`끝: ${(S.time / 60).toFixed(0)}분, T${S.regions[R].tier}, 발전도 ${st.dev}, 행복도 ${(st.H * 100).toFixed(0)}%, 동물 ${st.animals}마리 ${st.species}종, 물건 ${S.regions[R].items.length}개, 남은 인기 ${Math.floor(S.pop)}`);
+  console.log(`끝: ${(S.time / 60).toFixed(0)}분, T${S.regions[R].tier}, 발전도 ${st.dev}, 행복도 ${(st.H * 100).toFixed(0)}%, 동물 ${st.animals}마리 ${st.species}종, 물건 ${S.regions[R].items.length}개, 남은 인기 ${Math.floor(G.popOf(S, R))}`);
   const tot = income.view + income.capture + income.request;
   console.log(`수입: 관람 ${Math.round(income.view)} (${Math.round((income.view / tot) * 100)}%) · 포착 ${Math.round(income.capture)} · 요청 ${Math.round(income.request)}`);
   void tierAt; void SIZE; void animalValue;

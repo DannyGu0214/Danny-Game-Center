@@ -19,7 +19,7 @@ export const SIZE = {
 
 // 점수·가격·보상 상수(tools/sim.js 봇으로 조정)
 export const ECON = {
-  start: 60, // 시작 인기점수(첫 입양용)
+  start: 60, // 지역마다 시작 인기점수(첫 입양용). 인기점수는 지역마다 따로다
   incomeDiv: 25, // 분당 관람 수익 = 발전도 합 ÷ incomeDiv
   diversity: 30, // 종마다 다양성 점수
   speciesFull: 4, // 같은 종은 이 마릿수까지 가치 전부, 넘으면 절반
@@ -28,7 +28,7 @@ export const ECON = {
   itemBase: 10, // T1 물건 가격
   growth: 1.7, // 티어마다 가격 배율
   refund: 0.5, // 방생·치우기 환급 비율
-  offlineCapSec: 4 * 3600, // 자리를 비운 동안 쌓이는 관람 수익 상한
+  offlineCapSec: 30 * 60, // 쉬는 동안(게임을 끈 동안·다른 지역에 가 있는 동안) 지역마다 쌓이는 관람 수익 상한
   chanceEvery: [15, 35], // 순간 포착 기회 간격(초)
   chanceLen: 5, // 특수 행동(포착 가능) 시간(초)
   captureMinutes: 0.5, captureMin: 2, // 포착 보상 = 관람 수익 N분치(최소값)

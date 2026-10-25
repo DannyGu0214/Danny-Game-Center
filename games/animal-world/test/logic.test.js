@@ -5,13 +5,14 @@ import * as T from '../terrain.js';
 import { ECON, TIERS, SPECIES, ITEMS, GRID, animalPrice, itemPrice } from '../data.js';
 
 const R = 'grassland';
-const rich = (pop = 1e6, seed = 7) => { const S = G.newGame(seed, 0); S.pop = pop; return S; };
+const rich = (pop = 1e6, seed = 7) => { const S = G.newGame(seed, 0); for (const r of Object.values(S.regions)) r.pop = pop; return S; };
+const pop = (S, rid = R) => G.popOf(S, rid);
 const setTier = (S, t) => { S.regions[R].tier = t; S.rev = (S.rev || 0) + 1; };
 const place = (S, id) => { const at = G.freeSpot(S, R, id); return G.placeItem(S, R, id, at[0], at[1]); };
 
-test('새 게임: 시작 인기점수, T1, 요청 3장, 동물 없음', () => {
+test('새 게임: 지역마다 시작 인기점수, T1, 요청 3장, 동물 없음', () => {
   const S = G.newGame(1, 0);
-  assert.equal(S.pop, ECON.start);
+  for (const r of Object.keys(S.regions)) assert.equal(pop(S, r), ECON.start, r);
   assert.equal(S.regions[R].tier, 1);
   assert.equal(S.regions[R].animals.length, 0);
   assert.equal(S.requests.length, 3);
@@ -22,8 +23,8 @@ test('입양은 인기점수로 산다: 값만큼 줄고, 모자라면 못 산�
   const price = animalPrice(1);
   const r = G.adopt(S, R, 'rabbit');
   assert.ok(r.ok);
-  assert.equal(S.pop, ECON.start - price);
-  S.pop = price - 1;
+  assert.equal(pop(S), ECON.start - price);
+  S.regions[R].pop = price - 1;
   assert.equal(G.adopt(S, R, 'rabbit').ok, false);
   assert.equal(G.canAdopt(S, R, 'rabbit').why, '인기점수가 모자라요');
 });
@@ -72,10 +73,10 @@ test('티어가 올라도 동물·인기점수를 공짜로 주지 않는다', (
   const S = rich(5000);
   for (let i = 0; i < 4; i++) G.adopt(S, R, 'rabbit');
   place(S, 'grass'); place(S, 'grass'); place(S, 'hutch'); place(S, 'hutch');
-  const before = S.pop, animals = S.regions[R].animals.length;
+  const before = pop(S), animals = S.regions[R].animals.length;
   assert.equal(S.regions[R].tier, 2, '발전도 60 이상이면 T2');
   assert.equal(S.regions[R].animals.length, animals);
-  assert.equal(S.pop, before);
+  assert.equal(pop(S), before);
   assert.ok(S.events.some((e) => e.type === 'tier' && e.tier === 2));
 });
 
@@ -121,10 +122,10 @@ test('티어는 내려가지 않는다(방생해도 그대로), 방생은 50% �
   for (let i = 0; i < 4; i++) G.adopt(S, R, 'rabbit');
   place(S, 'grass'); place(S, 'grass'); place(S, 'hutch'); place(S, 'hutch');
   assert.equal(S.regions[R].tier, 2);
-  const a = S.regions[R].animals[0], before = S.pop;
+  const a = S.regions[R].animals[0], before = pop(S);
   const r = G.release(S, R, a.uid);
   assert.ok(r.ok);
-  assert.equal(S.pop, before + Math.floor(a.paid * 0.5));
+  assert.equal(pop(S), before + Math.floor(a.paid * 0.5));
   for (const b of [...S.regions[R].animals]) G.release(S, R, b.uid);
   assert.equal(S.regions[R].tier, 2);
 });
@@ -137,9 +138,9 @@ test('물건 놓기: 칸 밖·겹침은 막고, 치우면 50% 환급', () => {
   assert.equal(G.canPlace(S, R, 'grass', 8, 7).why, '놓을 수 없는 자리예요');
   assert.ok(G.canPlace(S, R, 'grass', 11, 6).ok);
   assert.equal(G.canPlace(S, R, 'baobab', 0, 5).why, 'T8에서 해금');
-  const it = S.regions[R].items[0], before = S.pop;
+  const it = S.regions[R].items[0], before = pop(S);
   assert.ok(G.removeItem(S, R, it.uid).ok);
-  assert.equal(S.pop, before + Math.floor(itemPrice(7) * 0.5));
+  assert.equal(pop(S), before + Math.floor(itemPrice(7) * 0.5));
 });
 
 test('발전도가 기준을 넘으면 여러 티어도 한 번에, 지역 해금 이벤트', () => {
@@ -182,18 +183,21 @@ test('동물은 시간이 지나면 움직이고, 먹이가 있으면 먹으러 
   for (const a of S.regions[R].animals) assert.ok(G.walkable(S, R, Math.floor(a.x), Math.floor(a.y)));
 });
 
-test('관람 수익: 분당 발전도 ÷ incomeDiv, 오프라인은 최대 4시간', () => {
+test('관람 수익: 그 지역 발전도 ÷ incomeDiv, 게임을 끈 동안은 최대 30분치', () => {
   const S = rich(0);
   setTier(S, 1);
-  S.pop = 1000;
+  S.regions[R].pop = 1000;
   for (let i = 0; i < 4; i++) G.adopt(S, R, 'rabbit');
   const perMin = G.incomePerMin(S);
   assert.equal(perMin, G.stats(S, R).dev / ECON.incomeDiv);
-  const p0 = S.pop;
+  assert.equal(ECON.offlineCapSec, 30 * 60);
+  const p0 = pop(S);
   S.savedAt = 0;
   const r = G.settleOffline(S, 10 * 3600 * 1000);
-  assert.equal(r.sec, 4 * 3600);
-  assert.ok(Math.abs(S.pop - (p0 + perMin * 240)) < 1e-6);
+  assert.equal(r.sec, 10 * 3600);
+  assert.ok(r.capped);
+  assert.ok(Math.abs(pop(S) - (p0 + perMin * 30)) < 1e-6);
+  assert.ok(Math.abs(r.gain - perMin * 30) < 1e-6);
   S.savedAt = 5000;
   assert.equal(G.settleOffline(S, 1000).gain, 0);
 });
@@ -226,9 +230,9 @@ test('관람객 요청: 다 되면 [받기]로 보상, 덜 되면 못 받고, �
   S.requests = [{ uid: 500, region: R, kind: 'adopt', sp: 'rabbit', n: 2, minutes: 4, reward: 40 }];
   assert.equal(G.claim(S, 500).ok, false);
   G.adopt(S, R, 'rabbit'); G.adopt(S, R, 'rabbit');
-  const before = S.pop;
+  const before = pop(S);
   assert.ok(G.claim(S, 500).ok);
-  assert.equal(S.pop, before + 40);
+  assert.equal(pop(S), before + 40);
   assert.equal(S.requests.length, 3);
   for (const q of S.requests) assert.equal(G.requestDone(S, q), false, '새 요청은 이미 끝난 것이 아니어야 한다');
 });
@@ -250,7 +254,7 @@ test('저장 → 불러오기: 같은 상태, 깨진 저장은 null', () => {
   const raw = G.serialize(S, 1234);
   const T = G.deserialize(raw);
   assert.equal(T.savedAt, 1234);
-  assert.equal(T.pop, S.pop);
+  assert.equal(pop(T), pop(S));
   assert.deepEqual(T.regions, S.regions);
   assert.equal(G.stats(T, R).dev, G.stats(S, R).dev);
   assert.equal(G.deserialize('{bad'), null);
@@ -383,7 +387,7 @@ test('지형 이전: 지형 전 세이브의 맞지 않는 물건은 맞는 자�
   assert.ok(items.some((it) => it.uid === 901 && it.x === 9 && it.y === 10), '맞는 물건은 그대로');
   const ponds = items.filter((it) => it.id === 'pond').length, refunded = 5 - ponds;
   assert.ok(ponds >= 1 && refunded >= 1, `연못 ${ponds}개 남고 ${refunded}개 환불`);
-  assert.equal(L.pop, S.pop + refunded * 50);
+  assert.equal(pop(L), pop(S) + refunded * 50);
   const ev = L.events.find((e) => e.type === 'terrain');
   assert.ok(ev && ev.refunded === refunded);
   const b = L.regions[R].animals[0];
@@ -392,4 +396,59 @@ test('지형 이전: 지형 전 세이브의 맞지 않는 물건은 맞는 자�
   const again = G.deserialize(G.serialize(L, 0));
   assert.deepEqual(again.regions, L.regions);
   assert.equal(again.events.length, 0);
+});
+
+test('인기점수는 지역마다 따로: 새 지역은 시작 점수부터, 산 값은 그 지역에서만 빠진다', () => {
+  const S = G.newGame(3, 0);
+  S.regions[R].pop = 5000; S.regions[R].tier = 4; S.rev++;
+  assert.ok(G.isUnlocked(S, 'seaside'));
+  assert.equal(pop(S, 'seaside'), ECON.start, '초원 점수를 가져가지 않는다');
+  assert.ok(G.setView(S, 'seaside').ok);
+  assert.equal(pop(S, 'seaside'), ECON.start, '처음 가는 지역은 쉬는 동안 쌓인 것이 없다(발전도 0)');
+  assert.ok(G.adopt(S, 'seaside', 'crab').ok);
+  assert.equal(pop(S, 'seaside'), ECON.start - animalPrice(1));
+  assert.equal(pop(S, R), 5000, '다른 지역 점수는 그대로');
+  assert.equal(G.canAdopt(S, 'seaside', 'gull').why, 'T2에서 해금');
+  // 보고 있는 지역에만 실시간 수익
+  const g0 = pop(S, R), s0 = pop(S, 'seaside');
+  for (let i = 0; i < 30 * 60; i++) G.step(S, G.STEP);
+  assert.equal(pop(S, R), g0, '쉬는 초원은 실시간으로 쌓이지 않는다');
+  assert.ok(pop(S, 'seaside') > s0);
+});
+
+test('쉬는 지역: 돌아오면 쉬는 동안의 관람 수익을 받되 최대 30분치, 게임을 끈 시간도 쉬는 시간에 더한다', () => {
+  const S = rich(1000);
+  setTier(S, 4);
+  for (let i = 0; i < 4; i++) G.adopt(S, R, 'rabbit');
+  const perMin = G.incomePerMin(S, R);
+  assert.ok(perMin > 0);
+  G.setView(S, 'seaside');
+  S.time += 10 * 60; // 바닷가에서 10분
+  const p0 = pop(S, R), back = G.setView(S, R);
+  assert.ok(Math.abs(back.rest.gain - perMin * 10) < 1e-6 && !back.rest.capped);
+  assert.ok(Math.abs(pop(S, R) - (p0 + perMin * 10)) < 1e-6);
+  // 다시 바닷가로 가서 20분 놀고, 게임을 1시간 껐다 켜면 초원은 30분치만
+  G.setView(S, 'seaside');
+  S.time += 20 * 60;
+  S.savedAt = 0; G.settleOffline(S, 3600 * 1000);
+  const p1 = pop(S, R), again = G.setView(S, R);
+  assert.ok(again.rest.capped);
+  assert.ok(Math.abs(pop(S, R) - (p1 + perMin * 30)) < 1e-6);
+});
+
+test('v1 세이브(점수 하나를 같이 씀) → v2: 그 점수는 발전도가 가장 높은 지역으로, 나머지는 시작 점수', () => {
+  const S = rich(0);
+  setTier(S, 4);
+  for (let i = 0; i < 3; i++) G.adopt(S, R, 'rabbit');
+  const o = JSON.parse(G.serialize(S, 0));
+  o.v = 1; o.pop = 777; o.view = 'seaside';
+  for (const r of Object.values(o.regions)) { delete r.pop; delete r.away; }
+  const L = G.deserialize(JSON.stringify(o));
+  assert.equal(L.v, G.SAVE_VERSION);
+  assert.equal(L.pop, undefined);
+  assert.equal(pop(L, R), 777);
+  for (const r of ['seaside', 'desert', 'antarctic']) assert.equal(pop(L, r), ECON.start, r);
+  assert.equal(L.regions.seaside.away, null, '보던 지역은 쉬지 않는다');
+  assert.equal(L.regions[R].away, L.time);
+  assert.equal(G.deserialize(JSON.stringify({ ...o, v: 1, pop: 'x' })), null);
 });

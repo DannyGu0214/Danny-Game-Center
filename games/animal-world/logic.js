@@ -7,8 +7,8 @@ import {
 import { TERRAIN, kindAt, terrainFits, allowedOn, hasWater, terrainOf } from './terrain.js';
 
 export const STEP = 1 / 30;
-export const SAVE_VERSION = 1;
-const SAVE_KEYS = ['v', 'rng', 'pop', 'earned', 'time', 'savedAt', 'view', 'regions', 'album', 'requests', 'reqSwapAt', 'chance', 'chanceIn', 'uid'];
+export const SAVE_VERSION = 2; // 2: 인기점수를 지역마다 따로(R.pop), 쉬는 지역은 R.away부터 정산
+const SAVE_KEYS = ['v', 'rng', 'earned', 'time', 'savedAt', 'view', 'regions', 'album', 'requests', 'reqSwapAt', 'chance', 'chanceIn', 'uid'];
 
 // ---------- 난수(mulberry32) ----------
 function rnd(S) {
@@ -24,11 +24,11 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // ---------- 새 게임 ----------
 export function newGame(seed = 1, now = Date.now()) {
   const S = {
-    v: SAVE_VERSION, rng: seed | 0 || 1, pop: ECON.start, earned: 0, time: 0, savedAt: now,
+    v: SAVE_VERSION, rng: seed | 0 || 1, earned: 0, time: 0, savedAt: now,
     view: 'grassland', regions: {}, album: {}, requests: [], reqSwapAt: 0,
     chance: null, chanceIn: 12, uid: 1, events: [],
   };
-  for (const r of REGIONS) S.regions[r.id] = { tier: 1, items: [], animals: [] };
+  for (const r of REGIONS) S.regions[r.id] = newRegion(r.id === S.view ? null : 0);
   fillRequests(S);
   return S;
 }
@@ -93,13 +93,18 @@ export function stats(S, rid) {
   });
 }
 
-// 분당 관람 수익: 해금된 모든 지역 발전도의 합 ÷ incomeDiv
-export function incomePerMin(S) {
-  let dev = 0;
-  for (const r of REGIONS) if (r.ready && isUnlocked(S, r.id)) dev += stats(S, r.id).dev;
-  return dev / ECON.incomeDiv;
+// ---------- 인기점수(지역마다 따로) ----------
+// 지역 하나: 티어·물건·동물 + 그 지역 인기점수(pop). away = 그 지역을 떠난 플레이 시각(보고 있으면 null)
+const newRegion = (away) => ({ tier: 1, items: [], animals: [], pop: ECON.start, away });
+export const popOf = (S, rid = S.view) => S.regions[rid].pop;
+// 분당 관람 수익: 그 지역 발전도 ÷ incomeDiv. 보고 있는 지역에만 실시간으로 쌓인다
+export function incomePerMin(S, rid = S.view) {
+  const d = regionDef(rid);
+  return d && d.ready && isUnlocked(S, rid) ? stats(S, rid).dev / ECON.incomeDiv : 0;
 }
-const gain = (S, n) => { S.pop += n; S.earned += n; };
+const gain = (S, rid, n) => { S.regions[rid].pop += n; S.earned += n; };
+// 쉬는 동안(sec초)의 관람 수익: 지역마다 최대 offlineCapSec 분량
+const restGain = (S, rid, sec) => (incomePerMin(S, rid) / 60) * clamp(sec, 0, ECON.offlineCapSec);
 
 // 구성이 바뀐 뒤: 다시 계산하고 티어를 올린다(티어는 내려가지 않는다)
 function refresh(S, rid) {
@@ -178,14 +183,14 @@ export function canAdopt(S, rid, sp) {
   if (d.swim && !swimTiles(S, rid).length) return no('헤엄칠 물이 필요해요');
   if (!st.counts[sp] && st.species >= st.caps.species) return no(`종 한도 ${st.caps.species}종`);
   if (st.animals >= st.caps.animals) return no(`개체 한도 ${st.caps.animals}마리`);
-  if (S.pop < priceOfAnimal(sp)) return no('인기점수가 모자라요');
+  if (popOf(S, rid) < priceOfAnimal(sp)) return no('인기점수가 모자라요');
   return ok;
 }
 export function adopt(S, rid, sp) {
   const c = canAdopt(S, rid, sp);
   if (!c.ok) return c;
   const price = priceOfAnimal(sp);
-  S.pop -= price;
+  S.regions[rid].pop -= price;
   const spot = spawnTile(S, rid, isSwimmer(sp));
   const a = {
     uid: S.uid++, sp, x: spot[0] + 0.5, y: spot[1] + 0.5, st: 'idle', t: range(S, 0.5, 2), path: null, goal: null,
@@ -199,12 +204,12 @@ export function release(S, rid, uid) {
   const R = S.regions[rid], i = R.animals.findIndex((a) => a.uid === uid);
   if (i < 0) return no('없는 동물');
   const [a] = R.animals.splice(i, 1);
-  gainRefund(S, a.paid);
+  gainRefund(S, rid, a.paid);
   if (S.chance && S.chance.uid === uid) endChance(S);
   refresh(S, rid);
   return { ok: true, refund: Math.floor(a.paid * ECON.refund) };
 }
-const gainRefund = (S, paid) => { S.pop += Math.floor(paid * ECON.refund); };
+const gainRefund = (S, rid, paid) => { S.regions[rid].pop += Math.floor(paid * ECON.refund); };
 
 // 물건을 놓을 수 있는 지형 이름(예: '낮은 언덕·평지')
 export const terrainNames = (id) => allowedOn(id).map((k) => TERRAIN[k].name).join('·');
@@ -216,14 +221,14 @@ export function canPlace(S, rid, id, x, y) {
   if (S.regions[rid].tier < d.tier) return no(`T${d.tier}에서 해금`);
   if (x >= 0 && y >= 0 && x + d.w <= GRID && y + d.h <= GRID && !terrainFits(rid, id, x, y)) return no(`${terrainNames(id)}에 놓아요`);
   if (!fits(S, rid, id, x, y)) return no('놓을 수 없는 자리예요');
-  if (S.pop < priceOfItem(id)) return no('인기점수가 모자라요');
+  if (popOf(S, rid) < priceOfItem(id)) return no('인기점수가 모자라요');
   return ok;
 }
 export function placeItem(S, rid, id, x, y) {
   const c = canPlace(S, rid, id, x, y);
   if (!c.ok) return c;
   const price = priceOfItem(id);
-  S.pop -= price;
+  S.regions[rid].pop -= price;
   const it = { uid: S.uid++, id, x, y, paid: price };
   S.regions[rid].items.push(it);
   refresh(S, rid);
@@ -235,7 +240,7 @@ export function removeItem(S, rid, uid) {
   if (i < 0) return no('없는 물건');
   if (ITEMS[R.items[i].id].swim && !hasWater(rid) && R.animals.some((a) => isSwimmer(a.sp)) && !R.items.some((it, j) => j !== i && ITEMS[it.id].swim)) return no('물에 사는 동물이 있어서 치울 수 없어요');
   const [it] = R.items.splice(i, 1);
-  gainRefund(S, it.paid);
+  gainRefund(S, rid, it.paid);
   refresh(S, rid);
   reroute(S, rid);
   return { ok: true, refund: Math.floor(it.paid * ECON.refund) };
@@ -401,12 +406,12 @@ export function capture(S, uid) {
   if (!S.chance || S.chance.uid !== uid) return no('지금은 포착할 수 없어요');
   const R = S.regions[S.chance.region], a = R.animals.find((b) => b.uid === uid);
   if (!a) { endChance(S); return no('없는 동물'); }
-  const first = !S.album[a.sp], perMin = incomePerMin(S);
+  const first = !S.album[a.sp], perMin = incomePerMin(S, S.chance.region), rid = S.chance.region;
   const reward = first
     ? Math.max(ECON.firstMin, Math.round(perMin * ECON.firstMinutes))
     : Math.max(ECON.captureMin, Math.round(perMin * ECON.captureMinutes));
   S.album[a.sp] = (S.album[a.sp] || 0) + 1;
-  gain(S, reward);
+  gain(S, rid, reward);
   for (const q of S.requests) if (q.kind === 'photo' && q.sp === a.sp) q.got++;
   endChance(S);
   S.events.push({ type: 'capture', sp: a.sp, reward, first });
@@ -456,7 +461,7 @@ function makeRequest(S) {
   const cand = requestCandidates(S, rid).filter((q) => !taken.has(reqKey(q)) && !requestDone(S, { ...q, region: rid }));
   if (!cand.length) return null;
   const q = pick(S, cand);
-  return { uid: S.uid++, region: rid, ...q, reward: Math.max(ECON.requestMin, Math.round(incomePerMin(S) * q.minutes)) };
+  return { uid: S.uid++, region: rid, ...q, reward: Math.max(ECON.requestMin, Math.round(incomePerMin(S, rid) * q.minutes)) };
 }
 function fillRequests(S) {
   while (S.requests.length < 3) {
@@ -470,7 +475,7 @@ export function claim(S, uid) {
   if (i < 0) return no('없는 요청');
   const q = S.requests[i];
   if (!requestDone(S, q)) return no('아직 덜 됐어요');
-  gain(S, q.reward);
+  gain(S, q.region, q.reward); // 보상은 그 요청을 낸 지역의 인기점수로
   S.requests.splice(i, 1);
   fillRequests(S);
   return { ok: true, reward: q.reward };
@@ -496,7 +501,7 @@ export function clock(S) {
 }
 export function step(S, dt) {
   S.time += dt;
-  gain(S, (incomePerMin(S) / 60) * dt);
+  gain(S, S.view, (incomePerMin(S) / 60) * dt);
   updateChance(S, dt);
   for (const r of REGIONS) {
     if (!r.ready) continue;
@@ -504,19 +509,26 @@ export function step(S, dt) {
   }
   if (S.requests.length < 3) fillRequests(S);
 }
-// 자리를 비운 동안의 관람 수익(최대 offlineCapSec). 시계가 뒤로 가면 0
+// 게임을 끈 동안: 보고 있던 지역은 바로 정산(최대 offlineCapSec), 다른 지역은 쉬는 시간에 더해 두었다가 돌아올 때 정산.
+// sec = 실제로 비운 시간, gain = 보고 있던 지역에 쌓인 점수. 시계가 뒤로 가면 0
 export function settleOffline(S, now) {
-  const sec = clamp((now - S.savedAt) / 1000, 0, ECON.offlineCapSec);
-  const n = (incomePerMin(S) / 60) * sec;
-  gain(S, n);
+  const sec = Math.max(0, (now - S.savedAt) / 1000), n = restGain(S, S.view, sec);
+  gain(S, S.view, n);
+  for (const r of REGIONS) { const R = S.regions[r.id]; if (r.id !== S.view && R.away != null) R.away -= sec; }
   S.savedAt = now;
-  return { sec, gain: n };
+  return { sec, gain: n, capped: sec > ECON.offlineCapSec };
 }
+// 지역 이동: 떠나는 지역은 쉬기 시작하고, 가는 지역은 쉬는 동안 쌓인 관람 수익(최대 offlineCapSec)을 받는다
 export function setView(S, rid) {
   if (!regionDef(rid) || !isUnlocked(S, rid) || !regionDef(rid).ready) return regionOpen(S, rid);
+  if (rid === S.view) return { ok: true, rest: { sec: 0, gain: 0 } };
   if (S.chance && S.chance.region !== rid) endChance(S);
+  const from = S.regions[S.view], to = S.regions[rid], sec = to.away == null ? 0 : S.time - to.away, n = restGain(S, rid, sec);
+  from.away = S.time;
+  gain(S, rid, n);
+  to.away = null;
   S.view = rid;
-  return ok;
+  return { ok: true, rest: { sec, gain: n, capped: sec > ECON.offlineCapSec } };
 }
 
 // ---------- 저장 ----------
@@ -529,19 +541,35 @@ export function serialize(S, now = Date.now()) {
 export function deserialize(raw) {
   let o;
   try { o = JSON.parse(raw); } catch { return null; }
-  if (!o || o.v !== SAVE_VERSION || typeof o.pop !== 'number' || !o.regions || !Array.isArray(o.requests)) return null;
+  if (!o || !(o.v === SAVE_VERSION || (o.v === 1 && typeof o.pop === 'number')) || !o.regions || !Array.isArray(o.requests)) return null;
   const S = { ...o, events: [] };
-  for (const r of REGIONS) S.regions[r.id] ??= { tier: 1, items: [], animals: [] };
+  for (const r of REGIONS) S.regions[r.id] ??= newRegion(0);
   for (const r of REGIONS) {
     const R = S.regions[r.id];
     R.items = R.items.filter((it) => ITEMS[it.id]);
     R.animals = R.animals.filter((a) => SPECIES[a.sp]);
   }
   touch(S);
+  if (o.v === 1) migrateV1(S);
+  for (const r of REGIONS) { const R = S.regions[r.id]; R.pop ??= ECON.start; if (R.away === undefined) R.away = r.id === S.view ? null : S.time; }
   fitTerrain(S);
   return S;
 }
 
+// v1(인기점수 하나를 모든 지역이 같이 씀) → v2: 그 점수는 발전도가 가장 높은 지역(같으면 앞 지역)으로, 나머지 지역은 시작 점수로.
+// 보고 있지 않던 지역은 지금부터 쉬는 것으로 친다
+function migrateV1(S) {
+  touch(S);
+  let best = REGIONS[0].id;
+  for (const r of REGIONS) if (stats(S, r.id).dev > stats(S, best).dev) best = r.id;
+  for (const r of REGIONS) {
+    const R = S.regions[r.id];
+    R.pop = r.id === best ? S.pop : ECON.start;
+    R.away = r.id === S.view ? null : S.time;
+  }
+  delete S.pop;
+  S.v = SAVE_VERSION;
+}
 // 지형이 생기기 전 세이브: 지형에 맞지 않는 물건은 가까운 맞는 자리로 옮기고, 자리가 없으면 낸 값을 모두 돌려준다.
 // 동물은 걸을 수 없는 칸(봉우리·물, 헤엄치는 동물은 물 밖)에 서 있으면 가까운 칸으로 옮긴다
 export function fitTerrain(S) {
@@ -553,7 +581,7 @@ export function fitTerrain(S) {
     touch(S);
     for (const it of bad) {
       const at = freeSpot(S, r.id, it.id);
-      if (at) { it.x = at[0]; it.y = at[1]; R.items.push(it); out.moved++; } else { S.pop += it.paid; out.refunded++; }
+      if (at) { it.x = at[0]; it.y = at[1]; R.items.push(it); out.moved++; } else { R.pop += it.paid; out.refunded++; }
       touch(S);
     }
   }
