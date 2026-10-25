@@ -1894,6 +1894,7 @@ test('날짜: 새 판은 1일차, 게임이 진행된 1분마다 하루, 꺼 둔
   const s = fresh(209);
   s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9; s.raidT = 1e9;
   assert.equal(G.dayOf(s), 1);
+  assert.deepEqual([0, 59, 60, 119, 9120].map(G.daysOf), [1, 1, 2, 2, 153], '지난 기록(초)도 일수로');
   stepFor(s, 59.9);
   assert.equal(G.dayOf(s), 1);
   stepFor(s, 0.2);
@@ -1904,4 +1905,24 @@ test('날짜: 새 판은 1일차, 게임이 진행된 1분마다 하루, 꺼 둔
   assert.equal(G.dayOf(s), 2);
   const t = G.deserialize(G.serialize(s));
   assert.equal(G.dayOf(t), 2, '저장·불러오기 뒤에도 같은 날');
+});
+
+test('생존자 특성: 젊은 남자 공격력 +10% · 중년 남자 받는 피해 −10% · 젊은 여자 이동 +10% · 중년 여자 파밍 +10%', () => {
+  const pick = (id) => { const s = fresh(210); s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9; G.setHero(s, id, '테스트'); return s; };
+  const base = fresh(210);
+  const ym = pick('youngM');
+  assert.ok(Math.abs(G.weaponDamage(ym, 'fist') / G.weaponDamage(base, 'fist') - 1.1) < 1e-9);
+  assert.ok(Math.abs(G.attackDps(ym, 'fist') / G.attackDps(base, 'fist') - 1.1) < 1e-9);
+  const om = pick('oldM');
+  assert.ok(Math.abs(G.playerGuard(om) - 0.1) < 1e-9);
+  G.gainArmor(om, 'shield');
+  assert.ok(Math.abs(G.playerGuard(om) - (1 - 0.9 * 0.9)) < 1e-9, '방패와 곱해서 겹친다');
+  const yf = pick('youngF');
+  yf.player.x = 900; yf.player.y = 900;
+  const x0 = yf.player.x; G.step(yf, 1, { x: 1, y: 0 });
+  assert.ok(Math.abs(yf.player.x - x0 - 91 * 1.1) < 1, '이동 +10%');
+  const of = pick('oldF');
+  assert.ok(Math.abs(G.farmMult(of) - 1.1) < 1e-9);
+  for (const s of [ym, om, yf]) assert.equal(G.farmMult(s), 1);
+  assert.equal(G.playerGuard(base), 0, '생존자를 고르기 전에는 특성 없음');
 });

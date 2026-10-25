@@ -274,16 +274,19 @@ export function armorStat(s, stat) {
 export function gainArmor(s, id) { s.armor[id] ||= 1; }
 // 공격속도 배율: 안전장갑 × 스팀팩. 근접 간격·총 발사 간격·재장전에 함께 붙는다.
 export const atkSpeedMult = (s) => (1 + armorStat(s, 'atkSpd')) * (s.player.stim > 0 ? STIM_MULT : 1);
-// 지금 실제로 내는 초당 피해(기댓값): 무기 점수 × 강화 × 레벨 × 공격속도 배율
-export const attackDps = (s, id) => weaponScore(id) * upgradeMult(s.weapons[id]) * levelAtkMult(s) * atkSpeedMult(s);
+// 이동·파밍 속도 배율(스팀팩 제외): 방어구 × 생존자 특성
+export const moveMult = (s) => (1 + armorStat(s, 'move')) * (1 + heroBonus(s, 'move'));
+export const farmMult = (s) => (1 + armorStat(s, 'farm')) * (1 + heroBonus(s, 'farm'));
+// 지금 실제로 내는 초당 피해(기댓값): 무기 점수 × 강화 × 레벨 × 생존자 특성 × 공격속도 배율
+export const attackDps = (s, id) => weaponScore(id) * upgradeMult(s.weapons[id]) * levelAtkMult(s) * (1 + heroBonus(s, 'atk')) * atkSpeedMult(s);
 
 export const xpToNext = (lv) => XP_BASE * lv;
 // 레벨업 때 뽑은 상승치를 누적해 둔다(s.growth). 같은 레벨이라도 사람마다 조금씩 다르다.
 export const levelAtkMult = (s) => 1 + s.growth.atk;
 export const rollGrowth = (s, base, spread = GROWTH_SPREAD) => base * (1 - spread + 2 * spread * rand(s));
 export const zombieXp = (z) => Math.round(ZTYPES[z.type].xp * (1 + 0.5 * z.d));
-// 한 번 맞힐 때의 피해: 공격력 × 강화(+10%/강화) × 레벨 보너스. 플레이어 무기에만 쓴다.
-export const weaponDamage = (s, id) => WEAPONS[id].atk * upgradeMult(s.weapons[id]) * levelAtkMult(s);
+// 한 번 맞힐 때의 피해: 공격력 × 강화(+10%/강화) × 레벨 보너스 × 생존자 특성(젊은 남자 +10%). 플레이어 무기에만 쓴다.
+export const weaponDamage = (s, id) => WEAPONS[id].atk * upgradeMult(s.weapons[id]) * levelAtkMult(s) * (1 + heroBonus(s, 'atk'));
 // 강화 비용(무기·방어구 공통): 총량 = 3 × 40 × 티어^1.25 × 목표 단계(+1 ×1 · +2 ×2 · … · +5 ×5). 실패는 없다.
 // 총량을 장비마다의 배합(mix: 목재·고철·플라스틱, 합 3)으로 나누고 10 단위로 맞춘다(남는 10은 소수 부분이 큰 자원부터).
 export const UPGRADE_COST_BASE = 40;
@@ -1262,7 +1265,7 @@ export function step(s, dt, input = null) {
   if (mag > 1) { mx /= mag; my /= mag; }
   P.moving = mag > 0.05;
   if (P.moving) P.face = Math.atan2(my, mx);
-  const speed = PLAYER_SPEED * (1 + armorStat(s, 'move')) * (P.stim > 0 ? STIM_MULT : 1);
+  const speed = PLAYER_SPEED * moveMult(s) * (P.stim > 0 ? STIM_MULT : 1);
   P.x = clamp(P.x + mx * speed * dt, 20, WORLD.w - 20);
   P.y = clamp(P.y + my * speed * dt, 20, WORLD.h - 20);
   pushOutOfObstacles(s, P, 10);
@@ -1309,12 +1312,16 @@ export function step(s, dt, input = null) {
 
 // ---------- 생존자(플레이어 캐릭터) ----------
 // 새 판마다 4명 중 하나를 고르고 이름을 붙인다(추천 이름 또는 직접 입력). 쓰러지거나 엔딩을 보면 이 이름으로 기록이 남는다.
+// 생존자 특성(perk): 고를 때의 차이. 방어구·스팀팩과 곱해서 겹친다.
 export const HEROES = {
-  youngM: { label: '젊은 남자', age: '20대', names: ['민준', '도윤', '지호', '현우'] },
-  oldM: { label: '중년 남자', age: '50대', names: ['영수', '성호', '정훈', '상철'] },
-  youngF: { label: '젊은 여자', age: '20대', names: ['서연', '하은', '수아', '예린'] },
-  oldF: { label: '중년 여자', age: '50대', names: ['미경', '은정', '혜숙', '정숙'] },
+  youngM: { label: '젊은 남자', age: '20대', perk: 'atk', names: ['민준', '도윤', '지호', '현우'] },
+  oldM: { label: '중년 남자', age: '50대', perk: 'guard', names: ['영수', '성호', '정훈', '상철'] },
+  youngF: { label: '젊은 여자', age: '20대', perk: 'move', names: ['서연', '하은', '수아', '예린'] },
+  oldF: { label: '중년 여자', age: '50대', perk: 'farm', names: ['미경', '은정', '혜숙', '정숙'] },
 };
+export const HERO_BONUS = 0.1;
+export const HERO_PERK_TEXT = { atk: '공격력 +10%', guard: '받는 피해 −10%', move: '이동 속도 +10%', farm: '파밍 속도 +10%' };
+export const heroBonus = (s, stat) => (s.hero && HEROES[s.hero.id]?.perk === stat ? HERO_BONUS : 0);
 export const HERO_NAME_MAX = 10;
 export const cleanName = (name) => String(name ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, HERO_NAME_MAX);
 export function setHero(s, id, name) {
@@ -1355,7 +1362,8 @@ function checkEnding(s, ev) {
 
 // 날짜: 새 판은 1일차, 게임이 실제로 진행된 1분(stats.playTime)마다 하루. 메뉴·생존자 고르기·시작 화면·화면이 숨은 동안·꺼 둔 동안(자리 비움)은 세지 않는다.
 export const DAY_S = 60;
-export const dayOf = (s) => Math.floor(s.stats.playTime / DAY_S) + 1;
+export const daysOf = (sec) => Math.floor(sec / DAY_S) + 1; // 진행 시간(초) → 그날이 며칠째인지(생존 일수)
+export const dayOf = (s) => daysOf(s.stats.playTime);
 
 // 한 판의 결과(게임 오버 화면·최고 기록용)
 export function runSummary(s) {
@@ -1394,7 +1402,7 @@ function gatherNodes(s, dt, ev) {
   }
   if (!node) { s.gather = null; return; }
   if (!s.gather || s.gather.node !== node) s.gather = { node, prog: 0 };
-  s.gather.prog += (dt / LOOT_TYPES[node.type].time) * (1 + armorStat(s, 'farm')) * (P.stim > 0 ? STIM_MULT : 1);
+  s.gather.prog += (dt / LOOT_TYPES[node.type].time) * farmMult(s) * (P.stim > 0 ? STIM_MULT : 1);
   if (s.gather.prog < 1) return;
 
   const room = bagCap(s) - bagTotal(s);
@@ -1618,7 +1626,7 @@ function nearestZombie(s, x, y, range) {
   return best;
 }
 
-export const playerGuard = (s) => Math.min(0.6, armorStat(s, 'guard')); // 받는 피해 감소(방어구, 상한 60%)
+export const playerGuard = (s) => Math.min(0.6, 1 - (1 - armorStat(s, 'guard')) * (1 - heroBonus(s, 'guard'))); // 받는 피해 감소(방어구 × 중년 남자 특성, 상한 60%)
 
 // by: 'player', 'post'(방어 동료), 'escort'(탐험 동료). 마지막으로 때린 쪽이 처치로 친다.
 function hit(s, z, dmg, ev, critChance, by = 'player') {
