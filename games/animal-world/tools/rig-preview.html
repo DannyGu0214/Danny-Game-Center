@@ -1,0 +1,82 @@
+<!doctype html>
+<!-- 리그 그림 점검표: ?sp=<종>. 한 장에 예전 그림 · 걸음 8프레임 · 상태별(쉬기·먹기·물·눕기·특수 행동) · 아이콘 크기·실루엣을 그린다.
+     &live=1 이면 걷기·쉬기를 실제로 움직여 보여 준다. 헤드리스 Chrome으로 찍어 점검한다(README 참고).
+     예: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars --force-device-scale-factor=1 --virtual-time-budget=3000 --window-size=1200,860 --screenshot=/tmp/gazelle.png "http://localhost:8793/tools/rig-preview.html?sp=gazelle" -->
+<meta charset="utf-8">
+<title>리그 점검표</title>
+<style>html, body { margin: 0; background: #f3ead6; } canvas { display: block; }</style>
+<canvas id="c"></canvas>
+<script type="module">
+import * as A from '../art.js';
+const q = new URLSearchParams(location.search), sp = q.get('sp') || 'zebra', live = q.get('live') === '1', lineup = sp === 'all';
+const cv = document.getElementById('c'), W = innerWidth, Hh = innerHeight, DPR = Math.min(2, devicePixelRatio || 1);
+cv.width = W * DPR; cv.height = Hh * DPR; cv.style.width = W + 'px'; cv.style.height = Hh + 'px';
+const ctx = cv.getContext('2d');
+const [hw, bh] = A.ANIMAL_BOX[sp] ?? [20, 44], stride = A.STRIDE[sp] || 10, rigged = A.RIGGED.has(sp);
+// 게임과 같은 외곽선(리그 종만): 작은 캔버스에 그린 뒤 실루엣을 사방으로 밀어 테두리
+const oA = document.createElement('canvas'), oa = oA.getContext('2d'), oB = document.createElement('canvas'), ob = oB.getContext('2d');
+function draw(x, y, k, pose, outline = rigged) {
+  if (!outline) { A.drawAnimal(ctx, sp, x, y, k, pose); return; }
+  const w = Math.ceil((hw * 2 + 24) * k * DPR), h = Math.ceil((bh + 30) * k * DPR);
+  oA.width = oB.width = w; oA.height = oB.height = h;
+  ctx.fillStyle = 'rgba(40,25,10,0.22)'; ctx.beginPath(); ctx.ellipse(x, y, Math.max(6, hw * 0.8) * k, Math.max(1.6, hw * 0.16) * k, 0, 0, Math.PI * 2); ctx.fill();
+  oa.setTransform(DPR, 0, 0, DPR, 0, 0); A.drawAnimal(oa, sp, w / 2 / DPR, (h - 6 * k * DPR) / DPR, k, { ...pose, shadow: false });
+  ob.drawImage(oA, 0, 0); ob.globalCompositeOperation = 'source-in'; ob.fillStyle = '#3b2f28'; ob.fillRect(0, 0, w, h);
+  const r = Math.max(0.8, Math.min(1.8, k * 1.2)) * DPR, x0 = x * DPR - w / 2, y0 = y * DPR - (h - 6 * k * DPR);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let i = 0; i < 8; i++) { const t = (i / 8) * Math.PI * 2; ctx.drawImage(oB, x0 + Math.cos(t) * r, y0 + Math.sin(t) * r); }
+  ctx.drawImage(oA, x0, y0); ctx.restore();
+}
+const base = (o) => ({ face: 1, st: 'idle', ph: 1.3, mv: 0, hd: 0, ly: 0, sp: -1, gait: 0, rig: {}, dt: 0, ...o });
+function label(t, x, y) { ctx.fillStyle = '#5a4a36'; ctx.font = '12px system-ui'; ctx.fillText(t, x, y); }
+function ground(y) { ctx.fillStyle = '#c8c467'; ctx.fillRect(0, y, W, 3); }
+
+if (lineup) {
+  // 8종을 같은 배율로 한 줄에 세워 크기 비율을 본다(위: 예전 그림, 아래: 지금 그림)
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const all = ['rabbit', 'meerkat', 'gazelle', 'zebra', 'ostrich', 'lion', 'giraffe', 'elephant'], k = (Hh / 2 - 40) / 90;
+  let x = 20;
+  for (const s of all) {
+    const [w2] = A.ANIMAL_BOX[s];
+    A.drawAnimal(ctx, s, x + w2 * k, Hh / 2 - 10, k, base({ legacy: true }));
+    A.drawAnimal(ctx, s, x + w2 * k, Hh - 20, k, base({}));
+    label(s + (A.RIGGED.has(s) ? ' ✓' : ''), x, Hh / 2 + 14);
+    x += (w2 * 2 + 10) * k;
+  }
+  ground(Hh / 2 - 10); ground(Hh - 20);
+  label('위: 예전 그림 · 아래: 지금 그림(✓ = 리그) · 같은 배율', 10, 18);
+  document.title = 'ready';
+} else if (!live) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const rows = 3, rowH = (Hh - 40) / rows, cellW = W / 8, k = Math.min((rowH - 34) / (bh + 6), (cellW - 10) / (hw * 2.4));
+  label(`${sp} · 리그 ${rigged ? '있음' : '없음(예전 그림)'} · STRIDE ${stride} · BOX [${hw}, ${bh}] · k ${k.toFixed(2)}`, 10, 18);
+  // 1줄: 걸음 8프레임(위상 0, 1/8, …)
+  let y = 30 + rowH - 10; ground(y);
+  for (let i = 0; i < 8; i++) { draw(cellW * (i + 0.5), y, k, base({ st: 'walk', mv: 1, gait: i / 8 })); label(`걷기 ${i}/8`, cellW * i + 6, y - rowH + 30); }
+  // 2줄: 상태
+  y += rowH; ground(y);
+  const states = [['쉬기', base({})], ['먹기', base({ st: 'eat', hd: 1 })], ['물', base({ st: 'drink', hd: 1 })], ['눕기', base({ st: 'rest', ly: 1 })], ['특수 0.2', base({ st: 'special', sp: 0.2 })], ['특수 0.5', base({ st: 'special', sp: 0.5 })], ['특수 0.8', base({ st: 'special', sp: 0.8 })], ['왼쪽 보기', base({ face: -1 })]];
+  states.forEach(([n, p], i) => { draw(cellW * (i + 0.5), y, k, p); label(n, cellW * i + 6, y - rowH + 30); });
+  // 3줄: 예전 그림 · 아이콘 크기(64×52) · 실루엣 · 큰 배율
+  y += rowH; ground(y);
+  A.drawAnimal(ctx, sp, cellW * 0.5, y, k, base({ legacy: true })); label('예전 그림', 6, y - rowH + 30);
+  const ik = Math.min(44 / bh, 56 / (hw * 2.3)); A.drawAnimal(ctx, sp, cellW * 1.5, y, ik, base({})); label('아이콘 크기', cellW + 6, y - rowH + 30);
+  A.drawAnimal(ctx, sp, cellW * 2.5, y, k, base({}), '#3b3127'); label('실루엣', cellW * 2 + 6, y - rowH + 30);
+  draw(cellW * 5, y, k * 1.9, base({ st: 'walk', mv: 1, gait: 0.3 })); label('크게(걷기 0.3)', cellW * 3.6, y - rowH + 30);
+  document.title = 'ready';
+} else {
+  // 움직임 보기: 위는 걷기(땅 위 풀이 고정이라 발이 미끄러지는지 보인다), 아래는 쉬기
+  const rig1 = {}, rig2 = {}, k = Math.min(Hh / 2 / (bh + 20), W / 6 / hw);
+  let last = performance.now(), t = 0, x = 0, gait = 0;
+  const frame = (now) => {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+    const speed = 14; x += speed * k * dt; gait = (gait + (speed * dt) / stride) % 1; if (x > W + 60 * k) x = -60 * k;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = '#d6ecee'; ctx.fillRect(0, 0, W, Hh);
+    for (const gy of [Hh * 0.45, Hh * 0.92]) { ground(gy); ctx.strokeStyle = '#7f9a3e'; ctx.lineWidth = 1.5; for (let gx = 8; gx < W; gx += 34) { ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx - 2, gy - 6); ctx.stroke(); } }
+    draw(x, Hh * 0.45, k, base({ st: 'walk', mv: 1, gait, rig: rig1, dt, ph: t }));
+    draw(W / 2, Hh * 0.92, k, base({ rig: rig2, dt, ph: t }));
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+</script>

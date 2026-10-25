@@ -295,6 +295,7 @@ function clampCam() {
   UI.cam.x = Math.max(-mx, Math.min(mx, UI.cam.x)); UI.cam.y = Math.max(-my, Math.min(my, UI.cam.y));
 }
 window.addEventListener('resize', resize);
+new ResizeObserver(() => { const r = view.getBoundingClientRect(); if (Math.round(r.width) !== Math.round(VW) || Math.round(r.height) !== Math.round(VH)) resize(); }).observe(view);
 // 메뉴 높이가 바뀌면(글꼴 로딩 등) 카드·놓기 막대를 그 위로 올린다
 new ResizeObserver(() => document.documentElement.style.setProperty('--bar-h', `${Math.round($('#bar').getBoundingClientRect().height)}px`)).observe($('#bar'));
 function P(x, y, z = 0) {
@@ -367,13 +368,12 @@ function poseOf(a, dt) {
 const ANIMAL_SCALE = 1.25; // 동물은 칸보다 조금 크게(관찰용)
 const animalK = () => zoom * ANIMAL_SCALE;
 // 외곽선: 리그를 적용한 종은 작은 캔버스에 따로 그린 뒤, 실루엣을 진한 색으로 사방 1~2px 밀어 테두리를 만들고 위에 원본을 얹는다
-const OUTLINED = new Set(['zebra']);
 const outA = document.createElement('canvas'), oa = outA.getContext('2d'), outB = document.createElement('canvas'), ob = outB.getContext('2d');
 function drawOutlined(g, sp, sx, sy, k, pose) {
-  const [hw, bh] = A.ANIMAL_BOX[sp], w = Math.ceil((hw * 2 + 24) * k * DPR), h = Math.ceil((bh + 14) * k * DPR);
+  const [hw, bh] = A.ANIMAL_BOX[sp], w = Math.ceil((hw * 2 + 24) * k * DPR), h = Math.ceil((bh + 30) * k * DPR); // 위로 넉넉히(뛰어오르는 특수 행동)
   if (outA.width < w || outA.height < h) { outA.width = outB.width = Math.max(w, outA.width); outA.height = outB.height = Math.max(h, outA.height); }
   const W2 = outA.width, H2 = outA.height, ox = W2 / 2, oy = H2 - 6 * k * DPR;
-  g.fillStyle = 'rgba(40,25,10,0.22)'; g.beginPath(); g.ellipse(sx, sy, 16 * k, 3.2 * k, 0, 0, Math.PI * 2); g.fill(); // 그림자는 테두리 밖에
+  g.fillStyle = 'rgba(40,25,10,0.22)'; g.beginPath(); g.ellipse(sx, sy, Math.max(6, hw * 0.8) * k, Math.max(1.6, hw * 0.16) * k, 0, 0, Math.PI * 2); g.fill(); // 그림자는 테두리 밖에, 종 크기만큼
   oa.setTransform(1, 0, 0, 1, 0, 0); oa.clearRect(0, 0, W2, H2); oa.setTransform(DPR, 0, 0, DPR, 0, 0);
   A.drawAnimal(oa, sp, ox / DPR, oy / DPR, k, { ...pose, shadow: false });
   ob.globalCompositeOperation = 'source-over'; ob.clearRect(0, 0, W2, H2); ob.drawImage(outA, 0, 0);
@@ -398,6 +398,7 @@ function emit(a, kind) {
 let lastT = performance.now(), drawT = 0;
 function draw(dt) {
   drawT += dt;
+  if (!scene.width || !scene.height) return; // 화면 크기가 0이면(숨은 탭·전환 중) 그리지 않는다. 크기가 생기면 resize가 다시 잡는다
   const rid = S.view, L = A.lightAt(S.time), g = sctx;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   A.drawSky(ctx, VW, VH, horizon, drawT, L);
@@ -431,7 +432,7 @@ function draw(dt) {
       g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.beginPath(); g.ellipse(sx, sy, hw * k + 4, (hw * k + 4) * 0.42, 0, 0, Math.PI * 2); g.stroke();
     }
     const kk = k * (0.96 + (a.uid % 5) * 0.02);
-    if (OUTLINED.has(a.sp)) drawOutlined(g, a.sp, sx, sy, kk, pose); else A.drawAnimal(g, a.sp, sx, sy, kk, pose);
+    if (A.RIGGED.has(a.sp)) drawOutlined(g, a.sp, sx, sy, kk, pose); else A.drawAnimal(g, a.sp, sx, sy, kk, pose);
     if (a.st === 'special' && a.sp === 'elephant' && Math.random() < dt * 30) emit(a, 'spray');
     if (a.st === 'special' && a.sp === 'zebra' && Math.random() < dt * 8) emit(a, 'dust');
   }

@@ -13,12 +13,15 @@
 | `index.html` | 화면·조작·HUD·시트(동물·꾸미기·요청·앨범)·저장(브라우저 저장소) |
 | `data.js` | 지역·티어·동물·물건 정의와 점수·가격 상수 |
 | `logic.js` | 게임 규칙 전부(화면 없음, 고정 시간 단계 1/30초, 시드 난수) |
-| `art.js` | 그림 전용(쿼터뷰 땅·물건, 옆모습 동물과 동작, 시간대 하늘·빛) |
+| `art.js` | 그림 전용(쿼터뷰 땅·물건, 시간대 하늘·빛, 동물 그림 공통 도우미) |
+| `rigs/<종>.js` | 동물 8종 리그 그림(관절·발 고정 걸음·몸짓·상태별 자세) |
 | `music.js` | 초원 배경음악 5곡 합성(Web Audio, 파일 없음) |
 | `sound.js` | 동물 소리 8종 × 2가지 합성 |
 | `test/logic.test.js` | 규칙 테스트 |
 | `tools/sim.js` | 밸런스 봇 |
 | `tools/icon.html` | 앱 아이콘 그리기 |
+| `tools/rig-preview.html` | 리그 점검표(`?sp=<종>`, `&live=1`, `?sp=all`) |
+| `tools/rig-demo.html` | 예전 그림 vs 리그 그림 비교 시제품 |
 | `manifest.webmanifest`, `sw.js`, `icons/` | 독립 실행(PWA): 홈 화면 설치·오프라인 실행 |
 
 ## 휴대폰에 설치
