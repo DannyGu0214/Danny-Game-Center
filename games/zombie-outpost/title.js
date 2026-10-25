@@ -366,7 +366,7 @@ export function runTitle(canvas, { onLayout, onPhase } = {}) {
 
   function resize() {
     dpr = Math.min(3, window.devicePixelRatio || 1);
-    const cw = canvas.clientWidth || window.innerWidth, ch = canvas.clientHeight || window.innerHeight;
+    const cw = canvas.clientWidth || window.innerWidth || 360, ch = canvas.clientHeight || window.innerHeight || 640; // 숨은 탭처럼 크기가 0이면 임시 크기(보이면 resize로 다시 그린다)
     canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
     cell = Math.max(2, Math.round(canvas.width / 200)); // 가로 약 200칸
     const w = Math.ceil(canvas.width / cell), h = Math.ceil(canvas.height / cell);

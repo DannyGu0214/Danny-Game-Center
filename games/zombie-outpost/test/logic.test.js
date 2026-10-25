@@ -295,6 +295,23 @@ test('동료: 방어 배치는 감시탑 레벨 + 1명까지', () => {
   assert.equal(G.defenders(s).length, 2);
 });
 
+test('감시탑 완공: 생산 근무 동료 1명을 원거리 사격 > 근거리 > 기타 순으로 방벽에 자동 배치', () => {
+  const s = rich(fresh(31)); s.hq = 9; // 감시탑 레벨 한도를 넉넉히
+  const mk = (role, rarity, post = 'work') => { const v = G.makeSurvivor(s); Object.assign(v, { role, rarity, post }); s.survivors.push(v); return v; };
+  mk('medic', 0, 'defense'); // 기본 1자리는 이미 찼다
+  const eng = mk('engineer', 2), brw = mk('brawler', 2), gun = mk('gunner', 0), sct = mk('scout', 1), esc = mk('gunner', 2, 'explore');
+  const build = () => { G.buyBuilding(s, 'watchtower'); return finish(s).find((e) => e.t === 'job-done'); };
+  const order = [];
+  for (let i = 0; i < 4; i++) { const e = build(); order.push(e.posted?.name); }
+  // 원거리끼리는 화력(전투력 × 공격 × 공속)이 큰 정찰병(희귀)이 일반 사수보다 먼저, 영웅 근접전사·기술자는 그 뒤
+  assert.deepEqual(order, [sct.name, gun.name, brw.name, eng.name]);
+  assert.equal(esc.post, 'explore', '탐험 동행은 데려가지 않는다');
+  assert.equal(G.defenders(s).length, 5);
+  const e = build();
+  assert.equal(e.posted, undefined, '생산 근무 동료가 없으면 아무도 옮기지 않는다');
+  assert.equal(G.defenders(s).length, 5);
+});
+
 test('동료: 탐험 동행은 본부 3레벨에 1명, 5레벨에 2명', () => {
   const s = rich(fresh(13));
   assert.deepEqual([1, 2, 3, 4, 5, 9].map((hq) => G.exploreSlots({ ...s, hq })), [0, 0, 1, 1, 2, 2]);

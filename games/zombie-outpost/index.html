@@ -202,6 +202,18 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .toast.bad { border-left-color: var(--red); }
 .toast.warn { border-left-color: var(--amber); }
 @keyframes toastIn { from { opacity: 0; transform: translateY(-6px); } }
+/* 습격 방어 보상: 아이콘 × 수량을 한 줄에 하나씩 */
+#reward { position: absolute; z-index: 7; left: 50%; top: 36%; transform: translate(-50%, -50%); pointer-events: none; }
+.reward-card {
+  background: rgba(18, 22, 30, 0.95); border: 1px solid var(--line); border-top: 3px solid var(--teal); border-radius: 10px;
+  padding: 10px 22px 12px; min-width: 150px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55); animation: rewardIn .22s ease-out; transition: opacity .4s;
+}
+.reward-card.out { opacity: 0; }
+.reward-card h4 { margin: 0 0 6px; font-size: 13px; color: var(--teal); text-align: center; letter-spacing: .02em; }
+.reward-line { display: flex; align-items: center; gap: 10px; font-family: var(--f-num); font-size: 20px; font-weight: 700; line-height: 1.55; font-variant-numeric: tabular-nums; animation: rewardIn .25s ease-out backwards; }
+.reward-line svg { width: 24px; height: 24px; flex: none; }
+.reward-line small { color: var(--muted); font-size: 14px; font-weight: 400; }
+@keyframes rewardIn { from { opacity: 0; transform: translateY(6px) scale(.96); } }
 
 /* 하단 탭과 관리 시트 */
 .tabs {
@@ -339,7 +351,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .gains b { display: block; font-family: var(--f-num); font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) {
-  .raid-pill.on, .toast { animation: none; }
+  .raid-pill.on, .toast, .reward-card, .reward-line { animation: none; }
 }
 </style>
 
@@ -378,6 +390,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   <button id="ctxBtn" hidden></button>
   <div id="hints" aria-live="polite"></div>
   <div id="toasts" aria-live="polite"></div>
+  <div id="reward" aria-live="polite"></div>
 
   <section id="sheet" hidden>
     <div class="sheet-head">
@@ -459,6 +472,15 @@ const mini = $('#mini'), mctx = mini.getContext('2d');
 const shade = document.createElement('canvas'), sctx = shade.getContext('2d');
 const RES_COLOR = { wood: '#c9925a', scrap: '#b9c0ca', plastic: '#5aa9dc' };
 const ITEM_COLOR = { medkit: '#e0533f', molotov: '#f08a3a', toolbox: '#b9c0ca', flare: '#ff5d8f', energy: '#8fd14f', stim: '#6fd6e0' };
+// 보상 아이콘(16×16 SVG): 자원 3종·탄약·아이템
+const REWARD_ICON = {
+  wood: '<rect x="1" y="5" width="12" height="7" rx="1.5" fill="#c9925a"/><path d="M3 7.6h6M4.5 10h5" stroke="#8a5a32" stroke-width=".9"/><ellipse cx="13" cy="8.5" rx="2.4" ry="3.5" fill="#e3bf92"/><ellipse cx="13" cy="8.5" rx="1.1" ry="1.7" fill="none" stroke="#8a5a32" stroke-width=".8"/>',
+  scrap: '<path d="M8 1.3l5.8 3.35v6.7L8 14.7l-5.8-3.35v-6.7z" fill="#b9c0ca"/><path d="M8 1.3l5.8 3.35L8 8z" fill="#dfe3e8"/><circle cx="8" cy="8" r="2.5" fill="#1b2029"/>',
+  plastic: '<rect x="6.2" y="0.8" width="3.6" height="2.4" rx=".6" fill="#e8f4ff"/><path d="M6 3.2h4v1.4l1.7 2.1V14a1 1 0 0 1-1 1H5.3a1 1 0 0 1-1-1V6.7L6 4.6z" fill="#5aa9dc"/><rect x="4.3" y="8" width="7.4" height="3.2" fill="#a9d4f2"/>',
+  ammo: '<path d="M3.5 7c0-3.4 1.4-5.5 2-5.5s2 2.1 2 5.5z" fill="#d9874a"/><path d="M8.5 7c0-3.4 1.4-5.5 2-5.5s2 2.1 2 5.5z" fill="#d9874a"/><rect x="3.5" y="7" width="4" height="7.5" fill="#e6c95c"/><rect x="8.5" y="7" width="4" height="7.5" fill="#e6c95c"/><path d="M3.5 13h4M8.5 13h4" stroke="#a8862f" stroke-width="1"/>',
+  toolbox: '<path d="M5.5 5.2V3.3h5v1.9" fill="none" stroke="#c9ced6" stroke-width="1.4"/><rect x="1.3" y="5" width="13.4" height="8.8" rx="1.2" fill="#c8573f"/><rect x="1.3" y="8" width="13.4" height="1.3" fill="#8c3828"/><rect x="7" y="7.3" width="2" height="2.6" rx=".4" fill="#e6e9ee"/>',
+};
+const rewardIcon = (k) => `<svg viewBox="0 0 16 16" aria-hidden="true">${REWARD_ICON[k] ?? `<rect x="2" y="2" width="12" height="12" rx="2" fill="${ITEM_COLOR[k] ?? '#98a1ac'}"/>`}</svg>`;
 const ITEM_SHORT = { medkit: '구급상자', molotov: '화염병', toolbox: '공구', flare: '신호탄', energy: '드링크', stim: '스팀팩' };
 const RARITY_COLOR = ['#9aa3ad', '#6fa8ff', '#f2c14e'];
 
@@ -877,8 +899,9 @@ function handleEvents(list) {
       case 'fire': fx.fires.push({ x: e.x, y: e.y, t: 0 }); sfx.play('fire'); mark(e.x, e.y, 70, '20,16,12', 0.55, 14, true); break;
       case 'item-auto': toast('위급해서 구급상자를 자동으로 썼어요', 'warn'); sfx.play('use', { id: 'medkit' }); break;
       case 'job-done':
-        toast(`${e.name} 완료${e.kind === 'craft' ? ' · 장착했어요' : ''}`, 'good');
+        toast(`${e.name} 완료${e.kind === 'craft' ? ' · 장착했어요' : ''}${e.posted ? ` · ${e.posted.name}(${G.ROLES[e.posted.role].name}) 방벽 배치` : ''}`, 'good');
         markTab(KIND_TAB[e.kind]);
+        if (e.posted) markTab('crew');
         hudCache.ctx = null;
         save();
         break;
@@ -915,7 +938,14 @@ function handleEvents(list) {
       case 'rescue-failed': toast(e.kind === 'siege' ? '생존자를 구하지 못했어요' : '조난자 신호가 끊겼어요', 'bad'); break;
       case 'dorm-full': toast(`숙소가 가득 찼어요(${e.cap}/${e.cap}). 아래 버튼으로 숙소를 올리면 바로 데려올 수 있어요`, 'warn'); break;
       case 'raid-start': toast(`기지 습격! 좀비 ${e.count}마리가 몰려와요`, 'bad'); sfx.play('siren'); break;
-      case 'raid-won': toast(`습격을 막았어요 · 고철 +${e.reward.scrap} · 목재 +${e.reward.wood} · 플라스틱 +${e.reward.plastic} · 공구 상자 · 탄약 +${e.reward.ammo}`, 'good'); sfx.play('win'); break;
+      case 'raid-won': {
+        const r = e.reward, lines = G.RES_KEYS.filter((k) => r[k] > 0).map((k) => [k, r[k], G.RES_NAMES[k]]);
+        if (r.item) lines.push([r.item, 1, G.ITEMS[r.item].name]);
+        if (r.ammo > 0) lines.push(['ammo', r.ammo, '탄약']);
+        showReward('습격 방어 성공', lines);
+        sfx.play('win');
+        break;
+      }
       case 'raid-lost': toast('방벽이 뚫렸어요. 창고 자원 20%를 빼앗겼어요', 'bad'); sfx.play('lose'); break;
       case 'wall-hit':
         sfx.play('wall', { metal: S.bld.barricade >= 3, dist: G.dist(e.x, e.y, S.player.x, S.player.y) });
@@ -1722,6 +1752,19 @@ function hint(title, text) {
   box.append(el);
   clearTimeout(hintTimer);
   hintTimer = setTimeout(() => el.remove(), 2200);
+}
+
+// 보상 카드: [아이콘] × 수량을 한 줄에 하나씩. lines = [[아이콘 키, 수량, 읽어 줄 이름], ...]
+let rewardTimer = 0;
+function showReward(title, lines) {
+  const box_ = $('#reward');
+  const el = document.createElement('div');
+  el.className = 'reward-card';
+  el.setAttribute('aria-label', `${title}: ${lines.map(([, n, name]) => `${name} ${n}`).join(', ')}`);
+  el.innerHTML = `<h4>${title}</h4>${lines.map(([k, n], i) => `<div class="reward-line" style="animation-delay:${0.08 + i * 0.1}s">${rewardIcon(k)}<small>×</small>${G.fmt(n)}</div>`).join('')}`;
+  box_.replaceChildren(el);
+  clearTimeout(rewardTimer);
+  rewardTimer = setTimeout(() => { el.classList.add('out'); rewardTimer = setTimeout(() => el.remove(), 400); }, 3200);
 }
 
 function toast(text, kind = '') {

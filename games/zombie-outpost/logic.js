@@ -374,6 +374,18 @@ export const survivorHit = (v) => survivorPower(v) * survivorAtk(v);
 export const survivorWork = (v) => (ROLES[v.role].work ?? 0.1) * survivorPower(v);
 export const survivorCarry = (v) => Math.round(ESCORT_CARRY * survivorPower(v)); // 탐험 동행 때 가방에 더해 주는 짐
 export const workBonus = (s) => s.survivors.reduce((a, v) => a + (v.post === 'work' ? survivorWork(v) : 0), 0);
+// 감시탑이 완공되면 늘어난 방어 자리에 생산 근무 동료 1명을 자동으로 올린다.
+// 순서: 원거리 사격(사수·정찰병) > 근거리 공격(근접전사) > 기타 보수·생산 인력(의무병·기술자), 같은 순서면 화력이 큰 동료.
+export const DEFENSE_RANK = { gunner: 0, scout: 0, brawler: 1, medic: 2, engineer: 2 };
+export function autoDefender(s) {
+  if (defenders(s).length >= defenseSlots(s)) return null;
+  const fire = (v) => survivorHit(v) * survivorRate(v);
+  const v = s.survivors.filter((x) => x.post === 'work').sort((a, b) => DEFENSE_RANK[a.role] - DEFENSE_RANK[b.role] || fire(b) - fire(a))[0];
+  if (!v) return null;
+  v.post = 'defense';
+  delete s.posts[v.id];
+  return v;
+}
 export const POSTS = { defense: '방어', work: '생산', explore: '탐험' };
 export const POST_ORDER = ['defense', 'work', 'explore'];
 // 탐험 동행 자리: 본부 3레벨에 1명, 5레벨에 2명
@@ -756,6 +768,7 @@ function finishJob(s, j) {
       const before = wallMax(s);
       s.bld[j.key] = Math.max(s.bld[j.key], j.next);
       if (j.key === 'barricade') s.wall += wallMax(s) - before;
+      if (j.key === 'watchtower') { const v = autoDefender(s); if (v) return { posted: { name: v.name, role: v.role } }; }
       break;
     }
     case 'craft': {
@@ -783,8 +796,8 @@ export function advanceJobs(s, dt, ev = []) {
     if (j.t > 0) continue;
     s.jobs.splice(s.jobs.indexOf(j), 1);
     const name = jobName(s, j);
-    finishJob(s, j);
-    ev.push({ t: 'job-done', kind: j.kind, key: j.key, next: j.next, name });
+    const extra = finishJob(s, j);
+    ev.push({ t: 'job-done', kind: j.kind, key: j.key, next: j.next, name, ...extra });
   }
   return ev;
 }
