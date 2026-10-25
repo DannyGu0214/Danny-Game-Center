@@ -61,6 +61,9 @@ button:disabled { cursor: default; }
 .pop small { color: var(--muted); font-size: 11px; margin-top: 2px; white-space: nowrap; }
 .dev .line { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
 .dev .line b { font-family: var(--f-display); font-size: 16px; font-weight: 400; }
+.hud .dev { pointer-events: auto; cursor: pointer; } /* 지역 이름 칸: 누르면 지역 고르기 */
+.dev .caret { font-style: normal; color: var(--muted); font-size: 12px; margin-left: -3px; }
+.item.here { border-color: var(--accent); background: #fff8ec; }
 .tier { font-family: var(--f-display); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 1px 7px; font-size: 13px; }
 .dev .line span:last-child { margin-left: auto; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 .meter { height: 7px; border-radius: 4px; background: #eadfc8; margin-top: 5px; overflow: hidden; }
@@ -98,11 +101,6 @@ button:disabled { cursor: default; }
 .menu button.on { background: var(--panel-2); }
 .menu button.on span { color: var(--ink); }
 .dot { position: absolute; top: 2px; right: calc(50% - 22px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font: 11px/16px var(--f-display); }
-.regions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 5px; }
-.regions button { border-radius: 11px; padding: 6px 2px; background: var(--panel-2); font-family: var(--f-display); font-size: 13px; line-height: 1.15; border: 1.5px solid transparent; }
-.regions button small { display: block; font-family: var(--f-body); font-size: 10px; color: var(--muted); }
-.regions button.cur { border-color: var(--accent); background: #fff1dd; }
-.regions button.lock { color: #a8987f; }
 
 /* 정보 카드·놓기 막대(메뉴 위에 뜬다) */
 .float {
@@ -184,8 +182,8 @@ button:disabled { cursor: default; }
   <canvas id="view" aria-label="동물 지역 쿼터뷰. 동물이나 물건을 탭하면 정보가 보여요"></canvas>
   <header class="hud" id="hud">
     <div class="pop"><span class="n">⭐ <b id="pop">0</b></span><small id="rate">+0/분</small></div>
-    <div class="dev">
-      <div class="line"><b id="rname">초원</b><span class="tier" id="tier">T1</span><span id="devtxt">발전도 0 / 60</span></div>
+    <div class="dev" id="regionBtn" role="button" tabindex="0" aria-label="지역 고르기">
+      <div class="line"><b id="rname">초원</b><i class="caret">▾</i><span class="tag new" id="rnew" hidden>NEW</span><span class="tier" id="tier">T1</span><span id="devtxt">발전도 0 / 60</span></div>
       <div class="meter"><i id="devbar"></i></div>
     </div>
     <div class="happy"><span class="n" id="happy">-</span><small>행복도</small></div>
@@ -212,7 +210,6 @@ button:disabled { cursor: default; }
       <button data-open="requests" id="mRequests">📋<span>요청</span><i class="dot" hidden></i></button>
       <button data-open="album" id="mAlbum">📷<span>앨범</span></button>
     </div>
-    <div class="regions" id="regions" hidden></div><!-- 지역 전환 줄: 다른 지역을 다 만든 뒤 전환 방식을 정할 때까지 숨김 -->
   </nav>
   <section class="sheet" id="sheet" hidden aria-modal="true" role="dialog">
     <header><h2 id="sheetTitle"></h2><span id="sheetSub"></span><button id="sheetClose" aria-label="닫기">✕</button></header>
@@ -240,7 +237,7 @@ const T = A.TILE, WG = GRID * T, ISO_A = A.ISO_A, ISO_B = A.ISO_B, SLAB = A.slab
 const SAVE_KEY = 'animal-world.save';
 
 let S = null;
-const UI = { sheet: null, tab: 'terrain', place: null, sel: null, follow: null, zl: 0, cam: { x: 0, y: 0 }, seen: { animals: {}, decor: {} }, confirm: null };
+const UI = { sheet: null, tab: 'terrain', place: null, sel: null, follow: null, zl: 0, cam: { x: 0, y: 0 }, seen: { animals: {}, decor: {}, regions: {} }, confirm: null };
 
 // ---------- 저장 ----------
 function save() {
@@ -256,7 +253,7 @@ function load() {
   return s;
 }
 function loadSeen() {
-  try { const o = JSON.parse(localStorage.getItem(SAVE_KEY + '.seen') || '{}'); return { animals: o.animals ?? {}, decor: o.decor ?? {} }; } catch { return { animals: {}, decor: {} }; }
+  try { const o = JSON.parse(localStorage.getItem(SAVE_KEY + '.seen') || '{}'); return { animals: o.animals ?? {}, decor: o.decor ?? {}, regions: o.regions ?? {} }; } catch { return { animals: {}, decor: {}, regions: {} }; }
 }
 function saveSeen() { try { localStorage.setItem(SAVE_KEY + '.seen', JSON.stringify(UI.seen)); } catch { /* 무시 */ } }
 
@@ -626,6 +623,7 @@ function hud() {
   // 티어가 오른 뒤 아직 열어 보지 않은 메뉴에 N 표시
   $('#mAnimals .dot').hidden = !(R.tier > (UI.seen.animals[rid] ?? 1));
   $('#mDecor .dot').hidden = !(R.tier > (UI.seen.decor[rid] ?? 1));
+  $('#rnew').hidden = !newRegions().length;
   const h = hintText(st, R);
   const hint = $('#hint');
   hint.hidden = !h || !!UI.sheet; if (h) setText(hint, h);
@@ -633,6 +631,8 @@ function hud() {
 function hintText(st, R) {
   if (UI.place) return '칸을 탭해 자리를 고르고 [놓기]를 눌러요';
   if (!st.animals) return '👇 [동물]에서 첫 동물을 입양해 보세요';
+  const nr = newRegions()[0];
+  if (nr) return `🗺️ ${josa(nr.name, '이', '가')} 열렸어요 — 위쪽 지역 이름을 눌러요`;
   for (const k of ['food', 'water', 'shelter']) {
     if (st.ratio[k] >= 1) continue;
     const who = Object.keys(st.counts).find((sp) => SPECIES[sp].needs.includes(k));
@@ -647,24 +647,46 @@ function hintText(st, R) {
   return `다음 티어까지 발전도 +${st.next - st.dev}`;
 }
 
-// ---------- 지역 버튼 ----------
-function renderRegions() {
-  const box = $('#regions');
-  box.innerHTML = '';
+// ---------- 지역 이동 ----------
+// 열렸지만 아직 가 보지 않은 지역(지역 이름 칸 NEW·힌트)
+const newRegions = () => REGIONS.filter((r) => r.id !== S.view && r.ready && G.isUnlocked(S, r.id) && !UI.seen.regions[r.id]);
+function goRegion(rid) {
+  const r = G.setView(S, rid);
+  if (!r.ok) return toast(r.why);
+  const def = G.regionDef(rid);
+  UI.seen.regions[rid] = true; saveSeen();
+  closeSheet(); exitPlace(); select(null); setZoom(0);
+  toast(`${def.icon} ${def.name}에 왔어요`);
+  afterChange();
+}
+$('#regionBtn').onclick = () => (UI.sheet === 'regions' ? closeSheet() : openSheet('regions'));
+$('#regionBtn').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#regionBtn').click(); } };
+function sheetRegions(body) {
+  $('#sheetTitle').textContent = '지역';
+  const rows = [];
   for (const r of REGIONS) {
-    const b = document.createElement('button'), open = G.isUnlocked(S, r.id);
-    let sub = `T${S.regions[r.id].tier}`;
-    if (!open) sub = `${G.regionDef(r.unlock.region).name} T${r.unlock.tier}`;
-    else if (!r.ready) sub = '준비 중';
-    b.innerHTML = `${open ? r.icon : '🔒'} ${r.name}<small>${sub}</small>`;
-    b.className = (r.id === S.view ? 'cur' : '') + (open ? '' : ' lock');
-    b.onclick = () => {
-      if (!open) return toast(`${G.regionDef(r.unlock.region).name} T${r.unlock.tier}가 되면 열려요`);
-      if (!r.ready) return toast(`${josa(r.name, '은', '는')} 다음 업데이트에서 열려요`);
-      G.setView(S, r.id); select(null); renderRegions();
-    };
-    box.appendChild(b);
+    const row = el('div', 'item'), cv = el('canvas');
+    const info = el('div', null, `<h4>${r.icon} ${r.name} <span class="tag tierTag"></span><span class="tag new" hidden>NEW</span></h4><p class="have"></p>`);
+    const side = el('div'), btn = el('button', 'buy'), why = el('small', 'why');
+    side.append(btn, why); row.append(cv, info, side);
+    btn.onclick = () => goRegion(r.id);
+    body.appendChild(row);
+    requestAnimationFrame(() => regionIcon(cv, r.id, !G.isUnlocked(S, r.id)));
+    rows.push({ r, row, info, btn, why });
   }
+  sheetUpdate = () => {
+    $('#sheetSub').textContent = `열린 지역 ${REGIONS.filter((r) => G.isUnlocked(S, r.id)).length}/${REGIONS.length}`;
+    for (const o of rows) {
+      const { r } = o, open = G.isUnlocked(S, r.id), here = r.id === S.view, R = S.regions[r.id], st = G.stats(S, r.id);
+      o.row.classList.toggle('locked', !open); o.row.classList.toggle('here', here);
+      setText(o.info.querySelector('.tierTag'), open ? `T${R.tier}` : '🔒');
+      o.info.querySelector('.new').hidden = !newRegions().includes(r);
+      setText(o.info.querySelector('.have'), !open ? `${G.regionDef(r.unlock.region).name} T${r.unlock.tier}에서 열려요` : `동물 ${st.animals}마리 · 발전도 ${st.dev}`);
+      setText(o.btn, here ? '지금 여기' : open ? '가 보기' : '🔒');
+      o.btn.disabled = here || !open || !r.ready;
+      setText(o.why, open && !r.ready ? '준비 중' : '');
+    }
+  };
 }
 
 // ---------- 아이콘 ----------
@@ -682,6 +704,15 @@ function itemIcon(cv, id) {
   const [r, ih] = A.ITEM_BOX[id], z = Math.min((w - 6) / (2 * r * 1.05), (h - 6) / (ih + r * 0.7));
   const ox = w / 2, oy = h - 4 - r * 0.35 * z;
   A.drawItem({ ctx: g, zoom: z, P: (x, y, zz = 0) => [ox + (x - y) * ISO_A * z, oy + (x + y) * ISO_B * z - zz * z] }, id, 1);
+}
+
+function regionIcon(cv, rid, locked) {
+  const w = cv.clientWidth || 64, h = cv.clientHeight || 52;
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (locked) g.filter = 'grayscale(1) opacity(0.55)';
+  const z = (w - 6) / (2 * WG * ISO_A), ox = w / 2, oy = (h - (2 * WG * ISO_B + SLAB) * z) / 2 + TOPZ * z * 0.5;
+  A.drawIsland({ ctx: g, zoom: z, P: (x, y, zz = 0) => [ox + (x - y) * ISO_A * z, oy + (x + y) * ISO_B * z - zz * z] }, WG, GRID, A.PAL[rid], 3, rid);
 }
 
 // ---------- 시트 ----------
@@ -705,7 +736,7 @@ for (const b of document.querySelectorAll('#zoombar button')) b.onclick = () => 
 function buildSheet() {
   const body = $('#sheetBody'), tabs = $('#sheetTabs');
   body.innerHTML = ''; tabs.hidden = true; tabs.innerHTML = '';
-  ({ animals: sheetAnimals, decor: sheetDecor, requests: sheetRequests, album: sheetAlbum })[UI.sheet](body, tabs);
+  ({ animals: sheetAnimals, decor: sheetDecor, requests: sheetRequests, album: sheetAlbum, regions: sheetRegions })[UI.sheet](body, tabs);
   sheetUpdate?.();
   body.scrollTop = 0;
 }
@@ -937,13 +968,14 @@ function showModal() {
   $('#modalBox').innerHTML = m.html + '<button class="btn main" id="modalOk">좋아요</button>';
   $('#modal').hidden = false;
   $('#modalOk').onclick = () => { modalQueue.shift(); m.onClose?.(); showModal(); };
+  for (const b of $('#modalBox').querySelectorAll('[data-go]')) b.onclick = () => { modalQueue.shift(); m.onClose?.(); showModal(); goRegion(b.dataset.go); };
 }
 function tierModal(rid, tier) {
   const c = caps(tier), def = G.regionDef(rid);
   const sp = speciesOf(rid).filter((s) => SPECIES[s].tier === tier).map((s) => `🆕 ${SPECIES[s].name}`);
   const its = itemsOf(rid).filter((i) => ITEMS[i].tier === tier).map((i) => `🆕 ${ITEMS[i].name}`);
   const unlockedRegion = REGIONS.find((r) => r.unlock && r.unlock.region === rid && r.unlock.tier === tier);
-  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${!unlockedRegion.ready ? ' (콘텐츠는 다음 업데이트)' : $('#regions').hidden ? ' (지역 이동은 곧 추가돼요)' : ''}</p>` : ''}`);
+  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${!unlockedRegion.ready ? ' (콘텐츠는 다음 업데이트)' : ''}</p>${unlockedRegion.ready ? `<button class="btn" data-go="${unlockedRegion.id}">${unlockedRegion.icon} ${josa(unlockedRegion.name, '으로', '로')} 가 보기</button>` : ''}` : ''}`);
 }
 
 // ---------- 변화 뒤 ----------
@@ -951,7 +983,6 @@ function afterChange() {
   sheetUpdate?.();
   if (UI.sel) renderCard();
   updatePlacebar();
-  renderRegions();
   drainEvents();
   save();
 }
@@ -961,7 +992,6 @@ function drainEvents() {
     if (e.type === 'tier') tierModal(e.region, e.tier);
     if (e.type === 'terrain') toast(`땅에 언덕·저지대·길이 생겼어요 — 물건 ${e.moved}개를 맞는 자리로 옮겼어요${e.refunded ? ` · ${e.refunded}개는 낸 값을 모두 돌려받았어요` : ''}`, 7000);
   }
-  if (ev.length) renderRegions();
 }
 
 // ---------- 소리 ----------
@@ -1053,7 +1083,7 @@ function start() {
   UI.seen = loadSeen();
   syncSoundBtns();
   resize();
-  renderRegions();
+  UI.seen.regions[S.view] = true;
   if (fresh) welcome();
   else {
     const r = G.settleOffline(S, Date.now());

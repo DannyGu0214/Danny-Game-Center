@@ -343,13 +343,14 @@ export function drawIsland(pen, G, n, pal, seed = 1, rid = null, onDiag = null) 
   for (let d = 0; d <= 2 * (n - 1); d++) {
     for (let x = Math.max(0, d - n + 1); x <= Math.min(n - 1, d); x++) {
       const y = d - x, k = kindAt(x, y), z = zAt(x, y), x0 = x * T, x1 = x0 + T, y0 = y * T, y1 = y0 + T;
-      const h = hash(x, y, seed), arr = pal[k] ?? pal.tiles, col = k === 'flat' ? pal.tiles[Math.floor(h * pal.tiles.length)] : arr[Math.floor(h * arr.length)];
+      const h = hash(x, y, seed), arr = pal[k] ?? pal.tiles, rock = k === 'peak'; // 봉우리 칸은 기둥까지 바위·얼음 색
+      const col = rock ? pal.spire.col : k === 'flat' ? pal.tiles[Math.floor(h * pal.tiles.length)] : arr[Math.floor(h * arr.length)];
       // 앞쪽 옆면: 섬 가장자리면 흙 단면(물이면 물 단면), 안쪽이면 앞 칸이 낮을 때만 비탈
       for (const side of ['x', 'y']) {
         const edge = side === 'x' ? x === n - 1 : y === n - 1, zb = edge ? -D : side === 'x' ? zAt(x + 1, y) : zAt(x, y + 1);
         if (zb >= z) continue;
         const q = side === 'x' ? [[x1, y0, zb], [x1, y1, zb], [x1, y1, z], [x1, y0, z]] : [[x0, y1, zb], [x1, y1, zb], [x1, y1, z], [x0, y1, z]];
-        const base = edge ? (k === 'water' ? shade(pal.water[0], side === 'x' ? 0.72 : 0.82) : side === 'x' ? pal.dirt2 : pal.dirt) : side === 'x' ? cliff[1] : cliff[0];
+        const base = rock ? shade(col, side === 'x' ? 0.68 : 0.82) : edge ? (k === 'water' ? shade(pal.water[0], side === 'x' ? 0.72 : 0.82) : side === 'x' ? pal.dirt2 : pal.dirt) : side === 'x' ? cliff[1] : cliff[0];
         poly(pen, q, base);
         const a = q[3], b = q[2];
         if (edge) for (let j = 1; j < 3; j++) { const zl = -D * j / 3; if (zl < z - 1) line(pen, [q[0][0], q[0][1], zl], [q[1][0], q[1][1], zl], shade(base, 0.85), 0.8); }
