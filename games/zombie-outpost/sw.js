@@ -1,8 +1,8 @@
 // 오프라인 실행용 서비스 워커(홈 화면에 설치한 독립 실행에서만 쓴다. claude.ai Artifact 안에서는 등록하지 않는다).
 // 게임 파일: 네트워크 우선 — 온라인이면 늘 새 파일(저장소를 고치면 바로 반영), 안 되면 캐시로 오프라인 실행.
 // 글꼴(Google Fonts): 한 번 받으면 바뀌지 않으니 캐시 우선.
-const CACHE = 'zombie-outpost-v1';
-const CORE = ['./', 'index.html', 'logic.js', 'art.js', 'music.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+const CACHE = 'zombie-outpost-v2';
+const CORE = ['./', 'index.html', 'logic.js', 'art.js', 'music.js', 'title.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const NET_TIMEOUT_MS = 4000; // 신호가 약하면 기다리지 않고 캐시로
 
