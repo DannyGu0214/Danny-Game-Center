@@ -705,6 +705,7 @@ export function newGame(seed = (Date.now() & 0x7fffffff) || 1) {
     stats: { kills: 0, deaths: 0, looted: 0, rescued: 0, raidsWon: 0, raidsLost: 0, militaryLoot: 0, playTime: 0, eliteKills: 0 },
     ended: null, // 엔딩에 닿은 때 { at: 플레이 시간(초), goals: 달성한 목표 id }
     hero: null, // 이번 판의 생존자 { id: HEROES 키, name, runId }
+    seenSites: [], // 발견한 전진기지 후보지(미니맵에 보인다)
     over: null,
     nextId: 1,
   };
@@ -1031,6 +1032,15 @@ export function levelSurvivor(s, id) {
 }
 
 export const nearSite = (s, site) => dist(s.player.x, s.player.y, s.sites[site].x, s.sites[site].y) < 90;
+// 후보지 발견: 플레이어가 SITE_SEEN_R 안으로 다가가면 발견한다(미니맵에 점이 생긴다). 세운 곳·공사 중인 곳은 늘 발견한 것으로 친다.
+export const SITE_SEEN_R = 300;
+export const siteSeen = (s, i) => s.seenSites.includes(i) || s.outposts.some((o) => o.site === i) || !!jobOf(s, 'obuild', i);
+function discoverSites(s, ev) {
+  const P = s.player;
+  s.sites.forEach((o, i) => {
+    if (!s.seenSites.includes(i) && dist(P.x, P.y, o.x, o.y) < SITE_SEEN_R) { s.seenSites.push(i); ev.push({ t: 'site-found', site: i }); }
+  });
+}
 
 export function buildOutpost(s, site) {
   if (!s.sites[site]) return fail('없는 후보지예요');
@@ -1269,6 +1279,7 @@ export function step(s, dt, input = null) {
   P.x = clamp(P.x + mx * speed * dt, 20, WORLD.w - 20);
   P.y = clamp(P.y + my * speed * dt, 20, WORLD.h - 20);
   pushOutOfObstacles(s, P, 10);
+  discoverSites(s, ev);
 
   // 2) 안전지대: 가방 비우기 + 회복
   const mh = maxHp(s);
@@ -1921,7 +1932,7 @@ export function serialize(s) {
     nodeMoves: s.nodes.flatMap((n, i) => (n.moved ? [[i, n.x, n.y]] : [])), // 옮겨진 대상물 자리(나머지는 시드로 다시 만든다)
     player: { x: s.player.x, y: s.player.y, hp: s.player.hp, mag: s.player.mag }, ammo: Math.round(s.ammo * 100) / 100, ammoOn: s.ammoOn, gunOn: s.gunOn, dur: s.dur, armor: s.armor,
     autoHunt: s.autoHunt, autoZone: s.autoZone, stance: s.stance, stats: s.stats, nextId: s.nextId,
-    items: s.items, claimed: s.claimed, over: s.over, ended: s.ended, hero: s.hero,
+    items: s.items, claimed: s.claimed, over: s.over, ended: s.ended, hero: s.hero, seenSites: s.seenSites,
   });
 }
 
@@ -1991,6 +2002,9 @@ export function deserialize(text) {
     .slice(0, outpostLimit(s))
     .map((x) => ({ site: x.site, lv: Math.floor(num(x.lv, 1, 1, OUTPOST_MAX_LV)) }));
   s.wall = num(o.wall, wallMax(s), 0, wallMax(s));
+  // 발견한 후보지(후보지 방식이 다른 예전 세이브·발견 기록이 없던 세이브는 세운 곳만 발견한 것으로)
+  const seenOld = fixedSites || !Array.isArray(o.seenSites) ? [] : o.seenSites.filter((i) => Number.isInteger(i) && i >= 0 && i < s.sites.length);
+  s.seenSites = [...new Set([...seenOld, ...s.outposts.map((x) => x.site)])];
   // 작업은 지금 레벨의 바로 다음 단계이고, 줄마다 하나뿐이며, 한도 안일 때만 살린다
   for (const j of Array.isArray(o.jobs) ? o.jobs : []) {
     const x = j && JOB_KINDS[j.kind] === 'outpost' ? { ...j, key: siteOf(j.key) } : j;

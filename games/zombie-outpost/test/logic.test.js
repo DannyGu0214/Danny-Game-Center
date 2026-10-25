@@ -1926,3 +1926,25 @@ test('생존자 특성: 젊은 남자 공격력 +10% · 중년 남자 받는 피
   for (const s of [ym, om, yf]) assert.equal(G.farmMult(s), 1);
   assert.equal(G.playerGuard(base), 0, '생존자를 고르기 전에는 특성 없음');
 });
+
+test('후보지 발견: 300px 안으로 다가가야 발견(미니맵), 세운 곳은 늘 발견, 저장된다', () => {
+  const s = fresh(211);
+  s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9; s.raidT = 1e9;
+  assert.deepEqual(s.seenSites, []);
+  assert.ok(s.sites.every((o, i) => !G.siteSeen(s, i)), '처음엔 하나도 모른다');
+  const o = s.sites[3];
+  s.player.x = o.x + G.SITE_SEEN_R + 40; s.player.y = o.y;
+  assert.ok(!G.step(s, DT).some((e) => e.t === 'site-found'));
+  s.player.x = o.x + G.SITE_SEEN_R - 40;
+  const ev = G.step(s, DT);
+  assert.ok(ev.some((e) => e.t === 'site-found' && e.site === 3));
+  assert.ok(G.siteSeen(s, 3) && !G.siteSeen(s, 4));
+  assert.ok(!G.step(s, DT).some((e) => e.t === 'site-found'), '한 번만 알린다');
+  s.hq = 4; s.outposts.push({ site: 7, lv: 1 }); // 본부 4레벨: 전진기지 한도 2
+  assert.ok(G.siteSeen(s, 7), '세운 곳은 발견한 것');
+  const t = G.deserialize(G.serialize(s));
+  assert.ok(G.siteSeen(t, 3) && G.siteSeen(t, 7) && !G.siteSeen(t, 4));
+  const old = JSON.parse(G.serialize(s)); delete old.seenSites;
+  const u = G.deserialize(JSON.stringify(old));
+  assert.deepEqual(u.seenSites, [7], '기록이 없던 세이브는 세운 곳만');
+});

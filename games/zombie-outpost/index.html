@@ -950,6 +950,7 @@ function handleEvents(list) {
         toast(`${G.ITEMS[e.id].name}을(를) 주웠어요 · ${G.ITEMS[e.id].desc}`, 'good');
         sfx.play('item');
         break;
+      case 'site-found': toast(`전진기지 후보지 발견 · ${S.sites[e.site].name}`, 'good'); break;
       case 'weapon-found': {
         const w = G.WEAPONS[e.id];
         toast(`드랍 무기 「${w.name}」(T${w.tier} · ${G.WEAPON_STRENGTH[w.str]}) 발견! 무기 탭에서 장착하세요`, 'good');
@@ -1620,7 +1621,7 @@ function drawMini(t) {
     mctx.beginPath(); mctx.ellipse(cx, cy, r * ISO_A * sc * 1.414, r * ISO_B * sc * 1.414, 0, 0, Math.PI * 2); mctx.stroke();
   }
   const dot = (x, y, r, col) => { const [px, py] = mp(x, y); mctx.fillStyle = col; mctx.beginPath(); mctx.arc(px, py, r, 0, Math.PI * 2); mctx.fill(); };
-  S.sites.forEach((o, i) => dot(o.x, o.y, 2.2, S.outposts.some((q) => q.site === i) ? '#5bb8a7' : 'rgba(242,169,59,0.6)'));
+  S.sites.forEach((o, i) => { if (G.siteSeen(S, i)) dot(o.x, o.y, 2.2, S.outposts.some((q) => q.site === i) ? '#5bb8a7' : 'rgba(242,169,59,0.6)'); }); // 발견한 후보지만
   dot(G.CENTER.x, G.CENTER.y, 3.4, S.raid && Math.sin(t * 8) > 0 ? '#e0533f' : '#f2a93b');
   if (S.rescue) dot(S.rescue.x, S.rescue.y, 2.6 + Math.sin(t * 6), S.rescue.kind === 'siege' ? '#e0533f' : '#5bb8a7');
   // 귀환 중: 목적지 기지에 뛰는 고리, 플레이어에서 목적지까지 점선
@@ -2022,12 +2023,11 @@ function statsHtml() {
     <div class="limit">레벨<b>Lv ${S.level}</b></div>
     <div class="limit">경험치<b>${S.level >= G.LEVEL_MAX ? '최대' : `${Math.floor(S.xp)} / ${G.xpToNext(S.level)}`}</b></div>
     <div class="limit">최대 체력<b>${Math.round(G.maxHp(S))}</b></div>
-    <div class="limit">공격력 보너스(레벨·특성)<b>+${((G.levelAtkMult(S) * (1 + G.heroBonus(S, 'atk')) - 1) * 100).toFixed(1)}%</b></div>
+    <div class="limit">공격력 보너스<b>+${((G.levelAtkMult(S) * (1 + G.heroBonus(S, 'atk')) - 1) * 100).toFixed(1)}%</b></div>
     <div class="limit">치명타 확률<b>근접 ${pct(melee.crit)}%${gun ? ` · 총 ${pct(gun.crit)}%` : ''}</b></div>
-    <div class="limit">치명타 피해<b>평타의 ${G.CRIT_MULT}배</b></div>
     <div class="limit">가방 용량<b>${G.bagCap(S)}</b></div>
     <div class="limit">예비 탄약${S.bld.ammo ? (S.ammoOn ? ` (분당 +${(G.ammoRateOf(S) * 60).toFixed(0)})` : ' (제작 멈춤)') : ''}<b>${Math.floor(S.ammo)}개</b></div>
-    <div class="limit">공격 속도(방어구·스팀팩)<b>×${G.atkSpeedMult(S).toFixed(2)}</b></div>
+    <div class="limit">공격 속도<b>×${G.atkSpeedMult(S).toFixed(2)}</b></div>
     <div class="limit">이동 · 파밍 속도<b>+${pct(G.moveMult(S) - 1)}% · +${pct(G.farmMult(S) - 1)}%</b></div>
     <div class="limit">받는 피해<b>−${pct(G.playerGuard(S))}%</b></div>
   </div>`;
@@ -2038,15 +2038,14 @@ function renderArms() {
   const group = (src, kind) => ids.filter((id) => G.weaponSource(id) === src && (!kind || G.WEAPONS[id].kind === kind));
   const found = group('drop').filter((id) => S.weapons[id]).length, uq = group('unique').filter((id) => S.weapons[id]).length;
   const armors = Object.keys(G.ARMORS), ownA = armors.filter((id) => S.armor[id]).length;
-  const lo = 1 - G.GROWTH_SPREAD, hi = 1 + G.GROWTH_SPREAD;
-  let h = `${jobBanner('forge')}<div class="section-label">능력치 · 좀비를 직접 잡으면 경험치. 레벨마다 체력 +${(G.HP_PER_LEVEL * lo).toFixed(1)}~${(G.HP_PER_LEVEL * hi).toFixed(1)}, 공격력 +${(G.ATK_PER_LEVEL * lo * 100).toFixed(1)}~${(G.ATK_PER_LEVEL * hi * 100).toFixed(1)}%, 가방 +${G.BAG_PER_LEVEL * (1 - G.BAG_SPREAD)}~${G.BAG_PER_LEVEL * (1 + G.BAG_SPREAD)} 무작위, 체력 모두 회복</div>${statsHtml()}`;
-  h += `<div class="section-label">무기 점수 = 공격력 × 속도 × 명중 × (1 + 치명) · 굵은 글씨가 그 무기의 강점 · 강화는 단계마다 기본의 +10%(최대 +5)</div>`;
-  h += `<div class="section-label">제작 · 근접 (공방 레벨 = 티어 · 맞힐 때마다 내구도가 닳고 0이면 파손 → 본부 수리점)</div>${group('craft', 'melee').map(weaponRow).join('')}`;
-  h += `<div class="section-label">제작 · 원거리 (예비 탄약으로 재장전 · 쉬지 않고 쏘면 초당 탄약 ${G.AMMO_PER_SEC}개)</div>${group('craft', 'gun').map(weaponRow).join('')}`;
-  h += `<div class="section-label">드랍 · 파밍으로만 · ${found}/6 발견</div>${[...group('drop', 'melee'), ...group('drop', 'gun')].map(weaponRow).join('')}`;
-  h += `<div class="section-label">유니크 · 미션 보상 · ${uq}/4</div>${[...group('unique', 'melee'), ...group('unique', 'gun')].map(weaponRow).join('')}`;
-  h += `<div class="section-label">방어구 · 얻으면 바로 효과(갈아 끼우지 않음) · 기본 10%, 강화마다 +1%p(최대 2강) · ${ownA}/${armors.length}</div>${armors.map(armorRow).join('')}`;
-  return { sub: '가까우면 근접 무기, 멀면 총으로 자동 공격해요 · 방어구는 얻으면 바로 효과', html: h };
+  // 설명 문구 없이 상자 안 정보만. 구역 제목은 짧게.
+  let h = `${jobBanner('forge')}<div class="section-label">능력치</div>${statsHtml()}`;
+  h += `<div class="section-label">제작 · 근접</div>${group('craft', 'melee').map(weaponRow).join('')}`;
+  h += `<div class="section-label">제작 · 원거리</div>${group('craft', 'gun').map(weaponRow).join('')}`;
+  h += `<div class="section-label">드랍 · ${found}/6</div>${[...group('drop', 'melee'), ...group('drop', 'gun')].map(weaponRow).join('')}`;
+  h += `<div class="section-label">유니크 · ${uq}/4</div>${[...group('unique', 'melee'), ...group('unique', 'gun')].map(weaponRow).join('')}`;
+  h += `<div class="section-label">방어구 · ${ownA}/${armors.length}</div>${armors.map(armorRow).join('')}`;
+  return { sub: '', html: h };
 }
 
 // 엔딩 목표: 진행도 글자(명장은 +강화 수, 거점망은 곳 수)
@@ -2128,8 +2127,11 @@ function renderOutposts() {
     <div class="limit">세운 전진기지<b>${S.outposts.length} / ${lim}</b></div>
     <div class="limit">다음 한도<b>${S.hq >= G.HQ_MAX ? '최대' : `본부 ${(Math.floor(S.hq / 2) + 1) * 2}레벨`}</b></div>
   </div>`;
-  S.sites.forEach((o, i) => {
-    const built = S.outposts.find((q) => q.site === i);
+  // 세운 전진기지(와 지금 공사 중인 곳)만 보여 준다. 후보지는 필드에서 직접 찾아야 한다(하나씩 발견하는 재미).
+  const shown = S.sites.map((o, i) => i).filter((i) => S.outposts.some((q) => q.site === i) || isJob('obuild', i));
+  if (!shown.length) h += '<div class="empty">아직 세운 전진기지가 없어요.<br>필드에서 후보지를 찾아 세우세요.</div>';
+  shown.forEach((i) => {
+    const o = S.sites[i], built = S.outposts.find((q) => q.site === i);
     const zone = G.ZONE_NAMES[G.zoneIndex(o.d)];
     let acts, cost = '', p;
     if (built) {
@@ -2139,13 +2141,11 @@ function renderOutposts() {
       acts = btn('이동', 'go', i, { cls: 'ghost' }) + jobBtn('oup', i, maxed ? '최고' : '강화', 'oup', { disabled: busy || maxed || !G.canAfford(S.res, up) })
         + jobBtn('odemo', i, armed ? '정말 철거?' : '철거', 'odemo', { cls: armed ? 'danger' : 'ghost', disabled: busy }, '철거 중');
       if (!maxed) cost = costHtml(up, G.jobDuration('oup', i, built.lv + 1));
-    } else {
-      const near = G.nearSite(S, i), building = isJob('obuild', i);
-      p = `${zone} · 위험 ${o.d.toFixed(1)} · 특산 ${prodText(G.outpostProd(S, i, 1))} · ${building ? '공사 중이에요. 자리를 떠나도 계속 지어져요' : near ? '지금 후보지에 있어요' : '직접 가야 세울 수 있어요'}`;
-      acts = btn('이동', 'go', i, { cls: 'ghost' }) + jobBtn('obuild', i, '건설', 'obuild', { disabled: busy || !near || S.outposts.length >= lim || !G.canAfford(S.res, G.outpostCost(S, i)) });
-      cost = costHtml(G.outpostCost(S, i), G.jobDuration('obuild', i, 1));
+    } else { // 공사 중
+      p = `${zone} · 특산 ${prodText(G.outpostProd(S, i, 1))} · 공사 중이에요. 자리를 떠나도 계속 지어져요`;
+      acts = btn('이동', 'go', i, { cls: 'ghost' }) + jobBtn('obuild', i, '건설', 'obuild', { disabled: true });
     }
-    h += `<div class="row${built ? ' hero' : ''}"><h3>${o.name} ${built ? `<span class="lv">Lv ${built.lv}</span>` : '<span class="tagline">후보지</span>'}</h3><p>${p}</p>${cost}<div class="acts">${acts}</div></div>`;
+    h += `<div class="row${built ? ' hero' : ''}"><h3>${o.name} ${built ? `<span class="lv">Lv ${built.lv}</span>` : '<span class="tagline">공사 중</span>'}</h3><p>${p}</p>${cost}<div class="acts">${acts}</div></div>`;
   });
   return { sub: '전진기지 수는 본부 레벨 ÷ 2까지예요 · 철거하면 다른 후보지에 지을 수 있어요', html: h };
 }
