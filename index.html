@@ -5,34 +5,69 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Danny Game Center</title>
 <meta name="theme-color" content="#0e1117">
+<!-- 홈 화면 바로가기 아이콘(아래 안내). display는 browser라 바로가기는 브라우저에서 열려요(게임에서 뒤로 돌아오기 쉽게) -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Danny Games">
 <style>
   :root { color-scheme: dark; --ink: #0e1117; --panel: #181c24; --line: #343b48; --text: #ece6da; --muted: #98a1ac; --amber: #f2a93b; }
   * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100vh; background: var(--ink); color: var(--text); font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; padding: 32px 16px; }
+  body { margin: 0; min-height: 100vh; background: var(--ink); color: var(--text); font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; padding: 32px 16px; word-break: keep-all; }
   main { max-width: 520px; margin: 0 auto; display: grid; gap: 16px; }
   h1 { margin: 0; font-size: 26px; letter-spacing: .01em; }
+  h2 { margin: 8px 0 0; font-size: 18px; }
+  h3 { margin: 0 0 6px; font-size: 15px; color: var(--amber); }
   p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 14px; }
   a.game { display: grid; grid-template-columns: 72px 1fr; gap: 14px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: inherit; text-decoration: none; }
   a.game:hover, a.game:focus-visible { border-color: var(--amber); }
   a.game img { width: 72px; height: 72px; border-radius: 16px; }
-  a.game b { display: block; font-size: 17px; margin-bottom: 4px; }
+  a.game span { min-width: 0; }
+  a.game b { display: block; font-size: 18px; margin-bottom: 4px; }
+  a.game .one { display: block; color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 한 줄 소개 */
+  .os { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+  .os ol { margin: 0; padding-left: 20px; color: var(--text); font-size: 14px; line-height: 1.7; }
+  .os ol b, .os p b { color: var(--text); }
+  .os .alt { margin-top: 8px; font-size: 13px; }
   .hint { font-size: 12px; }
+  @media (max-width: 350px) { a.game { grid-template-columns: 56px 1fr; gap: 12px; } a.game img { width: 56px; height: 56px; border-radius: 13px; } a.game .one { font-size: 12.5px; } } /* 아주 좁은 휴대폰에서도 한 줄 소개가 한 줄에 */
 </style>
 </head>
 <body>
 <main>
   <h1>Danny Game Center</h1>
   <p>by Danny Soft</p>
-  <p>대니의 게임 모음이에요. 휴대폰에서 열고 브라우저 메뉴의 <b>홈 화면에 추가</b>를 누르면 앱처럼 설치돼요(인터넷 없이도 실행).</p>
   <a class="game" href="games/zombie-outpost/">
     <img src="games/zombie-outpost/icons/icon-192.png" alt="">
-    <span><b>Zombie Outpost</b><p>무너진 도시의 끝, 마지막 불빛을 지켜라. 세로 화면 쿼터뷰 좀비 서바이벌. 필드에서 싸우고 파밍해 기지를 키우고, 동료를 구해 전진기지를 늘려요. 쓰러지면 처음부터(로그라이크).</p></span>
+    <span><b>Zombie Outpost</b><span class="one">마지막 불빛을 지키는 좀비 서바이벌</span></span>
   </a>
   <a class="game" href="games/animal-world/">
     <img src="games/animal-world/icons/icon-192.png" alt="">
-    <span><b>Animal World</b><p>동물을 입양하고 초원을 가꿔요. 캐릭터 없이 지켜보는 관찰형 게임. 발전도를 올려 티어를 높이고, 특수 행동을 하는 동물을 찰칵 찍어요.</p></span>
+    <span><b>Animal World</b><span class="one">동물을 입양하고 가꾸는 관찰 게임</span></span>
   </a>
-  <p class="hint">저장은 기기마다 그 브라우저(또는 설치한 앱)에 따로 남아요.</p>
+
+  <h2>📱 홈 화면에 바로가기 만들기</h2>
+  <p>이 화면을 홈 화면에 아이콘으로 두면 한 번에 열 수 있어요.</p>
+  <div class="os">
+    <h3>안드로이드 · Chrome</h3>
+    <ol>
+      <li>Chrome에서 이 페이지를 열어요.</li>
+      <li>오른쪽 위 <b>⋮</b>을 눌러요.</li>
+      <li><b>홈 화면에 추가</b>를 눌러요. 버전에 따라 <b>설치 및 바로가기 만들기</b> → <b>바로가기 만들기</b>로 나와요.</li>
+      <li>이름을 확인하고 <b>추가</b>를 눌러요.</li>
+    </ol>
+    <p class="alt">삼성 인터넷: 아래 <b>≡</b> → <b>현재 페이지 추가</b> → <b>홈 화면</b> → <b>추가</b></p>
+  </div>
+  <div class="os">
+    <h3>아이폰 · Safari</h3>
+    <ol>
+      <li>Safari에서 이 페이지를 열어요.</li>
+      <li>주소창의 <b>⋯</b> → <b>공유</b>를 눌러요. 화면 아래에 공유 버튼(네모에 위 화살표)이 보이면 그걸 눌러요.</li>
+      <li>목록을 아래로 내려 <b>홈 화면에 추가</b>를 눌러요.</li>
+      <li><b>웹 앱으로 열기</b>가 보이면 끄고, 오른쪽 위 <b>추가</b>를 눌러요. 꺼 두면 Safari에서 열려 게임에서 뒤로 돌아오기 쉬워요.</li>
+    </ol>
+  </div>
+  <p class="hint">게임 화면에서 같은 방법으로 추가하면 그 게임만 앱처럼 설치돼요(인터넷 없이도 실행). 저장은 기기마다 그 브라우저(또는 설치한 앱)에 따로 남아요.</p>
 </main>
 </body>
 </html>

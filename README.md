@@ -9,7 +9,7 @@
 | 게임 | 장르 | 상태 | 플레이 | 폴더 |
 |---|---|---|---|---|
 | Zombie Outpost (좀비 아웃포스트) | 세로 화면·쿼터뷰 모바일 웹 게임. 좀비 서바이벌, 수동 파밍, 기지 건설, 동료, 전진기지, 로그라이크 | 플레이 가능 | [바로 하기](https://dannygu0214.github.io/Danny-Game-Center/games/zombie-outpost/) | [`games/zombie-outpost`](games/zombie-outpost) |
-| Animal World (애니멀 월드) | 세로 화면·쿼터뷰 관찰형 게임. 동물 입양, 지역 꾸미기, 발전도·티어, 순간 포착 | 초원 지역 플레이 가능(MVP) | [바로 하기](https://dannygu0214.github.io/Danny-Game-Center/games/animal-world/) | [`games/animal-world`](games/animal-world) |
+| Animal World (애니멀 월드) | 세로 화면·쿼터뷰 관찰형 게임. 동물 입양, 지역 꾸미기, 발전도·티어, 순간 포착 | 4지역(초원·바닷가·사막·남극) 플레이 가능 | [바로 하기](https://dannygu0214.github.io/Danny-Game-Center/games/animal-world/) | [`games/animal-world`](games/animal-world) |
 
 ## 공통 규칙
 
@@ -23,7 +23,7 @@ cd games/zombie-outpost && python3 -m http.server 8791
 
 - 테스트: 각 게임 폴더에서 `npm test`(Node 20 이상).
 - 배포: GitHub Pages(main 브랜치 루트, https://dannygu0214.github.io/Danny-Game-Center/). `main`에 올리면 몇 분 안에 반영돼요. 게임은 PWA라 휴대폰에서 **홈 화면에 추가**하면 앱처럼 설치되고 인터넷 없이도 돌아가요. 저장은 기기마다 그 브라우저에 따로 남아요.
-- 루트 `index.html`은 게임 목록 첫 화면이에요. 새 게임을 추가하면 여기에도 한 칸 넣어요.
+- 루트 `index.html`은 게임 목록 첫 화면이에요(게임마다 아이콘·제목·한 줄 소개, 아래에 홈 화면 바로가기 만드는 법). 새 게임을 추가하면 여기에도 한 칸 넣어요. 첫 화면의 홈 화면 아이콘은 `icons/`, `manifest.webmanifest`(바로가기라 `display: browser`)예요.
 
 ## 새 게임 추가
 
