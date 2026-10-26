@@ -15,7 +15,7 @@ test('새 게임: 지역마다 시작 인기점수, T1, 요청 3장, 동물 없�
   for (const r of Object.keys(S.regions)) assert.equal(pop(S, r), ECON.start, r);
   assert.equal(S.regions[R].tier, 1);
   assert.equal(S.regions[R].animals.length, 0);
-  assert.equal(S.requests.length, 3);
+  assert.equal(G.requestsOf(S).length, 3);
 });
 
 test('입양은 인기점수로 산다: 값만큼 줄고, 모자라면 못 산다', () => {
@@ -205,7 +205,7 @@ test('관람 수익: 그 지역 발전도 ÷ incomeDiv, 게임을 끈 동안은 
 test('순간 포착: 기회가 떴을 때 그 동물만, 첫 포착 보너스, 앨범·사진 요청 반영', () => {
   const S = rich();
   for (let i = 0; i < 2; i++) G.adopt(S, R, 'rabbit');
-  S.requests = [{ uid: 999, region: R, kind: 'photo', sp: 'rabbit', n: 1, got: 0, minutes: 3, reward: 15 }];
+  S.regions[R].requests = [{ uid: 999, region: R, kind: 'photo', sp: 'rabbit', n: 1, got: 0, minutes: 3, reward: 15 }];
   S.chanceIn = 0;
   G.step(S, G.STEP);
   assert.ok(S.chance);
@@ -217,7 +217,7 @@ test('순간 포착: 기회가 떴을 때 그 동물만, 첫 포착 보너스, �
   assert.equal(r.reward, Math.max(ECON.firstMin, Math.round(G.incomePerMin(S) * ECON.firstMinutes)));
   assert.equal(S.album.rabbit, 1);
   assert.equal(S.chance, null);
-  assert.ok(G.requestDone(S, S.requests[0]));
+  assert.ok(G.requestDone(S, G.requestsOf(S)[0]));
   // 기회가 지나면 못 찍는다
   S.chanceIn = 0; G.step(S, G.STEP);
   const t2 = S.chance.uid;
@@ -227,23 +227,23 @@ test('순간 포착: 기회가 떴을 때 그 동물만, 첫 포착 보너스, �
 
 test('관람객 요청: 다 되면 [받기]로 보상, 덜 되면 못 받고, 받으면 새 요청', () => {
   const S = rich(1000);
-  S.requests = [{ uid: 500, region: R, kind: 'adopt', sp: 'rabbit', n: 2, minutes: 4, reward: 40 }];
+  S.regions[R].requests = [{ uid: 500, region: R, kind: 'adopt', sp: 'rabbit', n: 2, minutes: 4, reward: 40 }];
   assert.equal(G.claim(S, 500).ok, false);
   G.adopt(S, R, 'rabbit'); G.adopt(S, R, 'rabbit');
   const before = pop(S);
   assert.ok(G.claim(S, 500).ok);
   assert.equal(pop(S), before + 40);
-  assert.equal(S.requests.length, 3);
-  for (const q of S.requests) assert.equal(G.requestDone(S, q), false, '새 요청은 이미 끝난 것이 아니어야 한다');
+  assert.equal(G.requestsOf(S).length, 3);
+  for (const q of G.requestsOf(S)) assert.equal(G.requestDone(S, q), false, '새 요청은 이미 끝난 것이 아니어야 한다');
 });
 
 test('요청 바꾸기는 대기 시간이 있다', () => {
   const S = rich();
-  const u = S.requests[0].uid;
+  const u = G.requestsOf(S)[0].uid;
   assert.ok(G.swapRequest(S, u).ok);
-  assert.equal(G.swapRequest(S, S.requests[0].uid).ok, false);
+  assert.equal(G.swapRequest(S, G.requestsOf(S)[0].uid).ok, false);
   S.time += ECON.swapCooldown;
-  assert.ok(G.swapRequest(S, S.requests[0].uid).ok);
+  assert.ok(G.swapRequest(S, G.requestsOf(S)[0].uid).ok);
 });
 
 test('저장 → 불러오기: 같은 상태, 깨진 저장은 null', () => {
@@ -441,8 +441,8 @@ test('v1 세이브(점수 하나를 같이 씀) → v2: 그 점수는 발전도�
   setTier(S, 4);
   for (let i = 0; i < 3; i++) G.adopt(S, R, 'rabbit');
   const o = JSON.parse(G.serialize(S, 0));
-  o.v = 1; o.pop = 777; o.view = 'seaside';
-  for (const r of Object.values(o.regions)) { delete r.pop; delete r.away; }
+  o.v = 1; o.pop = 777; o.view = 'seaside'; o.requests = []; o.reqSwapAt = 0; // v1 세이브 모양(점수·요청을 같이 씀)
+  for (const r of Object.values(o.regions)) { delete r.pop; delete r.away; delete r.requests; delete r.reqSwapAt; }
   const L = G.deserialize(JSON.stringify(o));
   assert.equal(L.v, G.SAVE_VERSION);
   assert.equal(L.pop, undefined);
@@ -451,4 +451,39 @@ test('v1 세이브(점수 하나를 같이 씀) → v2: 그 점수는 발전도�
   assert.equal(L.regions.seaside.away, null, '보던 지역은 쉬지 않는다');
   assert.equal(L.regions[R].away, L.time);
   assert.equal(G.deserialize(JSON.stringify({ ...o, v: 1, pop: 'x' })), null);
+});
+
+test('관람객 요청은 지역마다 따로: 다른 지역에 가면 그 지역 요청 3장, 원래 지역 요청은 그대로 남는다', () => {
+  const S = rich(1000);
+  setTier(S, 4);
+  const grass = G.requestsOf(S, R).map((q) => q.uid);
+  assert.equal(grass.length, 3);
+  assert.ok(G.requestsOf(S, R).every((q) => q.region === R));
+  assert.equal(G.requestsOf(S, 'seaside').length, 0, '아직 안 가 본 지역은 요청이 없다');
+  assert.ok(G.setView(S, 'seaside').ok);
+  const sea = G.requestsOf(S, 'seaside');
+  assert.equal(sea.length, 3);
+  assert.ok(sea.every((q) => q.region === 'seaside'));
+  assert.deepEqual(G.requestsOf(S, R).map((q) => q.uid), grass, '초원 요청은 그대로');
+  // 바꾸기 대기 시간도 지역마다 따로
+  assert.ok(G.swapRequest(S, sea[0].uid).ok);
+  assert.equal(G.swapRequest(S, G.requestsOf(S, 'seaside')[0].uid).ok, false);
+  assert.ok(G.swapRequest(S, grass[0]).ok, '바닷가에서 바꿔도 초원 요청은 바로 바꿀 수 있다');
+});
+
+test('v2 세이브(요청을 같이 씀) → v3: 요청은 낸 지역으로 나눠 담는다', () => {
+  const S = rich(1000);
+  setTier(S, 4);
+  const o = JSON.parse(G.serialize(S, 0));
+  o.v = 2;
+  o.requests = [{ uid: 801, region: R, kind: 'adopt', sp: 'rabbit', n: 1, minutes: 2, reward: 10 }, { uid: 802, region: 'seaside', kind: 'adopt', sp: 'crab', n: 1, minutes: 2, reward: 10 }];
+  o.reqSwapAt = 42;
+  for (const r of Object.values(o.regions)) { delete r.requests; delete r.reqSwapAt; }
+  const L = G.deserialize(JSON.stringify(o));
+  assert.equal(L.v, G.SAVE_VERSION);
+  assert.equal(L.requests, undefined);
+  assert.deepEqual(G.requestsOf(L, R).map((q) => q.uid), [801]);
+  assert.deepEqual(G.requestsOf(L, 'seaside').map((q) => q.uid), [802]);
+  assert.equal(L.regions.seaside.reqSwapAt, 42);
+  assert.equal(G.deserialize(JSON.stringify({ ...o, requests: 'x' })), null);
 });

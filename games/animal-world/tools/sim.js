@@ -15,7 +15,7 @@ export function run({ minutes = MIN, seed = SEED, captureRate = CAP, requests = 
   const S = G.newGame(seed, 0);
   for (const d of REGIONS) if (d.unlock && (d.id === region || REGIONS.findIndex((x) => x.id === d.id) < REGIONS.findIndex((x) => x.id === region))) S.regions[d.unlock.region].tier = Math.max(S.regions[d.unlock.region].tier, d.unlock.tier);
   S.rev = (S.rev || 0) + 1;
-  if (region !== 'grassland') { const v = G.setView(S, region); if (!v.ok) throw new Error(v.why); S.requests = []; }
+  if (region !== 'grassland') { const v = G.setView(S, region); if (!v.ok) throw new Error(v.why); }
   const tierAt = { 1: 0 };
   let botRng = seed * 7919 + 13;
   const coin = () => ((botRng = (botRng * 1103515245 + 12345) % 2147483648) / 2147483648);
@@ -28,7 +28,7 @@ export function run({ minutes = MIN, seed = SEED, captureRate = CAP, requests = 
     // 순간 포착: 기회마다 한 번 탭할지 정하고, 1.5초 뒤에 탭한다
     if (S.chance && S.chance !== lastChance) { lastChance = S.chance; tapAt = coin() < captureRate ? S.time + 1.5 : null; }
     if (S.chance && tapAt != null && S.time >= tapAt) { const r = G.capture(S, S.chance.uid); if (r.ok) income.capture += r.reward; tapAt = null; }
-    if (requests) for (const q of [...S.requests]) if (G.requestDone(S, q)) { const r = G.claim(S, q.uid); if (r.ok) income.request += r.reward; }
+    if (requests) for (const q of [...G.requestsOf(S, R)]) if (G.requestDone(S, q)) { const r = G.claim(S, q.uid); if (r.ok) income.request += r.reward; }
     // 1초마다 살 것을 정한다
     if (Math.abs(t % 1) < 1e-9) {
       for (let k = 0; k < 4; k++) { const want = choose(S); if (!want || G.popOf(S, R) < want.price) break; buy(S, want); }

@@ -7,8 +7,8 @@ import {
 import { TERRAIN, kindAt, terrainFits, allowedOn, hasWater, terrainOf } from './terrain.js';
 
 export const STEP = 1 / 30;
-export const SAVE_VERSION = 2; // 2: 인기점수를 지역마다 따로(R.pop), 쉬는 지역은 R.away부터 정산
-const SAVE_KEYS = ['v', 'rng', 'earned', 'time', 'savedAt', 'view', 'regions', 'album', 'requests', 'reqSwapAt', 'chance', 'chanceIn', 'uid'];
+export const SAVE_VERSION = 3; // 2: 인기점수를 지역마다 따로(R.pop), 쉬는 지역은 R.away부터 정산 · 3: 관람객 요청도 지역마다 따로(R.requests·R.reqSwapAt)
+const SAVE_KEYS = ['v', 'rng', 'earned', 'time', 'savedAt', 'view', 'regions', 'album', 'chance', 'chanceIn', 'uid'];
 
 // ---------- 난수(mulberry32) ----------
 function rnd(S) {
@@ -25,11 +25,11 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export function newGame(seed = 1, now = Date.now()) {
   const S = {
     v: SAVE_VERSION, rng: seed | 0 || 1, earned: 0, time: 0, savedAt: now,
-    view: 'grassland', regions: {}, album: {}, requests: [], reqSwapAt: 0,
+    view: 'grassland', regions: {}, album: {},
     chance: null, chanceIn: 12, uid: 1, events: [],
   };
   for (const r of REGIONS) S.regions[r.id] = newRegion(r.id === S.view ? null : 0);
-  fillRequests(S);
+  fillRequests(S, S.view);
   return S;
 }
 
@@ -94,8 +94,8 @@ export function stats(S, rid) {
 }
 
 // ---------- 인기점수(지역마다 따로) ----------
-// 지역 하나: 티어·물건·동물 + 그 지역 인기점수(pop). away = 그 지역을 떠난 플레이 시각(보고 있으면 null)
-const newRegion = (away) => ({ tier: 1, items: [], animals: [], pop: ECON.start, away });
+// 지역 하나: 티어·물건·동물 + 그 지역 인기점수(pop)·관람객 요청(requests, reqSwapAt). away = 그 지역을 떠난 플레이 시각(보고 있으면 null)
+const newRegion = (away) => ({ tier: 1, items: [], animals: [], pop: ECON.start, away, requests: [], reqSwapAt: 0 });
 export const popOf = (S, rid = S.view) => S.regions[rid].pop;
 // 분당 관람 수익: 그 지역 발전도 ÷ incomeDiv. 보고 있는 지역에만 실시간으로 쌓인다
 export function incomePerMin(S, rid = S.view) {
@@ -412,7 +412,7 @@ export function capture(S, uid) {
     : Math.max(ECON.captureMin, Math.round(perMin * ECON.captureMinutes));
   S.album[a.sp] = (S.album[a.sp] || 0) + 1;
   gain(S, rid, reward);
-  for (const q of S.requests) if (q.kind === 'photo' && q.sp === a.sp) q.got++;
+  for (const q of R.requests) if (q.kind === 'photo' && q.sp === a.sp) q.got++;
   endChance(S);
   S.events.push({ type: 'capture', sp: a.sp, reward, first });
   return { ok: true, reward, first, sp: a.sp };
@@ -455,39 +455,48 @@ function requestCandidates(S, rid) {
   return out;
 }
 const reqKey = (q) => `${q.kind}:${q.sp || q.item || q.pct}`;
-function makeRequest(S) {
-  const rid = regionDef(S.view)?.ready && isUnlocked(S, S.view) ? S.view : 'grassland';
-  const taken = new Set(S.requests.map(reqKey));
+// 관람객 요청은 지역마다 3장. 그 지역에서만 보이고, 보상도 그 지역 인기점수로
+function makeRequest(S, rid) {
+  if (!regionDef(rid)?.ready || !isUnlocked(S, rid)) return null;
+  const taken = new Set(S.regions[rid].requests.map(reqKey));
   const cand = requestCandidates(S, rid).filter((q) => !taken.has(reqKey(q)) && !requestDone(S, { ...q, region: rid }));
   if (!cand.length) return null;
   const q = pick(S, cand);
   return { uid: S.uid++, region: rid, ...q, reward: Math.max(ECON.requestMin, Math.round(incomePerMin(S, rid) * q.minutes)) };
 }
-function fillRequests(S) {
-  while (S.requests.length < 3) {
-    const q = makeRequest(S);
+function fillRequests(S, rid) {
+  const list = S.regions[rid].requests;
+  while (list.length < 3) {
+    const q = makeRequest(S, rid);
     if (!q) break;
-    S.requests.push(q);
+    list.push(q);
   }
 }
+export const requestsOf = (S, rid = S.view) => S.regions[rid].requests;
+// uid로 요청 찾기(어느 지역 것이든)
+function findRequest(S, uid) {
+  for (const r of REGIONS) { const list = S.regions[r.id].requests, i = list.findIndex((q) => q.uid === uid); if (i >= 0) return { rid: r.id, list, i }; }
+  return null;
+}
 export function claim(S, uid) {
-  const i = S.requests.findIndex((q) => q.uid === uid);
-  if (i < 0) return no('없는 요청');
-  const q = S.requests[i];
+  const f = findRequest(S, uid);
+  if (!f) return no('없는 요청');
+  const q = f.list[f.i];
   if (!requestDone(S, q)) return no('아직 덜 됐어요');
-  gain(S, q.region, q.reward); // 보상은 그 요청을 낸 지역의 인기점수로
-  S.requests.splice(i, 1);
-  fillRequests(S);
+  gain(S, f.rid, q.reward);
+  f.list.splice(f.i, 1);
+  fillRequests(S, f.rid);
   return { ok: true, reward: q.reward };
 }
 export function swapRequest(S, uid) {
-  if (S.time < S.reqSwapAt) return no(`${Math.ceil(S.reqSwapAt - S.time)}초 뒤에 바꿀 수 있어요`);
-  const i = S.requests.findIndex((q) => q.uid === uid);
-  if (i < 0) return no('없는 요청');
-  const [old] = S.requests.splice(i, 1);
-  const q = makeRequest(S);
-  S.requests.splice(i, 0, q ?? old);
-  S.reqSwapAt = S.time + ECON.swapCooldown;
+  const f = findRequest(S, uid);
+  if (!f) return no('없는 요청');
+  const R = S.regions[f.rid];
+  if (S.time < R.reqSwapAt) return no(`${Math.ceil(R.reqSwapAt - S.time)}초 뒤에 바꿀 수 있어요`);
+  const [old] = f.list.splice(f.i, 1);
+  const q = makeRequest(S, f.rid);
+  f.list.splice(f.i, 0, q ?? old);
+  R.reqSwapAt = S.time + ECON.swapCooldown;
   return { ok: true };
 }
 
@@ -507,7 +516,7 @@ export function step(S, dt) {
     if (!r.ready) continue;
     for (const a of S.regions[r.id].animals) updateAnimal(S, r.id, a, dt);
   }
-  if (S.requests.length < 3) fillRequests(S);
+  if (S.regions[S.view].requests.length < 3) fillRequests(S, S.view);
 }
 // 게임을 끈 동안: 보고 있던 지역은 바로 정산(최대 offlineCapSec), 다른 지역은 쉬는 시간에 더해 두었다가 돌아올 때 정산.
 // sec = 실제로 비운 시간, gain = 보고 있던 지역에 쌓인 점수. 시계가 뒤로 가면 0
@@ -528,6 +537,7 @@ export function setView(S, rid) {
   gain(S, rid, n);
   to.away = null;
   S.view = rid;
+  fillRequests(S, rid);
   return { ok: true, rest: { sec, gain: n, capped: sec > ECON.offlineCapSec } };
 }
 
@@ -541,7 +551,7 @@ export function serialize(S, now = Date.now()) {
 export function deserialize(raw) {
   let o;
   try { o = JSON.parse(raw); } catch { return null; }
-  if (!o || !(o.v === SAVE_VERSION || (o.v === 1 && typeof o.pop === 'number')) || !o.regions || !Array.isArray(o.requests)) return null;
+  if (!o || !o.regions || !(o.v === SAVE_VERSION || (o.v === 2 && Array.isArray(o.requests)) || (o.v === 1 && typeof o.pop === 'number' && Array.isArray(o.requests)))) return null;
   const S = { ...o, events: [] };
   for (const r of REGIONS) S.regions[r.id] ??= newRegion(0);
   for (const r of REGIONS) {
@@ -550,8 +560,9 @@ export function deserialize(raw) {
     R.animals = R.animals.filter((a) => SPECIES[a.sp]);
   }
   touch(S);
-  if (o.v === 1) migrateV1(S);
-  for (const r of REGIONS) { const R = S.regions[r.id]; R.pop ??= ECON.start; if (R.away === undefined) R.away = r.id === S.view ? null : S.time; }
+  if (S.v === 1) migrateV1(S);
+  if (S.v === 2) migrateV2(S);
+  for (const r of REGIONS) { const R = S.regions[r.id]; R.pop ??= ECON.start; if (R.away === undefined) R.away = r.id === S.view ? null : S.time; R.requests ??= []; R.reqSwapAt ??= 0; }
   fitTerrain(S);
   return S;
 }
@@ -568,6 +579,13 @@ function migrateV1(S) {
     R.away = r.id === S.view ? null : S.time;
   }
   delete S.pop;
+  S.v = 2;
+}
+// v2(요청 3장을 모든 지역이 같이 씀) → v3: 요청은 낸 지역으로 나눠 담고, 바꾸기 대기 시간은 지역마다 같은 값으로 시작
+function migrateV2(S) {
+  for (const r of REGIONS) { const R = S.regions[r.id]; R.requests = []; R.reqSwapAt = S.reqSwapAt || 0; }
+  for (const q of S.requests || []) S.regions[q.region]?.requests.push(q);
+  delete S.requests; delete S.reqSwapAt;
   S.v = SAVE_VERSION;
 }
 // 지형이 생기기 전 세이브: 지형에 맞지 않는 물건은 가까운 맞는 자리로 옮기고, 자리가 없으면 낸 값을 모두 돌려준다.

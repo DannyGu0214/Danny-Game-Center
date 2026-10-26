@@ -620,7 +620,7 @@ function hud() {
     $('#devbar').style.width = `${Math.max(0, Math.min(100, ((st.dev - lo) / (hi - lo)) * 100))}%`;
   }
   setText($('#happy'), st.animals ? `${Math.round(st.H * 100)}%` : '-');
-  const done = S.requests.filter((q) => G.requestDone(S, q)).length, rb = $('#mRequests .dot');
+  const done = G.requestsOf(S).filter((q) => G.requestDone(S, q)).length, rb = $('#mRequests .dot'); // 지금 지역 요청만
   rb.hidden = !done; setText(rb, String(done));
   // 티어가 오른 뒤 아직 열어 보지 않은 메뉴에 N 표시
   $('#mAnimals .dot').hidden = !(R.tier > (UI.seen.animals[rid] ?? 1));
@@ -827,14 +827,15 @@ function reqText(q) {
 }
 function sheetRequests(body) {
   $('#sheetTitle').textContent = '관람객 요청';
-  const sig = () => S.requests.map((q) => q.uid).join(',');
+  const rid = S.view, list = () => G.requestsOf(S, rid); // 요청은 지역마다 따로
+  const sig = () => list().map((q) => q.uid).join(',');
   let built = null;
   const build = () => {
     body.innerHTML = '';
     built = sig();
     const rows = [];
-    if (!S.requests.length) body.appendChild(el('p', null, '지금은 요청이 없어요. 동물을 입양하면 새 요청이 와요.'));
-    for (const q of S.requests) {
+    if (!list().length) body.appendChild(el('p', null, '지금은 요청이 없어요. 동물을 입양하면 새 요청이 와요.'));
+    for (const q of list()) {
       const card = el('div', 'req', `<h4>${reqText(q)}</h4><div class="meter"><i></i></div>`);
       const btns = el('div', 'row-btns'), swap = el('button', 'btn', '다른 요청'), get = el('button', 'btn main');
       btns.append(swap, get); card.appendChild(btns); body.appendChild(card);
@@ -847,13 +848,13 @@ function sheetRequests(body) {
   let rows = build();
   sheetUpdate = () => {
     if (sig() !== built) rows = build();
-    $('#sheetSub').textContent = '받으면 관람 수익 몇 분치';
+    $('#sheetSub').textContent = `${G.regionDef(rid).name} 관람객`;
     for (const o of rows) {
       const [a, b] = G.requestProgress(S, o.q), done = G.requestDone(S, o.q);
       o.card.querySelector('.meter i').style.width = `${b ? (a / b) * 100 : 0}%`;
       setText(o.get, done ? `받기 ⭐${o.q.reward}` : `${a}/${b} · ⭐${o.q.reward}`);
       o.get.disabled = !done;
-      const wait = Math.ceil(S.reqSwapAt - S.time);
+      const wait = Math.ceil(S.regions[rid].reqSwapAt - S.time);
       setText(o.swap, wait > 0 ? `다른 요청 ${wait}초` : '다른 요청');
       o.swap.disabled = wait > 0;
     }
