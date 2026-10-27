@@ -1149,6 +1149,11 @@ function start() {
 }
 // 독립 실행에서만 오프라인 캐시(서비스 워커)를 켠다
 if ('serviceWorker' in navigator && !window.claude && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+// 새 버전 서비스 워커가 이 화면을 넘겨받으면 저장하고 한 번 다시 연다(새 파일로 실행). 처음 설치(이전 워커 없음)에는 다시 열지 않는다
+if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; save(); location.reload(); });
+}
 start();
 </script>
 </body>
