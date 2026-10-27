@@ -134,10 +134,10 @@ test('물건 놓기: 칸 밖·겹침은 막고, 치우면 50% 환급', () => {
   const S = rich();
   setTier(S, 7);
   assert.equal(G.canPlace(S, R, 'pond', GRID - 2, GRID - 2).why, '놓을 수 없는 자리예요'); // 3×3이 칸 밖으로 나간다
-  assert.ok(G.placeItem(S, R, 'pond', 7, 6).ok); // 초원 가운데 저지대
-  assert.equal(G.canPlace(S, R, 'grass', 8, 7).why, '놓을 수 없는 자리예요');
-  assert.ok(G.canPlace(S, R, 'grass', 11, 6).ok);
-  assert.equal(G.canPlace(S, R, 'baobab', 0, 5).why, 'T8에서 해금');
+  assert.ok(G.placeItem(S, R, 'pond', 14, 12).ok); // 초원 가운데 저지대
+  assert.equal(G.canPlace(S, R, 'grass', 16, 14).why, '놓을 수 없는 자리예요');
+  assert.ok(G.canPlace(S, R, 'grass', 25, 12).ok); // 저지대 둘레 계단 바깥 평지
+  assert.equal(G.canPlace(S, R, 'baobab', 0, 10).why, 'T8에서 해금');
   const it = S.regions[R].items[0], before = pop(S);
   assert.ok(G.removeItem(S, R, it.uid).ok);
   assert.equal(pop(S), before + Math.floor(itemPrice(7) * 0.5));
@@ -160,15 +160,15 @@ test('발전도가 기준을 넘으면 여러 티어도 한 번에, 지역 해�
 test('길찾기는 막힌 칸을 돌아가고, 물건 위에 선 동물은 빈칸으로 옮긴다', () => {
   const S = rich();
   setTier(S, 7);
-  G.placeItem(S, R, 'pond', 7, 6);
-  const p = G.findPath(S, R, [6, 7], (x, y) => x === 10 && y === 7);
-  assert.ok(p && p.length > 4);
+  G.placeItem(S, R, 'pond', 14, 12);
+  const p = G.findPath(S, R, [12, 14], (x, y) => x === 21 && y === 14);
+  assert.ok(p && p.length > 9);
   for (const [x, y] of p) assert.ok(G.walkable(S, R, x, y));
   G.adopt(S, R, 'rabbit');
   const a = S.regions[R].animals[0];
-  a.x = 16.5; a.y = 3.5;
-  assert.ok(G.placeItem(S, R, 'rocks', 16, 3).ok); // 오른쪽 바위 구릉
-  assert.equal(G.walkable(S, R, 16, 3), false);
+  a.x = 24.5; a.y = 2.5;
+  assert.ok(G.placeItem(S, R, 'rocks', 24, 2).ok); // 뒤쪽 평지
+  assert.equal(G.walkable(S, R, 24, 2), false);
   assert.ok(G.walkable(S, R, Math.floor(a.x), Math.floor(a.y)));
 });
 
@@ -297,7 +297,7 @@ test('물에 사는 동물: 바다 지형이나 헤엄칠 물건 칸에서만 �
   S.rev++;
   const W = 'seaside';
   assert.ok(G.canAdopt(S, W, 'otter').ok, '바닷가에는 바다가 있다');
-  const pool = G.placeItem(S, W, 'tidepool', 5, 4).item; // 바닷가 모래 저지대
+  const pool = G.placeItem(S, W, 'tidepool', 10, 8).item; // 바닷가 모래 저지대
   assert.ok(pool);
   assert.ok(G.adopt(S, W, 'otter').ok);
   const otter = S.regions[W].animals[0];
@@ -340,7 +340,7 @@ test('시간대: 1분마다 아침 → 낮 → 저녁 → 밤, 4분 = 하루, 1�
   assert.equal(G.clock(T).day, 1);
 });
 
-test('지형: 지도 4장은 20×20이고 걷는 칸이 모두 이어지며, 물건마다 놓을 자리가 있다', () => {
+test('지형: 지도 4장은 40×40이고 걷는 칸이 모두 이어지며, 물건마다 놓을 자리가 있다', () => {
   for (const rid of ['grassland', 'seaside', 'desert', 'antarctic']) {
     assert.equal(T.MAPS[rid].length, GRID, rid);
     for (const row of T.MAPS[rid]) assert.equal(row.length, GRID, rid);
@@ -360,31 +360,31 @@ test('지형: 봉우리·물은 못 걷고, 물건은 정해진 지형에만, �
   setTier(S, 8);
   assert.equal(T.kindAt(R, 0, 0), 'peak');
   assert.equal(G.walkable(S, R, 0, 0), false, '봉우리');
-  assert.equal(G.walkable(S, 'seaside', 10, 1), false, '땅 동물은 바다를 못 걷는다');
-  assert.ok(G.walkable(S, 'seaside', 10, 1, true), '헤엄치는 동물은 바다를 다닌다');
-  assert.equal(G.canPlace(S, R, 'pond', 12, 10).why, '저지대에 놓아요', '연못은 저지대에만');
-  assert.equal(G.canPlace(S, R, 'hutch', 2, 1).why, '낮은 언덕·평지에 놓아요', '은신처는 높은 언덕에 못 놓는다');
-  assert.ok(G.canPlace(S, R, 'tower', 2, 1).ok, '망루는 높은 언덕에');
-  assert.equal(G.canPlace(S, R, 'feeder', 0, 9).why, '낮은 언덕·평지에 놓아요', '길은 비워 둔다');
+  assert.equal(G.walkable(S, 'seaside', 20, 2), false, '땅 동물은 바다를 못 걷는다');
+  assert.ok(G.walkable(S, 'seaside', 20, 2, true), '헤엄치는 동물은 바다를 다닌다');
+  assert.equal(G.canPlace(S, R, 'pond', 24, 20).why, '저지대에 놓아요', '연못은 저지대에만');
+  assert.equal(G.canPlace(S, R, 'hutch', 4, 2).why, '낮은 언덕·평지에 놓아요', '은신처는 높은 언덕에 못 놓는다');
+  assert.ok(G.canPlace(S, R, 'tower', 4, 2).ok, '망루는 높은 언덕에');
+  assert.equal(G.canPlace(S, R, 'feeder', 0, 18).why, '낮은 언덕·평지에 놓아요', '길은 비워 둔다');
   assert.equal(T.kindAt(R, ...G.freeSpot(S, R, 'hutch')), 'hill', '은신처는 낮은 언덕부터');
   assert.equal(T.kindAt(R, ...G.freeSpot(S, R, 'tower')), 'high', '망루는 높은 언덕부터');
   assert.equal(T.kindAt(R, ...G.freeSpot(S, R, 'puddle')), 'low');
   // 여러 칸 물건은 높이가 같은 칸에만(낮은 언덕과 평지에 걸치면 안 된다)
-  assert.equal(T.terrainFits(R, 'rocks', 15, 4), false);
+  assert.equal(T.terrainFits(R, 'rocks', 30, 8), false);
 });
 
 test('지형 이전: 지형 전 세이브의 맞지 않는 물건은 맞는 자리로 옮기고, 자리가 없으면 전액 환불', () => {
   const S = rich(1000);
   setTier(S, 7);
   const Rg = S.regions[R];
-  Rg.items.push({ uid: 900, id: 'pond', x: 0, y: 0, paid: 50 }, { uid: 901, id: 'hutch', x: 9, y: 10, paid: 10 }, { uid: 902, id: 'tower', x: 5, y: 5, paid: 99 });
+  Rg.items.push({ uid: 900, id: 'pond', x: 0, y: 0, paid: 50 }, { uid: 901, id: 'hutch', x: 20, y: 36, paid: 10 }, { uid: 902, id: 'tower', x: 5, y: 5, paid: 99 });
   for (let i = 0; i < 4; i++) Rg.items.push({ uid: 910 + i, id: 'pond', x: 0, y: 0, paid: 50 }); // 저지대 자리보다 많은 연못
   G.adopt(S, R, 'rabbit');
   const a = Rg.animals[0]; a.x = 0.5; a.y = 0.5; // 봉우리 위
   const raw = G.serialize(S, 0), L = G.deserialize(raw);
   const items = L.regions[R].items;
   for (const it of items) assert.ok(T.terrainFits(R, it.id, it.x, it.y), it.id);
-  assert.ok(items.some((it) => it.uid === 901 && it.x === 9 && it.y === 10), '맞는 물건은 그대로');
+  assert.ok(items.some((it) => it.uid === 901 && it.x === 20 && it.y === 36), '맞는 물건은 그대로');
   const ponds = items.filter((it) => it.id === 'pond').length, refunded = 5 - ponds;
   assert.ok(ponds >= 1 && refunded >= 1, `연못 ${ponds}개 남고 ${refunded}개 환불`);
   assert.equal(pop(L), pop(S) + refunded * 50);
@@ -486,4 +486,48 @@ test('v2 세이브(요청을 같이 씀) → v3: 요청은 낸 지역으로 나�
   assert.deepEqual(G.requestsOf(L, 'seaside').map((q) => q.uid), [802]);
   assert.equal(L.regions.seaside.reqSwapAt, 42);
   assert.equal(G.deserialize(JSON.stringify({ ...o, requests: 'x' })), null);
+});
+
+test('v3 세이브(땅 20×20칸) → v4(40×40칸): 물건·동물 좌표를 2배로, 새 지도에 맞게 놓인다', () => {
+  const S = rich(1000);
+  setTier(S, 7);
+  const o = JSON.parse(G.serialize(S, 0));
+  o.v = 3;
+  o.regions[R].items = [{ uid: 700, id: 'pond', x: 7, y: 6, paid: 40 }, { uid: 701, id: 'hutch', x: 3, y: 12, paid: 10 }];
+  o.regions[R].animals = [{ uid: 702, sp: 'rabbit', x: 11.5, y: 3.5, st: 'walk', t: 1, path: [[12, 3]], goal: 'eat', face: 1, ph: 0, jx: 0, jy: 0, paid: 15 }];
+  const L = G.deserialize(JSON.stringify(o));
+  assert.equal(L.v, G.SAVE_VERSION);
+  const pond = L.regions[R].items.find((it) => it.uid === 700), hutch = L.regions[R].items.find((it) => it.uid === 701);
+  assert.deepEqual([pond.x, pond.y], [14, 12], '저지대 연못은 같은 자리(2배 좌표)');
+  assert.ok(hutch && T.terrainFits(R, 'hutch', hutch.x, hutch.y));
+  const a = L.regions[R].animals[0];
+  assert.deepEqual([a.x, a.y], [23, 7]);
+  assert.equal(a.path, null);
+  assert.equal(a.st, 'idle');
+});
+
+test('작은 계단: 높이가 다른 지형 사이는 한 칸에 한 계단(높이 1/3단계)씩, 계단 칸은 걷기만 하고 물건은 못 놓는다', () => {
+  const S = rich();
+  setTier(S, 8);
+  let ones = 0, twos = 0;
+  for (const rid of ['grassland', 'seaside', 'desert', 'antarctic']) {
+    for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+      const k = T.kindAt(rid, x, y), h = T.heightAt(rid, x, y);
+      if (k === 'peak' || k === 'water') continue;
+      // 이웃 칸과의 높이 차는 한 계단(1/3단계)을 넘지 않는다. 봉우리·물, 낮은 언덕이 저지대에 바로 닿는 곳(모래 언덕 절벽)은 뺀다
+      for (const [dx, dy] of [[1, 0], [0, 1]]) {
+        const nk = T.kindAt(rid, x + dx, y + dy);
+        if (!nk || nk === 'peak' || nk === 'water') continue;
+        const diff = Math.round(Math.abs(T.heightAt(rid, x + dx, y + dy) - h) * T.SUB);
+        if (k === 'high' || nk === 'high') continue; // 높은 언덕은 저지대 바로 옆이면 절벽으로 남는다(모래 언덕·바위 곶)
+        assert.ok(diff <= 2, `${rid} (${x},${y})→(${x + dx},${y + dy}) ${diff}계단`); // 언덕과 저지대가 가까운 곳만 두 계단 턱
+        if (diff === 2) twos++; else if (diff === 1) ones++;
+      }
+      if (k === 'step') assert.ok(G.walkable(S, rid, x, y), `${rid} 계단 칸은 걷는다`);
+    }
+  }
+  assert.ok(twos * 10 < ones, `두 계단 턱 ${twos}곳 / 한 계단 ${ones}곳`);
+  const step = T.terrainOf(R).indexOf('step'), sx = step % GRID, sy = (step - sx) / GRID;
+  assert.ok(step >= 0);
+  assert.equal(G.canPlace(S, R, 'hutch', sx, sy).ok, false, '계단 칸엔 물건을 못 놓는다');
 });

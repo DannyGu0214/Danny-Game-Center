@@ -38,10 +38,10 @@ import * as R_ORCA from './rigs/orca.js';
 import * as I_SEASIDE from './items/seaside.js';
 import * as I_DESERT from './items/desert.js';
 import * as I_ANTARCTIC from './items/antarctic.js';
-import { terrainOf, TERRAIN, LEVEL } from './terrain.js';
+import { baseOf, heightAt, LEVEL } from './terrain.js';
 
 export const ISO_A = 0.7071, ISO_B = 0.3536;
-export const TILE = 32;
+export const TILE = 16; // 2026-10-27 32에서 반으로(땅 40×40칸, 땅 크기 640은 그대로)
 
 // ---------- 난수·색 ----------
 export function hash(a, b, c = 0) {
@@ -327,9 +327,9 @@ export const slabOf = (G) => G * 0.075; // 흙 단면 두께(땅 크기에 비�
 // onDiag(d)는 대각선 d(x+y)를 다 그린 뒤 불린다(바닥 물건을 그 사이에 끼워 그리게).
 export const PEAK_EXTRA = 30; // 봉우리 위 바위·얼음 기둥이 칸 윗면보다 더 올라가는 높이(가림 계산용)
 export function drawIsland(pen, G, n, pal, seed = 1, rid = null, onDiag = null) {
-  const D = slabOf(G), T = G / n, ter = rid ? terrainOf(rid) : null;
+  const D = slabOf(G), T = G / n, ter = rid ? baseOf(rid) : null; // 색·장식은 지도 지형, 높이는 작은 계단까지 반영한 heightAt
   const kindAt = (x, y) => (x < 0 || y < 0 || x >= n || y >= n ? null : ter ? ter[y * n + x] : 'flat');
-  const zAt = (x, y) => { const k = kindAt(x, y); return k ? TERRAIN[k].h * LEVEL : -D; };
+  const zAt = (x, y) => (!kindAt(x, y) ? -D : rid ? heightAt(rid, x, y) * LEVEL : 0);
   const up = (z) => ({ ctx: pen.ctx, zoom: pen.zoom, P: (x, y, zz = 0) => pen.P(x, y, zz + z) });
   // 아래로 처진 흙덩이(섬 바닥)
   const R = rng(seed + 0.17);
@@ -358,41 +358,44 @@ export function drawIsland(pen, G, n, pal, seed = 1, rid = null, onDiag = null) 
         else line(pen, a, b, edge ? (side === 'x' ? shade(pal.lip, 0.85) : pal.lip) : shade(col, 1.06), edge ? 2.2 : 1.6); // 윗면 가장자리 테두리
       }
       // 윗면
-      poly(pen, [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], k === 'water' ? pal.water[Math.floor(h * pal.water.length)] : col);
+      const hw = hash(Math.floor(x * T / 32), Math.floor(y * T / 32), seed); // 물빛은 32단위 덩어리로(작은 칸마다 바뀌면 모자이크처럼 보인다)
+      poly(pen, [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], k === 'water' ? pal.water[Math.floor(hw * pal.water.length)] : col);
       const P2 = up(z), r = rng(hash(x, y, seed + 3) + 0.01), px = () => (x + 0.15 + r() * 0.7) * T, py = () => (y + 0.15 + r() * 0.7) * T;
+      // 장식 수는 칸 넓이에 비례(32단위 칸 기준 m개 → 작은 칸에선 평균 m×넓이비). 칸이 작아져도 땅 전체 밀도는 같다
+      const AR = (T / 32) ** 2, many = (m) => Math.floor(m * AR + r()), maybe = (p) => r() < p * AR;
       if (k === 'water') { // 물결과, 땅에 닿은 가장자리 거품
-        for (let i = 0; i < 2; i++) { const cx = px(), cy = py(); line(P2, [cx - 4, cy - 1, 0.1], [cx, cy + 1, 0.1], rgba(pal.foam, 0.45), 0.8); line(P2, [cx, cy + 1, 0.1], [cx + 4, cy - 1, 0.1], rgba(pal.foam, 0.45), 0.8); }
+        for (let i = many(2); i > 0; i--) { const cx = px(), cy = py(); line(P2, [cx - 4, cy - 1, 0.1], [cx, cy + 1, 0.1], rgba(pal.foam, 0.45), 0.8); line(P2, [cx, cy + 1, 0.1], [cx + 4, cy - 1, 0.1], rgba(pal.foam, 0.45), 0.8); }
         for (const [nx, ny, e] of [[x - 1, y, [[x0, y0], [x0, y1]]], [x + 1, y, [[x1, y0], [x1, y1]]], [x, y - 1, [[x0, y0], [x1, y0]]], [x, y + 1, [[x0, y1], [x1, y1]]]]) {
           const nk = kindAt(nx, ny);
           if (nk && nk !== 'water') line(P2, [e[0][0], e[0][1], 0.2], [e[1][0], e[1][1], 0.2], rgba(pal.foam, 0.85), 2);
         }
         continue;
       }
-      if (k === 'peak') { // 봉우리: 칸 위에 솟은 바위·메사·얼음 기둥
-        const sp = pal.spire;
-        lump(P2, (x + 0.5) * T, (y + 0.5) * T, sp.r, sp.h, sp.col, r, { top: sp.top, mid: sp.mid ?? 0.86 });
-        if (pal.deco === 'snow' || pal.deco === 'tuft') lump(P2, (x + 0.5) * T, (y + 0.5) * T, sp.r * sp.top * 1.2, 3, pal.deco === 'snow' ? '#ffffff' : '#b9c27a', r, { top: 0.6 });
+      if (k === 'peak') { // 봉우리: 칸 위에 솟은 바위·메사·얼음 기둥(작은 칸이 모여 바위 무리)
+        const sp = pal.spire, ks = Math.min(1, T / 32 * 1.25), kh = Math.min(1, 0.55 + T / 64), cx = (x + 0.5 + (r() - 0.5) * 0.3) * T, cy = (y + 0.5 + (r() - 0.5) * 0.3) * T;
+        lump(P2, cx, cy, sp.r * ks, sp.h * kh * (0.8 + r() * 0.4), sp.col, r, { top: sp.top, mid: sp.mid ?? 0.86 });
+        if (pal.deco === 'snow' || pal.deco === 'tuft') lump(P2, cx, cy, sp.r * ks * sp.top * 1.2, 3, pal.deco === 'snow' ? '#ffffff' : '#b9c27a', r, { top: 0.6 });
         continue;
       }
       if (k === 'path') { // 길: 흙·돌길 자갈, 나무 데크 판자, 눈길 발자국
-        if (pal.pathDeco === 'planks') for (let i = 1; i < 4; i++) line(P2, [x0 + i * T / 4, y0 + 1, 0.1], [x0 + i * T / 4, y1 - 1, 0.1], shade(col, 0.82), 0.7);
-        else if (pal.pathDeco === 'prints') for (let i = 0; i < 3; i++) { const cx = px(), cy = py(); puff(P2, cx, cy, 0.2, 0.9, shade(col, 0.9)); puff(P2, cx + 2.4, cy + 1.2, 0.2, 0.9, shade(col, 0.9)); }
-        else for (let i = 0; i < 3; i++) puff(P2, px(), py(), 0.4, 0.8 + r() * 0.9, shade(col, 0.82 + r() * 0.12));
+        if (pal.pathDeco === 'planks') for (let u = 8; u < T; u += 8) line(P2, [x0 + u, y0 + 1, 0.1], [x0 + u, y1 - 1, 0.1], shade(col, 0.82), 0.7); // 판자 8단위 간격
+        else if (pal.pathDeco === 'prints') for (let i = many(3); i > 0; i--) { const cx = px(), cy = py(); puff(P2, cx, cy, 0.2, 0.9, shade(col, 0.9)); puff(P2, cx + 2.4, cy + 1.2, 0.2, 0.9, shade(col, 0.9)); }
+        else for (let i = many(3); i > 0; i--) puff(P2, px(), py(), 0.4, 0.8 + r() * 0.9, shade(col, 0.82 + r() * 0.12));
         continue;
       }
-      if (r() < 0.55) soft(P2, (x + 0.3 + r() * 0.4) * T, (y + 0.3 + r() * 0.4) * T, 7 + r() * 5, r() < 0.5 ? pal.blot[0] : pal.blot[1], 0.35);
-      const nk = 1 + Math.floor(r() * 3);
+      if (maybe(0.55)) soft(P2, (x + 0.3 + r() * 0.4) * T, (y + 0.3 + r() * 0.4) * T, 7 + r() * 5, r() < 0.5 ? pal.blot[0] : pal.blot[1], 0.35);
+      const nk = many(2);
       if (pal.deco === 'tuft') { for (let i = 0; i < nk; i++) tuft(P2, px(), py(), (k === 'low' ? 5 : 4) + r() * 3, pal.tuft[i % 2], r); continue; }
       if (pal.deco === 'shell' || pal.deco === 'pebble') { // 바람에 생긴 모래결 + 조개껍데기·자갈
-        if (r() < 0.6) { const cx = px(), cy = py(); line(P2, [cx - 5, cy - 2, 0.1], [cx + 5, cy + 2, 0.1], shade(col, 0.9), 0.7); line(P2, [cx - 4, cy + 1, 0.1], [cx + 4, cy + 4, 0.1], shade(col, 0.92), 0.6); }
-        for (let i = 0; i < nk - 1; i++) puff(P2, px(), py(), 0.6, 0.9 + r() * 0.6, pal.tuft[i % 2]);
-        if (pal.deco === 'pebble' && r() < (k === 'low' ? 0.5 : 0.18)) tuft(P2, px(), py(), 3.5, '#8d9a52', r, 4); // 마른 덤불(오아시스 저지대엔 더 많이)
-        if (pal.deco === 'shell' && r() < 0.12) tuft(P2, px(), py(), 5, '#9fae62', r, 3); // 드문 해안 풀
+        if (maybe(0.6)) { const cx = px(), cy = py(); line(P2, [cx - 5, cy - 2, 0.1], [cx + 5, cy + 2, 0.1], shade(col, 0.9), 0.7); line(P2, [cx - 4, cy + 1, 0.1], [cx + 4, cy + 4, 0.1], shade(col, 0.92), 0.6); }
+        for (let i = many(1); i > 0; i--) puff(P2, px(), py(), 0.6, 0.9 + r() * 0.6, pal.tuft[i % 2]);
+        if (pal.deco === 'pebble' && maybe(k === 'low' ? 0.5 : 0.18)) tuft(P2, px(), py(), 3.5, '#8d9a52', r, 4); // 마른 덤불(오아시스 저지대엔 더 많이)
+        if (pal.deco === 'shell' && maybe(0.12)) tuft(P2, px(), py(), 5, '#9fae62', r, 3); // 드문 해안 풀
         continue;
       }
       // 눈: 반짝이는 점과 얼음 금
       for (let i = 0; i < nk; i++) puff(P2, px(), py(), 0.4, 0.6 + r() * 0.5, '#ffffff');
-      if (r() < 0.2) { const cx = px(), cy = py(); line(P2, [cx - 4, cy, 0.1], [cx + 1, cy + 3, 0.1], '#c4d8e6', 0.6); line(P2, [cx + 1, cy + 3, 0.1], [cx + 5, cy + 1, 0.1], '#c4d8e6', 0.6); }
+      if (maybe(0.2)) { const cx = px(), cy = py(); line(P2, [cx - 4, cy, 0.1], [cx + 1, cy + 3, 0.1], '#c4d8e6', 0.6); line(P2, [cx + 1, cy + 3, 0.1], [cx + 5, cy + 1, 0.1], '#c4d8e6', 0.6); }
     }
     onDiag?.(d);
   }

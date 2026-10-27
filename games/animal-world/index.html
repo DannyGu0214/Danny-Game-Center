@@ -369,7 +369,7 @@ function columnOf(rid, x, y, proj = P) {
   const x0 = x * T, x1 = x0 + T, y0 = y * T, y1 = y0 + T;
   return [proj(x0, y0, zt), proj(x1, y0, zt), proj(x1, y0, zb), proj(x1, y1, zb), proj(x0, y1, zb), proj(x0, y1, zt)];
 }
-// 뒤에 있는 동물·물건을 가릴 수 있는 칸: 뒤쪽(2칸 안) 칸보다 높은 칸과 봉우리. 지역마다 한 번 계산
+// 뒤에 있는 동물·물건을 가릴 수 있는 칸: 뒤쪽(64단위, 4칸 안) 칸보다 높은 칸과 봉우리. 지역마다 한 번 계산
 const occCache = {};
 function occludersOf(rid) {
   if (occCache[rid]) return occCache[rid];
@@ -377,8 +377,9 @@ function occludersOf(rid) {
   for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
     const z = heightAt(rid, x, y);
     let low = Infinity;
-    for (let dy = 0; dy <= 2; dy++) for (let dx = 0; dx <= 2; dx++) if ((dx || dy) && x - dx >= 0 && y - dy >= 0) low = Math.min(low, heightAt(rid, x - dx, y - dy));
-    if (kindAt(rid, x, y) === 'peak' || z > low) out.push({ x, y, key: x + y });
+    const B = Math.round(64 / T);
+    for (let dy = 0; dy <= B; dy++) for (let dx = 0; dx <= B; dx++) if ((dx || dy) && x - dx >= 0 && y - dy >= 0) low = Math.min(low, heightAt(rid, x - dx, y - dy));
+    if (kindAt(rid, x, y) === 'peak' || z > low) out.push({ x, y, key: x + y, zt: z * LEVEL });
   }
   return (occCache[rid] = out);
 }
@@ -397,10 +398,10 @@ function occArt(o, isl) {
   isl.occ.set(o, a);
   return a;
 }
-// 가리는 칸을 다시 찍는다(그 칸에 겹친, 먼저 그린 동물·물건이 있을 때만)
+// 가리는 칸을 다시 찍는다(그 칸에 겹치고, 그 칸 윗면보다 낮은 곳에 선, 먼저 그린 동물·물건이 있을 때만). boxes = [왼, 위, 오른, 아래, 발밑 높이]
 function stampColumn(o, boxes, isl, ix, iy) {
   const a = occArt(o, isl), bb = [ix + a.l, iy + a.t, ix + a.l + a.w, iy + a.t + a.h];
-  if (!boxes.some((b) => overlaps(b, bb))) return;
+  if (!boxes.some((b) => b[4] < o.zt - 0.5 && overlaps(b, bb))) return;
   sctx.drawImage(a.c, bb[0], bb[1], a.w, a.h);
 }
 function inPoly(q, x, y) {
@@ -500,7 +501,7 @@ function draw(dt) {
     }
     const kk = k * (0.96 + (a.uid % 5) * 0.02), [bw, bh] = A.ANIMAL_BOX[a.sp];
     if (A.RIGGED.has(a.sp)) drawOutlined(g, a.sp, sx, sy, kk, pose); else A.drawAnimal(g, a.sp, sx, sy, kk, pose);
-    boxes.push([sx - (bw + 4) * kk, sy - (bh + 8) * kk, sx + (bw + 4) * kk, sy + 2 * kk]);
+    boxes.push([sx - (bw + 4) * kk, sy - (bh + 8) * kk, sx + (bw + 4) * kk, sy + 2 * kk, mem.get(a.uid)?.z ?? groundZ(a)]);
     if (a.st === 'special' && a.sp === 'elephant' && Math.random() < dt * 30) emit(a, 'spray');
     if (a.st === 'special' && a.sp === 'zebra' && Math.random() < dt * 8) emit(a, 'dust');
   }
@@ -508,11 +509,13 @@ function draw(dt) {
   if (UI.sel?.type === 'item') { const it = R.items.find((i) => i.uid === UI.sel.uid); if (it) A.footprint(pen, it.x, it.y, ITEMS[it.id].w, ITEMS[it.id].h, 'rgba(255,255,255,0.18)', '#ffffff', itemZ(it)); }
   if (UI.place) {
     const id = UI.place.id, d = ITEMS[id], on = allowedOn(id), z = heightAt(rid, UI.place.x, UI.place.y) * LEVEL;
+    g.beginPath(); // 칸이 많아 한 번에 칠한다
     for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
       if (!on.includes(kindAt(rid, x, y)) || G.itemAt(S, rid, x, y)) continue;
-      const zz = heightAt(rid, x, y) * LEVEL + 0.3;
-      A.poly(pen, [[x * T + 1, y * T + 1, zz], [(x + 1) * T - 1, y * T + 1, zz], [(x + 1) * T - 1, (y + 1) * T - 1, zz], [x * T + 1, (y + 1) * T - 1, zz]], 'rgba(255,255,255,0.22)');
+      const zz = heightAt(rid, x, y) * LEVEL + 0.3, q = [P(x * T + 0.5, y * T + 0.5, zz), P((x + 1) * T - 0.5, y * T + 0.5, zz), P((x + 1) * T - 0.5, (y + 1) * T - 0.5, zz), P(x * T + 0.5, (y + 1) * T - 0.5, zz)];
+      g.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) g.lineTo(q[i][0], q[i][1]); g.closePath();
     }
+    g.fillStyle = 'rgba(255,255,255,0.22)'; g.fill();
     const okSpot = G.fits(S, rid, id, UI.place.x, UI.place.y), cash = G.popOf(S) >= itemPrice(d.tier);
     A.footprint(pen, UI.place.x, UI.place.y, d.w, d.h, okSpot && cash ? 'rgba(120,220,90,0.35)' : 'rgba(230,80,60,0.35)', okSpot && cash ? '#e8ffd8' : '#ffd2c8', z);
     const s = itemSprite(id, 0), [gx, gy] = P((UI.place.x + d.w / 2) * T, (UI.place.y + d.h / 2) * T, z);
@@ -540,7 +543,7 @@ function draw(dt) {
 function drawItemAt(it, d) {
   const [sx, sy] = P((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it)), s = itemSprite(it.id, it.uid % 3);
   blitAt(s, sx, sy);
-  return [sx - s.ax, sy - s.ay, sx - s.ax + s.w, sy - s.ay + s.h];
+  return [sx - s.ax, sy - s.ay, sx - s.ax + s.w, sy - s.ay + s.h, itemZ(it)];
 }
 
 // ---------- 입력: 탭(선택·포착·놓을 자리), 확대 중에는 끌어서 둘러보기 ----------

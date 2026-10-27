@@ -7,7 +7,7 @@ import {
 import { TERRAIN, kindAt, terrainFits, allowedOn, hasWater, terrainOf } from './terrain.js';
 
 export const STEP = 1 / 30;
-export const SAVE_VERSION = 3; // 2: 인기점수를 지역마다 따로(R.pop), 쉬는 지역은 R.away부터 정산 · 3: 관람객 요청도 지역마다 따로(R.requests·R.reqSwapAt)
+export const SAVE_VERSION = 4; // 2: 인기점수를 지역마다 따로(R.pop), 쉬는 지역은 R.away부터 정산 · 3: 관람객 요청도 지역마다 따로(R.requests·R.reqSwapAt) · 4: 땅 40×40칸(좌표 2배)
 const SAVE_KEYS = ['v', 'rng', 'earned', 'time', 'savedAt', 'view', 'regions', 'album', 'chance', 'chanceIn', 'uid'];
 
 // ---------- 난수(mulberry32) ----------
@@ -148,15 +148,26 @@ export function fits(S, rid, id, x, y) {
   for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GRID + xx]) return false;
   return true;
 }
-// 물건이 들어갈 자리: 그 물건에 권하는 지형(은신처·먹이 → 낮은 언덕, 놀이 → 높은 언덕) 먼저, 그다음 가운데에 가까운 순서. 없으면 null
-export function freeSpot(S, rid, id) {
+// 물건이 들어갈 자리: 그 물건에 권하는 지형(은신처·먹이 → 낮은 언덕, 놀이 → 높은 언덕) 먼저, 그다음 가운데에 가까운 순서. 없으면 null.
+// 지형은 바뀌지 않으므로 지형에 맞는 후보 목록은 지역·물건마다 한 번만 만들고(1,600칸이라 매번 정렬하면 느리다), 빈자리만 확인한다
+const spotLists = {};
+function spotList(rid, id) {
+  const key = rid + ':' + id;
+  if (spotLists[key]) return spotLists[key];
   const d = ITEMS[id], c = (GRID - 1) / 2, cand = [], on = allowedOn(id);
   for (let y = 0; y + d.h <= GRID; y++) for (let x = 0; x + d.w <= GRID; x++) {
     const pref = on.indexOf(kindAt(rid, x, y));
-    if (pref >= 0) cand.push([x, y, pref * 100 + Math.hypot(x + (d.w - 1) / 2 - c, y + (d.h - 1) / 2 - c)]);
+    if (pref >= 0 && terrainFits(rid, id, x, y)) cand.push([x, y, pref * 100 + Math.hypot(x + (d.w - 1) / 2 - c, y + (d.h - 1) / 2 - c)]);
   }
   cand.sort((a, b) => a[2] - b[2]);
-  for (const [x, y] of cand) if (fits(S, rid, id, x, y)) return [x, y];
+  return (spotLists[key] = cand.map(([x, y]) => [x, y]));
+}
+export function freeSpot(S, rid, id) {
+  const d = ITEMS[id], occ = occupancy(S, rid);
+  next: for (const [x, y] of spotList(rid, id)) {
+    for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GRID + xx]) continue next;
+    return [x, y];
+  }
   return null;
 }
 
@@ -194,7 +205,7 @@ export function adopt(S, rid, sp) {
   const spot = spawnTile(S, rid, isSwimmer(sp));
   const a = {
     uid: S.uid++, sp, x: spot[0] + 0.5, y: spot[1] + 0.5, st: 'idle', t: range(S, 0.5, 2), path: null, goal: null,
-    face: rnd(S) < 0.5 ? -1 : 1, ph: range(S, 0, 10), jx: range(S, -0.22, 0.22), jy: range(S, -0.22, 0.22), paid: price,
+    face: rnd(S) < 0.5 ? -1 : 1, ph: range(S, 0, 10), jx: range(S, -0.3, 0.3), jy: range(S, -0.3, 0.3), paid: price,
   };
   S.regions[rid].animals.push(a);
   refresh(S, rid);
@@ -315,7 +326,7 @@ function decide(S, rid, a) {
   if (s.swim) {
     if (r < 0.3) return arrive(a, rnd(S) < 0.5 ? 'eat' : 'rest');
     if (r < 0.85) {
-      const tx = clamp(from[0] + Math.round(range(S, -3, 3)), 0, GRID - 1), ty = clamp(from[1] + Math.round(range(S, -3, 3)), 0, GRID - 1);
+      const tx = clamp(from[0] + Math.round(range(S, -6, 6)), 0, GRID - 1), ty = clamp(from[1] + Math.round(range(S, -6, 6)), 0, GRID - 1);
       const path = findPath(S, rid, from, (x, y) => x === tx && y === ty, true);
       if (path && path.length) return go(a, path, null);
     }
@@ -329,7 +340,7 @@ function decide(S, rid, a) {
   }
   if (r < 0.5) {
     // 높은 언덕에 올라가 쉬거나(전망), 가까운 길로 나선다(길을 조금 더 좋아하지만 길로만 다니지는 않는다)
-    const want = r < 0.44 ? 'high' : 'path', near = terrainTiles(rid, want).filter(([x, y]) => Math.abs(x - from[0]) + Math.abs(y - from[1]) <= (want === 'high' ? 12 : 6));
+    const want = r < 0.44 ? 'high' : 'path', near = terrainTiles(rid, want).filter(([x, y]) => Math.abs(x - from[0]) + Math.abs(y - from[1]) <= (want === 'high' ? 24 : 12));
     if (near.length) {
       const [tx, ty] = pick(S, near), path = findPath(S, rid, from, (x, y) => x === tx && y === ty);
       if (path && path.length) return go(a, path, want === 'high' ? 'rest' : null);
@@ -337,10 +348,10 @@ function decide(S, rid, a) {
   }
   if (r < 0.8) {
     // 배회: 무리 동물은 같은 종 근처로
-    let cx = from[0], cy = from[1], rad = 5;
+    let cx = from[0], cy = from[1], rad = 10;
     if (s.needs.includes('herd') && rnd(S) < 0.6) {
       const mates = R.animals.filter((b) => b !== a && b.sp === a.sp);
-      if (mates.length) { const m = pick(S, mates); [cx, cy] = tileOf(m); rad = 2; }
+      if (mates.length) { const m = pick(S, mates); [cx, cy] = tileOf(m); rad = 4; }
     }
     const tx = clamp(cx + Math.round(range(S, -rad, rad)), 0, GRID - 1), ty = clamp(cy + Math.round(range(S, -rad, rad)), 0, GRID - 1);
     const path = findPath(S, rid, from, (x, y) => x === tx && y === ty);
@@ -551,7 +562,7 @@ export function serialize(S, now = Date.now()) {
 export function deserialize(raw) {
   let o;
   try { o = JSON.parse(raw); } catch { return null; }
-  if (!o || !o.regions || !(o.v === SAVE_VERSION || (o.v === 2 && Array.isArray(o.requests)) || (o.v === 1 && typeof o.pop === 'number' && Array.isArray(o.requests)))) return null;
+  if (!o || !o.regions || !(o.v === SAVE_VERSION || o.v === 3 || (o.v === 2 && Array.isArray(o.requests)) || (o.v === 1 && typeof o.pop === 'number' && Array.isArray(o.requests)))) return null;
   const S = { ...o, events: [] };
   for (const r of REGIONS) S.regions[r.id] ??= newRegion(0);
   for (const r of REGIONS) {
@@ -562,6 +573,7 @@ export function deserialize(raw) {
   touch(S);
   if (S.v === 1) migrateV1(S);
   if (S.v === 2) migrateV2(S);
+  if (S.v === 3) migrateV3(S);
   for (const r of REGIONS) { const R = S.regions[r.id]; R.pop ??= ECON.start; if (R.away === undefined) R.away = r.id === S.view ? null : S.time; R.requests ??= []; R.reqSwapAt ??= 0; }
   fitTerrain(S);
   return S;
@@ -586,6 +598,17 @@ function migrateV2(S) {
   for (const r of REGIONS) { const R = S.regions[r.id]; R.requests = []; R.reqSwapAt = S.reqSwapAt || 0; }
   for (const q of S.requests || []) S.regions[q.region]?.requests.push(q);
   delete S.requests; delete S.reqSwapAt;
+  S.v = 3;
+}
+// v3(땅 20×20칸) → v4(40×40칸, 칸 크기 반): 물건·동물 좌표를 2배로. 걷던 동물은 멈추고 다시 길을 정한다.
+// 새 지도에 맞지 않는 물건은 이어서 fitTerrain이 가까운 맞는 자리로 옮긴다
+function migrateV3(S) {
+  for (const r of REGIONS) {
+    const R = S.regions[r.id];
+    for (const it of R.items) { it.x *= 2; it.y *= 2; }
+    for (const a of R.animals) { a.x *= 2; a.y *= 2; a.path = null; a.goal = null; if (a.st === 'walk') { a.st = 'idle'; a.t = 0.5; } }
+  }
+  touch(S);
   S.v = SAVE_VERSION;
 }
 // 지형이 생기기 전 세이브: 지형에 맞지 않는 물건은 가까운 맞는 자리로 옮기고, 자리가 없으면 낸 값을 모두 돌려준다.
