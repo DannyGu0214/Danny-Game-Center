@@ -237,7 +237,7 @@ const T = A.TILE, WG = GRID * T, ISO_A = A.ISO_A, ISO_B = A.ISO_B, SLAB = A.slab
 const SAVE_KEY = 'animal-world.save';
 
 let S = null;
-const UI = { sheet: null, tab: 'terrain', place: null, sel: null, follow: null, zl: 0, cam: { x: 0, y: 0 }, seen: { animals: {}, decor: {}, regions: {} }, confirm: null };
+const UI = { sheet: null, tab: 'terrain', place: null, sel: null, follow: null, zl: 0, zf: 1, cam: { x: 0, y: 0 }, seen: { animals: {}, decor: {}, regions: {} }, confirm: null };
 
 // ---------- 저장 ----------
 function save() {
@@ -259,6 +259,8 @@ function saveSeen() { try { localStorage.setItem(SAVE_KEY + '.seen', JSON.string
 
 // ---------- 화면 크기·투영 ----------
 let VW = 0, VH = 0, DPR = 1, Z0 = 1, zoom = 1, cx = 0, cy = 0, horizon = 0;
+// zoom = 지금 화면 배율(Z0 × UI.zf), artZoom = 땅·물건 그림을 마지막으로 그린 배율. 핀치하는 동안은 그 그림을 늘려 보여 주고, 손을 떼면 다시 그린다
+let artZoom = 1;
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   const r = view.getBoundingClientRect();
@@ -272,22 +274,29 @@ function resize() {
   Z0 = Math.max(0.15, Math.min((VW - 16) / (2 * WG * ISO_A), (availH - 20) / (2 * WG * ISO_B + SLAB + 80)));
   cx = VW / 2; cy = top + 80 * Z0 + WG * ISO_B * Z0 + (availH - 80 * Z0 - (2 * WG * ISO_B + SLAB) * Z0) * 0.5;
   horizon = cy - WG * ISO_B * Z0 - 10;
-  setZoom(UI.zl);
+  zoom = Z0 * UI.zf; // 화면 크기가 바뀌면 같은 배율로 다시 맞춘다
+  setZoomF(UI.zf);
 }
-// 확대 단계: 1× · 1.5× · 2× · 3× · 4×(최대). 바꿀 때 화면 가운데 보던 곳을 그대로 둔다
+// 확대 단추: 1× · 1.5× · 2× · 3× · 4×(최대). 두 손가락 핀치·Ctrl+휠로는 그 사이 아무 배율이나(1~4×). 지금 배율에 가장 가까운 단추가 켜진다
 const ZOOMS = [1, 1.5, 2, 3, 4];
-function setZoom(i) {
+function setZoom(i) { setZoomF(ZOOMS[i]); if (i === 0) { UI.cam.x = 0; UI.cam.y = 0; UI.follow = null; } }
+// 배율 f(1~4)로. (ax, ay) 화면 점 아래 땅이 그 자리에 머문다(기본은 화면 가운데). live면 그림은 다시 그리지 않고 늘려 보여 준다
+function setZoomF(f, ax = cx, ay = cy, live = false, toX = ax, toY = ay) {
   const old = zoom;
-  UI.zl = i;
-  zoom = Z0 * ZOOMS[i];
-  if (i === 0) { UI.cam.x = 0; UI.cam.y = 0; UI.follow = null; } else { UI.cam.x *= zoom / old; UI.cam.y *= zoom / old; }
+  UI.zf = Math.max(1, Math.min(ZOOMS[ZOOMS.length - 1], f));
+  zoom = Z0 * UI.zf;
+  const u = (ax - cx + UI.cam.x) / old, v = (ay - cy + UI.cam.y) / old; // 고정할 점의 땅 좌표(배율 1 기준)
+  UI.cam.x = cx + u * zoom - toX; UI.cam.y = cy + v * zoom - toY;
   clampCam();
-  clearArt();
-  for (const b of document.querySelectorAll('#zoombar button')) b.classList.toggle('on', Number(b.dataset.z) === i);
+  UI.zl = ZOOMS.reduce((b, z, i) => (Math.abs(z - UI.zf) < Math.abs(ZOOMS[b] - UI.zf) ? i : b), 0);
+  for (const b of document.querySelectorAll('#zoombar button')) b.classList.toggle('on', Number(b.dataset.z) === UI.zl);
+  if (!live) commitZoom();
 }
+// 지금 배율로 땅·물건 그림을 다시 그린다
+function commitZoom() { if (artZoom !== zoom) { artZoom = zoom; clearArt(); } }
 // 확대한 만큼만 끌어서 둘러볼 수 있다(땅 가장자리까지)
 function clampCam() {
-  const L = ZOOMS[UI.zl] - 1, mx = WG * ISO_A * Z0 * L, my = WG * ISO_B * Z0 * L + (L > 0 ? 40 : 0);
+  const L = UI.zf - 1, mx = WG * ISO_A * Z0 * L, my = WG * ISO_B * Z0 * L + (L > 0 ? 40 : 0);
   UI.cam.x = Math.max(-mx, Math.min(mx, UI.cam.x)); UI.cam.y = Math.max(-my, Math.min(my, UI.cam.y));
 }
 window.addEventListener('resize', resize);
@@ -323,16 +332,16 @@ function canvasOf(w, h, sc = DPR) {
 }
 // 땅 그림 한 장의 최대 픽셀 수: 4×로 크게 보면 땅 그림이 커져서, 넘으면 해상도를 조금 낮춰 그린다(iOS 캔버스 한도 약 1,670만 픽셀)
 const ISLAND_MAX_PX = 12e6;
-const isoX = (x, y) => (x - y) * ISO_A * zoom, isoY = (x, y) => (x + y) * ISO_B * zoom;
+const isoX = (x, y) => (x - y) * ISO_A * artZoom, isoY = (x, y) => (x + y) * ISO_B * artZoom; // 그림 캐시용(artZoom)
 function itemSprite(id, v) {
   const key = id + '|' + v;
   let s = sprites.get(key);
   if (s) return s;
   const [r, h] = A.ITEM_BOX[id];
-  const w = Math.ceil(2 * (r + 10) * zoom), hh = Math.ceil((h + r + 22) * zoom);
-  const ax = w / 2, ay = Math.ceil((h + r * 0.5 + 12) * zoom);
+  const az = artZoom, w = Math.ceil(2 * (r + 10) * az), hh = Math.ceil((h + r + 22) * az);
+  const ax = w / 2, ay = Math.ceil((h + r * 0.5 + 12) * az);
   const [c, g] = canvasOf(w, hh);
-  A.drawItem({ ctx: g, zoom, P: (x, y, z = 0) => [isoX(x, y) + ax, isoY(x, y) + ay - z * zoom] }, id, v + 1);
+  A.drawItem({ ctx: g, zoom: az, P: (x, y, z = 0) => [isoX(x, y) + ax, isoY(x, y) + ay - z * az] }, id, v + 1);
   s = { c, ax, ay, w, h: hh };
   sprites.set(key, s);
   return s;
@@ -344,11 +353,11 @@ function islandArt() {
   const floors = R.items.filter((it) => A.FLOOR.has(it.id)), sig = floors.map((it) => `${it.uid}:${it.x}:${it.y}`).join(',');
   if (island && island.rid === S.view && island.sig === sig) { island.rev = S.rev; return island; }
   freeIsland();
-  const m = 10, w = 2 * WG * ISO_A * zoom + 2 * m, h = (2 * WG * ISO_B + SLAB * 1.6 + TOPZ) * zoom + 2 * m + 10;
-  const ox = WG * ISO_A * zoom + m, oy = m + 8 + TOPZ * zoom;
-  const sc = Math.min(DPR, Math.sqrt(ISLAND_MAX_PX / (w * h))), [c, g] = canvasOf(w, h, sc), IP = (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * zoom];
+  const az = artZoom, m = 10, w = 2 * WG * ISO_A * az + 2 * m, h = (2 * WG * ISO_B + SLAB * 1.6 + TOPZ) * az + 2 * m + 10;
+  const ox = WG * ISO_A * az + m, oy = m + 8 + TOPZ * az;
+  const sc = Math.min(DPR, Math.sqrt(ISLAND_MAX_PX / (w * h))), [c, g] = canvasOf(w, h, sc), IP = (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * az];
   // 바닥 물건은 앞 모서리 칸의 대각선까지 땅을 그린 뒤 끼워 그린다(앞쪽 언덕에 가려지게)
-  A.drawIsland({ ctx: g, zoom, P: IP }, WG, GRID, A.PAL[S.view] ?? A.PAL.grassland, 3, S.view, (dg) => {
+  A.drawIsland({ ctx: g, zoom: az, P: IP }, WG, GRID, A.PAL[S.view] ?? A.PAL.grassland, 3, S.view, (dg) => {
     for (const it of floors) {
       const d = ITEMS[it.id];
       if (it.x + d.w - 1 + it.y + d.h - 1 !== dg) continue;
@@ -388,7 +397,7 @@ const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a
 function occArt(o, isl) {
   let a = isl.occ.get(o);
   if (a) return a;
-  const IP = (x, y, z = 0) => [isl.ox + isoX(x, y), isl.oy + isoY(x, y) - z * zoom];
+  const IP = (x, y, z = 0) => [isl.ox + isoX(x, y), isl.oy + isoY(x, y) - z * artZoom];
   const q = columnOf(S.view, o.x, o.y, IP), xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
   const sc = isl.sc, l = Math.floor(Math.min(...xs) * sc) / sc, t = Math.floor(Math.min(...ys) * sc) / sc, w = Math.max(...xs) - l, h = Math.max(...ys) - t;
   const [c, g] = canvasOf(w, h, sc);
@@ -400,9 +409,9 @@ function occArt(o, isl) {
 }
 // 가리는 칸을 다시 찍는다(그 칸에 겹치고, 그 칸 윗면보다 낮은 곳에 선, 먼저 그린 동물·물건이 있을 때만). boxes = [왼, 위, 오른, 아래, 발밑 높이]
 function stampColumn(o, boxes, isl, ix, iy) {
-  const a = occArt(o, isl), bb = [ix + a.l, iy + a.t, ix + a.l + a.w, iy + a.t + a.h];
+  const a = occArt(o, isl), sk = zoom / artZoom, bb = [ix + a.l * sk, iy + a.t * sk, ix + (a.l + a.w) * sk, iy + (a.t + a.h) * sk];
   if (!boxes.some((b) => b[4] < o.zt - 0.5 && overlaps(b, bb))) return;
-  sctx.drawImage(a.c, bb[0], bb[1], a.w, a.h);
+  sctx.drawImage(a.c, bb[0], bb[1], a.w * sk, a.h * sk);
 }
 function inPoly(q, x, y) {
   let s = 0;
@@ -420,7 +429,11 @@ function tileAtScreen(sx, sy) {
   return null;
 }
 const snap = (v) => Math.round(v * DPR) / DPR;
-function blitAt(s, sx, sy) { sctx.drawImage(s.c, snap(sx - s.ax), snap(sy - s.ay), s.w, s.h); }
+function blitAt(s, sx, sy) {
+  const sk = zoom / artZoom;
+  if (sk === 1) sctx.drawImage(s.c, snap(sx - s.ax), snap(sy - s.ay), s.w, s.h);
+  else sctx.drawImage(s.c, sx - s.ax * sk, sy - s.ay * sk, s.w * sk, s.h * sk); // 핀치 중: 그려 둔 그림을 늘린다
+}
 
 // ---------- 동물 그림 상태(고개 숙임·눕기 부드럽게) ----------
 const mem = new Map();
@@ -480,8 +493,8 @@ function draw(dt) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   A.drawSky(ctx, VW, VH, horizon, drawT, L, rid);
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, scene.width, scene.height); g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const isl = islandArt(), [i0x, i0y] = P(0, 0, 0), ix = snap(i0x - isl.ox), iy = snap(i0y - isl.oy);
-  g.drawImage(isl.c, ix, iy, isl.w, isl.h);
+  const isl = islandArt(), sk = zoom / artZoom, [i0x, i0y] = P(0, 0, 0), ix = sk === 1 ? snap(i0x - isl.ox) : i0x - isl.ox * sk, iy = sk === 1 ? snap(i0y - isl.oy) : i0y - isl.oy * sk;
+  g.drawImage(isl.c, ix, iy, isl.w * sk, isl.h * sk);
   pen.zoom = zoom;
   const R = S.regions[rid], st = G.stats(S, rid);
   // 서 있는 물건·동물·가리는 지형 칸을 깊이(칸 x+y) 순서로. 바닥 물건은 땅 그림에 들어 있다
@@ -541,29 +554,63 @@ function draw(dt) {
   }
 }
 function drawItemAt(it, d) {
-  const [sx, sy] = P((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it)), s = itemSprite(it.id, it.uid % 3);
+  const [sx, sy] = P((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it)), s = itemSprite(it.id, it.uid % 3), sk = zoom / artZoom;
   blitAt(s, sx, sy);
-  return [sx - s.ax, sy - s.ay, sx - s.ax + s.w, sy - s.ay + s.h, itemZ(it)];
+  return [sx - s.ax * sk, sy - s.ay * sk, sx + (s.w - s.ax) * sk, sy + (s.h - s.ay) * sk, itemZ(it)];
 }
 
 // ---------- 입력: 탭(선택·포착·놓을 자리), 확대 중에는 끌어서 둘러보기 ----------
 const ptr = { id: null, x: 0, y: 0, sx: 0, sy: 0, drag: false };
+const fingers = new Map(); // 화면에 닿은 손가락(pointerId → 화면 위치)
+let pinch = null; // 두 손가락: { d: 처음 거리, f: 처음 배율, mx, my: 직전 가운데 }
+const local = (e) => { const r = view.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+const twoFingers = () => { const [a, b] = [...fingers.values()]; return { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2 }; };
 view.addEventListener('pointerdown', (e) => {
-  Object.assign(ptr, { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, drag: false });
+  fingers.set(e.pointerId, local(e));
   try { view.setPointerCapture(e.pointerId); } catch { /* 무시 */ }
+  if (fingers.size === 2) { const t = twoFingers(); pinch = { d: t.d, f: UI.zf, mx: t.mx, my: t.my }; ptr.drag = true; UI.follow = null; return; }
+  if (fingers.size === 1) Object.assign(ptr, { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, drag: false });
 });
 view.addEventListener('pointermove', (e) => {
+  if (!fingers.has(e.pointerId)) return;
+  fingers.set(e.pointerId, local(e));
+  if (pinch && fingers.size >= 2) { // 두 손가락 사이 가운데를 기준으로 확대·축소하고, 가운데가 움직인 만큼 둘러본다
+    const t = twoFingers();
+    setZoomF(pinch.f * (t.d / pinch.d), pinch.mx, pinch.my, true, t.mx, t.my);
+    pinch.mx = t.mx; pinch.my = t.my;
+    return;
+  }
   if (e.pointerId !== ptr.id) return;
   if (!ptr.drag && Math.hypot(e.clientX - ptr.sx, e.clientY - ptr.sy) > 8) ptr.drag = true;
-  if (ptr.drag && UI.zl > 0) { UI.cam.x -= e.clientX - ptr.x; UI.cam.y -= e.clientY - ptr.y; UI.follow = null; clampCam(); }
+  if (ptr.drag && UI.zf > 1) { UI.cam.x -= e.clientX - ptr.x; UI.cam.y -= e.clientY - ptr.y; UI.follow = null; clampCam(); }
   ptr.x = e.clientX; ptr.y = e.clientY;
 });
-view.addEventListener('pointerup', (e) => {
+function liftFinger(e, cancel = false) {
+  if (!fingers.delete(e.pointerId)) return;
+  if (pinch) {
+    if (fingers.size < 2) { pinch = null; commitZoom(); } // 손을 떼면 그 배율로 다시 그린다
+    if (fingers.size === 1) { const [id] = fingers.keys(); Object.assign(ptr, { id, x: e.clientX, y: e.clientY, drag: true }); } // 남은 손가락은 끌기만(탭 아님)
+    if (!fingers.size) ptr.id = null;
+    return;
+  }
   if (e.pointerId !== ptr.id) return;
   ptr.id = null;
-  if (!ptr.drag) tap(e.clientX - view.getBoundingClientRect().left, e.clientY - view.getBoundingClientRect().top);
-});
-view.addEventListener('pointercancel', () => { ptr.id = null; });
+  if (!cancel && !ptr.drag) tap(...local(e));
+}
+view.addEventListener('pointerup', (e) => liftFinger(e));
+view.addEventListener('pointercancel', (e) => liftFinger(e, true));
+// 데스크톱: Ctrl+휠(트랙패드 두 손가락 오므리기 포함)로 마우스 위치 기준 확대·축소. 멈추면 다시 그린다
+let wheelDone = 0;
+view.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault(); // 브라우저 페이지 확대 막기
+  const [x, y] = local(e);
+  setZoomF(UI.zf * Math.exp(-e.deltaY * 0.01), x, y, true);
+  UI.follow = null;
+  clearTimeout(wheelDone); wheelDone = setTimeout(commitZoom, 180);
+}, { passive: false });
+// iOS Safari: 화면 핀치로 페이지 전체가 확대되지 않게
+for (const evt of ['gesturestart', 'gesturechange']) document.addEventListener(evt, (e) => e.preventDefault(), { passive: false });
 
 function hitAnimal(a, x, y, grow = 1) {
   // 작은 동물도 손가락으로 맞힐 수 있게 최소 32×40px
@@ -900,7 +947,7 @@ function renderCard() {
       <div class="needs">${needs}</div>
       <div class="row-btns"><button class="btn" data-a="follow">${UI.follow === a.uid ? '따라보기 끄기' : '따라보기'}</button><button class="btn warn" data-a="release">${UI.confirm === 'release' ? `정말 방생? ⭐+${refund}` : `방생 ⭐+${refund}`}</button><button class="btn" data-a="close">닫기</button></div>`;
     animalIcon(card.querySelector('canvas'), a.sp);
-    card.querySelector('[data-a=follow]').onclick = () => { if (UI.follow === a.uid) UI.follow = null; else { UI.follow = a.uid; if (UI.zl < 2) setZoom(2); } renderCard(); };
+    card.querySelector('[data-a=follow]').onclick = () => { if (UI.follow === a.uid) UI.follow = null; else { UI.follow = a.uid; if (UI.zf < 2) setZoom(2); } renderCard(); };
     card.querySelector('[data-a=release]').onclick = () => {
       if (UI.confirm !== 'release') { UI.confirm = 'release'; return renderCard(); }
       const r = G.release(S, rid, a.uid); toast(`${josa(d.name, '을', '를')} 자연으로 돌려보냈어요 ⭐+${r.refund}`); select(null); afterChange();
@@ -1019,7 +1066,7 @@ for (const evt of ['pointerdown', 'keydown']) window.addEventListener(evt, () =>
 function animalSound(a, kind, vol = 1) {
   if (!a) return;
   const [sx] = animalScreen(a);
-  sound.play(a.sp, kind, { vol: vol * Math.min(1, 0.75 + 0.25 * (ZOOMS[UI.zl] - 1)), pan: ((sx / VW) * 2 - 1) * 0.7 });
+  sound.play(a.sp, kind, { vol: vol * Math.min(1, 0.75 + 0.25 * (UI.zf - 1)), pan: ((sx / VW) * 2 - 1) * 0.7 });
 }
 let lastChance = null, ambientIn = 10;
 // 특수 행동이 시작되면 그 동물의 special 소리, 가끔 보이는 동물 하나가 call 소리를 낸다
