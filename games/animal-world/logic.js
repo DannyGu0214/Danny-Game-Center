@@ -1,7 +1,7 @@
 // 게임 규칙 전부(화면 없음). 경제·한도·발전도·행복도·티어·요청·순간 포착·동물 행동·저장 형식.
 // 상태 S는 JSON으로 그대로 저장할 수 있는 순수 데이터다. 난수는 S.rng(시드)에서만 뽑는다.
 import {
-  GRID, MAX_TIER, TIERS, caps, SIZE, ECON, REGIONS, SPECIES, ITEMS,
+  GRID, GW, GH, ISLE, MAX_TIER, TIERS, caps, SIZE, ECON, REGIONS, SPECIES, ITEMS,
   animalValue, itemPoints, animalPrice, itemPrice, speciesOf, itemsOf,
 } from './data.js';
 import { TERRAIN, kindAt, terrainFits, allowedOn, hasWater, terrainOf } from './terrain.js';
@@ -119,45 +119,51 @@ function refresh(S, rid) {
 }
 
 // ---------- 땅: 칸 점유와 걸을 수 있는 칸 ----------
-const inGrid = (x, y) => x >= 0 && y >= 0 && x < GRID && y < GRID;
+// 지역 격자는 GW×GH(본섬 GRID행 + 다리 + T8 섬). 칸 번호 = y × GW + x
+const inGrid = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH;
+// T8 섬(본섬 앞 다리와 섬): 그 지역이 T8이 되면 열린다. 그전에는 못 가고 물건도 못 놓는다
+export const isleOpen = (S, rid) => S.regions[rid].tier >= ISLE.tier;
+const locked = (S, rid, y) => y >= GRID && !isleOpen(S, rid);
+const rowsOf = (S, rid) => (isleOpen(S, rid) ? GH : GRID); // 갈 수 있는 행 수(배회 목표를 고를 때)
 function occupancy(S, rid) {
   return cached(S, 'occ:' + rid, () => {
-    const occ = new Array(GRID * GRID).fill(null);
+    const occ = new Array(GW * GH).fill(null);
     for (const it of S.regions[rid].items) {
       const d = ITEMS[it.id];
-      for (let y = it.y; y < it.y + d.h; y++) for (let x = it.x; x < it.x + d.w; x++) occ[y * GRID + x] = it;
+      for (let y = it.y; y < it.y + d.h; y++) for (let x = it.x; x < it.x + d.w; x++) occ[y * GW + x] = it;
     }
     return occ;
   });
 }
-export const itemAt = (S, rid, x, y) => (inGrid(x, y) ? occupancy(S, rid)[y * GRID + x] : null);
+export const itemAt = (S, rid, x, y) => (inGrid(x, y) ? occupancy(S, rid)[y * GW + x] : null);
 // swim = 물에 사는 동물: 물 지형(바다·호수)과 헤엄칠 수 있는 물건(swim)의 칸만 다닌다.
 // 나머지는 걸을 수 있는 지형(봉우리·물 제외)의 빈칸과 걸을 수 있는 물건(walk)
 export function walkable(S, rid, x, y, swim = false) {
-  if (!inGrid(x, y)) return false;
-  const it = occupancy(S, rid)[y * GRID + x], t = TERRAIN[kindAt(rid, x, y)];
+  if (!inGrid(x, y) || locked(S, rid, y)) return false;
+  const it = occupancy(S, rid)[y * GW + x], t = TERRAIN[kindAt(rid, x, y)];
   if (swim) return !!t.swim || !!(it && ITEMS[it.id].swim);
   return t.walk && (!it || ITEMS[it.id].walk);
 }
 const isSwimmer = (sp) => !!SPECIES[sp].swim;
 export function fits(S, rid, id, x, y) {
   const d = ITEMS[id];
-  if (!d || x < 0 || y < 0 || x + d.w > GRID || y + d.h > GRID) return false;
+  if (!d || x < 0 || y < 0 || x + d.w > GW || y + d.h > GH || locked(S, rid, y + d.h - 1)) return false;
   if (!terrainFits(rid, id, x, y)) return false; // 지형마다 놓을 수 있는 물건이 정해져 있다(terrain.js)
   const occ = occupancy(S, rid);
-  for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GRID + xx]) return false;
+  for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GW + xx]) return false;
   return true;
 }
 // 물건이 들어갈 자리: 그 물건에 권하는 지형(은신처·먹이 → 낮은 언덕, 놀이 → 높은 언덕) 먼저, 그다음 가운데에 가까운 순서. 없으면 null.
-// 지형은 바뀌지 않으므로 지형에 맞는 후보 목록은 지역·물건마다 한 번만 만들고(1,600칸이라 매번 정렬하면 느리다), 빈자리만 확인한다
+// 지형은 바뀌지 않으므로 지형에 맞는 후보 목록은 지역·물건마다 한 번만 만들고(2,640칸이라 매번 정렬하면 느리다), 빈자리만 확인한다.
+// T8 섬 자리는 본섬 자리를 다 쓴 뒤에(섬이 열려 있어도 본섬부터 채운다)
 const spotLists = {};
 function spotList(rid, id) {
   const key = rid + ':' + id;
   if (spotLists[key]) return spotLists[key];
   const d = ITEMS[id], c = (GRID - 1) / 2, cand = [], on = allowedOn(id);
-  for (let y = 0; y + d.h <= GRID; y++) for (let x = 0; x + d.w <= GRID; x++) {
+  for (let y = 0; y + d.h <= GH; y++) for (let x = 0; x + d.w <= GW; x++) {
     const pref = on.indexOf(kindAt(rid, x, y));
-    if (pref >= 0 && terrainFits(rid, id, x, y)) cand.push([x, y, pref * 100 + Math.hypot(x + (d.w - 1) / 2 - c, y + (d.h - 1) / 2 - c)]);
+    if (pref >= 0 && terrainFits(rid, id, x, y)) cand.push([x, y, (y >= GRID ? 1000 : 0) + pref * 100 + Math.hypot(x + (d.w - 1) / 2 - c, y + (d.h - 1) / 2 - c)]);
   }
   cand.sort((a, b) => a[2] - b[2]);
   return (spotLists[key] = cand.map(([x, y]) => [x, y]));
@@ -165,7 +171,8 @@ function spotList(rid, id) {
 export function freeSpot(S, rid, id) {
   const d = ITEMS[id], occ = occupancy(S, rid);
   next: for (const [x, y] of spotList(rid, id)) {
-    for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GRID + xx]) continue next;
+    if (locked(S, rid, y + d.h - 1)) continue;
+    for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GW + xx]) continue next;
     return [x, y];
   }
   return null;
@@ -230,7 +237,8 @@ export function canPlace(S, rid, id, x, y) {
   const r = regionOpen(S, rid);
   if (!r.ok) return r;
   if (S.regions[rid].tier < d.tier) return no(`T${d.tier}에서 해금`);
-  if (x >= 0 && y >= 0 && x + d.w <= GRID && y + d.h <= GRID && !terrainFits(rid, id, x, y)) return no(`${terrainNames(id)}에 놓아요`);
+  if (x >= 0 && y >= 0 && x + d.w <= GW && y + d.h <= GH && locked(S, rid, y + d.h - 1)) return no(`T${ISLE.tier}에 열리는 섬이에요`);
+  if (x >= 0 && y >= 0 && x + d.w <= GW && y + d.h <= GH && !terrainFits(rid, id, x, y)) return no(`${terrainNames(id)}에 놓아요`);
   if (!fits(S, rid, id, x, y)) return no('놓을 수 없는 자리예요');
   if (popOf(S, rid) < priceOfItem(id)) return no('인기점수가 모자라요');
   return ok;
@@ -258,10 +266,10 @@ export function removeItem(S, rid, uid) {
 }
 
 // ---------- 동물 행동 ----------
-const tileOf = (a) => [clamp(Math.floor(a.x), 0, GRID - 1), clamp(Math.floor(a.y), 0, GRID - 1)];
+const tileOf = (a) => [clamp(Math.floor(a.x), 0, GW - 1), clamp(Math.floor(a.y), 0, GH - 1)];
 function walkTiles(S, rid, swim = false) {
   const out = [];
-  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) if (walkable(S, rid, x, y, swim)) out.push([x, y]);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (walkable(S, rid, x, y, swim)) out.push([x, y]);
   return out;
 }
 export const swimTiles = (S, rid) => cached(S, 'swim:' + rid, () => walkTiles(S, rid, true));
@@ -271,17 +279,17 @@ function spawnTile(S, rid, swim = false) {
 }
 // 걸을 수 있는 칸만 지나 goal(x,y)=true인 가장 가까운 칸까지. 경로는 시작 칸을 뺀 칸 목록
 export function findPath(S, rid, from, goal, swim = false) {
-  const seen = new Int16Array(GRID * GRID).fill(-1), q = [from[1] * GRID + from[0]];
+  const seen = new Int16Array(GW * GH).fill(-1), q = [from[1] * GW + from[0]];
   seen[q[0]] = q[0];
   for (let h = 0; h < q.length; h++) {
-    const cur = q[h], cx = cur % GRID, cy = (cur - cx) / GRID;
+    const cur = q[h], cx = cur % GW, cy = (cur - cx) / GW;
     if (goal(cx, cy)) {
       const path = [];
-      for (let c = cur; c !== q[0]; c = seen[c]) path.push([c % GRID, (c - (c % GRID)) / GRID]);
+      for (let c = cur; c !== q[0]; c = seen[c]) path.push([c % GW, (c - (c % GW)) / GW]);
       return path.reverse();
     }
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = cx + dx, ny = cy + dy, n = ny * GRID + nx;
+      const nx = cx + dx, ny = cy + dy, n = ny * GW + nx;
       if (inGrid(nx, ny) && seen[n] < 0 && walkable(S, rid, nx, ny, swim)) { seen[n] = cur; q.push(n); }
     }
   }
@@ -290,7 +298,7 @@ export function findPath(S, rid, from, goal, swim = false) {
 // 필요 k를 채우는 칸: 걸을 수 있는 물건이면 그 칸, 아니면 물건 바로 옆 칸
 function servesAt(S, rid, k) {
   return cached(S, `sv:${rid}:${k}`, () => {
-    const set = new Uint8Array(GRID * GRID);
+    const set = new Uint8Array(GW * GH);
     for (const it of S.regions[rid].items) {
       const d = ITEMS[it.id];
       if (!d.give[k]) continue;
@@ -298,7 +306,7 @@ function servesAt(S, rid, k) {
         if (!inGrid(x, y)) continue;
         const inside = x >= it.x && y >= it.y && x < it.x + d.w && y < it.y + d.h;
         const edge = !inside && (x >= it.x && x < it.x + d.w || y >= it.y && y < it.y + d.h); // 대각선 모서리는 뺀다
-        if ((inside && d.walk) || (edge && walkable(S, rid, x, y))) set[y * GRID + x] = 1;
+        if ((inside && d.walk) || (edge && walkable(S, rid, x, y))) set[y * GW + x] = 1;
       }
     }
     return set;
@@ -326,7 +334,7 @@ function decide(S, rid, a) {
   if (s.swim) {
     if (r < 0.3) return arrive(a, rnd(S) < 0.5 ? 'eat' : 'rest');
     if (r < 0.85) {
-      const tx = clamp(from[0] + Math.round(range(S, -6, 6)), 0, GRID - 1), ty = clamp(from[1] + Math.round(range(S, -6, 6)), 0, GRID - 1);
+      const tx = clamp(from[0] + Math.round(range(S, -6, 6)), 0, GW - 1), ty = clamp(from[1] + Math.round(range(S, -6, 6)), 0, rowsOf(S, rid) - 1);
       const path = findPath(S, rid, from, (x, y) => x === tx && y === ty, true);
       if (path && path.length) return go(a, path, null);
     }
@@ -335,12 +343,12 @@ function decide(S, rid, a) {
   const needs = s.needs.filter((k) => k !== 'herd');
   if (r < 0.38 && needs.length) {
     const k = pick(S, needs), set = servesAt(S, rid, k);
-    const path = findPath(S, rid, from, (x, y) => set[y * GRID + x] === 1);
+    const path = findPath(S, rid, from, (x, y) => set[y * GW + x] === 1);
     if (path) return go(a, path, NEED_STATE[k]);
   }
   if (r < 0.5) {
     // 높은 언덕에 올라가 쉬거나(전망), 가까운 길로 나선다(길을 조금 더 좋아하지만 길로만 다니지는 않는다)
-    const want = r < 0.44 ? 'high' : 'path', near = terrainTiles(rid, want).filter(([x, y]) => Math.abs(x - from[0]) + Math.abs(y - from[1]) <= (want === 'high' ? 24 : 12));
+    const want = r < 0.44 ? 'high' : 'path', near = terrainTiles(rid, want).filter(([x, y]) => y < rowsOf(S, rid) && Math.abs(x - from[0]) + Math.abs(y - from[1]) <= (want === 'high' ? 24 : 12));
     if (near.length) {
       const [tx, ty] = pick(S, near), path = findPath(S, rid, from, (x, y) => x === tx && y === ty);
       if (path && path.length) return go(a, path, want === 'high' ? 'rest' : null);
@@ -353,7 +361,7 @@ function decide(S, rid, a) {
       const mates = R.animals.filter((b) => b !== a && b.sp === a.sp);
       if (mates.length) { const m = pick(S, mates); [cx, cy] = tileOf(m); rad = 4; }
     }
-    const tx = clamp(cx + Math.round(range(S, -rad, rad)), 0, GRID - 1), ty = clamp(cy + Math.round(range(S, -rad, rad)), 0, GRID - 1);
+    const tx = clamp(cx + Math.round(range(S, -rad, rad)), 0, GW - 1), ty = clamp(cy + Math.round(range(S, -rad, rad)), 0, rowsOf(S, rid) - 1);
     const path = findPath(S, rid, from, (x, y) => x === tx && y === ty);
     if (path && path.length) return go(a, path, null);
   }
@@ -362,7 +370,7 @@ function decide(S, rid, a) {
 const tTiles = {};
 function terrainTiles(rid, kind) {
   const key = rid + ':' + kind;
-  if (!tTiles[key]) { tTiles[key] = []; terrainOf(rid).forEach((k, i) => { if (k === kind) tTiles[key].push([i % GRID, (i - (i % GRID)) / GRID]); }); }
+  if (!tTiles[key]) { tTiles[key] = []; terrainOf(rid).forEach((k, i) => { if (k === kind) tTiles[key].push([i % GW, (i - (i % GW)) / GW]); }); }
   return tTiles[key];
 }
 function go(a, path, then) {
@@ -634,4 +642,4 @@ export function fitTerrain(S) {
   return out;
 }
 
-export { GRID, MAX_TIER, TIERS };
+export { GRID, GW, GH, ISLE, MAX_TIER, TIERS };

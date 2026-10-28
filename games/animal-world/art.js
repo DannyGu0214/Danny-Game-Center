@@ -159,11 +159,13 @@ export const PAL = {
     tiles: ['#c8c467', '#bcc160', '#a9bd5a', '#d2c46e'], blot: ['#e0cf82', '#98b452'], deco: 'tuft', tuft: ['#8fa548', '#a3a64a'], dirt: '#9b6a3c', dirt2: '#7d5230', lip: '#93a84d',
     hill: ['#d1cb76', '#c7c86c', '#d8cd7c'], high: ['#dcd389', '#d3cf80'], low: ['#a3b862', '#98b05a', '#acbd68'], path: ['#c9a874', '#c19e6a', '#cfae7c'], pathDeco: 'stones',
     water: ['#5aa6c9', '#539ec2'], foam: '#e3f3f8', cliff: ['#a8875a', '#8f7049'], spire: { col: '#a09684', r: 14, h: 24, top: 0.35 },
+    bush: ['#6f9a3c', '#5f8d36', '#7aa646'], // T8 섬 숲 언덕
   },
   seaside: {
     tiles: ['#f1dda6', '#ead49a', '#f5e4b6', '#e6cf92'], blot: ['#fff1cc', '#d9bf84'], deco: 'shell', tuft: ['#c9b27a', '#e9e0cf'], dirt: '#c9a46a', dirt2: '#a8854f', lip: '#e2c98d',
     hill: ['#f5e3b0', '#efdaa2'], high: ['#bdb5a6', '#b0a898', '#c4bcae'], low: ['#dcc48c', '#d3ba80', '#e1ca94'], path: ['#b98a5a', '#ad7f51'], pathDeco: 'planks',
     water: ['#4f9fc8', '#4997c0'], foam: '#eef8fb', cliff: ['#d6b97c', '#c1a268'], spire: { col: '#958d80', r: 12, h: 26, top: 0.5 },
+    coral: ['#f08a7a', '#f6b26b', '#e46f9a', '#f4d06f'], // T8 섬 산호 석호
   },
   desert: {
     tiles: ['#e7b673', '#dfa864', '#edc085', '#e3ae6b'], blot: ['#f3cf96', '#c98f50'], deco: 'pebble', tuft: ['#a07a46', '#8d9a52'], dirt: '#b8683a', dirt2: '#97522c', lip: '#d89c58',
@@ -325,29 +327,42 @@ const FAR = {
 export const slabOf = (G) => G * 0.075; // 흙 단면 두께(땅 크기에 비례)
 // 지형(terrain.js)이 있으면 칸마다 높이만큼 올린 블록으로 그린다: 뒤 대각선부터 앞으로, 칸마다 앞쪽 두 옆면 → 윗면 → 장식.
 // onDiag(d)는 대각선 d(x+y)를 다 그린 뒤 불린다(바닥 물건을 그 사이에 끼워 그리게).
+// opt.ny = y 방향 칸 수(기본 n, 지역 격자 전체면 GH) · opt.skip(x, y) = 그리지 않을 칸(빈 하늘처럼 친다. 잠긴 섬은 따로 흐리게 그린다) · opt.isleY = T8 섬이 시작하는 행(섬 장식용)
 export const PEAK_EXTRA = 30; // 봉우리 위 바위·얼음 기둥이 칸 윗면보다 더 올라가는 높이(가림 계산용)
-export function drawIsland(pen, G, n, pal, seed = 1, rid = null, onDiag = null) {
+const BRIDGE = { deck: '#b98a55', seam: '#8d6236', side: '#6e4626', rope: '#5a3b20' };
+export function drawIsland(pen, G, n, pal, seed = 1, rid = null, onDiag = null, opt = {}) {
+  const ny = opt.ny ?? n, skip = opt.skip, isleY = opt.isleY ?? Infinity;
   const D = slabOf(G), T = G / n, ter = rid ? baseOf(rid) : null; // 색·장식은 지도 지형, 높이는 작은 계단까지 반영한 heightAt
-  const kindAt = (x, y) => (x < 0 || y < 0 || x >= n || y >= n ? null : ter ? ter[y * n + x] : 'flat');
+  const kindAt = (x, y) => {
+    if (x < 0 || y < 0 || x >= n || y >= ny || skip?.(x, y)) return null;
+    const k = ter ? ter[y * n + x] : 'flat';
+    return k === 'void' ? null : k;
+  };
   const zAt = (x, y) => (!kindAt(x, y) ? -D : rid ? heightAt(rid, x, y) * LEVEL : 0);
+  // 옆 칸이 빈 하늘이거나 땅에서 다리로 넘어가는 곳이면 그 면은 섬 가장자리(흙 단면)
+  const rim = (k, nk) => !nk || (nk === 'bridge' && k !== 'bridge');
   const up = (z) => ({ ctx: pen.ctx, zoom: pen.zoom, P: (x, y, zz = 0) => pen.P(x, y, zz + z) });
-  // 아래로 처진 흙덩이(섬 바닥)
-  const R = rng(seed + 0.17);
-  const nd = Math.round(n * 0.9), dw = G / nd / 2.4;
-  for (let i = 0; i < nd; i++) {
-    const u = (i + 0.5) / nd * G, dz = D * (1.15 + R() * 0.4);
-    poly(pen, [[u - dw, G, -D + 1], [u + dw, G, -D + 1], [u + dw * 0.25, G, -dz]], pal.dirt);
-    poly(pen, [[G, u - dw, -D + 1], [G, u + dw, -D + 1], [G, u + dw * 0.25, -dz]], pal.dirt2);
+  // 아래로 처진 흙덩이(섬 바닥): 앞쪽 가장자리 칸마다 하나씩
+  const dw = T * 0.46;
+  for (let y = 0; y < ny; y++) for (let x = 0; x < n; x++) {
+    const k = kindAt(x, y);
+    if (!k || k === 'bridge') continue;
+    const u = (x + 0.5) * T, v = (y + 0.5) * T;
+    if (rim(k, kindAt(x, y + 1)) && hash(x, y, seed + 7) < 0.9) { const dz = D * (1.15 + hash(x, y, seed + 8) * 0.4); poly(pen, [[u - dw, (y + 1) * T, -D + 1], [u + dw, (y + 1) * T, -D + 1], [u + dw * 0.25, (y + 1) * T, -dz]], pal.dirt); }
+    if (rim(k, kindAt(x + 1, y)) && hash(x, y, seed + 9) < 0.9) { const dz = D * (1.15 + hash(x, y, seed + 10) * 0.4); poly(pen, [[(x + 1) * T, v - dw, -D + 1], [(x + 1) * T, v + dw, -D + 1], [(x + 1) * T, v + dw * 0.25, -dz]], pal.dirt2); }
   }
   const cliff = pal.cliff ?? [pal.dirt, pal.dirt2];
-  for (let d = 0; d <= 2 * (n - 1); d++) {
-    for (let x = Math.max(0, d - n + 1); x <= Math.min(n - 1, d); x++) {
-      const y = d - x, k = kindAt(x, y), z = zAt(x, y), x0 = x * T, x1 = x0 + T, y0 = y * T, y1 = y0 + T;
+  for (let d = 0; d <= n + ny - 2; d++) {
+    for (let x = Math.max(0, d - ny + 1); x <= Math.min(n - 1, d); x++) {
+      const y = d - x, k = kindAt(x, y);
+      if (!k) continue;
+      const z = zAt(x, y), x0 = x * T, x1 = x0 + T, y0 = y * T, y1 = y0 + T;
+      if (k === 'bridge') { bridgeTile(pen, x0, y0, T, z, kindAt(x - 1, y) !== 'bridge', kindAt(x + 1, y) !== 'bridge', !kindAt(x, y + 1)); continue; }
       const h = hash(x, y, seed), arr = pal[k] ?? pal.tiles, rock = k === 'peak'; // 봉우리 칸은 기둥까지 바위·얼음 색
       const col = rock ? pal.spire.col : k === 'flat' ? pal.tiles[Math.floor(h * pal.tiles.length)] : arr[Math.floor(h * arr.length)];
       // 앞쪽 옆면: 섬 가장자리면 흙 단면(물이면 물 단면), 안쪽이면 앞 칸이 낮을 때만 비탈
       for (const side of ['x', 'y']) {
-        const edge = side === 'x' ? x === n - 1 : y === n - 1, zb = edge ? -D : side === 'x' ? zAt(x + 1, y) : zAt(x, y + 1);
+        const edge = side === 'x' ? rim(k, kindAt(x + 1, y)) : rim(k, kindAt(x, y + 1)), zb = edge ? -D : side === 'x' ? zAt(x + 1, y) : zAt(x, y + 1);
         if (zb >= z) continue;
         const q = side === 'x' ? [[x1, y0, zb], [x1, y1, zb], [x1, y1, z], [x1, y0, z]] : [[x0, y1, zb], [x1, y1, zb], [x1, y1, z], [x0, y1, z]];
         const base = rock ? shade(col, side === 'x' ? 0.68 : 0.82) : edge ? (k === 'water' ? shade(pal.water[0], side === 'x' ? 0.72 : 0.82) : side === 'x' ? pal.dirt2 : pal.dirt) : side === 'x' ? cliff[1] : cliff[0];
@@ -363,7 +378,8 @@ export function drawIsland(pen, G, n, pal, seed = 1, rid = null, onDiag = null) 
       const P2 = up(z), r = rng(hash(x, y, seed + 3) + 0.01), px = () => (x + 0.15 + r() * 0.7) * T, py = () => (y + 0.15 + r() * 0.7) * T;
       // 장식 수는 칸 넓이에 비례(32단위 칸 기준 m개 → 작은 칸에선 평균 m×넓이비). 칸이 작아져도 땅 전체 밀도는 같다
       const AR = (T / 32) ** 2, many = (m) => Math.floor(m * AR + r()), maybe = (p) => r() < p * AR;
-      if (k === 'water') { // 물결과, 땅에 닿은 가장자리 거품
+      if (k === 'water') { // 물결과, 땅에 닿은 가장자리 거품(T8 섬 석호엔 산호)
+        if (pal.coral && y >= isleY) for (let i = many(2.4); i > 0; i--) { const cx = px(), cy = py(), c = pal.coral[Math.floor(r() * pal.coral.length)]; puff(P2, cx, cy, 0.1, 1.6 + r() * 1.2, rgba(c, 0.8)); puff(P2, cx + 1.4, cy + 0.6, 0.1, 0.9 + r() * 0.6, rgba(shade(c, 1.15), 0.85)); }
         for (let i = many(2); i > 0; i--) { const cx = px(), cy = py(); line(P2, [cx - 4, cy - 1, 0.1], [cx, cy + 1, 0.1], rgba(pal.foam, 0.45), 0.8); line(P2, [cx, cy + 1, 0.1], [cx + 4, cy - 1, 0.1], rgba(pal.foam, 0.45), 0.8); }
         for (const [nx, ny, e] of [[x - 1, y, [[x0, y0], [x0, y1]]], [x + 1, y, [[x1, y0], [x1, y1]]], [x, y - 1, [[x0, y0], [x1, y0]]], [x, y + 1, [[x0, y1], [x1, y1]]]]) {
           const nk = kindAt(nx, ny);
@@ -385,7 +401,11 @@ export function drawIsland(pen, G, n, pal, seed = 1, rid = null, onDiag = null) 
       }
       if (maybe(0.55)) soft(P2, (x + 0.3 + r() * 0.4) * T, (y + 0.3 + r() * 0.4) * T, 7 + r() * 5, r() < 0.5 ? pal.blot[0] : pal.blot[1], 0.35);
       const nk = many(2);
-      if (pal.deco === 'tuft') { for (let i = 0; i < nk; i++) tuft(P2, px(), py(), (k === 'low' ? 5 : 4) + r() * 3, pal.tuft[i % 2], r); continue; }
+      if (pal.deco === 'tuft') {
+        if (pal.bush && y >= isleY && k === 'hill' && maybe(1.6)) lump(P2, px(), py(), 4 + r() * 2.5, 4 + r() * 3, pal.bush[Math.floor(r() * pal.bush.length)], r, { top: 0.55, n: 7 }); // T8 섬 숲 언덕의 덤불
+        for (let i = 0; i < nk; i++) tuft(P2, px(), py(), (k === 'low' ? 5 : 4) + r() * 3, pal.tuft[i % 2], r);
+        continue;
+      }
       if (pal.deco === 'shell' || pal.deco === 'pebble') { // 바람에 생긴 모래결 + 조개껍데기·자갈
         if (maybe(0.6)) { const cx = px(), cy = py(); line(P2, [cx - 5, cy - 2, 0.1], [cx + 5, cy + 2, 0.1], shade(col, 0.9), 0.7); line(P2, [cx - 4, cy + 1, 0.1], [cx + 4, cy + 4, 0.1], shade(col, 0.92), 0.6); }
         for (let i = many(1); i > 0; i--) puff(P2, px(), py(), 0.6, 0.9 + r() * 0.6, pal.tuft[i % 2]);
@@ -398,6 +418,19 @@ export function drawIsland(pen, G, n, pal, seed = 1, rid = null, onDiag = null) 
       if (maybe(0.2)) { const cx = px(), cy = py(); line(P2, [cx - 4, cy, 0.1], [cx + 1, cy + 3, 0.1], '#c4d8e6', 0.6); line(P2, [cx + 1, cy + 3, 0.1], [cx + 5, cy + 1, 0.1], '#c4d8e6', 0.6); }
     }
     onDiag?.(d);
+  }
+}
+// 나무다리 한 칸(다리는 y 방향으로 뻗는다): 판자 윗면, 두께만큼 옆면, 바깥쪽 난간. end = 앞이 끊긴 칸(잠긴 섬 쪽)
+function bridgeTile(pen, x0, y0, T, z, left, right, end) {
+  const x1 = x0 + T, y1 = y0 + T, t = 3;
+  if (right) poly(pen, [[x1, y0, z - t], [x1, y1, z - t], [x1, y1, z], [x1, y0, z]], BRIDGE.side);
+  if (end) poly(pen, [[x0, y1, z - t], [x1, y1, z - t], [x1, y1, z], [x0, y1, z]], shade(BRIDGE.side, 1.15));
+  poly(pen, [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], BRIDGE.deck);
+  for (let v = 4; v < T; v += 4) line(pen, [x0 + 0.5, y0 + v, z + 0.05], [x1 - 0.5, y0 + v, z + 0.05], BRIDGE.seam, 0.6);
+  for (const [on, xr] of [[left, x0 + 1], [right, x1 - 1]]) {
+    if (!on) continue;
+    line(pen, [xr, y0 + T / 2, z], [xr, y0 + T / 2, z + 7], BRIDGE.rope, 1.1); // 난간 기둥
+    line(pen, [xr, y0, z + 6], [xr, end ? y1 - 2 : y1, z + 6], BRIDGE.rope, 0.8); // 난간 줄
   }
 }
 export function footprint(pen, x, y, w, h, fill, stroke, z = 0) {

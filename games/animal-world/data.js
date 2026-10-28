@@ -1,7 +1,10 @@
 // 게임 데이터: 지역·티어·동물·물건 정의와 점수·가격 상수. 규칙(logic.js)과 그림(art.js)이 함께 읽는다.
 // 지역을 추가할 때는 SPECIES·ITEMS에 그 지역 항목을 넣고 REGIONS의 ready를 켠다.
 
-export const GRID = 40; // 지역 땅 40×40칸(2026-10-27 20×20에서 칸을 반으로 쪼갬. 땅 크기는 그대로)
+export const GRID = 40; // 본섬 40×40칸(2026-10-27 20×20에서 칸을 반으로 쪼갬. 땅 크기는 그대로)
+// 지역 격자 전체: 본섬(0~39행) + 다리(40~45행, 가운데 2칸) + T8 섬(46~65행, 가운데 20칸). 그 사이 칸은 빈 하늘(못 감)
+export const GW = 40, GH = 66;
+export const ISLE = { x0: 10, x1: 30, y0: 46, y1: 66, bridge: { x0: 19, x1: 21, y0: 40, y1: 46 }, tier: 8 };
 export const MAX_TIER = 8; // 비밀 티어(9)는 아직 없다
 export const TIERS = [0, 60, 150, 250, 370, 520, 680, 870]; // TIERS[t-1] = 티어 t가 되는 발전도
 export const caps = (tier) => ({ species: tier, animals: 4 * tier });

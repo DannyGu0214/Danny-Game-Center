@@ -1,7 +1,8 @@
 // 지형: 지역마다 정해진 40×40 지도(2026-10-27 20×20 손그림을 2배로 늘리고 해안선·언덕 모서리를 비스듬히 깎음). 칸마다 지형 종류가 있고, 높이·이동·놓을 수 있는 물건이 지형으로 정해진다.
 // 지도 글자: . 평지 · h 낮은 언덕(구릉) · H 높은 언덕 · ^ 봉우리 · l 저지대 · = 길 · ~ 물(바다·호수)
 // 화면에서 (0,0)이 맨 뒤 꼭짓점, x는 오른쪽 아래, y는 왼쪽 아래로 늘어난다. 키 큰 지형은 뒤쪽에 둔다.
-import { GRID, ITEMS } from './data.js';
+// 지역 격자 전체는 GW×GH: 본섬(0~39행) 앞으로 다리(40~45행 가운데 2칸)와 T8 섬(46~65행 가운데 20칸, ISLES)이 붙고 나머지는 빈 하늘(void)이다
+import { GRID, GW, GH, ISLE, ITEMS } from './data.js';
 
 export const LEVEL = 9; // 높이 한 단계(그림 단위, 칸 한 변은 32)
 export const TERRAIN = {
@@ -13,9 +14,11 @@ export const TERRAIN = {
   path: { name: '길', h: 0, walk: true },
   water: { name: '물', h: -1, walk: false, swim: true },
   step: { name: '비탈', h: 0, walk: true }, // 언덕·저지대 둘레의 작은 계단(지도에 없고 아래에서 만든다). 걷기만 하고 물건은 못 놓는다
+  bridge: { name: '다리', h: 0, walk: true }, // 본섬과 T8 섬을 잇는 나무다리. 길처럼 걷기만 한다
+  void: { name: '빈 하늘', h: 0, walk: false }, // 섬 밖(그리지 않고 못 간다)
 };
 export const SUB = 3; // 높이 한 단계(LEVEL)를 작은 계단 3개로 나눈다(2026-10-27)
-const CH = { '.': 'flat', h: 'hill', H: 'high', '^': 'peak', l: 'low', '=': 'path', '~': 'water' };
+const CH = { '.': 'flat', h: 'hill', H: 'high', '^': 'peak', l: 'low', '=': 'path', '~': 'water', ' ': 'void', '#': 'bridge' };
 
 export const MAPS = {
   // 초원: 뒤쪽 꼭짓점에 봉우리와 높은 언덕, 오른쪽에 바위 구릉, 왼쪽 앞에 구릉, 가운데·오른쪽 앞에 마른 저지대, 가로지르는 흙길
@@ -192,6 +195,120 @@ export const MAPS = {
   ],
 };
 
+// T8 섬 지도(20×20, 섬 안 좌표). 0행 가운데(9~10열)에 다리가 닿으므로 그 둘레 3칸은 평지로 비워 둔다. 모서리는 compose에서 비스듬히 깎는다.
+// 섬이 작아서 지형 사이를 띄운다: 언덕은 저지대·물에서 6칸, 평지로 남길 곳은 언덕·저지대에서 3칸(가까우면 작은 계단이 된다)
+export const ISLES = {
+  // 초원: 뒤쪽 양옆에 숲 언덕(덤불), 앞쪽 가운데 연못 저지대
+  grassland: [
+    '....................',
+    '..hhhh........hhhh..',
+    '.hhhhhh......hhhhhh.',
+    '.hhhhhh......hhhhhh.',
+    '.hhhhhh......hhhhhh.',
+    '.hhhhhh......hhhhhh.',
+    '..hhhh........hhhh..',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '.......llllll.......',
+    '......llllllll......',
+    '......llllllll......',
+    '......llllllll......',
+    '......llllllll......',
+    '.......llllll.......',
+    '....................',
+    '....................',
+  ],
+  // 바닷가: 뒤쪽 모래 언덕, 앞쪽에 모래 저지대가 둘러싼 산호 석호
+  seaside: [
+    '....................',
+    '..hhhh........hhhh..',
+    '.hhhhhh......hhhhhh.',
+    '.hhhhhh......hhhhhh.',
+    '..hhhh........hhhh..',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '.......llllll.......',
+    '.....llll~~llll.....',
+    '....lll~~~~~~lll....',
+    '....ll~~~~~~~~ll....',
+    '....ll~~~~~~~~ll....',
+    '....ll~~~~~~~~ll....',
+    '....lll~~~~~~lll....',
+    '.....llll~~llll.....',
+    '.......llllll.......',
+    '....................',
+  ],
+  // 사막: 뒤쪽 가운데 오아시스 저지대(오아시스 물건 자리), 앞쪽 양옆 모래 언덕
+  desert: [
+    '....................',
+    '....................',
+    '....................',
+    '.......llllll.......',
+    '.....llllllllll.....',
+    '....llllllllllll....',
+    '....llllllllllll....',
+    '....llllllllllll....',
+    '.....llllllllll.....',
+    '.......llllll.......',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '..hhhh........hhhh..',
+    '.hhhhhh......hhhhhh.',
+    '.hhhhhh......hhhhhh.',
+    '..hhhh........hhhh..',
+    '....................',
+  ],
+  // 남극: 가운데 펭귄 언덕(꼭대기는 높은 언덕), 앞쪽 양옆 빙산 웅덩이와 가운데 얼음 저지대
+  antarctic: [
+    '....................',
+    '....................',
+    '....................',
+    '......hhhhhhhh......',
+    '.....hhhhhhhhhh.....',
+    '.....hhhhhhhhhh.....',
+    '.....hhhHHHHhhh.....',
+    '.....hhhHHHHhhh.....',
+    '.....hhhhhhhhhh.....',
+    '.....hhhhhhhhhh.....',
+    '......hhhhhhhh......',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '.~~~~....llll...~~~.',
+    '.~^~~...llllll..~^~.',
+    '..~~~...llllll..~~..',
+    '....................',
+  ],
+};
+const CUT = [3, 2, 1]; // 섬 모서리를 깎는 칸 수(위·아래 0·1·2행)
+// 지역 격자 전체(GH줄 × GW칸 글자): 본섬 지도 + 다리 + T8 섬. 섬 밖은 공백(빈 하늘)
+function compose(rid) {
+  const rows = [], isle = ISLES[rid], b = ISLE.bridge, IW = ISLE.x1 - ISLE.x0, IH = ISLE.y1 - ISLE.y0;
+  for (let y = 0; y < GH; y++) {
+    if (y < GRID) { rows.push(MAPS[rid]?.[y] ?? '.'.repeat(GW)); continue; }
+    let row = '';
+    for (let x = 0; x < GW; x++) {
+      const iy = y - ISLE.y0, ix = x - ISLE.x0, cut = CUT[Math.min(iy, IH - 1 - iy)] ?? 0;
+      if (y >= b.y0 && y < b.y1 && x >= b.x0 && x < b.x1) row += '#';
+      else if (iy >= 0 && iy < IH && ix >= cut && ix < IW - cut) row += isle?.[iy]?.[ix] ?? '.';
+      else row += ' ';
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
 const built = {};
 // 지역 지도 → base(지도 글자 그대로의 지형) · kind(계단 칸은 'step') · sub(높이, 작은 계단 단위)
 // 작은 계단: 높이가 다른 지형 사이를 한 칸(8방향)에 한 계단(1/3단계)씩 잇는다.
@@ -203,14 +320,14 @@ const built = {};
 const REACH = 6; // 높은 언덕(6계단)에서 평지(0)까지 필요한 거리
 function build(rid) {
   if (built[rid]) return built[rid];
-  const rows = MAPS[rid], N = GRID * GRID, base = new Array(N).fill('flat');
-  if (rows) for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) base[y * GRID + x] = CH[rows[y]?.[x]] ?? 'flat';
+  const rows = compose(rid), N = GW * GH, base = new Array(N).fill('flat');
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) base[y * GW + x] = CH[rows[y][x]] ?? 'flat';
   const own = base.map((k) => TERRAIN[k].h * SUB), sub = own.slice(), kind = base.slice();
   const near = (i, f) => { // REACH 안의 칸 j와 거리 d(8방향)
-    const x = i % GRID, y = (i - x) / GRID;
+    const x = i % GW, y = (i - x) / GW;
     for (let dy = -REACH; dy <= REACH; dy++) for (let dx = -REACH; dx <= REACH; dx++) {
       const xx = x + dx, yy = y + dy;
-      if ((dx || dy) && xx >= 0 && yy >= 0 && xx < GRID && yy < GRID) f(yy * GRID + xx, Math.max(Math.abs(dx), Math.abs(dy)));
+      if ((dx || dy) && xx >= 0 && yy >= 0 && xx < GW && yy < GH) f(yy * GW + xx, Math.max(Math.abs(dx), Math.abs(dy)));
     }
   };
   const settle = (kinds, pullers, sink = true) => {
@@ -234,10 +351,10 @@ function build(rid) {
 export const terrainOf = (rid) => build(rid).kind;
 // 계단을 만들기 전 지도 지형(색·장식용)
 export const baseOf = (rid) => build(rid).base;
-const inGrid = (x, y) => x >= 0 && y >= 0 && x < GRID && y < GRID;
-export const kindAt = (rid, x, y) => (inGrid(x, y) ? terrainOf(rid)[y * GRID + x] : null);
+const inGrid = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH;
+export const kindAt = (rid, x, y) => (inGrid(x, y) ? terrainOf(rid)[y * GW + x] : null);
 // 칸 높이(단계 단위, 작은 계단이면 1/3씩). 화면 높이 = heightAt × LEVEL
-export const heightAt = (rid, x, y) => (inGrid(x, y) ? build(rid).sub[y * GRID + x] / SUB : 0);
+export const heightAt = (rid, x, y) => (inGrid(x, y) ? build(rid).sub[y * GW + x] / SUB : 0);
 export const hasWater = (rid) => terrainOf(rid).includes('water');
 
 // 물건을 놓을 수 있는 지형(앞에 있을수록 먼저 권하는 자리)

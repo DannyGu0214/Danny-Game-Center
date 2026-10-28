@@ -223,7 +223,7 @@ button:disabled { cursor: default; }
 </div>
 <script type="module">
 import * as G from './logic.js';
-import { GRID, MAX_TIER, TIERS, ECON, SIZE, SPECIES, ITEMS, REGIONS, NEED_NAME, NEED_ICON, caps, speciesOf, itemsOf, itemPrice, animalPrice } from './data.js';
+import { GRID, GW, GH, ISLE, MAX_TIER, TIERS, ECON, SIZE, SPECIES, ITEMS, REGIONS, NEED_NAME, NEED_ICON, caps, speciesOf, itemsOf, itemPrice, animalPrice } from './data.js';
 import * as A from './art.js';
 import { LEVEL, heightAt, kindAt, allowedOn } from './terrain.js';
 import { createMusic } from './music.js';
@@ -235,6 +235,9 @@ const view = $('#view'), ctx = view.getContext('2d');
 const scene = document.createElement('canvas'), sctx = scene.getContext('2d');
 const T = A.TILE, WG = GRID * T, ISO_A = A.ISO_A, ISO_B = A.ISO_B, SLAB = A.slabOf(WG), TOPZ = 3 * LEVEL + A.PEAK_EXTRA; // TOPZ = 가장 높은 지형(봉우리 꼭대기)
 const SAVE_KEY = 'animal-world.save';
+// 땅 범위(배율 1의 화면 좌표 u = (x−y)·ISO_A, v = (x+y)·ISO_B): 본섬만, 또는 앞쪽 T8 섬까지(섬은 본섬 왼쪽 아래로 붙는다)
+const MAIN_BOX = { u0: -WG * ISO_A, u1: WG * ISO_A, v0: 0, v1: 2 * WG * ISO_B };
+const FULL_BOX = { ...MAIN_BOX, u0: Math.min(MAIN_BOX.u0, (ISLE.x0 - ISLE.y1) * T * ISO_A), v1: Math.max(MAIN_BOX.v1, (ISLE.x1 + ISLE.y1) * T * ISO_B) };
 
 let S = null;
 const UI = { sheet: null, tab: 'terrain', place: null, sel: null, follow: null, zl: 0, zf: 1, cam: { x: 0, y: 0 }, seen: { animals: {}, decor: {}, regions: {} }, confirm: null };
@@ -258,7 +261,10 @@ function loadSeen() {
 function saveSeen() { try { localStorage.setItem(SAVE_KEY + '.seen', JSON.stringify(UI.seen)); } catch { /* 무시 */ } }
 
 // ---------- 화면 크기·투영 ----------
-let VW = 0, VH = 0, DPR = 1, Z0 = 1, zoom = 1, cx = 0, cy = 0, horizon = 0;
+let VW = 0, VH = 0, DPR = 1, Z0 = 1, zoom = 1, cx = 0, cy = 0, horizon = 0, barTop = 0;
+// VB = 1×에 화면에 맞추는 땅 범위(T8 섬이 열린 지역이면 섬까지), (uc, vc) = 그 가운데. 화면 (cx, cy)에 온다
+let VB = MAIN_BOX, uc = 0, vc = WG * ISO_B;
+const ny = () => (G.isleOpen(S, S.view) ? GH : GRID); // 지금 갈 수 있는 행 수(잠긴 섬은 뺀다)
 // zoom = 지금 화면 배율(Z0 × UI.zf), artZoom = 땅·물건 그림을 마지막으로 그린 배율. 핀치하는 동안은 그 그림을 늘려 보여 주고, 손을 떼면 다시 그린다
 let artZoom = 1;
 function resize() {
@@ -270,10 +276,14 @@ function resize() {
   const top = $('#hud').getBoundingClientRect().bottom + 24, bar = $('#bar').getBoundingClientRect();
   document.documentElement.style.setProperty('--bar-h', `${Math.round(bar.height)}px`);
   const availH = bar.top - top;
-  // 1× = 땅 전체가 화면 폭(또는 높이)에 들어오는 배율
-  Z0 = Math.max(0.15, Math.min((VW - 16) / (2 * WG * ISO_A), (availH - 20) / (2 * WG * ISO_B + SLAB + 80)));
-  cx = VW / 2; cy = top + 80 * Z0 + WG * ISO_B * Z0 + (availH - 80 * Z0 - (2 * WG * ISO_B + SLAB) * Z0) * 0.5;
-  horizon = cy - WG * ISO_B * Z0 - 10;
+  barTop = bar.top;
+  // 1× = 땅 전체(T8 섬이 열렸으면 섬까지)가 화면 폭(또는 높이)에 들어오는 배율
+  VB = S && G.isleOpen(S, S.view) ? FULL_BOX : MAIN_BOX;
+  const bw = VB.u1 - VB.u0, bh = VB.v1 - VB.v0;
+  uc = (VB.u0 + VB.u1) / 2; vc = (VB.v0 + VB.v1) / 2;
+  Z0 = Math.max(0.15, Math.min((VW - 16) / bw, (availH - 20) / (bh + SLAB + 80)));
+  cx = VW / 2; cy = top + 80 * Z0 + (vc - VB.v0) * Z0 + (availH - 80 * Z0 - (bh + SLAB) * Z0) * 0.5;
+  horizon = cy - (vc - VB.v0) * Z0 - 10;
   zoom = Z0 * UI.zf; // 화면 크기가 바뀌면 같은 배율로 다시 맞춘다
   setZoomF(UI.zf);
 }
@@ -296,7 +306,7 @@ function setZoomF(f, ax = cx, ay = cy, live = false, toX = ax, toY = ay) {
 function commitZoom() { if (artZoom !== zoom) { artZoom = zoom; clearArt(); } }
 // 확대한 만큼만 끌어서 둘러볼 수 있다(땅 가장자리까지)
 function clampCam() {
-  const L = UI.zf - 1, mx = WG * ISO_A * Z0 * L, my = WG * ISO_B * Z0 * L + (L > 0 ? 40 : 0);
+  const L = UI.zf - 1, mx = ((VB.u1 - VB.u0) / 2) * Z0 * L, my = ((VB.v1 - VB.v0) / 2) * Z0 * L + (L > 0 ? 40 : 0);
   UI.cam.x = Math.max(-mx, Math.min(mx, UI.cam.x)); UI.cam.y = Math.max(-my, Math.min(my, UI.cam.y));
 }
 window.addEventListener('resize', resize);
@@ -304,7 +314,7 @@ new ResizeObserver(() => { const r = view.getBoundingClientRect(); if (Math.roun
 // 메뉴 높이가 바뀌면(글꼴 로딩 등) 카드·놓기 막대를 그 위로 올린다
 new ResizeObserver(() => document.documentElement.style.setProperty('--bar-h', `${Math.round($('#bar').getBoundingClientRect().height)}px`)).observe($('#bar'));
 function P(x, y, z = 0) {
-  return [cx - UI.cam.x + (x - y) * ISO_A * zoom, cy - UI.cam.y + (x + y - WG) * ISO_B * zoom - z * zoom];
+  return [cx - UI.cam.x + ((x - y) * ISO_A - uc) * zoom, cy - UI.cam.y + ((x + y) * ISO_B - vc) * zoom - z * zoom];
 }
 const pen = { ctx: sctx, zoom: 1, P };
 
@@ -346,51 +356,62 @@ function itemSprite(id, v) {
   sprites.set(key, s);
   return s;
 }
-// 땅(지형)과 바닥 물건(풀밭·연못 등)을 한 장으로. 바닥 물건이 바뀌거나 배율·지역이 바뀌면 새로 그린다
+// 땅(지형)과 바닥 물건(풀밭·연못 등)을 한 장으로. 바닥 물건이 바뀌거나 배율·지역이 바뀌거나 T8 섬이 열리면 새로 그린다.
+// 그림은 늘 T8 섬까지 담는다(잠겨 있으면 다리 가운데가 끊기고 섬은 흐리게)
 function islandArt() {
-  const R = S.regions[S.view];
-  if (island && island.rid === S.view && island.rev === S.rev) return island;
+  const R = S.regions[S.view], open = G.isleOpen(S, S.view);
+  if (island && island.rid === S.view && island.open === open && island.rev === S.rev) return island;
   const floors = R.items.filter((it) => A.FLOOR.has(it.id)), sig = floors.map((it) => `${it.uid}:${it.x}:${it.y}`).join(',');
-  if (island && island.rid === S.view && island.sig === sig) { island.rev = S.rev; return island; }
+  if (island && island.rid === S.view && island.open === open && island.sig === sig) { island.rev = S.rev; return island; }
   freeIsland();
-  const az = artZoom, m = 10, w = 2 * WG * ISO_A * az + 2 * m, h = (2 * WG * ISO_B + SLAB * 1.6 + TOPZ) * az + 2 * m + 10;
-  const ox = WG * ISO_A * az + m, oy = m + 8 + TOPZ * az;
+  const B = FULL_BOX, az = artZoom, m = 10, w = (B.u1 - B.u0) * az + 2 * m, h = (B.v1 - B.v0 + SLAB * 1.6 + TOPZ) * az + 2 * m + 10;
+  const ox = -B.u0 * az + m, oy = m + 8 + TOPZ * az;
   const sc = Math.min(DPR, Math.sqrt(ISLAND_MAX_PX / (w * h))), [c, g] = canvasOf(w, h, sc), IP = (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * az];
+  const pal = A.PAL[S.view] ?? A.PAL.grassland, opt = { ny: GH, isleY: ISLE.y0 }, cut = ISLE.bridge.y0 + 2; // 잠긴 다리는 cut~cut+1행이 끊긴다
   // 바닥 물건은 앞 모서리 칸의 대각선까지 땅을 그린 뒤 끼워 그린다(앞쪽 언덕에 가려지게)
-  A.drawIsland({ ctx: g, zoom: az, P: IP }, WG, GRID, A.PAL[S.view] ?? A.PAL.grassland, 3, S.view, (dg) => {
+  A.drawIsland({ ctx: g, zoom: az, P: IP }, WG, GRID, pal, 3, S.view, (dg) => {
     for (const it of floors) {
       const d = ITEMS[it.id];
       if (it.x + d.w - 1 + it.y + d.h - 1 !== dg) continue;
       const s = itemSprite(it.id, it.uid % 3), [sx, sy] = IP((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it));
       g.drawImage(s.c, sx - s.ax, sy - s.ay, s.w, s.h);
     }
-  });
-  island = { c, ox, oy, w, h, sc, rid: S.view, sig, rev: S.rev, occ: new Map() };
+  }, open ? opt : { ...opt, skip: (x, y) => y >= cut });
+  if (!open) { // 잠긴 T8 섬: 끊긴 다리 건너편과 섬을 따로 그려 흐리게 얹는다
+    const [c2, g2] = canvasOf(w, h, sc);
+    A.drawIsland({ ctx: g2, zoom: az, P: IP }, WG, GRID, pal, 3, S.view, null, { ...opt, skip: (x, y) => y < cut + 2 });
+    g.globalAlpha = 0.45; g.drawImage(c2, 0, 0, w, h); g.globalAlpha = 1;
+    c2.width = c2.height = 0;
+  }
+  island = { c, ox, oy, w, h, sc, rid: S.view, open, sig, rev: S.rev, occ: new Map() };
   return island;
 }
 // ---------- 지형 높이 ----------
 const itemZ = (it) => heightAt(S.view, it.x, it.y) * LEVEL;
-const groundZ = (a) => (SPECIES[a.sp].swim ? -LEVEL : heightAt(S.view, Math.min(GRID - 1, Math.max(0, Math.floor(a.x))), Math.min(GRID - 1, Math.max(0, Math.floor(a.y)))) * LEVEL);
+const groundZ = (a) => (SPECIES[a.sp].swim ? -LEVEL : heightAt(S.view, Math.min(GW - 1, Math.max(0, Math.floor(a.x))), Math.min(GH - 1, Math.max(0, Math.floor(a.y)))) * LEVEL);
+const isVoid = (rid, x, y) => { const k = kindAt(rid, x, y); return !k || k === 'void'; };
 // 칸 기둥(윗면 + 앞쪽 옆면)의 화면 육각형. 앞 칸이 낮으면 옆면이 그만큼 내려간다(가장자리는 섬 바닥까지)
 function columnOf(rid, x, y, proj = P) {
-  const h = (xx, yy) => (xx >= GRID || yy >= GRID ? -SLAB / LEVEL : heightAt(rid, xx, yy));
+  const h = (xx, yy) => (isVoid(rid, xx, yy) ? -SLAB / LEVEL : heightAt(rid, xx, yy));
   const z = heightAt(rid, x, y) * LEVEL, zb = Math.min(z, h(x + 1, y) * LEVEL, h(x, y + 1) * LEVEL), zt = z + (kindAt(rid, x, y) === 'peak' ? A.PEAK_EXTRA : 0);
   const x0 = x * T, x1 = x0 + T, y0 = y * T, y1 = y0 + T;
   return [proj(x0, y0, zt), proj(x1, y0, zt), proj(x1, y0, zb), proj(x1, y1, zb), proj(x0, y1, zb), proj(x0, y1, zt)];
 }
-// 뒤에 있는 동물·물건을 가릴 수 있는 칸: 뒤쪽(64단위, 4칸 안) 칸보다 높은 칸과 봉우리. 지역마다 한 번 계산
+// 뒤에 있는 동물·물건을 가릴 수 있는 칸: 뒤쪽(64단위, 4칸 안) 칸보다 높은 칸과 봉우리. 지역마다(T8 섬이 열리면 섬까지 넣어 다시) 한 번 계산
 const occCache = {};
 function occludersOf(rid) {
-  if (occCache[rid]) return occCache[rid];
-  const out = [];
-  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+  const rows = ny(), key = rid + ':' + rows;
+  if (occCache[key]) return occCache[key];
+  const out = [], B = Math.round(64 / T);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < GW; x++) {
+    const k = kindAt(rid, x, y);
+    if (k === 'void' || k === 'bridge') continue;
     const z = heightAt(rid, x, y);
     let low = Infinity;
-    const B = Math.round(64 / T);
-    for (let dy = 0; dy <= B; dy++) for (let dx = 0; dx <= B; dx++) if ((dx || dy) && x - dx >= 0 && y - dy >= 0) low = Math.min(low, heightAt(rid, x - dx, y - dy));
-    if (kindAt(rid, x, y) === 'peak' || z > low) out.push({ x, y, key: x + y, zt: z * LEVEL });
+    for (let dy = 0; dy <= B; dy++) for (let dx = 0; dx <= B; dx++) if ((dx || dy) && x - dx >= 0 && y - dy >= 0 && !isVoid(rid, x - dx, y - dy)) low = Math.min(low, heightAt(rid, x - dx, y - dy));
+    if (k === 'peak' || z > low) out.push({ x, y, key: x + y, zt: z * LEVEL });
   }
-  return (occCache[rid] = out);
+  return (occCache[key] = out);
 }
 const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 // 가리는 칸의 그림: 땅 그림에서 그 칸 기둥 모양으로 한 번 오려 둔다(땅 그림을 새로 그리면 버린다)
@@ -423,8 +444,9 @@ function inPoly(q, x, y) {
 }
 // 화면 좌표 → 칸: 앞쪽 칸부터 기둥 육각형에 들어가는 첫 칸(높은 지형이 뒤 칸을 가린다)
 function tileAtScreen(sx, sy) {
-  for (let dg = 2 * (GRID - 1); dg >= 0; dg--) for (let x = Math.min(GRID - 1, dg); x >= Math.max(0, dg - GRID + 1); x--) {
-    if (inPoly(columnOf(S.view, x, dg - x), sx, sy)) return [x, dg - x];
+  const rows = ny();
+  for (let dg = GW + rows - 2; dg >= 0; dg--) for (let x = Math.min(GW - 1, dg); x >= Math.max(0, dg - rows + 1); x--) {
+    if (!isVoid(S.view, x, dg - x) && inPoly(columnOf(S.view, x, dg - x), sx, sy)) return [x, dg - x];
   }
   return null;
 }
@@ -523,7 +545,7 @@ function draw(dt) {
   if (UI.place) {
     const id = UI.place.id, d = ITEMS[id], on = allowedOn(id), z = heightAt(rid, UI.place.x, UI.place.y) * LEVEL;
     g.beginPath(); // 칸이 많아 한 번에 칠한다
-    for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    for (let y = 0, rows = ny(); y < rows; y++) for (let x = 0; x < GW; x++) {
       if (!on.includes(kindAt(rid, x, y)) || G.itemAt(S, rid, x, y)) continue;
       const zz = heightAt(rid, x, y) * LEVEL + 0.3, q = [P(x * T + 0.5, y * T + 0.5, zz), P((x + 1) * T - 0.5, y * T + 0.5, zz), P((x + 1) * T - 0.5, (y + 1) * T - 0.5, zz), P(x * T + 0.5, (y + 1) * T - 0.5, zz)];
       g.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) g.lineTo(q[i][0], q[i][1]); g.closePath();
@@ -546,12 +568,25 @@ function draw(dt) {
   // 시간대 빛: 그려진 땅·물건·동물에만 색을 덧입힌다(source-atop). 하늘은 drawSky가 시간대 색으로 그린다
   if (L.tint[1] > 0.004) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = A.rgba(L.tint[0], L.tint[1]); g.fillRect(0, 0, VW, VH); g.globalCompositeOperation = 'source-over'; }
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(scene, 0, 0); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  UI.isleBadge = G.isleOpen(S, rid) ? null : isleBadge();
   // 위에 뜨는 표시: 순간 포착 반짝이, 행복도 낮음 물방울(빛을 입히지 않아 밤에도 잘 보인다)
   for (const a of R.animals) {
     const [sx, sy] = animalScreen(a), [, bh] = A.ANIMAL_BOX[a.sp], top = sy - bh * k - 6;
     if (S.chance && S.chance.uid === a.uid && S.chance.region === rid) A.sparkle(ctx, sx, top - 4, Math.max(5, 7 * zoom), drawT);
     else if ((st.happy[a.sp] ?? 1) < 0.5 && ((S.time + a.uid * 1.37) % 6) < 1.6) A.sadDrop(ctx, sx + 6, top, Math.max(0.7, zoom));
   }
+}
+// 잠긴 T8 섬 가운데의 🔒 표시(섬이 화면 가장자리에 걸치면 화면 안쪽으로 당긴다). 누를 수 있는 범위 [왼, 위, 폭, 높이]를 돌려준다
+function isleBadge() {
+  const [bx, by] = P(((ISLE.x0 + ISLE.x1) / 2) * T, ((ISLE.y0 + ISLE.y1) / 2) * T, 0), w = 64, h = 26;
+  if (bx < -w || bx > VW + w || by < 0 || by > barTop + h) return null;
+  const x = Math.max(8, Math.min(VW - w - 8, bx - w / 2)), y = Math.min(barTop - h - 8, by - h / 2);
+  ctx.fillStyle = 'rgba(42,32,24,0.72)'; ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2); else ctx.rect(x, y, w, h);
+  ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '700 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(`🔒 T${ISLE.tier}`, x + w / 2, y + h / 2 + 1);
+  return [x, y, w, h];
 }
 function drawItemAt(it, d) {
   const [sx, sy] = P((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it)), s = itemSprite(it.id, it.uid % 3), sk = zoom / artZoom;
@@ -628,8 +663,8 @@ function tap(x, y) {
     const hit = tileAtScreen(x, y), d = ITEMS[UI.place.id];
     if (!hit) return;
     const [tx, ty] = hit;
-    UI.place.x = Math.max(0, Math.min(GRID - d.w, tx - Math.floor((d.w - 1) / 2)));
-    UI.place.y = Math.max(0, Math.min(GRID - d.h, ty - Math.floor((d.h - 1) / 2)));
+    UI.place.x = Math.max(0, Math.min(GW - d.w, tx - Math.floor((d.w - 1) / 2)));
+    UI.place.y = Math.max(0, Math.min(ny() - d.h, ty - Math.floor((d.h - 1) / 2)));
     updatePlacebar();
     return;
   }
@@ -644,6 +679,8 @@ function tap(x, y) {
   }
   const a = animalAt(x, y);
   if (a) { animalSound(a, 'call'); select({ type: 'animal', uid: a.uid }); return; }
+  const bd = UI.isleBadge;
+  if (bd && x >= bd[0] && x <= bd[0] + bd[2] && y >= bd[1] && y <= bd[1] + bd[3]) { toast(`🏝️ ${G.regionDef(rid).name} T${ISLE.tier}이 되면 다리가 이어지고 새 섬이 열려요`); return; }
   const hit = tileAtScreen(x, y), it = hit && G.itemAt(S, rid, hit[0], hit[1]);
   if (it) { select({ type: 'item', uid: it.uid }); return; }
   select(null);
@@ -707,7 +744,7 @@ function goRegion(rid) {
   if (!r.ok) return toast(r.why);
   const def = G.regionDef(rid);
   UI.seen.regions[rid] = true; saveSeen();
-  closeSheet(); exitPlace(); select(null); setZoom(0);
+  closeSheet(); exitPlace(); select(null); resize(); setZoom(0); // 지역마다 T8 섬이 열렸는지가 달라 1× 범위를 다시 잡는다
   toast(`${def.icon} ${def.name}에 왔어요${r.rest.gain >= 1 ? ` · 쉬는 동안 ⭐+${fmt(r.rest.gain)}` : ''}`);
   afterChange();
 }
@@ -1028,7 +1065,7 @@ function tierModal(rid, tier) {
   const sp = speciesOf(rid).filter((s) => SPECIES[s].tier === tier).map((s) => `🆕 ${SPECIES[s].name}`);
   const its = itemsOf(rid).filter((i) => ITEMS[i].tier === tier).map((i) => `🆕 ${ITEMS[i].name}`);
   const unlockedRegion = REGIONS.find((r) => r.unlock && r.unlock.region === rid && r.unlock.tier === tier);
-  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${!unlockedRegion.ready ? ' (콘텐츠는 다음 업데이트)' : ''}</p>${unlockedRegion.ready ? `<button class="btn" data-go="${unlockedRegion.id}">${unlockedRegion.icon} ${josa(unlockedRegion.name, '으로', '로')} 가 보기</button>` : ''}` : ''}`);
+  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${tier === ISLE.tier ? '<p>🏝️ <b>새 섬이 열렸어요</b> — 다리를 건너 꾸며 보세요</p>' : ''}${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${!unlockedRegion.ready ? ' (콘텐츠는 다음 업데이트)' : ''}</p>${unlockedRegion.ready ? `<button class="btn" data-go="${unlockedRegion.id}">${unlockedRegion.icon} ${josa(unlockedRegion.name, '으로', '로')} 가 보기</button>` : ''}` : ''}`);
 }
 
 // ---------- 변화 뒤 ----------
@@ -1043,6 +1080,7 @@ function drainEvents() {
   const ev = S.events.splice(0);
   for (const e of ev) {
     if (e.type === 'tier') tierModal(e.region, e.tier);
+    if (e.type === 'tier' && e.tier === ISLE.tier && e.region === S.view) { resize(); setZoom(0); } // 섬까지 한 화면에
     if (e.type === 'terrain') toast(`땅에 언덕·저지대·길이 생겼어요 — 물건 ${e.moved}개를 맞는 자리로 옮겼어요${e.refunded ? ` · ${e.refunded}개는 낸 값을 모두 돌려받았어요` : ''}`, 7000);
   }
 }
@@ -1098,7 +1136,7 @@ function frame(now) {
     const a = S.regions[S.view].animals.find((b) => b.uid === UI.follow);
     if (!a) UI.follow = null;
     else {
-      const tx = (a.x * T - a.y * T) * ISO_A * zoom, ty = (a.x * T + a.y * T - WG) * ISO_B * zoom - 20 * zoom;
+      const tx = ((a.x - a.y) * T * ISO_A - uc) * zoom, ty = ((a.x + a.y) * T * ISO_B - vc) * zoom - 20 * zoom;
       UI.cam.x += (tx - UI.cam.x) * Math.min(1, dt * 4); UI.cam.y += (ty - UI.cam.y) * Math.min(1, dt * 4); clampCam();
     }
   }
