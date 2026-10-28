@@ -168,10 +168,11 @@ function spotList(rid, id) {
   cand.sort((a, b) => a[2] - b[2]);
   return (spotLists[key] = cand.map(([x, y]) => [x, y]));
 }
-export function freeSpot(S, rid, id) {
+// on: 그 지형 칸에 걸치는 자리만(지형 꾸미기 요청)
+export function freeSpot(S, rid, id, on = null) {
   const d = ITEMS[id], occ = occupancy(S, rid);
   next: for (const [x, y] of spotList(rid, id)) {
-    if (locked(S, rid, y + d.h - 1)) continue;
+    if (locked(S, rid, y + d.h - 1) || (on && !covers(rid, id, x, y, on))) continue;
     for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GW + xx]) continue next;
     return [x, y];
   }
@@ -431,56 +432,88 @@ export function capture(S, uid) {
     : Math.max(ECON.captureMin, Math.round(perMin * ECON.captureMinutes));
   S.album[a.sp] = (S.album[a.sp] || 0) + 1;
   gain(S, rid, reward);
-  for (const q of R.requests) if (q.kind === 'photo' && q.sp === a.sp) q.got++;
+  const phase = clock(S).phase;
+  for (const q of R.requests) if (q.kind === 'photo' && q.sp === a.sp && (q.phase == null || q.phase === phase)) q.got++;
   endChance(S);
   S.events.push({ type: 'capture', sp: a.sp, reward, first });
   return { ok: true, reward, first, sp: a.sp };
 }
 
 // ---------- 관람객 요청 ----------
-export function requestDone(S, q) {
-  const st = stats(S, q.region);
-  if (q.kind === 'adopt') return (st.counts[q.sp] || 0) >= q.n;
-  if (q.kind === 'place') return (st.items[q.item] || 0) >= q.n;
-  if (q.kind === 'happy') return st.animals >= 2 && Math.round(st.H * 100) >= q.pct;
-  if (q.kind === 'photo') return q.got >= q.n;
+// 지역마다 3장, 같은 종류는 한 장만(2026-10-28 대니님 승인 후속작업 4). 그 지역에서만 보이고, 보상도 그 지역 인기점수로(관람 수익 N분치, 최소 requestMin)
+//   adopt 그 종 N마리(종마다 4마리까지) · species 지역 동물 N종 · set 필요별 물건 수(먹이·물·쉼터를 주는 물건) ·
+//   terrain 그 지형 위에 그 물건 · happy 행복도 N% · photo 그 종 특수 행동 사진(phase가 있으면 그 시간대에)
+//   place(물건 N개)는 예전 세이브에만 남아 있다
+const SET_NEEDS = ['food', 'water', 'shelter'];
+// 물건이 그 지형 칸에 걸쳐 있나(물·저지대에 걸치는 헤엄 물건 말고는 덮는 칸 지형이 모두 같다)
+function covers(rid, id, x, y, k) {
+  const d = ITEMS[id];
+  for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (kindAt(rid, xx, yy) === k) return true;
   return false;
 }
+const needCount = (st, k) => Object.entries(st.items).reduce((n, [id, c]) => n + (ITEMS[id].give[k] ? c : 0), 0);
+const countOn = (S, rid, id, k) => S.regions[rid].items.filter((it) => it.id === id && covers(rid, id, it.x, it.y, k)).length;
 export function requestProgress(S, q) {
   const st = stats(S, q.region);
   if (q.kind === 'adopt') return [Math.min(q.n, st.counts[q.sp] || 0), q.n];
+  if (q.kind === 'species') return [Math.min(q.n, st.species), q.n];
+  if (q.kind === 'set') {
+    const ks = Object.keys(q.need);
+    return [ks.reduce((n, k) => n + Math.min(q.need[k], needCount(st, k)), 0), ks.reduce((n, k) => n + q.need[k], 0)];
+  }
+  if (q.kind === 'terrain') return [Math.min(q.n, countOn(S, q.region, q.item, q.on)), q.n];
   if (q.kind === 'place') return [Math.min(q.n, st.items[q.item] || 0), q.n];
   if (q.kind === 'happy') return [Math.min(q.pct, Math.round(st.H * 100 * (st.animals >= 2 ? 1 : 0))), q.pct];
   return [Math.min(q.n, q.got), q.n];
 }
+export function requestDone(S, q) {
+  if (q.kind === 'happy') { const st = stats(S, q.region); return st.animals >= 2 && Math.round(st.H * 100) >= q.pct; }
+  const [a, b] = requestProgress(S, q);
+  return a >= b;
+}
+// 지금 낼 수 있는 요청을 종류별로
 function requestCandidates(S, rid) {
-  const R = S.regions[rid], st = stats(S, rid), out = [];
-  const room = st.caps.animals - st.animals;
+  const R = S.regions[rid], st = stats(S, rid), out = { adopt: [], species: [], set: [], terrain: [], happy: [], photo: [] };
+  const room = st.caps.animals - st.animals, water = swimTiles(S, rid).length > 0;
+  const canHave = (sp) => SPECIES[sp].tier <= R.tier && (!SPECIES[sp].swim || water);
   for (const sp of speciesOf(rid)) {
     const have = st.counts[sp] || 0;
-    if (SPECIES[sp].tier > R.tier || room <= 0 || (!have && st.species >= st.caps.species) || (SPECIES[sp].swim && !swimTiles(S, rid).length)) continue;
-    const add = Math.min(room, 1 + Math.floor(rnd(S) * 2));
-    out.push({ kind: 'adopt', sp, n: have + add, minutes: 2 + 2 * add });
-    if (have) out.push({ kind: 'photo', sp, n: 1, got: 0, minutes: 3 });
+    if (have) {
+      out.photo.push({ kind: 'photo', sp, n: 1, got: 0, minutes: 1 });
+      out.photo.push({ kind: 'photo', sp, n: 1, got: 0, phase: Math.floor(rnd(S) * 4), minutes: 2 });
+    }
+    if (!canHave(sp) || room <= 0 || have >= ECON.speciesFull || (!have && st.species >= st.caps.species)) continue;
+    const add = Math.min(room, ECON.speciesFull - have, 1 + Math.floor(rnd(S) * 2));
+    out.adopt.push({ kind: 'adopt', sp, n: have + add, minutes: add });
   }
-  for (const id of itemsOf(rid)) {
-    if (ITEMS[id].tier > R.tier || !freeSpot(S, rid, id)) continue;
-    out.push({ kind: 'place', item: id, n: (st.items[id] || 0) + 1, minutes: 3 });
+  if (st.species >= 1 && st.species < st.caps.species && room > 0 && speciesOf(rid).some((sp) => !st.counts[sp] && canHave(sp))) out.species.push({ kind: 'species', n: st.species + 1, minutes: 2 });
+  const open = itemsOf(rid).filter((id) => ITEMS[id].tier <= R.tier);
+  const needs = SET_NEEDS.filter((k) => open.some((id) => ITEMS[id].give[k] && freeSpot(S, rid, id)));
+  if (needs.length) {
+    const drop = needs.length > 2 ? pick(S, needs) : null, ks = needs.filter((k) => k !== drop), need = {}; // 두 가지까지
+    for (const k of ks) need[k] = needCount(st, k) + 1;
+    out.set.push({ kind: 'set', need, minutes: ks.length });
+  }
+  for (const id of open) for (const k of allowedOn(id)) {
+    if (k !== 'flat' && freeSpot(S, rid, id, k)) out.terrain.push({ kind: 'terrain', item: id, on: k, n: countOn(S, rid, id, k) + 1, minutes: 2 });
   }
   if (st.animals >= 2) {
     const pct = Math.ceil((Math.round(st.H * 100) + 5) / 5) * 5;
-    if (pct <= 100) out.push({ kind: 'happy', pct, minutes: 5 });
+    if (pct <= 100) out.happy.push({ kind: 'happy', pct, minutes: 3 });
   }
   return out;
 }
-const reqKey = (q) => `${q.kind}:${q.sp || q.item || q.pct}`;
-// 관람객 요청은 지역마다 3장. 그 지역에서만 보이고, 보상도 그 지역 인기점수로
-function makeRequest(S, rid) {
+const reqKey = (q) => `${q.kind}:${q.sp || q.item || q.pct || ''}:${q.on ?? q.phase ?? ''}`;
+// 새 요청 하나: 남은 요청과 다른 종류 중에서 종류를 먼저 고르고(종류마다 같은 확률), 그 안에서 하나. avoid = 방금 바꾼 요청(같은 것을 다시 내지 않게)
+function makeRequest(S, rid, avoid = null) {
   if (!regionDef(rid)?.ready || !isUnlocked(S, rid)) return null;
-  const taken = new Set(S.regions[rid].requests.map(reqKey));
-  const cand = requestCandidates(S, rid).filter((q) => !taken.has(reqKey(q)) && !requestDone(S, { ...q, region: rid }));
-  if (!cand.length) return null;
-  const q = pick(S, cand);
+  const taken = new Set(S.regions[rid].requests.map((q) => q.kind)), cand = requestCandidates(S, rid);
+  const kinds = Object.keys(cand)
+    .filter((k) => !taken.has(k))
+    .map((k) => cand[k].filter((q) => reqKey(q) !== avoid && !requestDone(S, { ...q, region: rid })))
+    .filter((l) => l.length);
+  if (!kinds.length) return null;
+  const q = pick(S, pick(S, kinds));
   return { uid: S.uid++, region: rid, ...q, reward: Math.max(ECON.requestMin, Math.round(incomePerMin(S, rid) * q.minutes)) };
 }
 function fillRequests(S, rid) {
@@ -513,7 +546,7 @@ export function swapRequest(S, uid) {
   const R = S.regions[f.rid];
   if (S.time < R.reqSwapAt) return no(`${Math.ceil(R.reqSwapAt - S.time)}초 뒤에 바꿀 수 있어요`);
   const [old] = f.list.splice(f.i, 1);
-  const q = makeRequest(S, f.rid);
+  const q = makeRequest(S, f.rid, reqKey(old));
   f.list.splice(f.i, 0, q ?? old);
   R.reqSwapAt = S.time + ECON.swapCooldown;
   return { ok: true };
@@ -535,7 +568,7 @@ export function step(S, dt) {
     if (!r.ready) continue;
     for (const a of S.regions[r.id].animals) updateAnimal(S, r.id, a, dt);
   }
-  if (S.regions[S.view].requests.length < 3) fillRequests(S, S.view);
+  if (S.regions[S.view].requests.length < 3 && Math.floor(S.time) !== Math.floor(S.time - dt)) fillRequests(S, S.view); // 빈 칸은 1초마다 다시 채워 본다(낼 요청이 없을 때 매 프레임 자리 찾기를 하지 않게)
 }
 // 게임을 끈 동안: 보고 있던 지역은 바로 정산(최대 offlineCapSec), 다른 지역은 쉬는 시간에 더해 두었다가 돌아올 때 정산.
 // sec = 실제로 비운 시간, gain = 보고 있던 지역에 쌓인 점수. 시계가 뒤로 가면 0

@@ -225,7 +225,7 @@ button:disabled { cursor: default; }
 import * as G from './logic.js';
 import { GRID, GW, GH, ISLE, MAX_TIER, TIERS, ECON, SIZE, SPECIES, ITEMS, REGIONS, NEED_NAME, NEED_ICON, caps, speciesOf, itemsOf, itemPrice, animalPrice } from './data.js';
 import * as A from './art.js';
-import { LEVEL, heightAt, kindAt, allowedOn } from './terrain.js';
+import { LEVEL, TERRAIN, heightAt, kindAt, allowedOn } from './terrain.js';
 import { createMusic } from './music.js';
 import { createSound } from './sound.js';
 
@@ -954,10 +954,14 @@ function sheetDecor(body, tabs) {
   };
 }
 function reqText(q) {
-  if (q.kind === 'adopt') return `${SPECIES[q.sp].name} ${q.n}마리 보고 싶어요`;
+  const sp = SPECIES[q.sp], at = q.phase != null ? `${G.PHASE_NAME[q.phase]}에 ` : '';
+  if (q.kind === 'adopt') return `${sp.name} ${q.n}마리 보고 싶어요`;
+  if (q.kind === 'species') return `${G.regionDef(q.region).name} 동물 ${q.n}종을 보고 싶어요`;
+  if (q.kind === 'set') return `${Object.entries(q.need).map(([k, n]) => `${NEED_ICON[k]} ${NEED_NAME[k]} ${n}곳`).join(' · ')}이 있으면 좋겠어요`;
+  if (q.kind === 'terrain') return `${TERRAIN[q.on].name}에 ${ITEMS[q.item].name}${q.n > 1 ? ` ${q.n}개` : ''} 놓아 주세요`;
   if (q.kind === 'place') return `${ITEMS[q.item].name}${q.n > 1 ? ` ${q.n}개` : ''} 놓아 주세요`;
   if (q.kind === 'happy') return `행복도 ${q.pct}% 이상인 곳이 좋아요`;
-  return `${SPECIES[q.sp].name} 사진을 찍어 주세요 (✨가 뜨면 탭)`;
+  return `${at}${sp.name} ‘${sp.special}’ 사진을 찍어 주세요 (✨가 뜨면 탭)`;
 }
 function sheetRequests(body) {
   $('#sheetTitle').textContent = '관람객 요청';

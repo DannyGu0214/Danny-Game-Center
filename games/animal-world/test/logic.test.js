@@ -246,6 +246,97 @@ test('관람객 요청: 다 되면 [받기]로 보상, 덜 되면 못 받고, �
   for (const q of G.requestsOf(S)) assert.equal(G.requestDone(S, q), false, '새 요청은 이미 끝난 것이 아니어야 한다');
 });
 
+// 요청을 여러 번 새로 받아 본다(바꾸기 대기 시간을 넘기며)
+const drawRequests = (S, rid, times) => {
+  const seen = [];
+  for (let i = 0; i < times; i++) {
+    S.time += ECON.swapCooldown;
+    const list = G.requestsOf(S, rid);
+    assert.equal(new Set(list.map((q) => q.kind)).size, list.length, `같은 종류 요청이 겹침: ${list.map((q) => q.kind)}`);
+    seen.push(...list);
+    assert.ok(G.swapRequest(S, list[i % list.length].uid).ok);
+  }
+  return seen;
+};
+
+test('요청 3장은 종류가 모두 다르고, 여섯 종류가 다 나온다', () => {
+  const S = rich(); setTier(S, 6);
+  for (const sp of ['rabbit', 'meerkat', 'gazelle']) G.adopt(S, R, sp);
+  place(S, 'grass');
+  const seen = drawRequests(S, R, 300);
+  assert.deepEqual([...new Set(seen.map((q) => q.kind))].sort(), ['adopt', 'happy', 'photo', 'set', 'species', 'terrain']);
+  assert.ok(seen.some((q) => q.kind === 'photo' && q.phase != null) && seen.some((q) => q.kind === 'photo' && q.phase == null), '시간대 사진·그냥 사진 둘 다');
+});
+
+test('입양 요청은 종마다 4마리까지만, 4마리 찬 종은 요청하지 않는다', () => {
+  const S = rich(); setTier(S, 3);
+  for (let i = 0; i < 4; i++) G.adopt(S, R, 'rabbit');
+  for (let i = 0; i < 3; i++) G.adopt(S, R, 'meerkat');
+  const u0 = S.uid, adopts = drawRequests(S, R, 300).filter((q) => q.kind === 'adopt' && q.uid >= u0); // 새 게임 때 받은 요청은 빼고
+  assert.ok(adopts.length > 10);
+  for (const q of adopts) { assert.ok(q.n <= ECON.speciesFull, `${q.sp} ${q.n}마리`); assert.notEqual(q.sp, 'rabbit'); }
+  assert.ok(adopts.some((q) => q.sp === 'meerkat' && q.n === 4));
+});
+
+test('종 모으기·물건 세트 요청: 종 수, 필요별 물건 수(먹이·물·쉼터를 주는 물건)를 센다', () => {
+  const S = rich(); setTier(S, 4);
+  G.adopt(S, R, 'rabbit');
+  const sp = { uid: 701, region: R, kind: 'species', n: 3, minutes: 5, reward: 10 };
+  const set = { uid: 702, region: R, kind: 'set', need: { food: 2, shelter: 1 }, minutes: 6, reward: 10 };
+  S.regions[R].requests = [sp, set];
+  assert.deepEqual(G.requestProgress(S, sp), [1, 3]);
+  G.adopt(S, R, 'meerkat'); G.adopt(S, R, 'meerkat');
+  assert.equal(G.requestDone(S, sp), false, '같은 종을 더 들여도 종 수는 그대로');
+  G.adopt(S, R, 'gazelle');
+  assert.ok(G.requestDone(S, sp));
+  assert.deepEqual(G.requestProgress(S, set), [0, 3]);
+  place(S, 'grass'); place(S, 'hutch');
+  assert.deepEqual(G.requestProgress(S, set), [2, 3]);
+  place(S, 'puddle');
+  assert.equal(G.requestDone(S, set), false, '물은 세지 않는다');
+  place(S, 'feeder');
+  assert.ok(G.requestDone(S, set));
+});
+
+test('지형 꾸미기 요청: 그 지형 위에 놓은 것만 센다', () => {
+  const S = rich(); setTier(S, 8);
+  const q = { uid: 703, region: R, kind: 'terrain', item: 'tower', on: 'high', n: 1, minutes: 4, reward: 10 };
+  S.regions[R].requests = [q];
+  const flat = G.freeSpot(S, R, 'tower', 'flat');
+  assert.ok(G.placeItem(S, R, 'tower', flat[0], flat[1]).ok);
+  assert.equal(G.requestDone(S, q), false, '평지에 놓은 망루는 안 친다');
+  const high = G.freeSpot(S, R, 'tower', 'high');
+  assert.equal(T.kindAt(R, high[0], high[1]), 'high');
+  assert.ok(G.placeItem(S, R, 'tower', high[0], high[1]).ok);
+  assert.ok(G.requestDone(S, q));
+  assert.equal(G.claim(S, 703).ok, true);
+});
+
+test('시간대 사진 요청: 그 시간대에 찍은 사진만 친다', () => {
+  const S = rich();
+  G.adopt(S, R, 'rabbit');
+  const night = { uid: 704, region: R, kind: 'photo', sp: 'rabbit', n: 1, got: 0, phase: 3, minutes: 5, reward: 10 };
+  const day = { uid: 705, region: R, kind: 'photo', sp: 'rabbit', n: 1, got: 0, phase: 1, minutes: 5, reward: 10 };
+  const any = { uid: 706, region: R, kind: 'photo', sp: 'rabbit', n: 1, got: 0, minutes: 3, reward: 10 };
+  S.regions[R].requests = [night, day, any];
+  S.time = G.DAY_SEC * 2 + G.PHASE_SEC * 3 + 5; // 3일차 밤
+  assert.equal(G.PHASE_NAME[G.clock(S).phase], '밤');
+  S.chanceIn = 0; G.step(S, G.STEP);
+  assert.ok(G.capture(S, S.chance.uid).ok);
+  assert.ok(G.requestDone(S, night));
+  assert.equal(G.requestDone(S, day), false);
+  assert.ok(G.requestDone(S, any));
+});
+
+test('예전 세이브의 물건 놓기 요청도 끝낼 수 있다', () => {
+  const S = rich();
+  const q = { uid: 707, region: R, kind: 'place', item: 'grass', n: 1, minutes: 3, reward: 10 };
+  S.regions[R].requests = [q];
+  assert.equal(G.requestDone(S, q), false);
+  place(S, 'grass');
+  assert.ok(G.claim(S, 707).ok);
+});
+
 test('요청 바꾸기는 대기 시간이 있다', () => {
   const S = rich();
   const u = G.requestsOf(S)[0].uid;
