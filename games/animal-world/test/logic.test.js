@@ -49,12 +49,21 @@ test('종 한도·개체 한도: 티어 t → t종 4t마리', () => {
   assert.ok(G.canAdopt(S, R, 'rabbit').ok);
 });
 
-test('한 종 32마리 구성도 한도 안이면 된다', () => {
+test('한 종으로 한도를 다 채운 구성도 된다(T7 28마리)', () => {
+  const S = rich();
+  setTier(S, 7);
+  for (let i = 0; i < 28; i++) assert.ok(G.adopt(S, R, 'giraffe').ok, `${i}번째`);
+  assert.equal(G.canAdopt(S, R, 'giraffe').why, '개체 한도 28마리');
+  assert.equal(G.canAdopt(S, R, 'rabbit').why, '개체 한도 28마리');
+});
+
+test('T8 섬이 열리면 개체 한도 44마리, 종 한도는 8종 그대로', () => {
   const S = rich();
   setTier(S, 8);
-  for (let i = 0; i < 32; i++) assert.ok(G.adopt(S, R, 'elephant').ok, `${i}번째`);
-  assert.equal(G.canAdopt(S, R, 'elephant').why, '개체 한도 32마리');
-  assert.equal(G.canAdopt(S, R, 'rabbit').why, '개체 한도 32마리');
+  assert.ok(G.isleOpen(S, R));
+  assert.deepEqual(G.stats(S, R).caps, { species: 8, animals: 44 });
+  for (let i = 0; i < 44; i++) assert.ok(G.adopt(S, R, 'elephant').ok, `${i}번째`);
+  assert.equal(G.canAdopt(S, R, 'elephant').why, '개체 한도 44마리');
 });
 
 test('새 종 한도: T2에서 2종이 차면 세 번째 종은 막힌다', () => {

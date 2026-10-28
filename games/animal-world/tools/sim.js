@@ -65,6 +65,11 @@ function choose(S) {
     const sp = open.filter((s) => st.counts[s] && st.counts[s] < ECON.speciesFull).sort((a, b) => SPECIES[b].tier - SPECIES[a].tier)[0];
     if (sp) return { kind: 'animal', sp, price: G.priceOfAnimal(sp) };
   }
+  // 3-1) 종마다 4마리가 다 차고도 자리가 남으면(T8 섬) 한도까지: 적은 종부터, 같으면 높은 티어부터
+  if (st.animals < st.caps.animals) {
+    const sp = open.filter((s) => st.counts[s]).sort((a, b) => st.counts[a] - st.counts[b] || SPECIES[b].tier - SPECIES[a].tier)[0];
+    if (sp) return { kind: 'animal', sp, price: G.priceOfAnimal(sp) };
+  }
   // 4) 꾸밈: 늘어나는 점수 ÷ 가격이 좋은 것
   const gainOf = (id) => itemPoints(ITEMS[id].tier) * ((st.items[id] || 0) < ECON.itemFull ? 1 : 0.5);
   const c = items.sort((a, b) => gainOf(b) / G.priceOfItem(b) - gainOf(a) / G.priceOfItem(a))[0];

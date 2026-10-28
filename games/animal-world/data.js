@@ -4,10 +4,10 @@
 export const GRID = 40; // 본섬 40×40칸(2026-10-27 20×20에서 칸을 반으로 쪼갬. 땅 크기는 그대로)
 // 지역 격자 전체: 본섬(0~39행) + 다리(40~45행, 가운데 2칸) + T8 섬(46~65행, 가운데 20칸). 그 사이 칸은 빈 하늘(못 감)
 export const GW = 40, GH = 66;
-export const ISLE = { x0: 10, x1: 30, y0: 46, y1: 66, bridge: { x0: 19, x1: 21, y0: 40, y1: 46 }, tier: 8 };
+export const ISLE = { x0: 10, x1: 30, y0: 46, y1: 66, bridge: { x0: 19, x1: 21, y0: 40, y1: 46 }, tier: 8, animals: 12 }; // animals: 섬이 열리면 느는 개체 한도
 export const MAX_TIER = 8; // 비밀 티어(9)는 아직 없다
 export const TIERS = [0, 60, 150, 250, 370, 520, 680, 870]; // TIERS[t-1] = 티어 t가 되는 발전도
-export const caps = (tier) => ({ species: tier, animals: 4 * tier });
+export const caps = (tier) => ({ species: tier, animals: 4 * tier + (tier >= ISLE.tier ? ISLE.animals : 0) }); // T8은 섬까지 44마리, 종은 그대로 8
 
 export const NEED_NAME = { food: '먹이', water: '물', shelter: '쉼터', herd: '무리' };
 export const NEED_ICON = { food: '🌿', water: '💧', shelter: '🏠', herd: '👥' };

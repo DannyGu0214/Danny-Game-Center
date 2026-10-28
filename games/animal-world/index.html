@@ -475,25 +475,64 @@ function poseOf(a, dt) {
 }
 const ANIMAL_SCALE = 1.25; // 동물은 칸보다 조금 크게(관찰용)
 const animalK = () => zoom * ANIMAL_SCALE;
-// 외곽선: 리그를 적용한 종은 작은 캔버스에 따로 그린 뒤, 실루엣을 진한 색으로 사방 1~2px 밀어 테두리를 만들고 위에 원본을 얹는다
-const outA = document.createElement('canvas'), oa = outA.getContext('2d'), outB = document.createElement('canvas'), ob = outB.getContext('2d');
-function drawOutlined(g, sp, sx, sy, k, pose) {
-  const [hw, bh] = A.ANIMAL_BOX[sp], w = Math.ceil((hw * 2 + 24) * k * DPR), h = Math.ceil((bh + 30) * k * DPR); // 위로 넉넉히(뛰어오르는 특수 행동)
-  if (outA.width < w || outA.height < h) { outA.width = outB.width = Math.max(w, outA.width); outA.height = outB.height = Math.max(h, outA.height); }
-  const W2 = outA.width, H2 = outA.height, ox = W2 / 2, oy = H2 - 6 * k * DPR;
+// 외곽선: 리그를 적용한 종은 따로 그린 뒤, 실루엣을 사방 1~2px 밀어 찍은 테두리를 진한 색으로 칠해 깔고 위에 원본을 얹는다.
+// 화면에 보이는 리그 동물은 프레임마다 큰 캔버스 하나(atA)에 모아 그리고, 테두리와 원본을 겹친 그림도 한꺼번에(atB) 만들어 장면에는 한 번씩만 찍는다.
+// 동물마다 작은 캔버스에 그리자마자 장면에 찍으면 그때마다 GPU가 밀린 그리기를 처리해서 44마리에서 느려졌다(헤드리스 실측: 32마리 51fps → 44마리 38fps)
+function animalShadow(g, sp, sx, sy, k) {
+  const [hw] = A.ANIMAL_BOX[sp];
   if (SPECIES[sp].swim) { // 물에 사는 동물: 그림자 대신 물결 고리
     g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(0.8, k * 0.8);
     for (const f of [1, 1.35]) { g.beginPath(); g.ellipse(sx, sy, hw * f * k, hw * f * 0.32 * k, 0, 0, Math.PI * 2); g.stroke(); }
   } else { g.fillStyle = 'rgba(40,25,10,0.22)'; g.beginPath(); g.ellipse(sx, sy, Math.max(6, hw * 0.8) * k, Math.max(1.6, hw * 0.16) * k, 0, 0, Math.PI * 2); g.fill(); } // 그림자는 테두리 밖에, 종 크기만큼
-  oa.setTransform(1, 0, 0, 1, 0, 0); oa.clearRect(0, 0, W2, H2); oa.setTransform(DPR, 0, 0, DPR, 0, 0);
-  A.drawAnimal(oa, sp, ox / DPR, oy / DPR, k, { ...pose, shadow: false });
-  ob.globalCompositeOperation = 'source-over'; ob.clearRect(0, 0, W2, H2); ob.drawImage(outA, 0, 0);
-  ob.globalCompositeOperation = 'source-in'; ob.fillStyle = '#3b2f28'; ob.fillRect(0, 0, W2, H2);
-  const r = Math.max(0.8, Math.min(1.8, k * 1.2)) * DPR, x0 = Math.round(sx * DPR - ox), y0 = Math.round(sy * DPR - oy);
+}
+// 한 마리 자리: 상자 w×h(위로 넉넉히, 뛰어오르는 특수 행동) + 테두리 여백 m
+function outlineBox(sp, k) {
+  const [hw, bh] = A.ANIMAL_BOX[sp], w = Math.ceil((hw * 2 + 24) * k * DPR), h = Math.ceil((bh + 30) * k * DPR);
+  const r = Math.max(0.8, Math.min(1.8, k * 1.2)) * DPR, m = Math.ceil(r);
+  return { w, h, r, m, W: w + 2 * m, H: h + 2 * m, ox: w / 2, oy: h - 6 * k * DPR };
+}
+const atA = document.createElement('canvas'), atB = document.createElement('canvas'), outA = document.createElement('canvas'), outB = document.createElement('canvas');
+const AT_W = 2048, AT_MAX_H = 4096;
+// list의 동물마다 o.slot(cA·cB 안의 자리)을 정하고, cA에 원본을, cB에 테두리와 원본을 겹쳐 그린다. 자리가 모자라면 그 동물은 slot 없이 남는다.
+// 자리마다 테두리 여백 m을 두고 원본은 상자 안으로 잘라 그려서, 밀어 찍을 때 옆 자리나 지난 그림이 섞이지 않는다
+function packOutlined(list, cA, cB, maxW, maxH) {
+  let x = 0, y = 0, rowH = 0, wide = 0;
+  for (const o of list) {
+    const b = outlineBox(o.sp, o.kk);
+    if (x + b.W > maxW) { x = 0; y += rowH; rowH = 0; }
+    if (b.W > maxW || y + b.H > maxH) { o.slot = null; continue; }
+    o.slot = { ...b, x, y, c: cB }; x += b.W; rowH = Math.max(rowH, b.H); wide = Math.max(wide, x);
+  }
+  const used = y + rowH;
+  if (!used) return;
+  if (cA.width < wide || cA.height < used) { cA.width = cB.width = Math.max(wide, cA.width); cA.height = cB.height = Math.max(used, cA.height); }
+  const ga = cA.getContext('2d'), gb = cB.getContext('2d');
+  ga.setTransform(1, 0, 0, 1, 0, 0); ga.clearRect(0, 0, wide, used);
+  for (const o of list) {
+    const q = o.slot; if (!q) continue;
+    ga.save(); ga.beginPath(); ga.rect(q.x + q.m, q.y + q.m, q.w, q.h); ga.clip(); ga.setTransform(DPR, 0, 0, DPR, 0, 0);
+    A.drawAnimal(ga, o.sp, (q.x + q.m + q.ox) / DPR, (q.y + q.m + q.oy) / DPR, o.kk, { ...o.pose, shadow: false });
+    ga.restore();
+  }
+  gb.setTransform(1, 0, 0, 1, 0, 0); gb.globalCompositeOperation = 'source-over'; gb.clearRect(0, 0, wide, used);
+  for (const o of list) {
+    const q = o.slot; if (!q) continue;
+    for (let i = 0; i < 8; i++) { const t = (i / 8) * Math.PI * 2; gb.drawImage(cA, q.x + q.m, q.y + q.m, q.w, q.h, q.x + q.m + Math.cos(t) * q.r, q.y + q.m + Math.sin(t) * q.r, q.w, q.h); }
+  }
+  gb.globalCompositeOperation = 'source-in'; gb.fillStyle = '#3b2f28'; gb.fillRect(0, 0, wide, used); gb.globalCompositeOperation = 'source-over';
+  for (const o of list) { const q = o.slot; if (q) gb.drawImage(cA, q.x + q.m, q.y + q.m, q.w, q.h, q.x + q.m, q.y + q.m, q.w, q.h); } // 테두리 위에 원본을 미리 얹어 장면에는 한 번만 찍는다
+}
+function blitOutlined(g, o) {
+  const q = o.slot, x0 = Math.round(o.sx * DPR - q.ox), y0 = Math.round(o.sy * DPR - q.oy);
+  animalShadow(g, o.sp, o.sx, o.sy, o.kk);
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
-  for (let i = 0; i < 8; i++) { const t = (i / 8) * Math.PI * 2; g.drawImage(outB, x0 + Math.cos(t) * r, y0 + Math.sin(t) * r); }
-  g.drawImage(outA, x0, y0);
+  g.drawImage(q.c, q.x, q.y, q.W, q.H, x0 - q.m, y0 - q.m, q.W, q.H);
   g.restore();
+}
+// 큰 캔버스에 자리가 없을 때(아주 크게 확대해 큰 동물이 화면을 채울 때): 작은 캔버스로 한 마리씩
+function drawOutlined(g, o) {
+  packOutlined([o], outA, outB, Infinity, Infinity);
+  blitOutlined(g, o);
 }
 function animalScreen(a) { return P(a.x * T, a.y * T, mem.get(a.uid)?.z ?? groundZ(a)); }
 
@@ -525,18 +564,26 @@ function draw(dt) {
   for (const a of R.animals) { const tx = Math.floor(a.x), ty = Math.floor(a.y); stand.push({ key: tx + ty + 0.25 + (a.x + a.y - tx - ty) * 0.25, a }); }
   for (const o of occludersOf(rid)) stand.push(o);
   stand.sort((p, q) => p.key - q.key);
-  const k = animalK(), boxes = [];
+  const k = animalK(), boxes = [], pre = new Map();
+  for (const a of R.animals) { // 자세(높이를 부드럽게 바꾼다)를 먼저 구하고 화면 위치를 잰다
+    const pose = poseOf(a, dt), [sx, sy] = animalScreen(a), kk = k * (0.96 + (a.uid % 5) * 0.02), [bw, bh] = A.ANIMAL_BOX[a.sp], mx = (bw + 14) * kk;
+    const seen = sx > -mx && sx < VW + mx && sy > -8 * kk && sy - (bh + 32) * kk < VH; // 테두리·뛰어오르기까지 넣은 상자가 화면에 걸치면
+    pre.set(a, { sp: a.sp, pose, sx, sy, kk, seen, box: [sx - (bw + 4) * kk, sy - (bh + 8) * kk, sx + (bw + 4) * kk, sy + 2 * kk] });
+  }
+  packOutlined([...pre.values()].filter((p) => p.seen && A.RIGGED.has(p.sp)), atA, atB, AT_W, AT_MAX_H);
   for (const o of stand) {
     if (o.it) { boxes.push(drawItemAt(o.it, o.d)); continue; }
     if (!o.a) { if (boxes.length) stampColumn(o, boxes, isl, ix, iy); continue; }
-    const a = o.a, pose = poseOf(a, dt), [sx, sy] = animalScreen(a);
+    const a = o.a, p = pre.get(a), { pose, sx, sy, kk } = p;
     if (UI.sel?.type === 'animal' && UI.sel.uid === a.uid) {
       const [hw] = A.ANIMAL_BOX[a.sp];
       g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.beginPath(); g.ellipse(sx, sy, hw * k + 4, (hw * k + 4) * 0.42, 0, 0, Math.PI * 2); g.stroke();
     }
-    const kk = k * (0.96 + (a.uid % 5) * 0.02), [bw, bh] = A.ANIMAL_BOX[a.sp];
-    if (A.RIGGED.has(a.sp)) drawOutlined(g, a.sp, sx, sy, kk, pose); else A.drawAnimal(g, a.sp, sx, sy, kk, pose);
-    boxes.push([sx - (bw + 4) * kk, sy - (bh + 8) * kk, sx + (bw + 4) * kk, sy + 2 * kk, mem.get(a.uid)?.z ?? groundZ(a)]);
+    if (p.slot) blitOutlined(g, p);
+    else if (!p.seen) { /* 화면 밖 */ }
+    else if (A.RIGGED.has(a.sp)) drawOutlined(g, p);
+    else A.drawAnimal(g, a.sp, sx, sy, kk, pose);
+    boxes.push([...p.box, mem.get(a.uid)?.z ?? groundZ(a)]);
     if (a.st === 'special' && a.sp === 'elephant' && Math.random() < dt * 30) emit(a, 'spray');
     if (a.st === 'special' && a.sp === 'zebra' && Math.random() < dt * 8) emit(a, 'dust');
   }
