@@ -1257,18 +1257,21 @@ export function drawSite(pen, building) {
   for (const [x, y] of [[-26, -26], [26, -26], [26, 26], [-26, 26]]) { line(pen, [x, y, 0], [x, y, 7], '#8a6a44', 1); poly(pen, [[x, y, 7], [x + 4, y - 1, 6], [x, y, 5]], '#f07a2a'); }
 }
 // 본부 바닥: 다진 흙 원판, 안쪽 순찰로, 콘크리트 판. R = 안전지대 반지름
-export function drawBaseFloor(pen, R) {
-  const { ctx, P, zoom } = pen, [sx, sy] = P(0, 0), rr = R * zoom;
-  ctx.save(); ctx.translate(sx, sy); ctx.scale(1, 0.5);
-  const g = ctx.createRadialGradient(0, 0, rr * 0.2, 0, 0, rr);
-  g.addColorStop(0, '#4a4334'); g.addColorStop(0.75, '#3f392c'); g.addColorStop(1, '#35302a');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(120,105,80,0.35)'; ctx.lineWidth = 9 * zoom; ctx.setLineDash([3 * zoom, 2 * zoom]);
-  ctx.beginPath(); ctx.arc(0, 0, rr * 0.8, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-  ctx.restore();
-  const Rn = rng(hash(Math.round(R), 1, 9));
-  for (let i = 0; i < R * 1.2; i++) { const a = Rn() * Math.PI * 2, d = Math.sqrt(Rn()) * R * 0.95; disc(pen, Math.cos(a) * d, Math.sin(a) * d, 0.8 + Rn() * 1.2, Rn() < 0.5 ? 'rgba(170,150,110,0.3)' : 'rgba(0,0,0,0.2)'); }
-  for (let i = 0; i < 5; i++) { const a = Rn() * Math.PI * 2, d = R * (0.3 + Rn() * 0.5); splat(pen, Math.cos(a) * d, Math.sin(a) * d, 8 + Rn() * 10, 'rgba(30,26,20,0.35)', Rn); }
+// 본부 바닥: 사각형 기지(꼭짓점은 본부 중심 기준 월드 좌표). 흙 마당 + 안쪽 밝은 마당 + 점선 길 + 흙·얼룩 + 가운데 콘크리트 판.
+export function drawBaseFloor(pen, pts) {
+  const R = Math.max(...pts.map(([x, y]) => Math.hypot(x, y)));
+  const scaleP = (k) => pts.map(([x, y]) => [x * k, y * k]);
+  poly(pen, pts, '#3a3429');
+  poly(pen, scaleP(0.9), '#3f392c');
+  poly(pen, scaleP(0.62), '#463f31');
+  const { ctx, P, zoom } = pen;
+  ctx.save(); ctx.strokeStyle = 'rgba(120,105,80,0.35)'; ctx.lineWidth = 9 * zoom; ctx.setLineDash([3 * zoom, 2 * zoom]);
+  ctx.beginPath(); scaleP(0.78).forEach(([x, y], i) => { const [sx, sy] = P(x, y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); }); ctx.closePath(); ctx.stroke(); ctx.restore();
+  // 사각형 안쪽인지(볼록, 반시계)
+  const inside = (x, y, k) => scaleP(k).every(([ax, ay], i, a) => { const [bx, by] = a[(i + 1) % a.length]; return (x - ax) * (by - ay) - (y - ay) * (bx - ax) <= 0; });
+  const Rn = rng(hash(Math.round(R), Math.round(pts[0][0]), 9));
+  for (let i = 0; i < R * 1.2; i++) { const x = (Rn() * 2 - 1) * R, y = (Rn() * 2 - 1) * R; if (inside(x, y, 0.95)) disc(pen, x, y, 0.8 + Rn() * 1.2, Rn() < 0.5 ? 'rgba(170,150,110,0.3)' : 'rgba(0,0,0,0.2)'); }
+  for (let i = 0; i < 6; i++) { const x = (Rn() * 2 - 1) * R * 0.7, y = (Rn() * 2 - 1) * R * 0.7; if (inside(x, y, 0.8)) splat(pen, x, y, 8 + Rn() * 10, 'rgba(30,26,20,0.35)', Rn); }
   poly(pen, [[-36, -36], [36, -36], [36, 36], [-36, 36]], '#55524a'); // 콘크리트 판
   for (let k = -36; k <= 36; k += 12) { line(pen, [k, -36], [k, 36], 'rgba(0,0,0,0.18)', 0.6); line(pen, [-36, k], [36, k], 'rgba(0,0,0,0.18)', 0.6); }
 }

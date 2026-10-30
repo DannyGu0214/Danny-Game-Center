@@ -1211,7 +1211,7 @@ const glow = (x, y, z, r, rgb, a) => glows.push([x, y, z, r, rgb, a]);
 function baseLayout() {
   const R = G.hqSafeRadius(S);
   return BLD_ORDER.map((id, i) => {
-    const a = (i / BLD_ORDER.length) * Math.PI * 2 + 0.4, r = R * 0.58;
+    const a = (i / BLD_ORDER.length) * Math.PI * 2 + 0.4, r = R * 0.55; // 사각형의 가장 좁은 쪽에도 들어가게
     return { id, x: G.CENTER.x + Math.cos(a) * r, y: G.CENTER.y + Math.sin(a) * r };
   });
 }
@@ -1219,11 +1219,11 @@ let floorKey = '';
 const onScreen = (x, y, m = 120) => { const [sx, sy] = P(x, y); return sx > -m && sx < VW + m && sy > -m && sy < VH + m * 1.5; };
 
 function pushBase(list) {
-  const R = G.hqSafeRadius(S), cx = G.CENTER.x, cy = G.CENTER.y;
+  const R = G.hqOuterRadius(S), cx = G.CENTER.x, cy = G.CENTER.y, poly = G.hqPoly(S);
   if (!onScreen(cx, cy, R * 1.5 + 120)) return;
   // 바닥(본부 레벨마다 크기가 달라 레벨별로 그려 둔다). 가장 큰 그림이라 레벨이 바뀌면 예전 것은 바로 버린다.
   if (floorKey !== `floor:${S.hq}`) { if (floorKey) dropSprite(floorKey); floorKey = `floor:${S.hq}`; }
-  blit(sprite(floorKey, R + 2, 0, (pen) => A.drawBaseFloor(pen, R)), cx, cy);
+  blit(sprite(floorKey, R + 2, 0, (pen) => A.drawBaseFloor(pen, poly.map(([x, y]) => [x - cx, y - cy]))), cx, cy);
 
   // 본부 건물(+ 확장 공사 중이면 비계)
   const hq = S.hq, hqJob = G.jobOf(S, 'hq', 0);
@@ -1258,21 +1258,24 @@ function pushBase(list) {
   }
 
   // 방벽(한 칸씩 깊이 정렬해서 앞뒤가 맞게 보인다)
-  const lvB = S.bld.barricade, n = Math.round(24 + R / 12);
-  const postH = 14 + Math.min(lvB, 8) * 2.5;
+  // 방벽: 사각형의 네 변을 30px 안팎의 칸으로 나눈다
+  const lvB = S.bld.barricade, postH = 14 + Math.min(lvB, 8) * 2.5;
   const wallRatio = S.wall / G.wallMax(S);
-  for (let i = 0; i < n; i++) {
-    const a1 = (i / n) * Math.PI * 2, a2 = ((i + 1) / n) * Math.PI * 2;
-    const x1 = cx + Math.cos(a1) * R, y1 = cy + Math.sin(a1) * R, x2 = cx + Math.cos(a2) * R, y2 = cy + Math.sin(a2) * R;
-    if (!onScreen(x1, y1, 60)) continue;
-    const broken = hash(i, 99) > wallRatio + 0.1;
-    list.push({ k: (x1 + x2) / 2 + (y1 + y2) / 2, draw: () => A.drawWallSeg(LIVE, x1, y1, x2, y2, postH, lvB, broken, hash(i, 7)) });
-  }
+  let wi = 0;
+  poly.forEach(([ax, ay], e) => {
+    const [bx, by] = poly[(e + 1) % poly.length], m = Math.max(3, Math.round(Math.hypot(bx - ax, by - ay) / 30));
+    for (let j = 0; j < m; j++, wi++) {
+      const x1 = ax + (bx - ax) * j / m, y1 = ay + (by - ay) * j / m, x2 = ax + (bx - ax) * (j + 1) / m, y2 = ay + (by - ay) * (j + 1) / m;
+      if (!onScreen(x1, y1, 60)) continue;
+      const broken = hash(wi, 99) > wallRatio + 0.1, seed = hash(wi, 7);
+      list.push({ k: (x1 + x2) / 2 + (y1 + y2) / 2, draw: () => A.drawWallSeg(LIVE, x1, y1, x2, y2, postH, lvB, broken, seed) });
+    }
+  });
 
-  // 감시탑(최대 4개 표시)
+  // 감시탑(최대 4개 표시): 사각형 모서리에
   const towers = Math.min(4, S.bld.watchtower);
   for (let i = 0; i < towers; i++) {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4, x = cx + Math.cos(a) * (R - 4), y = cy + Math.sin(a) * (R - 4);
+    const [qx, qy] = poly[i], d = Math.hypot(qx - cx, qy - cy) || 1, x = qx + ((cx - qx) / d) * 6, y = qy + ((cy - qy) / d) * 6;
     list.push({ k: x + y + 1, draw: () => blit(sprite('tower', ...A.TOWER_BOX, A.drawTower), x, y) });
     glow(x, y, 46, 22, '255,210,140', 0.22);
   }

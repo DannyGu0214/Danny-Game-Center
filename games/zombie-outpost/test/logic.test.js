@@ -276,7 +276,7 @@ test('기지 안에 숨으면 일반 좀비는 추격을 포기하고, 포위 �
   const s = fresh(74);
   s.autoHunt = false; s.spawnT = 1e9; s.rescueT = 1e9;
   s.player.x = G.CENTER.x; s.player.y = G.CENTER.y;
-  const R = G.hqSafeRadius(s);
+  const R = G.hqOuterRadius(s);
   const z = zombieAt(s, G.CENTER.x + R + 80, G.CENTER.y); z.speed = 60; z.wa = 0; z.wt = 99; // 바깥쪽으로 걷게
   stepFor(s, 2);
   assert.ok(G.dist(z.x, z.y, G.CENTER.x, G.CENTER.y) > R + 80, '방벽으로 몰려오지 않는다');
@@ -294,10 +294,10 @@ test('좀비는 바리케이드(안전지대) 안으로 못 들어온다', () =>
   const s = fresh(10);
   s.autoHunt = false;
   s.player.x = G.CENTER.x; s.player.y = G.CENTER.y;
-  const z = zombieAt(s, G.CENTER.x + G.hqSafeRadius(s) + 30, G.CENTER.y);
+  const z = zombieAt(s, G.CENTER.x + G.hqOuterRadius(s) + 30, G.CENTER.y);
   z.speed = 80;
   stepFor(s, 5);
-  assert.ok(G.dist(z.x, z.y, G.CENTER.x, G.CENTER.y) >= G.hqSafeRadius(s) + z.r - 0.01);
+  assert.ok(G.hqEdgeDist(s, z.x, z.y).d >= z.r - 0.01, '사각형 방벽 바깥에 머문다');
 });
 
 test('군사 구역에 맨주먹으로 서 있으면 위험하다(난이도가 거리로 오른다)', () => {
@@ -731,7 +731,7 @@ test('귀환: 가장 가까운 기지(경계까지 거리)로 걸어가 안에 �
   assert.equal(r.ok, false, '이미 기지 안');
   // 본부 쪽이 더 가까우면 본부로
   s.zombies = [];
-  s.player.x = G.CENTER.x - G.hqSafeRadius(s) - 50; s.player.y = G.CENTER.y;
+  s.player.x = G.CENTER.x - G.hqOuterRadius(s) - 50; s.player.y = G.CENTER.y;
   r = G.returnToBase(s);
   assert.equal(r.msg, '본부로 귀환해요');
   assert.deepEqual(['본부', '버려진 편의점', '시립 병원', '물류 창고'].map(G.roParticle), ['로', '으로', '으로', '로']);
@@ -874,7 +874,8 @@ test('성장: 플레이어가 잡은 좀비만 경험치를 주고, 방어 동�
   t.autoHunt = false; t.spawnT = 1e9; t.rescueT = 1e9;
   t.player.x = G.CENTER.x; t.player.y = G.CENTER.y; // 본부 안: 맨주먹은 방벽 밖에 닿지 않는다
   const v = G.makeSurvivor(t); v.role = 'gunner'; v.post = 'defense'; t.survivors.push(v);
-  zombieAt(t, G.CENTER.x, G.CENTER.y - G.hqSafeRadius(t) - 60, 1);
+  const top = G.postPosition(t, 0, 1), td = G.dist(top.x, top.y, G.CENTER.x, G.CENTER.y);
+  zombieAt(t, top.x + (top.x - G.CENTER.x) / td * 70, top.y + (top.y - G.CENTER.y) / td * 70, 1); // 방어 동료 자리 바로 바깥
   stepFor(t, 1.5);
   assert.equal(t.stats.kills, 1);
   assert.equal(t.xp, 0);
@@ -1947,4 +1948,28 @@ test('후보지 발견: 300px 안으로 다가가야 발견(미니맵), 세운 �
   const old = JSON.parse(G.serialize(s)); delete old.seenSites;
   const u = G.deserialize(JSON.stringify(old));
   assert.deepEqual(u.seenSites, [7], '기록이 없던 세이브는 세운 곳만');
+});
+
+test('기지 모양: 판마다 다른 비정형 사각형(직각·정사각형 없음), 넓이는 레벨마다 +10%, 꼭짓점은 380px 안, 방어는 꼭짓점부터', () => {
+  const a = fresh(301), b = fresh(302), a2 = fresh(301);
+  assert.deepEqual(a.hqShape, a2.hqShape, '같은 시드면 같은 모양');
+  assert.notDeepEqual(a.hqShape.pts, b.hqShape.pts, '판마다 다르다');
+  for (let seed = 1; seed <= 200; seed++) { const q = G.quadAngles(fresh(seed).hqShape.pts); assert.ok(q.every((v) => v >= 40 && v <= 140 && Math.abs(v - 90) > 12), `시드 ${seed}: ${q.map((v) => v.toFixed(0))}`); }
+  for (const s of [a, b]) {
+    assert.equal(G.hqPoly(s).length, 4);
+    for (let hq = 2; hq <= G.HQ_MAX; hq++) { const k = (h) => { s.hq = h; return G.hqArea(s); }; assert.ok(Math.abs(k(hq) / k(hq - 1) - 1.1) < 1e-9); }
+    s.hq = G.HQ_MAX; assert.ok(G.hqOuterRadius(s) <= 370 + 1e-6, '10레벨에도 대상물 구역(380px) 밖으로 나가지 않는다');
+    s.hq = 1; assert.ok(Math.abs(G.hqSafeRadius(s) - 162) < 10, '1레벨은 예전 원과 비슷한 넓이');
+    // 직각을 피한다: 네 내각 모두 40~140°, 90°에서 12° 넘게
+    const p = G.hqPoly(s), ang = G.quadAngles(p);
+    assert.ok(ang.every((v) => v >= 40 && v <= 140 && Math.abs(v - 90) > 12), `내각 ${ang.map((v) => v.toFixed(0))}`);
+    // 안·밖 판정
+    assert.ok(G.safeZoneAt(s, G.CENTER.x, G.CENTER.y)?.kind === 'hq');
+    const [cx, cy] = p[0], d = G.dist(cx, cy, G.CENTER.x, G.CENTER.y);
+    assert.ok(G.safeZoneAt(s, G.CENTER.x + (cx - G.CENTER.x) * 0.95, G.CENTER.y + (cy - G.CENTER.y) * 0.95)?.kind === 'hq', '모서리 안쪽은 안');
+    assert.equal(G.safeZoneAt(s, G.CENTER.x + (cx - G.CENTER.x) / d * (d + 20), G.CENTER.y + (cy - G.CENTER.y) / d * (d + 20)), null, '모서리 바깥은 밖');
+    // 방어 동료 자리: 처음 넷은 꼭짓점, 그 뒤는 방벽 안쪽 가장자리
+    for (let i = 0; i < 4; i++) { const q = G.postPosition(s, i, 6); assert.ok(G.dist(q.x, q.y, p[i][0], p[i][1]) < 13, `꼭짓점 ${i}`); }
+    for (let i = 4; i < 6; i++) { const q = G.postPosition(s, i, 6), e = G.hqEdgeDist(s, q.x, q.y).d; assert.ok(e < 0 && e > -12, `자리 ${i}: ${e.toFixed(1)}`); }
+  }
 });

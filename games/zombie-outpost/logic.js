@@ -359,7 +359,54 @@ export const PACK_BONUS = 0.25;
 export const ESCORT_CARRY = 25; // 탐험 동료 1명이 드는 짐 = 25 × 전투력
 export const bagCap = (s) => Math.floor((60 + s.growth.bag + escorts(s).reduce((a, v) => a + survivorCarry(v), 0)) * (1 + PACK_BONUS * s.bld.pack));
 export const maxHp = (s) => (100 + 25 * s.bld.clinic + s.growth.hp) * (1 + armorStat(s, 'hp'));
-export const hqSafeRadius = (s) => 140 + 22 * s.hq;
+// 본부 안전지대(기지) 모양(2026-10-25): 판마다 무작위로 정해지는 비정형 볼록 사각형(시드로 다시 만들어 저장하지 않는다).
+// 정사각형·직각은 피한다: 네 내각이 모두 40~140°이고 90°에서 12° 넘게 벗어나야 한다(사다리꼴·마름모·그 밖의 비정형 허용).
+// 넓이는 본부 레벨마다 직전의 +10%(1레벨 = 예전 원과 같은 넓이 π·162²). 본부 380px 안에는 파밍 대상물이 없으므로
+// 10레벨에서도 가장 먼 꼭짓점이 370px 안에 들도록 판마다 크기를 한 번 맞춘다(모든 레벨에 같은 비율).
+export const HQ_AREA_GROWTH = 0.1, HQ_AREA_1 = Math.PI * 162 * 162, HQ_MAX_CORNER = 370;
+const polyArea = (p) => p.reduce((a, [x, y], i) => { const [x2, y2] = p[(i + 1) % p.length]; return a + x * y2 - x2 * y; }, 0) / 2;
+export function quadAngles(pts) { // 꼭짓점마다 내각(도)
+  return pts.map((p, k) => {
+    const a = pts[(k + 3) % 4], b = pts[(k + 1) % 4], v1 = [a[0] - p[0], a[1] - p[1]], v2 = [b[0] - p[0], b[1] - p[1]];
+    return (Math.acos(Math.max(-1, Math.min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / (Math.hypot(...v1) * Math.hypot(...v2))))) * 180) / Math.PI;
+  });
+}
+function genHqShape(seed) {
+  const g = { rng: (seed ^ 0x5bd1e995) | 0 };
+  let pts;
+  for (let tries = 0; tries < 400; tries++) {
+    const rot = rand(g) * Math.PI * 2;
+    pts = [0, 1, 2, 3].map((k) => { const a = rot + Math.PI / 4 + k * Math.PI / 2 + (rand(g) - 0.5) * 0.9, r = 0.82 + rand(g) * 0.3; return [Math.cos(a) * r, Math.sin(a) * r]; });
+    const ang = quadAngles(pts), convex = Math.abs(ang.reduce((x, v) => x + v, 0) - 360) < 0.5;
+    if (polyArea(pts) > 0 && convex && ang.every((v) => v >= 40 && v <= 140 && Math.abs(v - 90) > 12)) break;
+  }
+  const area = polyArea(pts), maxR = Math.max(...pts.map(([x, y]) => Math.hypot(x, y)));
+  const k10 = Math.sqrt((HQ_AREA_1 * (1 + HQ_AREA_GROWTH) ** (HQ_MAX - 1)) / area);
+  return { pts, area, fit: Math.min(1, HQ_MAX_CORNER / (maxR * k10)) };
+}
+const hqAreaAt = (s, lv) => HQ_AREA_1 * (1 + HQ_AREA_GROWTH) ** (lv - 1) * s.hqShape.fit ** 2;
+export const hqArea = (s) => hqAreaAt(s, s.hq);
+// 기지 꼭짓점(월드 좌표, 반시계). 레벨이 바뀔 때만 다시 계산한다.
+export function hqPoly(s) {
+  if (s._hqPoly?.hq === s.hq) return s._hqPoly.pts;
+  const k = Math.sqrt(hqArea(s) / s.hqShape.area);
+  const pts = s.hqShape.pts.map(([x, y]) => [CENTER.x + x * k, CENTER.y + y * k]);
+  s._hqPoly = { hq: s.hq, pts };
+  return pts;
+}
+export const hqSafeRadius = (s) => Math.sqrt(hqArea(s) / Math.PI); // 같은 넓이 원의 반지름(대략적인 크기)
+export const hqOuterRadius = (s) => Math.max(...hqPoly(s).map(([x, y]) => dist(x, y, CENTER.x, CENTER.y)));
+// 기지 경계까지의 부호 거리(밖 +, 안 −)와 그 변의 바깥 방향. 볼록 사각형이라 변마다의 바깥 거리 중 최댓값을 쓴다.
+export function hqEdgeDist(s, x, y) {
+  const p = hqPoly(s);
+  let best = { d: -Infinity, nx: 0, ny: 0 };
+  for (let i = 0; i < p.length; i++) {
+    const [ax, ay] = p[i], [bx, by] = p[(i + 1) % p.length], L = Math.hypot(bx - ax, by - ay) || 1, nx = (by - ay) / L, ny = -(bx - ax) / L;
+    const d = (x - ax) * nx + (y - ay) * ny;
+    if (d > best.d) best = { d, nx, ny };
+  }
+  return best;
+}
 
 // ---------- 전진기지 후보지 ----------
 // 후보지마다 특산 자원이 다르다(prod는 1레벨·위험도 0 기준 초당 생산량).
@@ -710,6 +757,7 @@ export function newGame(seed = (Date.now() & 0x7fffffff) || 1) {
     nextId: 1,
   };
   s.sites = genSites(seed);
+  s.hqShape = genHqShape(seed);
   s.nodes = genNodes(seed, s.sites);
   setObstacles(s, genObstacles(seed, s.nodes, s.sites));
   return resetTransient(s);
@@ -753,12 +801,12 @@ export const gunReady = (s) => s.gunOn && !!s.equip.gun && s.player.reload <= 0 
 
 // ---------- 안전지대 ----------
 export function safeZones(s) {
-  const zones = [{ x: CENTER.x, y: CENTER.y, r: hqSafeRadius(s), kind: 'hq' }];
+  const zones = [{ x: CENTER.x, y: CENTER.y, r: hqSafeRadius(s), kind: 'hq' }]; // 본부는 사각형(hqEdgeDist로 판정)
   for (const o of s.outposts) zones.push({ x: s.sites[o.site].x, y: s.sites[o.site].y, r: OUTPOST_SAFE_R, kind: 'outpost', site: o.site });
   return zones;
 }
 export function safeZoneAt(s, x, y, margin = 0) {
-  for (const z of safeZones(s)) if (dist(x, y, z.x, z.y) < z.r + margin) return z;
+  for (const z of safeZones(s)) if (z.kind === 'hq' ? hqEdgeDist(s, x, y).d < margin : dist(x, y, z.x, z.y) < z.r + margin) return z;
   return null;
 }
 function nearestSafe(s, x, y) {
@@ -1200,7 +1248,7 @@ function updateRaid(s, dt, ev) {
     const d = raidDanger(s);
     for (let i = 0; i < 2 && R.queue.length; i++) {
       const type = R.queue.pop();
-      const a = R.ang + (rand(s) - 0.5) * 1.6, r = hqSafeRadius(s) + 420 + rand(s) * 120;
+      const a = R.ang + (rand(s) - 0.5) * 1.6, r = hqOuterRadius(s) + 420 + rand(s) * 120;
       const x = clamp(CENTER.x + Math.cos(a) * r, 30, WORLD.w - 30), y = clamp(CENTER.y + Math.sin(a) * r, 30, WORLD.h - 30);
       const z = makeZombie(s, type, x, y, d, { raid: true });
       R.hpTotal += z.max;
@@ -1354,7 +1402,7 @@ export const ENDING_GOALS = [
   { id: 'network', req: true, name: '개척 거점망', desc: '전진기지 4곳, 모두 3레벨', goal: 4, progress: (s) => s.outposts.filter((o) => o.lv >= OUTPOST_MAX_LV).length },
   { id: 'elite', name: '학살자 사냥꾼', desc: '상급 좀비(거구·학살자) 100마리 처치', goal: 100, progress: (s) => s.stats.eliteKills },
   { id: 'military', name: '군사 구역 정복', desc: '군사 구역에서 100번 파밍', goal: 100, progress: (s) => s.stats.militaryLoot },
-  { id: 'fortress', name: '난공불락', desc: '기지 습격 12회 방어', goal: 12, progress: (s) => s.stats.raidsWon },
+  { id: 'fortress', name: '난공불락', desc: '기지 습격 14회 방어', goal: 14, progress: (s) => s.stats.raidsWon },
   { id: 'master', name: '명장', desc: '무기 하나를 +5(최대)까지 강화', goal: 6, progress: (s) => Math.max(1, ...Object.values(s.weapons)) },
   { id: 'veteran', name: '베테랑', desc: '플레이어 레벨 30', goal: 30, progress: (s) => s.level },
 ];
@@ -1573,7 +1621,7 @@ function spawnZombies(s, dt) {
 }
 
 function moveZombies(s, dt, ev) {
-  const P = s.player, alive = !P.dead, zones = safeZones(s), hqR = hqSafeRadius(s);
+  const P = s.player, alive = !P.dead, zones = safeZones(s);
   // 플레이어가 기지·전진기지 안에 숨으면 일반 좀비는 추격을 포기한다(방벽 앞에 몰려 대기하지 않게)
   const hidden = !!safeZoneAt(s, P.x, P.y);
   for (const z of s.zombies) {
@@ -1595,7 +1643,7 @@ function moveZombies(s, dt, ev) {
       if (z.wt <= 0) { z.wa = rand(s) * TAU; z.wt = 2 + rand(s) * 3; }
       vx = Math.cos(z.wa); vy = Math.sin(z.wa); sp *= 0.35;
     }
-    const atWall = z.raid && dist(z.x, z.y, CENTER.x, CENTER.y) <= hqR + z.r + 3;
+    const atWall = z.raid && hqEdgeDist(s, z.x, z.y).d <= z.r + 3;
     if (chase && dp < z.r + 14) {
       z.atk -= dt;
       if (z.atk <= 0) { z.atk = z.atkCd ?? ZOMBIE_ATK_CD; const dmg = z.dmg * (1 - playerGuard(s)); P.hp -= dmg; ev.push({ t: 'hurt', dmg }); }
@@ -1608,6 +1656,7 @@ function moveZombies(s, dt, ev) {
     pushOutOfObstacles(s, z, z.r);
     // 좀비는 바리케이드(안전지대) 안으로 못 들어온다
     for (const q of zones) {
+      if (q.kind === 'hq') { const e = hqEdgeDist(s, z.x, z.y); if (e.d < z.r) { z.x += e.nx * (z.r - e.d); z.y += e.ny * (z.r - e.d); } continue; }
       const d = dist(z.x, z.y, q.x, q.y), min = q.r + z.r;
       if (d < min) { const k = min / (d || 1); z.x = q.x + (z.x - q.x) * k; z.y = q.y + (z.y - q.y) * k; }
     }
@@ -1707,9 +1756,16 @@ function playerAttack(s, dt, ev) {
 }
 
 // 방어 배치 동료는 본부 방벽 둘레에 서서 사거리 안의 좀비를 공격한다. 의무병·기술자는 습격 중 방벽을 보수한다.
+// 방어 동료 자리: 꼭짓점 네 곳을 먼저 채우고(안쪽으로 12px), 다섯째부터는 방벽 둘레(꼭짓점 사이)를 고르게 나눈 곳(안쪽 8px)
 export function postPosition(s, i, n) {
-  const a = (i / Math.max(1, n)) * TAU - Math.PI / 2, r = hqSafeRadius(s) - 8;
-  return { x: CENTER.x + Math.cos(a) * r, y: CENTER.y + Math.sin(a) * r };
+  const p = hqPoly(s);
+  const inset = (x, y, r) => { const d = dist(x, y, CENTER.x, CENTER.y) || 1; return { x: x + ((CENTER.x - x) / d) * r, y: y + ((CENTER.y - y) / d) * r }; };
+  if (i < 4) return inset(p[i][0], p[i][1], 12);
+  const lens = p.map(([ax, ay], k) => dist(ax, ay, p[(k + 1) % p.length][0], p[(k + 1) % p.length][1]));
+  let t = ((i - 4 + 0.5) / Math.max(1, n - 4)) * lens.reduce((a, v) => a + v, 0), k = 0;
+  while (k < lens.length - 1 && t > lens[k]) { t -= lens[k]; k++; }
+  const [ax, ay] = p[k], [bx, by] = p[(k + 1) % p.length], f = Math.min(1, t / lens[k]);
+  return inset(ax + (bx - ax) * f, ay + (by - ay) * f, 8);
 }
 
 function defend(s, dt, ev) {
