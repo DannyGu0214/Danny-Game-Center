@@ -673,3 +673,107 @@ test('작은 계단: 높이가 다른 지형 사이는 한 칸에 한 계단(높
   assert.ok(step >= 0);
   assert.equal(G.canPlace(S, R, 'hutch', sx, sy).ok, false, '계단 칸엔 물건을 못 놓는다');
 });
+
+// 섬 칸 안에서 놓을 수 있는(on이 있으면 그 지형에 걸치는) 첫 자리
+const isleSpot = (S, rid, id, on = null) => {
+  const d = ITEMS[id];
+  for (let y = ISLE.y0; y < ISLE.y1; y++) for (let x = ISLE.x0; x < ISLE.x1; x++) {
+    if (!G.fits(S, rid, id, x, y)) continue;
+    if (!on) return [x, y];
+    for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (on.includes(T.kindAt(rid, xx, yy))) return [x, y];
+  }
+  return null;
+};
+const placeIsle = (S, rid, id, on = null) => { const at = isleSpot(S, rid, id, on); assert.ok(at, `${rid} 섬에 ${id} 자리(${on})`); return G.placeItem(S, rid, id, at[0], at[1]); };
+const isleP = (S, key) => G.isleProgress(S, R, key);
+
+test('섬 꾸미기: 섬이 열려야 시작하고, 채운 항목은 기록해 두었다가 받기, 6항목을 다 받으면 섬 마스터', () => {
+  const S = rich();
+  setTier(S, 7);
+  assert.equal(G.visitIsle(S, R), false, '잠긴 섬은 방문할 수 없다');
+  G.step(S, 1);
+  assert.deepEqual(S.regions[R].isle.done, []);
+  setTier(S, 8);
+  G.step(S, 1);
+  assert.deepEqual(S.regions[R].isle.done, [], '섬에 아무것도 없으면 달성 없음');
+  assert.equal(G.claimIsle(S, R, 'item').why, '아직 덜 됐어요');
+  // 본섬 물건은 세지 않는다
+  place(S, 'hutch');
+  assert.deepEqual(isleP(S, 'item'), [0, 1]);
+  // 섬 언덕에 은신 상자: 첫 물건, 쉼터, 언덕
+  placeIsle(S, R, 'hutch', ['hill']);
+  assert.deepEqual(isleP(S, 'item'), [1, 1]);
+  assert.deepEqual(isleP(S, 'needs'), [1, 3]);
+  assert.deepEqual(isleP(S, 'terrain'), [1, 2]);
+  placeIsle(S, R, 'grass', ['low']); // 먹이, 저지대
+  placeIsle(S, R, 'puddle', ['low']); // 물
+  assert.deepEqual(isleP(S, 'needs'), [3, 3]);
+  assert.deepEqual(isleP(S, 'terrain'), [2, 2]);
+  placeIsle(S, R, 'acacia'); placeIsle(S, R, 'baobab'); // 테마(초원 숲) 2개
+  assert.deepEqual(isleP(S, 'theme'), [2, 2]);
+  // 섬 주민: 섬 칸 안에 동물 6마리
+  const tiles = [];
+  for (let y = ISLE.y0; y < ISLE.y1 && tiles.length < 6; y++) for (let x = ISLE.x0; x < ISLE.x1 && tiles.length < 6; x++) if (G.walkable(S, R, x, y)) tiles.push([x, y]);
+  const rabbits = [];
+  for (let i = 0; i < 6; i++) rabbits.push(G.adopt(S, R, 'rabbit').animal);
+  rabbits.forEach((a, i) => { a.x = tiles[i][0] + 0.5; a.y = tiles[i][1] + 0.5; a.st = 'idle'; a.t = 100; });
+  assert.deepEqual(isleP(S, 'residents'), [6, 6]);
+  S.events.length = 0;
+  G.step(S, 1);
+  assert.deepEqual([...S.regions[R].isle.done].sort(), ['item', 'needs', 'residents', 'terrain', 'theme']);
+  assert.equal(S.events.filter((e) => e.type === 'isle').length, 5, '달성마다 알림');
+  // 기록한 항목은 동물이 떠나고 물건을 치워도 그대로
+  for (const a of rabbits) { a.x = 20.5; a.y = 10.5; }
+  for (const it of S.regions[R].items.filter((it) => it.y >= ISLE.y0)) G.removeItem(S, R, it.uid);
+  assert.deepEqual(isleP(S, 'residents'), [6, 6]);
+  assert.deepEqual(isleP(S, 'needs'), [3, 3]);
+  // 방문은 화면에서(visitIsle). 한 번만
+  assert.deepEqual(isleP(S, 'visit'), [0, 1]);
+  assert.equal(G.visitIsle(S, R), true);
+  assert.equal(G.visitIsle(S, R), false);
+  assert.equal(G.isleReady(S, R), 6);
+  // 받기: 관람 수익 N분치(최소 requestMin), 한 번만. 6번째에 섬 마스터 20분치
+  const per = G.incomePerMin(S, R);
+  for (const g of G.ISLE_GOALS.slice(0, 5)) {
+    const p0 = pop(S), r = G.claimIsle(S, R, g.key);
+    assert.ok(r.ok, g.key);
+    assert.equal(r.reward, Math.max(ECON.requestMin, Math.round(per * g.minutes)));
+    assert.equal(pop(S) - p0, r.reward);
+    assert.equal(r.master, 0);
+  }
+  assert.equal(G.claimIsle(S, R, 'visit').why, '이미 받았어요');
+  assert.equal(G.isleMaster(S, R), false);
+  const p0 = pop(S), last = G.ISLE_GOALS[5], r = G.claimIsle(S, R, last.key);
+  assert.equal(r.master, Math.max(ECON.requestMin, Math.round(per * G.ISLE_MASTER_MINUTES)));
+  assert.equal(pop(S) - p0, r.reward + r.master);
+  assert.ok(G.isleMaster(S, R));
+  assert.equal(G.isleReady(S, R), 0);
+  assert.ok(S.events.some((e) => e.type === 'isleMaster' && e.region === R && e.reward === r.master));
+  // 다른 지역 섬은 따로
+  assert.equal(G.isleMaster(S, 'seaside'), false);
+  // 저장했다 불러와도 그대로, 섬 꾸미기 전 세이브는 빈 목록으로
+  const L = G.deserialize(G.serialize(S, 0));
+  assert.ok(G.isleMaster(L, R));
+  const o = JSON.parse(G.serialize(S, 0));
+  for (const reg of Object.values(o.regions)) delete reg.isle;
+  assert.deepEqual(G.deserialize(JSON.stringify(o)).regions[R].isle, { done: [], got: [] });
+});
+
+test('섬 꾸미기: 4지역 섬 모두 테마 물건 2개·먹이·물·쉼터·언덕·저지대 물건을 놓을 자리가 있다', () => {
+  for (const rid of ['grassland', 'seaside', 'desert', 'antarctic']) {
+    const S = rich();
+    for (const r of Object.values(S.regions)) r.tier = 8;
+    S.rev++;
+    G.setView(S, rid);
+    const open = Object.keys(ITEMS).filter((id) => ITEMS[id].region === rid);
+    const first = (ok, on = null) => open.find((id) => ok(id) && isleSpot(S, rid, id, on));
+    for (const k of ['food', 'water', 'shelter']) assert.ok(first((id) => ITEMS[id].give[k]), `${rid} 섬 ${k}`);
+    // 테마 물건 2개(둘째가 안 들어가면 첫째를 하나 더)
+    const [a, b] = G.ISLE_THEME[rid];
+    placeIsle(S, rid, a); placeIsle(S, rid, isleSpot(S, rid, b) ? b : a);
+    assert.deepEqual(G.isleProgress(S, rid, 'theme'), [2, 2], `${rid} 섬 테마 ${a}·${b}`);
+    // 그다음 언덕·저지대(테마 물건이 이미 덮었으면 그대로)
+    for (const on of [['hill', 'high'], ['low', 'water']]) { const id = first(() => true, on); if (id) placeIsle(S, rid, id, on); }
+    assert.deepEqual(G.isleProgress(S, rid, 'terrain'), [2, 2], `${rid} 섬 언덕·저지대`);
+  }
+});

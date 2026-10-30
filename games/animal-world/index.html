@@ -151,11 +151,22 @@ button:disabled { cursor: default; }
 .req { padding: 10px 12px; border-radius: 14px; background: #fff; border: 1px solid var(--line); margin-bottom: 8px; }
 .req h4 { margin: 0 0 6px; font: 400 16px var(--f-display); }
 .req .meter { margin: 0 0 8px; }
+/* T8 섬 꾸미기 6항목(요청 시트 맨 위) */
+.isle { padding: 10px 12px 4px; border-radius: 14px; background: #eaf5ee; border: 1px solid #b8d9c3; margin-bottom: 10px; }
+.isle h4 { margin: 0 0 4px; font: 400 16px var(--f-display); display: flex; align-items: baseline; gap: 6px; }
+.isle h4 span { margin-left: auto; color: var(--muted); font: 12.5px var(--f-body); }
+.isle .goal { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px dashed #c5dfcd; }
+.isle .goal > b { flex: none; width: 16px; text-align: center; font-weight: 400; color: var(--green); }
+.isle .goal > span { flex: 1; min-width: 0; font-size: 13.5px; }
+.isle .goal small { display: block; color: var(--muted); font-size: 11.5px; }
+.isle .goal .btn { flex: none; min-width: 84px; padding: 7px 8px; font-size: 13px; }
 .album { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .album div { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px; text-align: center; }
 .album canvas { width: 100%; height: 70px; background: var(--panel-2); border-radius: 10px; }
 .album b { display: block; font: 400 15px var(--f-display); margin-top: 4px; }
 .album small { color: var(--muted); font-size: 11.5px; }
+.album .stamp { grid-column: 1 / -1; border: 2px dashed var(--gold); background: #fff8e2; font: 17px var(--f-display); padding: 10px; }
+.album .stamp small { display: block; font: 11.5px var(--f-body); margin-top: 2px; }
 
 /* 알림 */
 .modal { position: absolute; inset: 0; z-index: 20; background: rgba(40, 30, 15, 0.45); display: grid; place-items: center; padding: 20px; }
@@ -223,7 +234,7 @@ button:disabled { cursor: default; }
 </div>
 <script type="module">
 import * as G from './logic.js';
-import { GRID, GW, GH, ISLE, MAX_TIER, TIERS, ECON, SIZE, SPECIES, ITEMS, REGIONS, NEED_NAME, NEED_ICON, caps, speciesOf, itemsOf, itemPrice, animalPrice } from './data.js';
+import { GRID, GW, GH, ISLE, ISLE_THEME, MAX_TIER, TIERS, ECON, SIZE, SPECIES, ITEMS, REGIONS, NEED_NAME, NEED_ICON, caps, speciesOf, itemsOf, itemPrice, animalPrice } from './data.js';
 import * as A from './art.js';
 import { LEVEL, TERRAIN, heightAt, kindAt, allowedOn } from './terrain.js';
 import { createMusic } from './music.js';
@@ -754,12 +765,17 @@ function hud() {
     $('#devbar').style.width = `${Math.max(0, Math.min(100, ((st.dev - lo) / (hi - lo)) * 100))}%`;
   }
   setText($('#happy'), st.animals ? `${Math.round(st.H * 100)}%` : '-');
-  const done = G.requestsOf(S).filter((q) => G.requestDone(S, q)).length, rb = $('#mRequests .dot'); // 지금 지역 요청만
+  const done = G.requestsOf(S).filter((q) => G.requestDone(S, q)).length + G.isleReady(S, rid), rb = $('#mRequests .dot'); // 지금 지역 요청·섬 꾸미기만
   rb.hidden = !done; setText(rb, String(done));
   // 티어가 오른 뒤 아직 열어 보지 않은 메뉴에 N 표시
   $('#mAnimals .dot').hidden = !(R.tier > (UI.seen.animals[rid] ?? 1));
   $('#mDecor .dot').hidden = !(R.tier > (UI.seen.decor[rid] ?? 1));
   $('#rnew').hidden = !newRegions().length;
+  // 섬 첫 방문: 1.5× 이상 확대해서 화면 가운데(땅 높이 0 기준)에 섬 칸이 오면
+  if (UI.zf >= 1.5 && G.isleOpen(S, rid) && !R.isle.done.includes('visit')) {
+    const a = (UI.cam.x / zoom + uc) / ISO_A / T, b = (UI.cam.y / zoom + vc) / ISO_B / T, x = (a + b) / 2, y = (b - a) / 2;
+    if (y >= ISLE.y0 && x >= ISLE.x0 && x < ISLE.x1) G.visitIsle(S, rid);
+  }
   const h = hintText(st, R);
   const hint = $('#hint');
   hint.hidden = !h || !!UI.sheet; if (h) setText(hint, h);
@@ -802,7 +818,7 @@ function sheetRegions(body) {
   const rows = [];
   for (const r of REGIONS) {
     const row = el('div', 'item'), cv = el('canvas');
-    const info = el('div', null, `<h4>${r.icon} ${r.name} <span class="tag tierTag"></span><span class="tag new" hidden>NEW</span></h4><p class="have"></p>`);
+    const info = el('div', null, `<h4>${r.icon} ${r.name} <span class="tag tierTag"></span><span class="tag isleTag" hidden>🏝️✓</span><span class="tag new" hidden>NEW</span></h4><p class="have"></p>`);
     const side = el('div'), btn = el('button', 'buy'), why = el('small', 'why');
     side.append(btn, why); row.append(cv, info, side);
     btn.onclick = () => goRegion(r.id);
@@ -817,6 +833,7 @@ function sheetRegions(body) {
       o.row.classList.toggle('locked', !open); o.row.classList.toggle('here', here);
       setText(o.info.querySelector('.tierTag'), open ? `T${R.tier}` : '🔒');
       o.info.querySelector('.new').hidden = !newRegions().includes(r);
+      o.info.querySelector('.isleTag').hidden = !G.isleMaster(S, r.id); // 섬 마스터
       setText(o.info.querySelector('.have'), !open ? `${G.regionDef(r.unlock.region).name} T${r.unlock.tier}에서 열려요` : `⭐${fmt(R.pop)} · 동물 ${st.animals} · 발전도 ${st.dev}`);
       setText(o.btn, here ? '지금 여기' : open ? '가 보기' : '🔒');
       o.btn.disabled = here || !open || !r.ready;
@@ -963,15 +980,59 @@ function reqText(q) {
   if (q.kind === 'happy') return `행복도 ${q.pct}% 이상인 곳이 좋아요`;
   return `${at}${sp.name} ‘${sp.special}’ 사진을 찍어 주세요 (✨가 뜨면 탭)`;
 }
+// T8 섬 꾸미기 항목 글자: [할 일, 도움말]
+const ISLE_TEXT = {
+  visit: () => ['다리를 건너 섬 구경하기', '섬을 확대해서 화면 가운데에 두면 돼요'],
+  item: () => ['섬에 첫 물건 놓기', ''],
+  needs: () => [`섬에 ${['food', 'water', 'shelter'].map((k) => `${NEED_ICON[k]} ${NEED_NAME[k]}`).join(' · ')} 물건 하나씩`, ''],
+  theme: (rid) => ['섬에 테마 물건 2개', ISLE_THEME[rid].map((id) => ITEMS[id].name).join(' · ')],
+  residents: () => ['섬에서 지내는 동물 6마리', '섬에 먹이·물이 있으면 동물이 건너와요'],
+  terrain: () => ['섬 언덕에 하나, 저지대에 하나 물건 놓기', ''],
+};
+// 요청 시트 맨 위 섬 꾸미기 칸(섬이 열린 지역만). 달성하면 [받기], 섬 첫 방문은 [가 보기]로 섬을 확대해 보여 준다. 다시 칠하는 함수를 돌려준다
+function isleSection(body, rid) {
+  const box = el('div', 'isle', '<h4>🏝️ 섬 꾸미기 <span></span></h4>'), rows = [];
+  for (const g of G.ISLE_GOALS) {
+    const [t, hint] = ISLE_TEXT[g.key](rid), row = el('div', 'goal', `<b></b><span>${t}${hint ? `<small>${hint}</small>` : ''}</span>`), btn = el('button', 'btn');
+    row.appendChild(btn); box.appendChild(row);
+    btn.onclick = () => {
+      if (g.key === 'visit' && !S.regions[rid].isle.done.includes('visit')) return goIsle();
+      const r = G.claimIsle(S, rid, g.key);
+      if (!r.ok) return toast(r.why);
+      toast(`섬 꾸미기 완료! ⭐+${r.reward}`); afterChange();
+    };
+    rows.push({ g, row, btn });
+  }
+  body.appendChild(box);
+  return () => {
+    const I = S.regions[rid].isle;
+    setText(box.querySelector('h4 span'), G.isleMaster(S, rid) ? '🏆 섬 마스터' : `${I.done.length}/${G.ISLE_GOALS.length}`);
+    for (const o of rows) {
+      const got = I.got.includes(o.g.key), done = I.done.includes(o.g.key), [a, b] = G.isleProgress(S, rid, o.g.key);
+      setText(o.row.querySelector('b'), done ? '✓' : '○');
+      setText(o.btn, got ? '받음' : done ? `받기 ⭐${G.isleReward(S, rid, o.g.minutes)}` : o.g.key === 'visit' ? '가 보기' : `${a}/${b}`);
+      o.btn.className = done && !got ? 'btn main' : 'btn';
+      o.btn.disabled = got || (!done && o.g.key !== 'visit');
+    }
+  };
+}
+// 섬 첫 방문 [가 보기]: 시트를 닫고 2×로 섬 쪽을 보여 준다(hud의 확인에서 방문으로 친다)
+function goIsle() {
+  closeSheet(); select(null);
+  setZoomF(2);
+  const px = ((ISLE.x0 + ISLE.x1) / 2) * T, py = ((ISLE.y0 + ISLE.y1) / 2) * T;
+  UI.cam.x = ((px - py) * ISO_A - uc) * zoom; UI.cam.y = ((px + py) * ISO_B - vc) * zoom; clampCam();
+}
 function sheetRequests(body) {
   $('#sheetTitle').textContent = '관람객 요청';
   const rid = S.view, list = () => G.requestsOf(S, rid); // 요청은 지역마다 따로
-  const sig = () => list().map((q) => q.uid).join(',');
-  let built = null;
+  const sig = () => `${G.isleOpen(S, rid)}|${list().map((q) => q.uid).join(',')}`;
+  let built = null, isle = null;
   const build = () => {
     body.innerHTML = '';
     built = sig();
     const rows = [];
+    isle = G.isleOpen(S, rid) ? isleSection(body, rid) : null;
     if (!list().length) body.appendChild(el('p', null, '지금은 요청이 없어요. 동물을 입양하면 새 요청이 와요.'));
     for (const q of list()) {
       const card = el('div', 'req', `<h4>${reqText(q)}</h4><div class="meter"><i></i></div>`);
@@ -987,6 +1048,7 @@ function sheetRequests(body) {
   sheetUpdate = () => {
     if (sig() !== built) rows = build();
     $('#sheetSub').textContent = `${G.regionDef(rid).name} 관람객`;
+    isle?.();
     for (const o of rows) {
       const [a, b] = G.requestProgress(S, o.q), done = G.requestDone(S, o.q);
       o.card.querySelector('.meter i').style.width = `${b ? (a / b) * 100 : 0}%`;
@@ -1004,6 +1066,7 @@ function sheetAlbum(body) {
   const list = speciesOf(rid), got = list.filter((sp) => S.album[sp]).length;
   $('#sheetSub').textContent = `${got}/${list.length}종 포착`;
   const grid = el('div', 'album');
+  if (G.isleMaster(S, rid)) grid.appendChild(el('div', 'stamp', `🏝️ 섬 마스터<small>${G.regionDef(rid).name} 섬 꾸미기 ${G.ISLE_GOALS.length}가지를 모두 해냈어요</small>`));
   for (const sp of list) {
     const d = SPECIES[sp], n = S.album[sp] || 0, cell = el('div'), cv = el('canvas');
     cell.appendChild(cv);
@@ -1116,7 +1179,7 @@ function tierModal(rid, tier) {
   const sp = speciesOf(rid).filter((s) => SPECIES[s].tier === tier).map((s) => `🆕 ${SPECIES[s].name}`);
   const its = itemsOf(rid).filter((i) => ITEMS[i].tier === tier).map((i) => `🆕 ${ITEMS[i].name}`);
   const unlockedRegion = REGIONS.find((r) => r.unlock && r.unlock.region === rid && r.unlock.tier === tier);
-  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${tier === ISLE.tier ? '<p>🏝️ <b>새 섬이 열렸어요</b> — 다리를 건너 꾸며 보세요</p>' : ''}${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${!unlockedRegion.ready ? ' (콘텐츠는 다음 업데이트)' : ''}</p>${unlockedRegion.ready ? `<button class="btn" data-go="${unlockedRegion.id}">${unlockedRegion.icon} ${josa(unlockedRegion.name, '으로', '로')} 가 보기</button>` : ''}` : ''}`);
+  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${tier === ISLE.tier ? '<p>🏝️ <b>새 섬이 열렸어요</b> — 다리를 건너 꾸며 보세요. 📋 요청에 섬 꾸미기 6가지가 생겼어요</p>' : ''}${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${!unlockedRegion.ready ? ' (콘텐츠는 다음 업데이트)' : ''}</p>${unlockedRegion.ready ? `<button class="btn" data-go="${unlockedRegion.id}">${unlockedRegion.icon} ${josa(unlockedRegion.name, '으로', '로')} 가 보기</button>` : ''}` : ''}`);
 }
 
 // ---------- 변화 뒤 ----------
@@ -1132,6 +1195,8 @@ function drainEvents() {
   for (const e of ev) {
     if (e.type === 'tier') tierModal(e.region, e.tier);
     if (e.type === 'tier' && e.tier === ISLE.tier && e.region === S.view) { resize(); setZoom(0); } // 섬까지 한 화면에
+    if (e.type === 'isle' && e.region === S.view) toast(`🏝️ ${ISLE_TEXT[e.key](e.region)[0]} 달성 — 📋 요청에서 보상을 받아요`);
+    if (e.type === 'isleMaster') modal(`<h2>🏆 섬 마스터!</h2><p>${G.regionDef(e.region).name} 섬 꾸미기 ${G.ISLE_GOALS.length}가지를 모두 해냈어요</p><p style="font-size:22px">⭐ +${fmt(e.reward)}</p><p>📷 앨범에 <b>섬 마스터</b> 도장을 찍었어요</p>`);
     if (e.type === 'terrain') toast(`땅에 언덕·저지대·길이 생겼어요 — 물건 ${e.moved}개를 맞는 자리로 옮겼어요${e.refunded ? ` · ${e.refunded}개는 낸 값을 모두 돌려받았어요` : ''}`, 7000);
   }
 }

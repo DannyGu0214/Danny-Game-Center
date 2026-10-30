@@ -29,6 +29,12 @@ export function run({ minutes = MIN, seed = SEED, captureRate = CAP, requests = 
     if (S.chance && S.chance !== lastChance) { lastChance = S.chance; tapAt = coin() < captureRate ? S.time + 1.5 : null; }
     if (S.chance && tapAt != null && S.time >= tapAt) { const r = G.capture(S, S.chance.uid); if (r.ok) income.capture += r.reward; tapAt = null; }
     if (requests) for (const q of [...G.requestsOf(S, R)]) if (G.requestDone(S, q)) { const r = G.claim(S, q.uid); if (r.ok) income.request += r.reward; }
+    // T8 섬 꾸미기: 섬이 열리면 바로 가 보고, 달성한 항목은 받는다(섬 마스터 보상 포함)
+    if (requests && G.isleOpen(S, R)) {
+      G.visitIsle(S, R);
+      const I = S.regions[R].isle;
+      for (const k of I.done.filter((k) => !I.got.includes(k))) { const r = G.claimIsle(S, R, k); if (r.ok) income.request += r.reward + r.master; }
+    }
     // 1초마다 살 것을 정한다
     if (Math.abs(t % 1) < 1e-9) {
       for (let k = 0; k < 4; k++) { const want = choose(S); if (!want || G.popOf(S, R) < want.price) break; buy(S, want); }
@@ -87,5 +93,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`끝: ${(S.time / 60).toFixed(0)}분, T${S.regions[R].tier}, 발전도 ${st.dev}, 행복도 ${(st.H * 100).toFixed(0)}%, 동물 ${st.animals}마리 ${st.species}종, 물건 ${S.regions[R].items.length}개, 남은 인기 ${Math.floor(G.popOf(S, R))}`);
   const tot = income.view + income.capture + income.request;
   console.log(`수입: 관람 ${Math.round(income.view)} (${Math.round((income.view / tot) * 100)}%) · 포착 ${Math.round(income.capture)} · 요청 ${Math.round(income.request)}`);
+  if (G.isleOpen(S, R)) console.log(`섬 꾸미기: ${S.regions[R].isle.done.length}/${G.ISLE_GOALS.length} (${S.regions[R].isle.done.join(' ')})${G.isleMaster(S, R) ? ' · 섬 마스터' : ''}`);
   void tierAt; void SIZE; void animalValue;
 }

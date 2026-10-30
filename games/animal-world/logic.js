@@ -1,7 +1,7 @@
 // 게임 규칙 전부(화면 없음). 경제·한도·발전도·행복도·티어·요청·순간 포착·동물 행동·저장 형식.
 // 상태 S는 JSON으로 그대로 저장할 수 있는 순수 데이터다. 난수는 S.rng(시드)에서만 뽑는다.
 import {
-  GRID, GW, GH, ISLE, MAX_TIER, TIERS, caps, SIZE, ECON, REGIONS, SPECIES, ITEMS,
+  GRID, GW, GH, ISLE, ISLE_THEME, MAX_TIER, TIERS, caps, SIZE, ECON, REGIONS, SPECIES, ITEMS,
   animalValue, itemPoints, animalPrice, itemPrice, speciesOf, itemsOf,
 } from './data.js';
 import { TERRAIN, kindAt, terrainFits, allowedOn, hasWater, terrainOf } from './terrain.js';
@@ -94,8 +94,9 @@ export function stats(S, rid) {
 }
 
 // ---------- 인기점수(지역마다 따로) ----------
-// 지역 하나: 티어·물건·동물 + 그 지역 인기점수(pop)·관람객 요청(requests, reqSwapAt). away = 그 지역을 떠난 플레이 시각(보고 있으면 null)
-const newRegion = (away) => ({ tier: 1, items: [], animals: [], pop: ECON.start, away, requests: [], reqSwapAt: 0 });
+// 지역 하나: 티어·물건·동물 + 그 지역 인기점수(pop)·관람객 요청(requests, reqSwapAt)·섬 꾸미기(isle). away = 그 지역을 떠난 플레이 시각(보고 있으면 null)
+const newRegion = (away) => ({ tier: 1, items: [], animals: [], pop: ECON.start, away, requests: [], reqSwapAt: 0, isle: newIsle() });
+const newIsle = () => ({ done: [], got: [] }); // 섬 꾸미기: 달성한 항목·보상 받은 항목
 export const popOf = (S, rid = S.view) => S.regions[rid].pop;
 // 분당 관람 수익: 그 지역 발전도 ÷ incomeDiv. 보고 있는 지역에만 실시간으로 쌓인다
 export function incomePerMin(S, rid = S.view) {
@@ -552,6 +553,73 @@ export function swapRequest(S, uid) {
   return { ok: true };
 }
 
+// ---------- T8 섬 꾸미기 ----------
+// 섬이 열리면 일반 요청 3장과 따로 6항목(2026-10-30 대니님 승인 후속작업 5). 아무 순서로, 바꾸기·기한 없음.
+// 조건을 한 번 채우면 달성으로 기록하고(동물은 섬을 드나드니까) [받기]로 보상(관람 수익 N분치, 최소 requestMin).
+// 6항목을 다 받으면 섬 마스터(20분치, 앨범 도장, 지역 카드 🏝️✓). 섬 위 물건·동물은 섬 칸(ISLE.y0행부터)으로 센다. 행복도는 지역 하나에 하나 그대로
+export const ISLE_GOALS = [
+  { key: 'visit', n: 1, minutes: 5 }, // 섬 첫 방문(화면에서 섬을 확대해 보기 — visitIsle)
+  { key: 'item', n: 1, minutes: 3 }, // 섬 첫 물건
+  { key: 'needs', n: 3, minutes: 5 }, // 먹이·물·쉼터 물건 하나씩
+  { key: 'theme', n: 2, minutes: 6 }, // 지역 테마 물건 2개(ISLE_THEME)
+  { key: 'residents', n: 6, minutes: 6 }, // 섬에서 지내는 동물 6마리
+  { key: 'terrain', n: 2, minutes: 5 }, // 섬 언덕(낮은·높은)에 하나, 저지대·물에 하나
+];
+export const ISLE_MASTER_MINUTES = 20;
+const onIsle = (y) => y >= ISLE.y0;
+function isleNow(S, rid, key) {
+  const R = S.regions[rid], items = R.items.filter((it) => onIsle(it.y));
+  const on = (ks) => items.some((it) => ks.some((k) => covers(rid, it.id, it.x, it.y, k)));
+  if (key === 'visit') return 0;
+  if (key === 'item') return items.length;
+  if (key === 'needs') return SET_NEEDS.filter((k) => items.some((it) => ITEMS[it.id].give[k])).length;
+  if (key === 'theme') return items.filter((it) => ISLE_THEME[rid].includes(it.id)).length;
+  if (key === 'residents') return R.animals.filter((a) => onIsle(tileOf(a)[1])).length;
+  return (on(['hill', 'high']) ? 1 : 0) + (on(['low', 'water']) ? 1 : 0);
+}
+export function isleProgress(S, rid, key) {
+  const g = ISLE_GOALS.find((x) => x.key === key);
+  return [S.regions[rid].isle.done.includes(key) ? g.n : Math.min(g.n, isleNow(S, rid, key)), g.n];
+}
+export const isleReward = (S, rid, minutes) => Math.max(ECON.requestMin, Math.round(incomePerMin(S, rid) * minutes));
+export const isleMaster = (S, rid) => ISLE_GOALS.every((g) => S.regions[rid].isle.got.includes(g.key));
+// 받을 수 있는(달성했고 아직 안 받은) 항목 수
+export const isleReady = (S, rid) => { const I = S.regions[rid].isle; return I.done.filter((k) => !I.got.includes(k)).length; };
+// 새로 채운 항목을 달성으로 기록한다(보고 있는 지역, 1초마다)
+function checkIsle(S, rid) {
+  if (!isleOpen(S, rid)) return;
+  const I = S.regions[rid].isle;
+  for (const g of ISLE_GOALS) {
+    if (I.done.includes(g.key) || isleNow(S, rid, g.key) < g.n) continue;
+    I.done.push(g.key);
+    S.events.push({ type: 'isle', region: rid, key: g.key });
+  }
+}
+export function visitIsle(S, rid) {
+  const I = S.regions[rid].isle;
+  if (!isleOpen(S, rid) || I.done.includes('visit')) return false;
+  I.done.push('visit');
+  S.events.push({ type: 'isle', region: rid, key: 'visit' });
+  return true;
+}
+export function claimIsle(S, rid, key) {
+  const I = S.regions[rid].isle, g = ISLE_GOALS.find((x) => x.key === key);
+  if (!g) return no('없는 항목');
+  checkIsle(S, rid);
+  if (I.got.includes(key)) return no('이미 받았어요');
+  if (!I.done.includes(key)) return no('아직 덜 됐어요');
+  const reward = isleReward(S, rid, g.minutes);
+  gain(S, rid, reward);
+  I.got.push(key);
+  let master = 0;
+  if (isleMaster(S, rid)) {
+    master = isleReward(S, rid, ISLE_MASTER_MINUTES);
+    gain(S, rid, master);
+    S.events.push({ type: 'isleMaster', region: rid, reward: master });
+  }
+  return { ok: true, reward, master };
+}
+
 // ---------- 시간 ----------
 // 하루 = 플레이 4분: 아침 → 낮 → 저녁 → 밤이 1분씩. 진행일수는 1일차부터
 export const DAY_SEC = 240, PHASE_SEC = 60;
@@ -568,7 +636,10 @@ export function step(S, dt) {
     if (!r.ready) continue;
     for (const a of S.regions[r.id].animals) updateAnimal(S, r.id, a, dt);
   }
-  if (S.regions[S.view].requests.length < 3 && Math.floor(S.time) !== Math.floor(S.time - dt)) fillRequests(S, S.view); // 빈 칸은 1초마다 다시 채워 본다(낼 요청이 없을 때 매 프레임 자리 찾기를 하지 않게)
+  if (Math.floor(S.time) !== Math.floor(S.time - dt)) {
+    if (S.regions[S.view].requests.length < 3) fillRequests(S, S.view); // 빈 칸은 1초마다 다시 채워 본다(낼 요청이 없을 때 매 프레임 자리 찾기를 하지 않게)
+    checkIsle(S, S.view);
+  }
 }
 // 게임을 끈 동안: 보고 있던 지역은 바로 정산(최대 offlineCapSec), 다른 지역은 쉬는 시간에 더해 두었다가 돌아올 때 정산.
 // sec = 실제로 비운 시간, gain = 보고 있던 지역에 쌓인 점수. 시계가 뒤로 가면 0
@@ -615,7 +686,7 @@ export function deserialize(raw) {
   if (S.v === 1) migrateV1(S);
   if (S.v === 2) migrateV2(S);
   if (S.v === 3) migrateV3(S);
-  for (const r of REGIONS) { const R = S.regions[r.id]; R.pop ??= ECON.start; if (R.away === undefined) R.away = r.id === S.view ? null : S.time; R.requests ??= []; R.reqSwapAt ??= 0; }
+  for (const r of REGIONS) { const R = S.regions[r.id]; R.pop ??= ECON.start; if (R.away === undefined) R.away = r.id === S.view ? null : S.time; R.requests ??= []; R.reqSwapAt ??= 0; R.isle ??= newIsle(); }
   fitTerrain(S);
   return S;
 }
@@ -675,4 +746,4 @@ export function fitTerrain(S) {
   return out;
 }
 
-export { GRID, GW, GH, ISLE, MAX_TIER, TIERS };
+export { GRID, GW, GH, ISLE, ISLE_THEME, MAX_TIER, TIERS };
