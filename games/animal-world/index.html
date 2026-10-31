@@ -601,10 +601,10 @@ function draw(dt) {
   // 선택한 물건 · 놓을 자리(놓을 수 있는 지형 칸을 밝게, 고른 자리는 초록/빨강)
   if (UI.sel?.type === 'item') { const it = R.items.find((i) => i.uid === UI.sel.uid); if (it) A.footprint(pen, it.x, it.y, ITEMS[it.id].w, ITEMS[it.id].h, 'rgba(255,255,255,0.18)', '#ffffff', itemZ(it)); }
   if (UI.place) {
-    const id = UI.place.id, d = ITEMS[id], on = allowedOn(id), z = heightAt(rid, UI.place.x, UI.place.y) * LEVEL;
+    const id = UI.place.id, d = ITEMS[id], on = [allowedOn(id), allowedOn(id, true)], z = heightAt(rid, UI.place.x, UI.place.y) * LEVEL; // [본섬, T8 섬]
     g.beginPath(); // 칸이 많아 한 번에 칠한다
     for (let y = 0, rows = ny(); y < rows; y++) for (let x = 0; x < GW; x++) {
-      if (!on.includes(kindAt(rid, x, y)) || G.itemAt(S, rid, x, y)) continue;
+      if (!on[y >= ISLE.y0 ? 1 : 0].includes(kindAt(rid, x, y)) || G.itemAt(S, rid, x, y)) continue;
       const zz = heightAt(rid, x, y) * LEVEL + 0.3, q = [P(x * T + 0.5, y * T + 0.5, zz), P((x + 1) * T - 0.5, y * T + 0.5, zz), P((x + 1) * T - 0.5, (y + 1) * T - 0.5, zz), P(x * T + 0.5, (y + 1) * T - 0.5, zz)];
       g.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) g.lineTo(q[i][0], q[i][1]); g.closePath();
     }
@@ -987,7 +987,7 @@ const ISLE_TEXT = {
   needs: () => [`섬에 ${['food', 'water', 'shelter'].map((k) => `${NEED_ICON[k]} ${NEED_NAME[k]}`).join(' · ')} 물건 하나씩`, ''],
   theme: (rid) => ['섬에 테마 물건 2개', ISLE_THEME[rid].map((id) => ITEMS[id].name).join(' · ')],
   residents: () => ['섬에서 지내는 동물 6마리', '섬에 먹이·물이 있으면 동물이 건너와요'],
-  terrain: () => ['섬 언덕에 하나, 저지대에 하나 물건 놓기', ''],
+  terrain: () => ['섬 언덕에 물건 2개 놓기', ''],
 };
 // 요청 시트 맨 위 섬 꾸미기 칸(섬이 열린 지역만). 달성하면 [받기], 섬 첫 방문은 [가 보기]로 섬을 확대해 보여 준다. 다시 칠하는 함수를 돌려준다
 function isleSection(body, rid) {
@@ -1197,7 +1197,7 @@ function drainEvents() {
     if (e.type === 'tier' && e.tier === ISLE.tier && e.region === S.view) { resize(); setZoom(0); } // 섬까지 한 화면에
     if (e.type === 'isle' && e.region === S.view) toast(`🏝️ ${ISLE_TEXT[e.key](e.region)[0]} 달성 — 📋 요청에서 보상을 받아요`);
     if (e.type === 'isleMaster') modal(`<h2>🏆 섬 마스터!</h2><p>${G.regionDef(e.region).name} 섬 꾸미기 ${G.ISLE_GOALS.length}가지를 모두 해냈어요</p><p style="font-size:22px">⭐ +${fmt(e.reward)}</p><p>📷 앨범에 <b>섬 마스터</b> 도장을 찍었어요</p>`);
-    if (e.type === 'terrain') toast(`땅에 언덕·저지대·길이 생겼어요 — 물건 ${e.moved}개를 맞는 자리로 옮겼어요${e.refunded ? ` · ${e.refunded}개는 낸 값을 모두 돌려받았어요` : ''}`, 7000);
+    if (e.type === 'terrain') toast(`땅 모양이 바뀌어 물건 ${e.moved}개를 맞는 자리로 옮겼어요${e.refunded ? ` · ${e.refunded}개는 낸 값을 모두 돌려받았어요` : ''}`, 7000);
   }
 }
 

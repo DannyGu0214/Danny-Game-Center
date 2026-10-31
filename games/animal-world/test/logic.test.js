@@ -469,10 +469,12 @@ test('T8 섬: 잠겨 있으면 다리·섬에 못 가고 못 놓는다. T8이 �
     assert.equal(T.kindAt(rid, b.x0 - 1, b.y0), 'void');
     assert.equal(T.kindAt(rid, 0, ISLE.y0), 'void', '섬 옆은 빈 하늘');
     for (let x = b.x0; x < b.x1; x++) { assert.equal(T.heightAt(rid, x, b.y0 - 1), 0, `${rid} 본섬 쪽 다리 끝`); assert.equal(T.heightAt(rid, x, b.y1), 0, `${rid} 섬 쪽 다리 끝`); }
-    // 섬에도 평지·낮은 언덕·저지대가 있다(지형 맞춤 꾸미기용)
-    const kinds = new Set();
-    for (let y = ISLE.y0; y < ISLE.y1; y++) for (let x = ISLE.x0; x < ISLE.x1; x++) kinds.add(T.kindAt(rid, x, y));
-    for (const k of ['flat', 'hill', 'low']) assert.ok(kinds.has(k), `${rid} 섬에 ${k}`);
+    // 섬은 평지(1단)·낮은 언덕(2단) 두 층과 그 사이 비탈뿐이고, 평지가 60% 이상(2026-10-31 대니님 요청)
+    const kinds = {};
+    for (let y = ISLE.y0; y < ISLE.y1; y++) for (let x = ISLE.x0; x < ISLE.x1; x++) { const k = T.kindAt(rid, x, y); if (k !== 'void') kinds[k] = (kinds[k] || 0) + 1; }
+    assert.deepEqual(Object.keys(kinds).sort(), ['flat', 'hill', 'step'], `${rid} 섬 지형`);
+    const all = Object.values(kinds).reduce((a, n) => a + n, 0);
+    assert.ok(kinds.flat / all >= 0.6, `${rid} 섬 평지 ${kinds.flat}/${all}`);
     // 섬에 놓을 물건과 자리(평지·낮은 언덕에 놓는 물건)
     const id = Object.keys(ITEMS).find((k) => ITEMS[k].region === rid && ITEMS[k].tier === 1 && T.allowedOn(k).includes('flat'));
     let at = null;
@@ -705,9 +707,11 @@ test('섬 꾸미기: 섬이 열려야 시작하고, 채운 항목은 기록해 �
   assert.deepEqual(isleP(S, 'item'), [1, 1]);
   assert.deepEqual(isleP(S, 'needs'), [1, 3]);
   assert.deepEqual(isleP(S, 'terrain'), [1, 2]);
-  placeIsle(S, R, 'grass', ['low']); // 먹이, 저지대
-  placeIsle(S, R, 'puddle', ['low']); // 물
+  placeIsle(S, R, 'grass', ['flat']); // 먹이(평지라 언덕은 그대로)
+  assert.deepEqual(isleP(S, 'terrain'), [1, 2]);
+  placeIsle(S, R, 'puddle', ['flat']); // 물: 섬에선 물웅덩이도 평지에
   assert.deepEqual(isleP(S, 'needs'), [3, 3]);
+  placeIsle(S, R, 'feeder', ['hill']); // 섬 언덕에 둘째 물건
   assert.deepEqual(isleP(S, 'terrain'), [2, 2]);
   placeIsle(S, R, 'acacia'); placeIsle(S, R, 'baobab'); // 테마(초원 숲) 2개
   assert.deepEqual(isleP(S, 'theme'), [2, 2]);
@@ -759,7 +763,7 @@ test('섬 꾸미기: 섬이 열려야 시작하고, 채운 항목은 기록해 �
   assert.deepEqual(G.deserialize(JSON.stringify(o)).regions[R].isle, { done: [], got: [] });
 });
 
-test('섬 꾸미기: 4지역 섬 모두 테마 물건 2개·먹이·물·쉼터·언덕·저지대 물건을 놓을 자리가 있다', () => {
+test('섬 꾸미기: 4지역 섬 모두 부표 말고는 모든 물건을 놓을 자리가 있고, 테마 물건 2개·언덕 물건 2개를 놓는다', () => {
   for (const rid of ['grassland', 'seaside', 'desert', 'antarctic']) {
     const S = rich();
     for (const r of Object.values(S.regions)) r.tier = 8;
@@ -767,13 +771,28 @@ test('섬 꾸미기: 4지역 섬 모두 테마 물건 2개·먹이·물·쉼터�
     G.setView(S, rid);
     const open = Object.keys(ITEMS).filter((id) => ITEMS[id].region === rid);
     const first = (ok, on = null) => open.find((id) => ok(id) && isleSpot(S, rid, id, on));
+    for (const id of open) assert.equal(!!isleSpot(S, rid, id), id !== 'buoy', `${rid} 섬에 ${id}`); // 물 자연물·헤엄 물건도 섬 평지에
     for (const k of ['food', 'water', 'shelter']) assert.ok(first((id) => ITEMS[id].give[k]), `${rid} 섬 ${k}`);
     // 테마 물건 2개(둘째가 안 들어가면 첫째를 하나 더)
     const [a, b] = G.ISLE_THEME[rid];
     placeIsle(S, rid, a); placeIsle(S, rid, isleSpot(S, rid, b) ? b : a);
     assert.deepEqual(G.isleProgress(S, rid, 'theme'), [2, 2], `${rid} 섬 테마 ${a}·${b}`);
-    // 그다음 언덕·저지대(테마 물건이 이미 덮었으면 그대로)
-    for (const on of [['hill', 'high'], ['low', 'water']]) { const id = first(() => true, on); if (id) placeIsle(S, rid, id, on); }
-    assert.deepEqual(G.isleProgress(S, rid, 'terrain'), [2, 2], `${rid} 섬 언덕·저지대`);
+    // 그다음 섬 언덕에 물건 2개(테마 물건이 이미 언덕에 있으면 그만큼 덜)
+    while (G.isleProgress(S, rid, 'terrain')[0] < 2) placeIsle(S, rid, first(() => true, ['hill']), ['hill']);
+    assert.deepEqual(G.isleProgress(S, rid, 'terrain'), [2, 2], `${rid} 섬 언덕`);
   }
+});
+
+test('섬 지도가 바뀐 세이브: 맞지 않게 된 섬 물건은 섬 안 가장 가까운 빈자리로 옮긴다', () => {
+  const S = rich();
+  setTier(S, 8);
+  // 2층 지도에선 비탈인 칸(초원 섬 8행 0열 = 예전 지도의 숲 언덕 가장자리)
+  const x = ISLE.x0, y = ISLE.y0 + 8;
+  assert.equal(T.kindAt(R, x, y), 'step');
+  S.regions[R].items.push({ uid: 950, id: 'hutch', x, y, paid: 10 });
+  const L = G.deserialize(G.serialize(S, 0)), it = L.regions[R].items.find((i) => i.uid === 950);
+  assert.ok(it.y >= ISLE.y0, '섬에 남는다');
+  assert.ok(T.terrainFits(R, 'hutch', it.x, it.y));
+  assert.ok(Math.hypot(it.x - x, it.y - y) <= 3, `가까운 자리 ${it.x},${it.y}`);
+  assert.equal(L.events.find((e) => e.type === 'terrain').moved, 1);
 });

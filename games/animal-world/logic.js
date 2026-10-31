@@ -161,9 +161,9 @@ const spotLists = {};
 function spotList(rid, id) {
   const key = rid + ':' + id;
   if (spotLists[key]) return spotLists[key];
-  const d = ITEMS[id], c = (GRID - 1) / 2, cand = [], on = allowedOn(id);
+  const d = ITEMS[id], c = (GRID - 1) / 2, cand = [], on = [allowedOn(id), allowedOn(id, true)];
   for (let y = 0; y + d.h <= GH; y++) for (let x = 0; x + d.w <= GW; x++) {
-    const pref = on.indexOf(kindAt(rid, x, y));
+    const pref = on[y >= ISLE.y0 ? 1 : 0].indexOf(kindAt(rid, x, y));
     if (pref >= 0 && terrainFits(rid, id, x, y)) cand.push([x, y, (y >= GRID ? 1000 : 0) + pref * 100 + Math.hypot(x + (d.w - 1) / 2 - c, y + (d.h - 1) / 2 - c)]);
   }
   cand.sort((a, b) => a[2] - b[2]);
@@ -231,8 +231,13 @@ export function release(S, rid, uid) {
 }
 const gainRefund = (S, rid, paid) => { S.regions[rid].pop += Math.floor(paid * ECON.refund); };
 
-// 물건을 놓을 수 있는 지형 이름(예: '낮은 언덕·평지')
-export const terrainNames = (id) => allowedOn(id).map((k) => TERRAIN[k].name).join('·');
+// 물건을 놓을 수 있는 지형 이름(예: '낮은 언덕·평지'). isle을 주면 그 땅(본섬 false · T8 섬 true) 기준,
+// 없으면 둘 다(섬에서 더 놓을 수 있으면 '저지대(섬은 평지도)')
+export function terrainNames(id, isle = null) {
+  const name = (k) => TERRAIN[k].name, main = allowedOn(id), more = allowedOn(id, true).filter((k) => !main.includes(k));
+  if (isle != null) return allowedOn(id, isle).map(name).join('·');
+  return main.map(name).join('·') + (more.length ? `(섬은 ${more.map(name).join('·')}도)` : '');
+}
 export function canPlace(S, rid, id, x, y) {
   const d = ITEMS[id];
   if (!d || d.region !== rid) return no('이 지역 물건이 아니에요');
@@ -240,7 +245,7 @@ export function canPlace(S, rid, id, x, y) {
   if (!r.ok) return r;
   if (S.regions[rid].tier < d.tier) return no(`T${d.tier}에서 해금`);
   if (x >= 0 && y >= 0 && x + d.w <= GW && y + d.h <= GH && locked(S, rid, y + d.h - 1)) return no(`T${ISLE.tier}에 열리는 섬이에요`);
-  if (x >= 0 && y >= 0 && x + d.w <= GW && y + d.h <= GH && !terrainFits(rid, id, x, y)) return no(`${terrainNames(id)}에 놓아요`);
+  if (x >= 0 && y >= 0 && x + d.w <= GW && y + d.h <= GH && !terrainFits(rid, id, x, y)) return no(`${terrainNames(id, y >= ISLE.y0)}에 놓아요`);
   if (!fits(S, rid, id, x, y)) return no('놓을 수 없는 자리예요');
   if (popOf(S, rid) < priceOfItem(id)) return no('인기점수가 모자라요');
   return ok;
@@ -563,19 +568,18 @@ export const ISLE_GOALS = [
   { key: 'needs', n: 3, minutes: 5 }, // 먹이·물·쉼터 물건 하나씩
   { key: 'theme', n: 2, minutes: 6 }, // 지역 테마 물건 2개(ISLE_THEME)
   { key: 'residents', n: 6, minutes: 6 }, // 섬에서 지내는 동물 6마리
-  { key: 'terrain', n: 2, minutes: 5 }, // 섬 언덕(낮은·높은)에 하나, 저지대·물에 하나
+  { key: 'terrain', n: 2, minutes: 5 }, // 섬 언덕에 물건 2개(2026-10-31 섬이 평지·언덕 두 층이 되며 '언덕 하나 + 저지대 하나'에서 바꿈)
 ];
 export const ISLE_MASTER_MINUTES = 20;
 const onIsle = (y) => y >= ISLE.y0;
 function isleNow(S, rid, key) {
   const R = S.regions[rid], items = R.items.filter((it) => onIsle(it.y));
-  const on = (ks) => items.some((it) => ks.some((k) => covers(rid, it.id, it.x, it.y, k)));
   if (key === 'visit') return 0;
   if (key === 'item') return items.length;
   if (key === 'needs') return SET_NEEDS.filter((k) => items.some((it) => ITEMS[it.id].give[k])).length;
   if (key === 'theme') return items.filter((it) => ISLE_THEME[rid].includes(it.id)).length;
   if (key === 'residents') return R.animals.filter((a) => onIsle(tileOf(a)[1])).length;
-  return (on(['hill', 'high']) ? 1 : 0) + (on(['low', 'water']) ? 1 : 0);
+  return items.filter((it) => covers(rid, it.id, it.x, it.y, 'hill')).length;
 }
 export function isleProgress(S, rid, key) {
   const g = ISLE_GOALS.find((x) => x.key === key);
@@ -723,8 +727,8 @@ function migrateV3(S) {
   touch(S);
   S.v = SAVE_VERSION;
 }
-// 지형이 생기기 전 세이브: 지형에 맞지 않는 물건은 가까운 맞는 자리로 옮기고, 자리가 없으면 낸 값을 모두 돌려준다.
-// 동물은 걸을 수 없는 칸(봉우리·물, 헤엄치는 동물은 물 밖)에 서 있으면 가까운 칸으로 옮긴다
+// 지형이 생기기 전 세이브(또는 지도가 바뀐 T8 섬): 지형에 맞지 않는 물건은 맞는 자리로 옮기고, 자리가 없으면 낸 값을 모두 돌려준다.
+// 섬에 있던 물건은 섬 안에서 원래 자리와 가장 가까운 빈자리로(없으면 다른 자리). 동물은 걸을 수 없는 칸(봉우리·물, 헤엄치는 동물은 물 밖)에 서 있으면 가까운 칸으로 옮긴다
 export function fitTerrain(S) {
   const out = { moved: 0, refunded: 0 };
   for (const r of REGIONS) {
@@ -733,7 +737,7 @@ export function fitTerrain(S) {
     R.items = R.items.filter((it) => !bad.includes(it));
     touch(S);
     for (const it of bad) {
-      const at = freeSpot(S, r.id, it.id);
+      const at = (onIsle(it.y) && nearIsleSpot(S, r.id, it)) || freeSpot(S, r.id, it.id);
       if (at) { it.x = at[0]; it.y = at[1]; R.items.push(it); out.moved++; } else { R.pop += it.paid; out.refunded++; }
       touch(S);
     }
@@ -744,6 +748,19 @@ export function fitTerrain(S) {
   }
   if (out.moved || out.refunded) S.events.push({ type: 'terrain', ...out });
   return out;
+}
+
+// 섬 물건 it이 갈 섬 안의 빈자리 중 원래 자리와 가장 가까운 곳(섬이 잠겨 있거나 없으면 null)
+function nearIsleSpot(S, rid, it) {
+  const d = ITEMS[it.id], occ = occupancy(S, rid);
+  let best = null, bd = Infinity;
+  next: for (const [x, y] of spotList(rid, it.id)) {
+    if (!onIsle(y) || locked(S, rid, y + d.h - 1)) continue;
+    for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) if (occ[yy * GW + xx]) continue next;
+    const dist = Math.hypot(x - it.x, y - it.y);
+    if (dist < bd) { bd = dist; best = [x, y]; }
+  }
+  return best;
 }
 
 export { GRID, GW, GH, ISLE, ISLE_THEME, MAX_TIER, TIERS };
