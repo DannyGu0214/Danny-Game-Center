@@ -276,6 +276,10 @@ export function waitDay(S) {
   payWages(S);
   return true;
 }
+// 금화 세는 말: 한 닢, 두 닢 … 열 닢, 그 위는 숫자로
+export const coinCount = (n) => { const w = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉', '열'][n]; return w ? `${w} 닢` : `${n}닢`; };
+// 주량이 아주 센 선원은 보수를 럼주 값으로 달라고 한다(내는 금화는 같다)
+export const wantsRum = (c) => (c.drink ?? CREW.baseStat) >= CREW.rumDrink;
 // 기준값의 ±25% 안에서 고른다
 const vary = (S, base) => Math.max(1, Math.round(base * (1 - CREW.spread + rnd(S) * 2 * CREW.spread)));
 function makeCandidate(S, taken) {
@@ -305,7 +309,7 @@ export function hire(S, id) {
   if (!st.hull.crew) return { ok: false, why: `${st.hull.name}엔 선원 태울 자리가 없다고!` };
   if (S.crew.length >= st.crewCap) return { ok: false, why: '재울 데가 없잖아! 해먹부터 달아, 선장!' };
   if (hasRole(S, c.role)) return { ok: false, why: `${ROLES[c.role].name}은(는) 이미 있다고!` };
-  if (S.res.coin < c.hireCost) return { ok: false, why: '코인이 모자라, 선장! 주머니가 가볍다고!' };
+  if (S.res.coin < c.hireCost) return { ok: false, why: '금화가 모자라, 선장! 주머니가 가볍다고!' };
   S.res.coin -= c.hireCost;
   S.crew.push(c);
   S.cands[S.docked].list = list.filter((q) => q !== c);

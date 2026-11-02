@@ -357,6 +357,13 @@ test('선술집 곡: 마디마다 박자가 맞고 조에서 벗어나지 않는
   }
 });
 
+test('금화 세기와 럼주 선원: 내는 금화는 같고 말만 다르다', () => {
+  assert.deepEqual([1, 2, 5, 10, 12].map(G.coinCount), ['한 닢', '두 닢', '다섯 닢', '열 닢', '12닢']);
+  assert.equal(G.wantsRum({ drink: 115 }), true);
+  assert.equal(G.wantsRum({ drink: 114 }), false);
+  assert.equal(G.wantsRum({}), false, '예전 선원은 금화로 받아요');
+});
+
 test('출항 이야기: 선장마다 3쪽, 마지막은 여정, 이름 조사가 맞는다', () => {
   assert.deepEqual(Object.keys(STORIES), Object.keys(CAPTAINS));
   for (const [id, St] of Object.entries(STORIES)) {

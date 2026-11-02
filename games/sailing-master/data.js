@@ -83,7 +83,7 @@ export const ROLES = {
 };
 export const CREW_NAMES = { 남: ['라파엘', '니콜라스', '루이스', '파블로', '세바스티안', '올리버', '토마스 2세', '후안 3세', '얀', '페드로', '알론소 2세', '빌럼'], 여: ['마리아', '클라라', '이네스', '줄리에타', '페르난다', '브리타', '로사', '비앙카', '솔레다드', '아나벨 2세', '마르타', '엘로이사'] };
 // 선원 후보: 항구마다 1~3명. 능력치는 기준값의 ±25% 안에서 정해지고, 며칠 지나면 후보가 바뀐다
-export const CREW = { spread: 0.25, baseStat: 100, refreshDays: 3, minCands: 1, maxCands: 3, speedPerSkill: 0.1 };
+export const CREW = { spread: 0.25, baseStat: 100, refreshDays: 3, minCands: 1, maxCands: 3, speedPerSkill: 0.1, rumDrink: 115 }; // rumDrink: 이 주량부터 보수를 럼주 값으로 받겠다고 한다
 
 // 선장 4명. 게임을 시작할 때 고르고, 특성은 판 내내 그대로예요(Zombie Outpost 생존자 고르기와 같은 방식)
 export const CAPTAINS = {
@@ -119,7 +119,7 @@ export const STORIES = {
 
 
 // 자원. 항해 중엔 화물칸에 담고, 입항하면 창고로 옮겨요
-export const RES = { wood: { name: '목재', icon: '🪵' }, cloth: { name: '천', icon: '🧵' }, coin: { name: '코인', icon: '🪙' } };
+export const RES = { wood: { name: '목재', icon: '🪵' }, cloth: { name: '천', icon: '🧵' }, coin: { name: '금화', icon: '🪙' } };
 
 export const SPECIES = {
   crucian: { name: '붕어', kind: 'fish', region: 'pond', color: '#9c8a55', len: 0.5 },
