@@ -334,13 +334,13 @@ export function passGate(S, gate) {
 }
 
 // ── 기록 ──
+// 동물은 관찰 대상이라 탭하면 기록만 된다. 보상은 도감 달성(도전과제)으로 받는다
 export function recordSpecies(S, id) {
-  if (!SPECIES[id] || S.seen[id]) return 0;
-  const R = SPECIES[id].reward;
-  S.seen[id] = 1; S.res.coin += R;
-  emit(S, 'species', { id, reward: R });
+  if (!SPECIES[id] || S.seen[id]) return false;
+  S.seen[id] = 1;
+  emit(S, 'species', { id });
   checkAch(S);
-  return R;
+  return true;
 }
 function giveAch(S, id) {
   const a = ACHIEVEMENTS.find((q) => q.id === id);
@@ -366,6 +366,7 @@ export function checkAch(S) {
   c('lakeAll', worldDone(S, 'lake'));
   const nSeen = Object.keys(S.seen).length;
   c('species5', nSeen >= 5);
+  c('species10', nSeen >= 10);
   c('speciesAll', nSeen >= Object.keys(SPECIES).length);
 }
 

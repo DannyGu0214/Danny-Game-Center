@@ -174,6 +174,31 @@ function patternsOf(sc, g) {
   return sc.patterns;
 }
 
+// 물결의 흐름 상태. 위치를 '방향 × 전체 시간'으로 계산하면 바람이 조금만 돌아도 물결이 옆으로 크게 미끄러지므로
+// 프레임마다 지난 시간만큼 더해 간다. 바람이 돌 때는 카메라를 중심으로 돌려서 화면 가운데 물결이 튀지 않게 한다.
+export const FLOW_LAYERS = [{ scale: 0.11, drift: 1.1, alpha: 0.9 }, { scale: 0.19, drift: 0.55, alpha: 0.8 }];
+const PAW_SPEED = 6, TURN_LAG = 3;
+// 무늬의 물마루는 가로이고 위로 볼록하다. 볼록한 쪽(-y)이 바람 부는 쪽을 보게 하는 회전각
+export const waveAngle = (blow) => blow + Math.PI / 2;
+export function advanceFlow(sc, cam, t, wind) {
+  const target = wind.from + Math.PI;
+  if (!sc.flow) sc.flow = { t, ang: target, layers: FLOW_LAYERS.map(() => ({ x: 0, y: 0 })), paw: { x: 0, y: 0 } };
+  const F = sc.flow, dt = Math.max(0, Math.min(0.25, t - F.t));
+  F.t = t;
+  let d = (target - F.ang) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2; else if (d < -Math.PI) d += Math.PI * 2;
+  const dA = d * (1 - Math.exp(-dt / TURN_LAG)), c = Math.cos(dA), n = Math.sin(dA);
+  F.ang += dA;
+  const wx = Math.cos(F.ang), wy = Math.sin(F.ang), k = 0.6 + wind.speed / 15, [fx, fy] = sc.world.flowAt(cam.x, cam.y);
+  FLOW_LAYERS.forEach((L, i) => {
+    const o = F.layers[i], rx = o.x - cam.x, ry = o.y - cam.y;
+    o.x = cam.x + rx * c - ry * n + (wx * L.drift * k + fx) * dt;
+    o.y = cam.y + rx * n + ry * c + (wy * L.drift * k + fy) * dt;
+  });
+  F.paw.x += wx * PAW_SPEED * k * dt; F.paw.y += wy * PAW_SPEED * k * dt;
+  return F;
+}
+
 // 물 바닥: 색 + 서로 다른 속도로 흐르는 무늬 두 겹 + 바람 자국 + 반짝임
 export function drawWater(g, sc, cam, W, H, t, wind, dpr) {
   const z = cam.zoom, k = VIEW.tiltY;
@@ -182,33 +207,32 @@ export function drawWater(g, sc, cam, W, H, t, wind, dpr) {
   grad.addColorStop(0, '#2b7f9f'); grad.addColorStop(1, '#2f94a9');
   g.fillStyle = grad; g.fillRect(0, 0, W, H);
 
-  const pat = patternsOf(sc, g);
-  const wx = -Math.cos(wind.from), wy = -Math.sin(wind.from);
-  const flow = [
-    { p: pat.a, s: 0.11, drift: 1.1, wob: 3.2, alpha: 0.9, phase: 0 },
-    { p: pat.b, s: 0.19, drift: 0.55, wob: 4.6, alpha: 0.8, phase: 1.7 },
-  ];
-  for (const f of flow) {
-    const ox = (wx * t * f.drift + Math.sin(t * 0.21 + f.phase) * f.wob - cam.x) * z;
-    const oy = (wy * t * f.drift + Math.cos(t * 0.17 + f.phase) * f.wob - cam.y) * z * k;
-    const m = new DOMMatrix([z * f.s, 0, 0, z * f.s * k, W / 2 + ox, cam.cy + oy]);
-    f.p.setTransform(m);
-    g.globalAlpha = f.alpha;
-    g.fillStyle = f.p; g.fillRect(0, 0, W, H);
-  }
+  const pat = patternsOf(sc, g), F = advanceFlow(sc, cam, t, wind);
+  // 무늬 좌표 → 세상(돌리고 옮김) → 화면(3/4로 납작하게). 물마루가 바람에 직각이 되게 돌린다
+  const deg = waveAngle(F.ang) * 180 / Math.PI;
+  FLOW_LAYERS.forEach((L, i) => {
+    const o = F.layers[i], m = new DOMMatrix().translate(W / 2, cam.cy).scale(z, z * k).translate(o.x - cam.x, o.y - cam.y).rotate(deg).scale(L.scale);
+    const p = i === 0 ? pat.a : pat.b;
+    p.setTransform(m);
+    g.globalAlpha = L.alpha;
+    g.fillStyle = p; g.fillRect(0, 0, W, H);
+  });
   g.globalAlpha = 1;
 
-  // 바람 자국: 바람 방향으로 흘러가는 어두운 잔물결 덩어리(바람이 어디서 오는지 보여 준다)
+  // 바람 자국: 바람 부는 쪽으로 흘러가는 어두운 잔물결 덩어리
   const span = Math.max(W, H / k) / z * 1.4;
   for (const p of sc.paws) {
     const life = (t * 0.045 + p.s) % 1, fade = Math.sin(life * Math.PI);
-    const px = ((p.rx * span + wx * t * 7) % span + span) % span - span / 2 + cam.x;
-    const py = ((p.ry * span + wy * t * 7) % span + span) % span - span / 2 + cam.y;
+    const px = ((p.rx * span + F.paw.x) % span + span) % span - span / 2 + cam.x;
+    const py = ((p.ry * span + F.paw.y) % span + span) % span - span / 2 + cam.y;
     const sx = W / 2 + (px - cam.x) * z, sy = cam.cy + (py - cam.y) * z * k;
-    const sw = 60 * p.size * z, sh = 30 * p.size * z * k;
-    if (sx < -sw || sx > W + sw || sy < -sh || sy > H + sh) continue;
+    const sw = 60 * p.size * z, sh = 30 * p.size * z;
+    if (sx < -sw || sx > W + sw || sy < -sw || sy > H + sw) continue;
+    g.save();
+    g.translate(sx, sy); g.scale(1, k); g.rotate(waveAngle(F.ang));
     g.globalAlpha = 0.34 * fade;
-    g.drawImage(sc.paw, sx - sw / 2, sy - sh / 2, sw, sh);
+    g.drawImage(sc.paw, -sw / 2, -sh / 2, sw, sh);
+    g.restore();
   }
   g.globalAlpha = 1;
 
@@ -467,14 +491,18 @@ function flotSprite(k) {
 export function drawFlotsam(g, sc, list, cam, W, H, t, dpr) {
   const z = cam.zoom, k = VIEW.tiltY;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const size = Math.max(14, 3.3 * z);
+  const size = Math.max(18, 3.6 * z);
   for (const f of list) {
     const sx = W / 2 + (f.x - cam.x) * z, sy = cam.cy + (f.y - cam.y) * z * k + Math.sin(t * 1.4 + f.ph) * 0.12 * z;
     if (sx < -size || sx > W + size || sy < -size || sy > H + size) continue;
-    const pulse = 1 + 0.5 * ((t * 0.5 + f.ph) % 1), a = 0.55 * (1 - ((t * 0.5 + f.ph) % 1));
-    g.strokeStyle = `rgba(255,255,240,${a})`; g.lineWidth = 1;
-    g.beginPath(); g.ellipse(sx, sy + size * 0.1, size * 0.5 * pulse, size * 0.5 * pulse * k, 0, 0, TAU); g.stroke();
+    // 건질 것만 금빛 고리와 반짝임을 쓴다(동물과 헷갈리지 않게)
+    const q = (t * 0.6 + f.ph) % 1, pulse = 0.8 + 0.7 * q;
+    g.strokeStyle = `rgba(255,214,102,${0.85 * (1 - q)})`; g.lineWidth = 1.6;
+    g.beginPath(); g.ellipse(sx, sy + size * 0.1, size * 0.6 * pulse, size * 0.6 * pulse * k, 0, 0, TAU); g.stroke();
     g.drawImage(sc.flot[f.k], sx - size / 2, sy - size * 0.55, size, size * 0.75);
+    const tw = 0.55 + 0.45 * Math.sin(t * 4 + f.ph * 3), r = size * 0.26 * tw, gx = sx + size * 0.3, gy = sy - size * 0.5;
+    g.fillStyle = '#ffe9a8';
+    g.beginPath(); g.moveTo(gx, gy - r); g.quadraticCurveTo(gx, gy, gx + r, gy); g.quadraticCurveTo(gx, gy, gx, gy + r); g.quadraticCurveTo(gx, gy, gx - r, gy); g.quadraticCurveTo(gx, gy, gx, gy - r); g.fill();
   }
   
 }

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as G from '../logic.js';
 import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
+import { advanceFlow, waveAngle, FLOW_LAYERS } from '../art.js';
+import { createCreatures, hitRadius } from '../creatures.js';
 import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS } from '../data.js';
 
 const D = Math.PI / 180;
@@ -397,14 +399,31 @@ test('꾸미기: 도전과제로 열리고, 칠과 이름이 바뀐다', () => {
   assert.equal(S.ship.name, '파도호');
 });
 
-test('도감: 처음 기록할 때만 보상, 전부 모으면 도전과제', () => {
-  const S = G.newGame(1), coin = S.res.coin;
-  assert.equal(G.recordSpecies(S, 'duck'), SPECIES.duck.reward);
-  assert.equal(S.res.coin, coin + SPECIES.duck.reward);
-  assert.equal(G.recordSpecies(S, 'duck'), 0);
-  for (const id of Object.keys(SPECIES)) G.recordSpecies(S, id);
-  assert.ok(S.ach.species5 && S.ach.speciesAll);
-  assert.equal(ACHIEVEMENTS.length, 15);
+test('도감: 동물을 기록해도 자원이 늘지 않고, 달성 보상만 받는다', () => {
+  const S = G.newGame(1), res = { ...S.res }, hold = { ...S.hold };
+  assert.equal(G.recordSpecies(S, 'duck'), true);
+  assert.deepEqual(S.res, res);
+  assert.deepEqual(S.hold, hold);
+  assert.equal(G.recordSpecies(S, 'duck'), false);
+  const ids = Object.keys(SPECIES);
+  for (const id of ids.slice(0, 5)) G.recordSpecies(S, id);
+  assert.ok(S.ach.species5);
+  assert.equal(S.res.coin, res.coin + 30);
+  assert.ok(!S.ach.species10);
+  for (const id of ids) G.recordSpecies(S, id);
+  assert.ok(S.ach.species10 && S.ach.speciesAll);
+  assert.equal(S.res.coin, res.coin + 30 + 50 + 80);
+  assert.equal(ACHIEVEMENTS.length, 16);
+  for (const d of Object.values(SPECIES)) assert.equal(d.reward, undefined);
+});
+
+test('동물 탭 범위는 몸에 맞고, 떨어진 곳은 잡지 않는다', () => {
+  const zoom = 8, W2 = 400, cam = { x: 0, y: 0, zoom, cy: 400 };
+  const cr = createCreatures(worldOf('pond'));
+  cr.list.push({ sp: 'duck', kind: 'duck', x: 0, y: 0, h: 0, age: 1, life: 30, ph: 0, act: 0, next: 9, size: 1 });
+  assert.ok(cr.at(W2 / 2, 400, cam, W2));
+  assert.equal(cr.at(W2 / 2 + 40, 400, cam, W2), null, '40px 옆은 동물이 아니다');
+  assert.ok(hitRadius(cr.list[0], zoom) < 34);
 });
 
 test('강 끝: 조건을 채우면 엔딩', () => {
@@ -423,6 +442,44 @@ test('저장: 다시 불러도 같고, 망가진 저장은 거른다', () => {
   assert.equal(T.boat.x, S.boat.x);
   assert.equal(G.deserialize('{"v":99}'), null);
   assert.equal(G.deserialize('망가짐'), null);
+});
+
+test('물결: 물마루가 바람 부는 쪽을 보게 돌아간다', () => {
+  // 무늬의 볼록한 쪽(0, -1)을 돌리면 바람 부는 쪽과 같아야 한다
+  for (const blow of [0, 1, 2.5, -1.2, -2.9]) {
+    const a = waveAngle(blow), x = Math.sin(a), y = -Math.cos(a);
+    assert.ok(Math.abs(x - Math.cos(blow)) < 1e-9 && Math.abs(y - Math.sin(blow)) < 1e-9);
+  }
+});
+
+test('물결: 오래 플레이해도 바람 부는 쪽으로 의도한 속도로 흐른다', () => {
+  for (const region of REGION_ORDER) {
+    const S = G.newGame(1), sc = { world: worldOf(region) }, cam = { x: 30, y: 40 };
+    S.region = region;
+    const maxSpd = FLOW_LAYERS[0].drift * (0.6 + REGIONS[region].wind.speed * 1.32 / 15) + (REGIONS[region].flow || 0);
+    let off = 0, n = 0, top = 0, worst = 0;
+    // 화면 가운데(카메라) 물결이 한 단계 뒤 어디로 갔는지 잰다
+    S.t = 0; advanceFlow(sc, cam, 0, G.windAt(S));
+    for (let i = 1; i < 3600 * 30; i++) {
+      const F = sc.flow, p = F.layers[0], t0 = waveAngle(F.ang), rx = cam.x - p.x, ry = cam.y - p.y;
+      const u = rx * Math.cos(-t0) - ry * Math.sin(-t0), v = rx * Math.sin(-t0) + ry * Math.cos(-t0); // 무늬 좌표
+      S.t = i / 30;
+      const w = G.windAt(S);
+      advanceFlow(sc, cam, S.t, w);
+      const t1 = waveAngle(F.ang), nx = p.x + u * Math.cos(t1) - v * Math.sin(t1), ny = p.y + u * Math.sin(t1) + v * Math.cos(t1);
+      const vx = (nx - cam.x) * 30, vy = (ny - cam.y) * 30;
+      if (i < 30 * 30) continue; // 첫 30초 뒤부터 잰다
+      const d = Math.abs(G.angDiff(Math.atan2(vy, vx), F.ang)), lag = Math.abs(G.angDiff(F.ang, w.from + Math.PI));
+      if (!REGIONS[region].flow) { off += Math.max(d, lag); n++; worst = Math.max(worst, d, lag); }
+      top = Math.max(top, Math.hypot(vx, vy));
+      assert.ok(lag < 0.4, `${region} 바람을 못 따라감 ${lag}`);
+    }
+    if (n) {
+      assert.ok(off / n * 180 / Math.PI < 10, `${region} 평균 어긋남 ${(off / n * 180 / Math.PI).toFixed(1)}°`);
+      console.log(region, `물결 평균 어긋남 ${(off / n * 180 / Math.PI).toFixed(1)}°, 최대 ${(worst * 180 / Math.PI).toFixed(1)}°, 최대 속도 ${top.toFixed(2)}m/s`);
+    } else console.log(region, `물결 최대 속도 ${top.toFixed(2)}m/s(물살 포함)`);
+    assert.ok(top <= maxSpd + 0.05, `${region} 너무 빠름 ${top}`);
+  }
 });
 
 test('같은 시드는 같은 결과', () => {

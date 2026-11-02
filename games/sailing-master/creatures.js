@@ -58,7 +58,7 @@ export function createCreatures(world) {
       }
     },
     // 땅 위 짐승과 물 위 생물을 함께 그린다
-    draw(g, cam, W, H, dpr) {
+    draw(g, cam, W, H, dpr, seen = {}) {
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       const z = cam.zoom, k = VIEW.tiltY;
       for (const c of list) {
@@ -67,17 +67,18 @@ export function createCreatures(world) {
         const fade = Math.min(1, c.age, (c.life - c.age));
         g.globalAlpha = Math.max(0, fade);
         DRAW[c.kind](g, c, sx, sy, z, SPECIES[c.sp]);
+        if (!seen[c.sp]) newBadge(g, c, sx, sy, z);
       }
       g.globalAlpha = 1;
     },
-    // 화면 좌표 근처의 생물
+    // 화면 좌표에 있는 생물: 몸 크기에 맞춰 판정한다(넓으면 물이나 건질 것을 누른 게 동물로 잡힌다)
     at(sx, sy, cam, W) {
       const z = cam.zoom, k = VIEW.tiltY;
-      let best = null, bd = 34;
+      let best = null, bd = Infinity;
       for (const c of list) {
-        const px = W / 2 + (c.x - cam.x) * z, py = cam.cy + (c.y - cam.y) * z * k - (c.kind === 'land' ? 1 * z : 0);
+        const px = W / 2 + (c.x - cam.x) * z, py = cam.cy + (c.y - cam.y) * z * k - bodyLift(c, z);
         const d = Math.hypot(px - sx, py - sy);
-        if (d < bd) { bd = d; best = c; }
+        if (d < hitRadius(c, z) && d < bd) { bd = d; best = c; }
       }
       return best;
     },
@@ -85,9 +86,37 @@ export function createCreatures(world) {
   };
 }
 
-function ring(g, x, y, r, a, k = VIEW.tiltY) {
-  g.strokeStyle = `rgba(240,252,250,${a})`; g.lineWidth = 1;
-  g.beginPath(); g.ellipse(x, y, r, r * k, 0, 0, TAU); g.stroke();
+// 동물 둘레의 물결: 닫힌 고리는 건질 것 전용이라, 동물은 짧은 호 두 개만 그린다
+// 몸이 그려지는 높이(화면 px)와 탭 범위
+function bodyLift(c, z) {
+  const s = Math.max(0.75, z / 8);
+  if (c.kind === 'bird') return 7 * z;
+  if (c.kind === 'wader') return 11 * s;
+  if (c.kind === 'land') return 6 * s * (SPECIES[c.sp].height || 1);
+  if (c.kind === 'duck') return 3 * s * (c.size || 1);
+  return 0;
+}
+export function hitRadius(c, z) {
+  const s = Math.max(0.75, z / 8), def = SPECIES[c.sp];
+  const body = c.kind === 'fish' ? def.len * 1.9 * z * 0.5 + (def.school ? 2 * z : 0) : c.kind === 'land' ? 7 * s * (def.height || 1) : c.kind === 'wader' ? 9 * s : c.kind === 'bird' ? 10 * s : 7 * s * (c.size || 1);
+  return Math.max(16, body + 6);
+}
+// 아직 기록하지 않은 동물 위의 작은 책 표시
+function newBadge(g, c, x, y, z) {
+  const s = Math.max(0.8, z / 8), by = y - bodyLift(c, z) - (c.kind === 'fish' ? 8 : 12) * s - Math.sin(c.ph * 2.2) * 1.2;
+  g.fillStyle = 'rgba(16,48,62,.85)'; g.beginPath(); g.arc(x, by, 6.4 * s, 0, TAU); g.fill();
+  g.fillStyle = '#f4efe0';
+  g.fillRect(x - 3.6 * s, by - 2.6 * s, 3.3 * s, 5 * s); g.fillRect(x + 0.3 * s, by - 2.6 * s, 3.3 * s, 5 * s);
+}
+function ripple(g, x, y, r, a, k = VIEW.tiltY) {
+  g.strokeStyle = `rgba(214,240,244,${a})`; g.lineWidth = 1;
+  g.beginPath(); g.ellipse(x, y, r, r * k, 0, 0.25, 1.05); g.stroke();
+  g.beginPath(); g.ellipse(x, y, r, r * k, 0, Math.PI + 0.25, Math.PI + 1.05); g.stroke();
+}
+// 물방울 몇 개(물고기가 튈 때, 수달이 잠수할 때)
+function drops(g, x, y, r, a) {
+  g.fillStyle = `rgba(232,248,250,${a})`;
+  for (const q of [-1, -0.4, 0.5, 1]) { g.beginPath(); g.arc(x + q * r, y - Math.abs(q) * r * 0.25, 1, 0, TAU); g.fill(); }
 }
 const DRAW = {
   // 물고기: 평소엔 물속 그림자, 가끔 튀어 오른다
@@ -109,13 +138,13 @@ const DRAW = {
       g.beginPath(); g.moveTo(-L * 0.45, 0); g.lineTo(-L * 0.72, L * 0.2); g.lineTo(-L * 0.72, -L * 0.2); g.closePath(); g.fill();
       g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.ellipse(L * 0.05, -L * 0.07, L * 0.24, L * 0.05, 0, 0, TAU); g.fill();
       g.restore();
-      ring(g, x, y, (0.4 + p * 1.4) * z, 0.6 * (1 - p));
+      drops(g, x, y, (0.3 + p * 1.1) * z, 0.8 * (1 - p));
     }
   },
   // 물새: 오리·백조(옆모습 + 물결)
   duck(g, c, x, y, z, def) {
     const s = Math.max(0.65, z / 8) * (c.size || 1), f = Math.cos(c.h) >= 0 ? 1 : -1, bob = Math.sin(c.ph * 2) * 0.6;
-    ring(g, x, y + 1.6 * s, 7.5 * s + Math.sin(c.ph) * s, 0.45);
+    ripple(g, x, y + 1.6 * s, 7.5 * s + Math.sin(c.ph) * s, 0.4);
     g.save(); g.translate(x, y + bob); g.scale(f * s, s);
     g.fillStyle = def.color; g.beginPath(); g.moveTo(-7.5, -1.5); g.quadraticCurveTo(-2, 3.2, 6, 1); g.quadraticCurveTo(5.5, -4.5, 0, -4.5); g.quadraticCurveTo(-4, -4.5, -7.5, -1.5); g.closePath(); g.fill();
     const nk = def.neck || 1;
@@ -127,7 +156,7 @@ const DRAW = {
   // 물가에 선 긴 다리 새
   wader(g, c, x, y, z, def) {
     const s = Math.max(0.7, z / 8), f = Math.sin(c.ph * 0.2) > 0 ? 1 : -1, peck = c.act > 0 ? Math.sin(Math.min(1, c.act) * Math.PI) : 0;
-    ring(g, x, y, 3.5 * s, 0.35);
+    ripple(g, x, y, 3.5 * s, 0.35);
     g.save(); g.translate(x, y); g.scale(f * s, s);
     g.strokeStyle = '#5f5a4a'; g.lineWidth = 0.9; g.beginPath(); g.moveTo(-0.8, 0); g.lineTo(-0.8, -8); g.moveTo(1, 0); g.lineTo(1, -8); g.stroke();
     g.fillStyle = def.color; g.beginPath(); g.ellipse(0, -10.5, 5.5, 3.2, -0.25, 0, TAU); g.fill();
@@ -149,7 +178,7 @@ const DRAW = {
     for (let i = 0; i < n; i++) {
       const ox = i ? -Math.cos(c.h) * i * 6 * s + (i % 2 ? 3 : -3) * s : 0, oy = i ? -Math.sin(c.h) * i * 6 * s * VIEW.tiltY : 0, sc = i ? 0.7 : 1;
       const px = x + ox, py = y + oy;
-      if (c.act > 0 && i === 0) { ring(g, px, py, 4 * s, 0.4); continue; }
+      if (c.act > 0 && i === 0) { drops(g, px, py, 4 * s, 0.5); continue; }
       g.strokeStyle = 'rgba(240,252,250,.5)'; g.lineWidth = 1;
       const back = c.h + Math.PI;
       for (const q of [-0.4, 0.4]) { g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(back + q) * 11 * s, py + Math.sin(back + q) * 11 * s * VIEW.tiltY); g.stroke(); }
@@ -160,7 +189,7 @@ const DRAW = {
   },
   turtle(g, c, x, y, z, def) {
     const s = Math.max(0.7, z / 8);
-    ring(g, x, y, 6.5 * s, 0.35);
+    ripple(g, x, y, 6.5 * s, 0.3);
     g.save(); g.translate(x, y); g.scale(1, VIEW.tiltY); g.rotate(c.h);
     g.fillStyle = '#7fa35c'; g.beginPath(); g.ellipse(5.5 * s, 0, 1.8 * s, 1.5 * s, 0, 0, TAU); g.fill();
     g.fillStyle = def.color; g.beginPath(); g.ellipse(0, 0, 5 * s, 4 * s, 0, 0, TAU); g.fill();

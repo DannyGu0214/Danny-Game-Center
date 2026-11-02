@@ -295,20 +295,20 @@ function zoomAbout(zNew, sx, sy) {
 }
 function tapWorld(sx, sy) {
   if (S.docked) return;
-  const c = creatures.at(sx, sy, cam, W);
-  if (c) {
-    const def = SPECIES[c.sp], got = G.recordSpecies(S, c.sp);
-    snd.play('record');
-    if (got) drainEvents(); else toast(`${def.name}`);
-    return;
-  }
   const [x, y] = toWorld(sx, sy), w = worldOf(S.region), R = 24 / cam.zoom + 8;
+  // 건질 것·항구·수문을 먼저 본다. 동물은 그다음이고, 이미 기록한 동물은 이름만 알려 주고 그 자리로 간다
+  const fl = G.flotsamOf(S).find((f) => Math.hypot(f.x - x, f.y - y) < 18 / cam.zoom + 3);
+  if (fl) { if (G.setDest(S, fl.x, fl.y, { type: 'pick' })) { snd.play('tap'); syncButtons(); } return; }
   const port = w.ports.find((p) => Math.hypot(p.x - x, p.y - y) < R);
   if (port) { if (G.setDest(S, port.x, port.y, { type: 'port', id: port.id })) { snd.play('tap'); showHint(`${port.name}(으)로 가요`, 2); } return; }
   const gate = w.gates.find((g) => Math.hypot(g.x - x, g.y - y) < R);
   if (gate) { if (G.setDest(S, gate.x, gate.y, { type: 'gate', id: gate.id })) { snd.play('tap'); showHint(`${gate.name}(으)로 가요`, 2); } return; }
-  const fl = G.flotsamOf(S).find((f) => Math.hypot(f.x - x, f.y - y) < 18 / cam.zoom + 3);
-  if (G.setDest(S, fl ? fl.x : x, fl ? fl.y : y, fl ? { type: 'pick' } : null)) { snd.play('tap'); syncButtons(); }
+  const c = creatures.at(sx, sy, cam, W);
+  if (c) {
+    if (G.recordSpecies(S, c.sp)) { snd.play('record'); drainEvents(); return; }
+    toast(SPECIES[c.sp].name);
+  }
+  if (G.setDest(S, x, y)) { snd.play('tap'); syncButtons(); }
 }
 view.addEventListener('pointerdown', (e) => {
   view.setPointerCapture(e.pointerId);
@@ -359,7 +359,7 @@ function drainEvents() {
       case 'pick': snd.play('pick'); wake.ring(ev.x, ev.y, 1); toast(`${RES[ev.k].icon} +${ev.n}`); break;
       case 'holdFull': showHint('화물칸이 찼어요. 항구로 돌아가요', 3); break;
       case 'found': snd.play('found'); overlay(`<h3>🗺 ${ev.name}</h3><p>새로운 곳을 찾았어요!</p><p>${fmt({ wood: ev.wood, cloth: ev.cloth, coin: ev.coin })}${ev.blueprint ? `<br>📜 설계도: ${MODULES[ev.blueprint].name}` : ''}</p>`, '계속 항해', null); break;
-      case 'species': toast(`📖 새 기록 ${SPECIES[ev.id].name} 🪙+${ev.reward}`); showHint(`새 기록: ${SPECIES[ev.id].name}`, 2); break;
+      case 'species': showHint(`📖 ${SPECIES[ev.id].name}: 도감에 기록했어요`, 2.4); break;
       case 'ach': { snd.play('ach'); const a = ACHIEVEMENTS.find((q) => q.id === ev.id); toast(`🏆 ${a.name} 🪙+${a.coin}`); showHint(`🏆 ${a.name}${a.decor ? ` · ${DECOR[a.decor].name} 꾸미기 열림` : ''}`, 3); break; }
       case 'gustSoon': snd.play('warn'); showHint('돌풍이 다가와요. 돛을 줄여요', 4, true); break;
       case 'gustOn': snd.play('gust'); showHint('돌풍!', 2, true); break;
@@ -454,7 +454,8 @@ function portFoot() {
     if (!r.ok) { showHint(r.why, 3, true); return; }
     sheet.port = false; closeSheet(); syncButtons(); snd.play('sail');
     if (chartPick) { const p = chartPick; chartPick = null; G.setDest(S, p.x, p.y, p.target); }
-    showHint('물을 탭하면 그곳으로 가요', 3);
+    if (S.stats.taughtTap) showHint('물을 탭하면 그곳으로 가요', 3);
+    else { S.stats.taughtTap = 1; showHint('✨ 반짝이는 것은 건져요. 📖 동물은 탭해서 기록해요', 6); }
   });
   return [b];
 }
@@ -698,7 +699,7 @@ function renderLog(body) {
   const seen = Object.keys(S.seen).length, all = Object.keys(SPECIES).length, ach = Object.keys(S.ach).length;
   const title = TITLES[REGION_ORDER.filter((r) => S.visited[r]).length - 1];
   body.append(el('p', 'note', `칭호 <b>${title}</b> · 항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번`));
-  body.append(el('div', 'h3', `도감 ${seen}/${all} (물에서 지나가는 생물을 탭해요)`));
+  body.append(el('div', 'h3', `도감 ${seen}/${all} (📖 표시가 있는 생물을 탭해요. 5종·10종·전체를 모으면 보상)`));
   const grid = el('div', 'grid');
   for (const id of Object.keys(SPECIES)) {
     const known = S.seen[id], def = SPECIES[id];
@@ -855,7 +856,7 @@ function render() {
   const bx = sx(b.x), by = sy(b.y), st = shipState(bx, by, b.h, t, b.heel, cam.zoom);
   SA.drawShipOnWater(ctx, sprite, st, cam.zoom, bx, by);
   if (!S.docked) A.drawBowFoam(ctx, cam, W, DPR, b, Math.min(1, b.spd / 6), t, sprite.hull.len);
-  creatures.draw(ctx, cam, W, H, DPR);
+  creatures.draw(ctx, cam, W, H, DPR, S.seen);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
   const props = A.visibleProps(sc, cam, W, H);
@@ -935,7 +936,7 @@ if ('serviceWorker' in navigator && !query.get('dbg') && (location.protocol === 
 }
 
 // 점검용 창구(?dbg=1): 자동 확인이 상태를 읽고 조작할 때 씁니다
-if (query.get('dbg')) window.SM = { get S() { return S; }, G, SH, cam, snd, music, render, worldOf, get sheet() { return sheet; }, drainEvents, bakeIfNeeded, openPort, closeSheet, renderSheet, changeRegionArt, openGate, tapWorld };
+if (query.get('dbg')) window.SM = { get S() { return S; }, get creatures() { return creatures; }, get sc() { return sc; }, G, SH, cam, snd, music, render, worldOf, get sheet() { return sheet; }, drainEvents, bakeIfNeeded, openPort, closeSheet, renderSheet, changeRegionArt, openGate, tapWorld };
 </script>
 </body>
 </html>
