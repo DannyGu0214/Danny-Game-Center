@@ -146,10 +146,10 @@ test('노: 맞바람에도 가고 오래 저으면 지친다. 돛대 없는 뗏�
   const S = G.newGame(1); G.undock(S);
   G.setRow(S, true); run(S, 1);
   for (let i = 0; i < 10 * 30; i++) { G.step(S, G.FIXED_DT); S.boat.h = S.wind.from; }
-  assert.ok(S.boat.spd > 1.2, `뗏목 ${S.boat.spd}`);
+  assert.ok(S.boat.spd > 2.4, `뗏목 ${S.boat.spd}`);
   S.boat.stamina = 0;
   for (let i = 0; i < 12 * 30; i++) { G.step(S, G.FIXED_DT); S.boat.h = S.wind.from; }
-  assert.ok(S.boat.spd < 1.35, `지친 뗏목 ${S.boat.spd}`);
+  assert.ok(S.boat.spd < 2.7, `지친 뗏목 ${S.boat.spd}`);
   assert.equal(G.setSail(S, 2), false, '돛대 없음');
 });
 
@@ -362,6 +362,13 @@ test('금화 세기와 럼주 선원: 내는 금화는 같고 말만 다르다',
   assert.equal(G.wantsRum({ drink: 115 }), true);
   assert.equal(G.wantsRum({ drink: 114 }), false);
   assert.equal(G.wantsRum({}), false, '예전 선원은 금화로 받아요');
+});
+
+test('뗏목은 예전의 2배로 젓고, 나룻배가 뗏목보다 빠르다', () => {
+  const rowSpeed = (hull) => SH.statsOf({ hull, mods: [{ id: 'oar', col: 0, row: 2, rot: 0 }] }).rowSpeed;
+  assert.ok(rowSpeed('raft') >= 3.8);
+  assert.ok(rowSpeed('rowboat') > rowSpeed('raft'));
+  assert.equal(HULLS.raft.row, 3.8);
 });
 
 test('출항 이야기: 선장마다 3쪽, 마지막은 여정, 이름 조사가 맞는다', () => {

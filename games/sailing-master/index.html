@@ -931,7 +931,7 @@ function renderDesign(body) {
   // 제원표
   const meter = (label, v, shown, bad) => `<div class="meter${bad ? ' bad' : ''}"><div class="t">${label}<b>${shown}</b></div><i><b style="width:${Math.min(100, Math.round(v * 100))}%"></b></i></div>`;
   const line = (label, val, bad) => `<div class="line${bad ? ' bad' : ''}">${label}<b>${val}</b></div>`;
-  stage.append(el('div', 'spec', `<div class="hero"><div class="l">최고 속도</div><div class="v">${(st.maxSpeed * 1.94).toFixed(1)}<small>kt</small></div></div>`
+  stage.append(el('div', 'spec', `<div class="hero"><div class="l">최고 속도</div><div class="v">${(Math.max(st.maxSpeed, st.rowSpeed) * 1.94).toFixed(1)}<small>kt</small></div></div>`
     + meter('적재', st.load, `${Math.round(st.load * 100)}%`, st.load > 0.9) + meter('복원력', st.stability, `${Math.round(st.stability * 100)}%`, st.stability < 0.8)
     + line('흘수', `${st.draft.toFixed(2)}m`, st.draft > 1) + line('쏠림', st.listing < 0.15 ? '균형' : `${Math.round(st.listing * 100)}%`, st.listing > 0.5)
     + line('돛', st.sailArea ? (st.sailArea >= 1 ? '큰 돛' : '작은 돛') : '없음') + line('노', st.oars ? `${st.oars}자리` : '없음', !st.oars && !st.sailArea)

@@ -714,7 +714,7 @@ export function step(S, dt) {
   if (d < BOAT.clear) {
     const [gx, gy] = w.gradient(nx, ny);
     nx += gx * (BOAT.clear - d); ny += gy * (BOAT.clear - d);
-    if (!b.grounded && b.spd > 1) { emit(S, 'ground'); S.hull -= b.spd * WEATHER.hitHurt; }
+    if (!b.grounded && b.spd > 1) { emit(S, 'ground'); S.hull -= b.spd * (b.row ? 0.5 : 1) * WEATHER.hitHurt; } // 노 속도를 2배로 올리면서 부딪힘 피해는 그대로 둔다
     b.grounded = true;
     // 뱃머리가 물가로 향할수록 크게 느려진다. 스치기만 하면 조금만
     const into = Math.max(0, -(Math.cos(b.h) * gx + Math.sin(b.h) * gy));
