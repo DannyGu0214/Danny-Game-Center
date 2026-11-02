@@ -79,6 +79,14 @@ export function newGame(seed = 1) {
   return S;
 }
 const W = (S) => worldOf(S.region);
+// 이 판의 발견지. 1등급 맵은 자리가 고정이고, 2등급 이상은 처음 들어갈 때 시드로 정해 저장한다
+export function findsOf(S, region = S.region) {
+  const w = worldOf(region);
+  if (REGIONS[region].grade < 2) return w.finds;
+  if (!S.findPos) S.findPos = {};
+  if (!S.findPos[region]) S.findPos[region] = w.randomFinds(() => rnd(S));
+  return S.findPos[region];
+}
 const rnd = (S) => { S.rng = (S.rng + 0x6D2B79F5) >>> 0; let t = S.rng; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 export const stats = (S) => SH.statsOf(S.ship, holdUsed(S), S.food);
 export const holdUsed = (S) => S.hold.wood + S.hold.cloth + S.hold.coin;
@@ -313,7 +321,7 @@ export const decorOpen = (S, id) => ACHIEVEMENTS.some((a) => a.decor === id && S
 export function gateStatus(S, gate) {
   const r = gate.req, st = stats(S), list = [];
   if (r.grade) list.push({ text: `${['', '뗏목', '나룻배', '슬루프'][r.grade]} 이상`, ok: HULLS[S.ship.hull].grade >= r.grade });
-  if (r.found) { const n = W(S).finds.filter((f) => S.found[f.id]).length; list.push({ text: `이 수역 발견지 ${r.found}곳(${n})`, ok: n >= r.found }); }
+  if (r.found) { const n = findsOf(S).filter((f) => S.found[f.id]).length; list.push({ text: `이 수역 발견지 ${r.found}곳(${n})`, ok: n >= r.found }); }
   if (r.draft) list.push({ text: `흘수 ${r.draft}m 이하(${st.draft.toFixed(2)}m)`, ok: st.draft <= r.draft });
   return { list, ok: list.every((x) => x.ok) };
 }
@@ -323,6 +331,7 @@ export function passGate(S, gate) {
   const from = S.region;
   // 화물은 그대로 싣고 넘어간다. 도착 항구에 들르면 창고로 옮겨요
   S.region = gate.to; S.visited[gate.to] = 1;
+  findsOf(S, gate.to);
   placeAtPort(S, gate.entry);
   S.docked = gate.entry;
   S.cap.x = HULLS[S.ship.hull].helmX; S.cap.at = 'helm'; S.cap.to = null;
@@ -337,6 +346,7 @@ export function passGate(S, gate) {
 // 동물은 관찰 대상이라 탭하면 기록만 된다. 보상은 도감 달성(도전과제)으로 받는다
 export function recordSpecies(S, id) {
   if (!SPECIES[id] || S.seen[id]) return false;
+  if (SPECIES[id].kind === 'land' && !stats(S).telescope) return false; // 뭍짐승은 망원경으로 봐요
   S.seen[id] = 1;
   emit(S, 'species', { id });
   checkAch(S);
@@ -348,8 +358,19 @@ function giveAch(S, id) {
   S.ach[id] = 1; S.res.coin += a.coin || 0;
   emit(S, 'ach', { id });
 }
-const worldDone = (S, region) => worldOf(region).finds.every((f) => S.found[f.id]);
+const worldDone = (S, region) => worldOf(region).def.finds.every((f) => S.found[f.id]);
+// 다음 등급 배의 재료가 모이면 한 번 알려 준다(창고 + 화물칸). 뗏목은 느려서 빨리 짓고 싶어 하니까
+export function nextHull(S) {
+  const g = HULLS[S.ship.hull].grade;
+  return Object.values(HULLS).find((H) => H.grade === g + 1) || null;
+}
+export function canAffordHull(S, H) {
+  if (!H || (H.id === 'sloop' && !S.visited.lake)) return false;
+  return Object.entries(H.price).every(([k, v]) => S.res[k] + S.hold[k] >= v);
+}
 export function checkAch(S) {
+  const next = nextHull(S);
+  if (next && S.buildHint !== next.id && canAffordHull(S, next)) { S.buildHint = next.id; emit(S, 'canBuild', { id: next.id }); }
   const c = (id, ok) => { if (ok) giveAch(S, id); };
   const t = S.stats;
   c('firstRow', t.rowDist >= 100);
@@ -408,7 +429,7 @@ function spawnFlot(S) {
   }
 }
 function collectFlot(S) {
-  const st = stats(S), b = S.boat, list = flotsamOf(S), R = 6 + (st.telescope ? 3 : 0) + (hasRole(S, 'lookout') ? 6 : 0);
+  const st = stats(S), b = S.boat, list = flotsamOf(S), R = 6 + (hasRole(S, 'lookout') ? 6 : 0);
   for (let i = list.length - 1; i >= 0; i--) {
     const f = list[i];
     if (Math.hypot(f.x - b.x, f.y - b.y) > R) continue;
@@ -423,10 +444,23 @@ function collectFlot(S) {
 }
 
 // ── 발견 ──
+// 망원경: 볼 수 있는 거리가 26m에서 70m로 늘고, 내륙 발견지와 뭍짐승을 찾을 수 있다
+export const sightRange = (S) => (stats(S).telescope ? 70 : 26) + (hasRole(S, 'lookout') ? 14 : 0);
+// 내륙 발견지는 찾기 전까지 그림도 보이지 않는다(끌어서 둘러봐도 미리 알 수 없게)
+export function canSeeFind(S, f) {
+  if (S.found[f.id] || !f.inland) return true;
+  return stats(S).telescope && Math.hypot(f.x - S.boat.x, f.y - S.boat.y) <= sightRange(S);
+}
 function checkFinds(S) {
-  const st = stats(S), b = S.boat, R = 26 + (st.telescope ? 14 : 0) + (hasRole(S, 'lookout') ? 14 : 0);
-  for (const f of W(S).finds) {
-    if (S.found[f.id] || Math.hypot(f.x - b.x, f.y - b.y) > R) continue;
+  const st = stats(S), b = S.boat, R = sightRange(S);
+  for (const f of findsOf(S)) {
+    if (S.found[f.id]) continue;
+    const d = Math.hypot(f.x - b.x, f.y - b.y);
+    if (f.inland && !st.telescope) {
+      if (d < 70 && !S.stats.inlandHint) { S.stats.inlandHint = 1; emit(S, 'inlandHint'); }
+      continue;
+    }
+    if (d > R) continue;
     S.found[f.id] = 1;
     S.res.coin += f.coin || 0; S.res.wood += f.wood || 0; S.res.cloth += f.cloth || 0;
     if (f.blueprint) S.blueprints[f.blueprint] = 1;

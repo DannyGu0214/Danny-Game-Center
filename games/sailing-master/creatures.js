@@ -17,7 +17,7 @@ export function createCreatures(world) {
       const sx = (R() * 0.9 + 0.05) * W, sy = (R() * 0.8 + 0.08) * H;
       const x = cam.x + (sx - W / 2) / z, y = cam.y + (sy - cam.cy) / (z * k), d = world.dist(x, y);
       const land = def.kind === 'land', shore = def.kind === 'wader' || def.kind === 'frog';
-      if (land ? (d < -9 || d > -1.5) : shore ? (d < 0.5 || d > 5) : d < 7) continue;
+      if (land ? (d < -45 || d > -3) : shore ? (d < 0.5 || d > 5) : d < 7) continue;
       return { sp, kind: def.kind, x, y, h: R() * TAU, age: 0, life: 22 + R() * 26, ph: R() * TAU, act: 0, next: 2 + R() * 6, bob: 0, size: def.size || 1 };
     }
     return null;
@@ -25,7 +25,8 @@ export function createCreatures(world) {
 
   return {
     list,
-    update(dt, cam, W, H, boat) {
+    // telescope: 뭍짐승은 망원경이 있어야 나타난다
+    update(dt, cam, W, H, boat, telescope = false) {
       timer -= dt;
       const hw = W / 2 / cam.zoom + 30, hh = H / 2 / (cam.zoom * VIEW.tiltY) + 30;
       for (let i = list.length - 1; i >= 0; i--) {
@@ -51,14 +52,15 @@ export function createCreatures(world) {
           default: break;
         }
       }
-      if (timer <= 0 && list.length < 7 && pool.length) {
+      const choices = telescope ? pool : pool.filter((id) => SPECIES[id].kind !== 'land');
+      if (timer <= 0 && list.length < 7 && choices.length) {
         timer = 1.6 + R() * 2.6;
-        const c = place(pool[Math.floor(R() * pool.length)], cam, W, H);
+        const c = place(choices[Math.floor(R() * choices.length)], cam, W, H);
         if (c) list.push(c);
       }
     },
     // 땅 위 짐승과 물 위 생물을 함께 그린다
-    draw(g, cam, W, H, dpr, seen = {}) {
+    draw(g, cam, W, H, dpr) {
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       const z = cam.zoom, k = VIEW.tiltY;
       for (const c of list) {
@@ -67,7 +69,6 @@ export function createCreatures(world) {
         const fade = Math.min(1, c.age, (c.life - c.age));
         g.globalAlpha = Math.max(0, fade);
         DRAW[c.kind](g, c, sx, sy, z, SPECIES[c.sp]);
-        if (!seen[c.sp]) newBadge(g, c, sx, sy, z);
       }
       g.globalAlpha = 1;
     },
@@ -100,13 +101,6 @@ export function hitRadius(c, z) {
   const s = Math.max(0.75, z / 8), def = SPECIES[c.sp];
   const body = c.kind === 'fish' ? def.len * 1.9 * z * 0.5 + (def.school ? 2 * z : 0) : c.kind === 'land' ? 7 * s * (def.height || 1) : c.kind === 'wader' ? 9 * s : c.kind === 'bird' ? 10 * s : 7 * s * (c.size || 1);
   return Math.max(16, body + 6);
-}
-// 아직 기록하지 않은 동물 위의 작은 책 표시
-function newBadge(g, c, x, y, z) {
-  const s = Math.max(0.8, z / 8), by = y - bodyLift(c, z) - (c.kind === 'fish' ? 8 : 12) * s - Math.sin(c.ph * 2.2) * 1.2;
-  g.fillStyle = 'rgba(16,48,62,.85)'; g.beginPath(); g.arc(x, by, 6.4 * s, 0, TAU); g.fill();
-  g.fillStyle = '#f4efe0';
-  g.fillRect(x - 3.6 * s, by - 2.6 * s, 3.3 * s, 5 * s); g.fillRect(x + 0.3 * s, by - 2.6 * s, 3.3 * s, 5 * s);
 }
 function ripple(g, x, y, r, a, k = VIEW.tiltY) {
   g.strokeStyle = `rgba(214,240,244,${a})`; g.lineWidth = 1;

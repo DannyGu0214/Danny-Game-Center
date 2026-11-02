@@ -151,7 +151,7 @@ function sharedArt() {
   return shared;
 }
 
-export function createScene(regionId) {
+export function createScene(regionId, finds = worldOf(regionId).finds) {
   const w = worldOf(regionId), art = sharedArt();
   const layers = LAND_LAYERS.map((l) => ({ ...l, path: landPath(w.outlines, l.d) }));
   // 항구·수문·발견지는 물가 쪽 땅에 그림을 세운다
@@ -159,7 +159,7 @@ export function createScene(regionId) {
   const shore = (p) => { const [gx, gy] = w.gradient(p.x, p.y); return [p.x - gx * (w.dist(p.x, p.y) + 2.5), p.y - gy * (w.dist(p.x, p.y) + 2.5), gx, gy]; };
   for (const p of w.ports) { const [x, y, gx, gy] = shore(p); marks.push({ kind: 'hut', x: x - gx * 3, y: y - gy * 3, size: 1, name: p.name, port: p }); marks.push({ kind: 'pier', x: (x + p.x) / 2, y: (y + p.y) / 2, size: 1, ang: Math.atan2(gy, gx) }); }
   for (const g of w.gates) { const [x, y] = shore(g); marks.push({ kind: 'sign', x, y, size: 1, name: g.name, gate: g }); }
-  for (const f of w.finds) { const [x, y, gx, gy] = shore(f); marks.push({ kind: f.art, x: f.art === 'wreck' ? f.x + gx * -1 : x - gx * 1.5, y: f.art === 'wreck' ? f.y + gy * -1 : y - gy * 1.5, size: 1, find: f }); }
+  for (const f of finds) marks.push({ kind: f.art, x: f.x, y: f.y, size: 1, find: f });
   const trees = w.scatter().filter((t) => !marks.some((m) => (m.port || m.find || m.gate) && Math.hypot(m.x - t.x, m.y - t.y) < 9));
   const props = [...trees, ...marks].sort((a, b) => a.y - b.y);
   const foam = w.outlines(-0.7, 420);

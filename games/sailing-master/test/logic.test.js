@@ -33,10 +33,18 @@ test('지도: 수역마다 항구·수문·발견지가 물 위에 있고 서로
   for (const id of REGION_ORDER) {
     const w = worldOf(id), [p0] = w.ports;
     assert.ok(w.dist(p0.x, p0.y) >= 8, `${id} 항구`);
-    for (const q of [...w.ports, ...w.gates, ...w.finds]) {
+    for (const q of [...w.ports, ...w.gates]) {
       assert.ok(w.dist(q.x, q.y) > 5, `${id} ${q.id}`);
       assert.ok(w.findPath(p0.x, p0.y, q.x, q.y), `${id} 길 ${q.id}`);
     }
+    for (const f of w.finds) {
+      const [ax, ay] = w.nearestWater(f.x, f.y), gap = Math.hypot(f.x - ax, f.y - ay), d = w.dist(f.x, f.y);
+      assert.ok(w.findPath(p0.x, p0.y, ax, ay), `${id} 길 ${f.id}`);
+      if (f.where === 'water') assert.ok(d > 5, `${f.id} 물 위`);
+      else if (f.where === 'shore') { assert.ok(d < 0 && d > -7, `${f.id} 물가 ${d}`); assert.ok(gap < 24, `${f.id} 맨눈 ${gap}`); } else { assert.ok(d < -12, `${f.id} 내륙 ${d}`); assert.ok(gap < 66, `${f.id} 망원경 ${gap}`); }
+    }
+    assert.ok(w.finds.some((f) => f.where === 'inland'), `${id} 내륙 발견지`);
+    assert.ok(w.finds.some((f) => f.where === 'shore'), `${id} 물가 발견지`);
     for (const I of REGIONS[id].islands) assert.equal(w.isWater(I.x, I.y), false, `${id} 섬`);
   }
   assert.equal(worldOf('pond').isWater(0, 400), false);
@@ -169,7 +177,7 @@ test('자동 항로: 맞바람 쪽 목적지도 태킹해서 도착한다', () =
 test('자동 항로: 세 수역 어디서 어디로 가든 도착하고 땅에 안 닿는다', () => {
   const worst = {};
   for (const id of REGION_ORDER) {
-    const w = worldOf(id), pts = [...w.ports, ...w.gates, ...w.finds];
+    const w = worldOf(id), pts = [...w.ports, ...w.gates, ...w.finds.map((f) => { const [x, y] = w.nearestWater(f.x, f.y); return { id: f.id, x, y }; })];
     worst[id] = 0;
     for (const seed of [1, 2]) for (let i = 0; i < pts.length; i++) {
       const a = pts[i], b = pts[(i + 2) % pts.length];
@@ -226,6 +234,78 @@ test('표류물은 수역 한도까지 저절로 생긴다', () => {
   assert.ok(G.flotsamOf(S).length <= REGIONS.pond.flot.cap);
 });
 
+test('발견지: 1등급 맵은 고정, 2등급 맵은 처음 들어갈 때 판마다 자리가 정해지고 목록과 개수는 같다', () => {
+  const pos = (S, r) => G.findsOf(S, r).map((f) => [f.id, Math.round(f.x), Math.round(f.y)]);
+  const A = G.newGame(1), B = G.newGame(2);
+  assert.deepEqual(pos(A, 'pond'), pos(B, 'pond'));
+  assert.deepEqual(pos(A, 'lake'), pos(B, 'lake'));
+  assert.equal(A.findPos, undefined, '강에 들어가기 전엔 정하지 않아요');
+  const ids = REGIONS.river.finds.map((f) => f.id);
+  const seen = new Set();
+  const w = worldOf('river');
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const S = G.newGame(seed);
+    S.ship.hull = 'sloop'; S.ship.mods = [{ id: 'oar', col: 1, row: 4, rot: 0 }]; S.region = 'lake';
+    for (const f of worldOf('lake').finds) S.found[f.id] = 1;
+    assert.ok(G.passGate(S, worldOf('lake').gates[0]));
+    const list = G.findsOf(S, 'river');
+    assert.deepEqual(list.map((f) => f.id), ids, '목록과 순서가 같아요');
+    seen.add(JSON.stringify(pos(S, 'river')));
+    // 규칙: 물 위·물가·내륙이 맞고, 배로 다가가 찾을 수 있고, 서로 떨어져 있다
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i], def = REGIONS.river.finds[i], d = w.dist(f.x, f.y), [ax, ay] = w.nearestWater(f.x, f.y), gap = Math.hypot(f.x - ax, f.y - ay);
+      if (def.art === 'wreck') { assert.equal(f.where, 'water'); assert.ok(d >= 12, `물 위 ${f.id} ${d}`); } else if (def.inland) { assert.equal(f.where, 'inland'); assert.ok(d < -12, `내륙 ${f.id} ${d}`); assert.ok(gap < 66, `망원경 거리 ${f.id} ${gap}`); } else { assert.equal(f.where, 'shore'); assert.ok(d < 0 && d > -7, `물가 ${f.id} ${d}`); assert.ok(gap < 24, `맨눈 거리 ${f.id} ${gap}`); }
+      assert.ok(w.findPath(w.ports[0].x, w.ports[0].y, ax, ay), `길 ${f.id}`);
+      for (let j = i + 1; j < list.length; j++) assert.ok(Math.hypot(f.x - list[j].x, f.y - list[j].y) > 38, `간격 ${f.id} ${list[j].id}`);
+    }
+    // 저장해도 자리가 그대로
+    const T = G.deserialize(G.serialize(S));
+    assert.deepEqual(pos(T, 'river'), pos(S, 'river'));
+  }
+  assert.ok(seen.size >= 7, `판마다 달라야 해요: ${seen.size}`);
+});
+
+test('망원경: 내륙 발견지와 뭍짐승은 망원경이 있어야 찾고, 보는 거리가 늘어난다', () => {
+  const w = worldOf('pond'), f = w.finds.find((q) => q.id === 'grove'), [ax, ay] = w.nearestWater(f.x, f.y);
+  const S = G.newGame(1); G.undock(S);
+  S.boat.x = ax; S.boat.y = ay;
+  assert.equal(G.canSeeFind(S, f), false);
+  assert.equal(G.sightRange(S), 26);
+  run(S, 1);
+  assert.ok(!S.found.grove, '맨눈으로는 못 찾아요');
+  assert.equal(drain(S).filter((e) => e.type === 'inlandHint').length, 1);
+  assert.equal(G.recordSpecies(S, 'deer'), false, '뭍짐승은 망원경으로');
+  S.ship.mods.push({ id: 'telescope', col: 0, row: 3, rot: 0 });
+  assert.equal(G.sightRange(S), 70);
+  S.boat.x = ax; S.boat.y = ay;
+  assert.equal(G.canSeeFind(S, f), true);
+  run(S, 1);
+  assert.ok(S.found.grove, '망원경으로 찾아요');
+  assert.equal(G.recordSpecies(S, 'deer'), true);
+  // 건지기 범위는 망원경과 무관
+  const T = G.newGame(1); G.undock(T); T.boat.x = 0; T.boat.y = 0; T.boat.spd = 0;
+  T.ship.mods.push({ id: 'telescope', col: 0, row: 3, rot: 0 });
+  G.flotsamOf(T).push({ x: 8, y: 0, k: 'wood', n: 5, ph: 0 });
+  run(T, 1);
+  assert.equal(T.hold.wood, 0);
+});
+
+test('뭍짐승은 망원경이 있을 때만 나타난다', () => {
+  const cam = { x: 150, y: 0, zoom: 4, cy: 400 }, boat = { x: 150, y: 0 };
+  const count = (tele) => {
+    const cr = createCreatures(worldOf('lake'));
+    let land = 0;
+    for (let i = 0; i < 2500; i++) {
+      cr.update(0.5, cam, 390, 844, boat, tele);
+      land += cr.list.filter((c) => c.kind === 'land').length;
+      if (cr.list.length > 5) cr.list.length = 0;
+    }
+    return land;
+  };
+  assert.equal(count(false), 0);
+  assert.ok(count(true) > 0);
+});
+
 test('발견: 가까이 가면 보상과 설계도를 받고 해도가 밝아진다', () => {
   const S = G.newGame(1); G.undock(S);
   const f = worldOf('pond').finds.find((q) => q.id === 'skiff'), fog0 = G.fogOf(S, 'pond');
@@ -235,6 +315,35 @@ test('발견: 가까이 가면 보상과 설계도를 받고 해도가 밝아진
   assert.ok(S.found.skiff && S.blueprints.telescope);
   assert.equal(S.res.coin, coin + f.coin);
   assert.notEqual(G.fogOf(S, 'pond'), fog0);
+});
+
+test('작은 호수 발견지 보상만으로 나룻배를 지을 수 있고, 발견지끼리 떨어져 있다', () => {
+  const w = worldOf('pond'), S = G.newGame(1), price = HULLS.rowboat.price;
+  const open = w.finds.filter((f) => !f.inland);
+  const near = open.filter((f) => Math.hypot(f.x - w.ports[0].x, f.y - w.ports[0].y) < 90);
+  assert.ok(near.length >= 2, `나루 가까이 ${near.length}곳`);
+  let wood = S.res.wood, coin = S.res.coin, n = 0;
+  for (const f of open.slice().sort((a, b) => Math.hypot(a.x - w.ports[0].x, a.y - w.ports[0].y) - Math.hypot(b.x - w.ports[0].x, b.y - w.ports[0].y))) {
+    if (wood >= price.wood && coin >= price.coin) break;
+    wood += f.wood || 0; coin += f.coin || 0; n++;
+  }
+  assert.ok(wood >= price.wood && coin >= price.coin, `발견지로 모자람 ${wood} ${coin}`);
+  assert.ok(n <= 4, `가까운 ${n}곳이면 충분해야 함`);
+  for (let i = 0; i < w.finds.length; i++) for (let j = i + 1; j < w.finds.length; j++) {
+    assert.ok(Math.hypot(w.finds[i].x - w.finds[j].x, w.finds[i].y - w.finds[j].y) > 34, `${w.finds[i].id} ${w.finds[j].id} 너무 가까움`);
+  }
+});
+
+test('다음 배 재료가 모이면 한 번만 알려 준다', () => {
+  const S = G.newGame(1);
+  G.undock(S);
+  run(S, 1);
+  assert.ok(!drain(S).some((e) => e.type === 'canBuild'), '아직 모자람');
+  S.res.wood = 30; S.hold.wood = 10; S.res.coin = 15;
+  run(S, 1);
+  assert.equal(drain(S).filter((e) => e.type === 'canBuild').length, 1);
+  run(S, 1);
+  assert.equal(drain(S).filter((e) => e.type === 'canBuild').length, 0);
 });
 
 test('수문: 조건이 안 되면 못 넘고, 되면 다음 수역 항구에 닿는다', () => {
@@ -405,6 +514,7 @@ test('도감: 동물을 기록해도 자원이 늘지 않고, 달성 보상만 �
   assert.deepEqual(S.res, res);
   assert.deepEqual(S.hold, hold);
   assert.equal(G.recordSpecies(S, 'duck'), false);
+  S.ship.mods.push({ id: 'telescope', col: 0, row: 3, rot: 0 }); // 뭍짐승은 망원경으로 봐요
   const ids = Object.keys(SPECIES);
   for (const id of ids.slice(0, 5)) G.recordSpecies(S, id);
   assert.ok(S.ach.species5);
@@ -428,7 +538,7 @@ test('동물 탭 범위는 몸에 맞고, 떨어진 곳은 잡지 않는다', ()
 
 test('강 끝: 조건을 채우면 엔딩', () => {
   const S = sloopAt('river');
-  for (const f of worldOf('river').finds) S.found[f.id] = 1;
+  for (const f of G.findsOf(S, 'river')) S.found[f.id] = 1;
   const g = worldOf('river').gates[0];
   assert.ok(G.passGate(S, g));
   assert.ok(S.ended && S.ach.riverEnd);

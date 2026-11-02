@@ -216,9 +216,41 @@ export function createWorld(def) {
 
   // 항구·수문·발견지 자리: 물가에 가까운 물 위로 맞춘다
   const snap = (p) => { const [x, y] = nearestWater(p.x, p.y); return { ...p, x, y }; };
-  const ports = def.ports.map(snap), gates = def.gates.map(snap), finds = def.finds.map(snap);
+  // 물가에서 뭍 쪽으로 depth m 들어간 자리
+  function landSpot(x, y, depth) {
+    let px = x, py = y;
+    for (let i = 0; i < 300 && dist(px, py) > -depth; i++) { const [gx, gy] = gradient(px, py); px -= gx * 2; py -= gy * 2; }
+    return [px, py];
+  }
+  // 발견지: 난파선은 물 위, 나머지는 물가의 뭍, inland가 있으면 그만큼 내륙이다
+  const finds = def.finds.map((f) => {
+    const w = snap(f);
+    if (f.art === 'wreck') return { ...w, where: 'water' };
+    const [x, y] = landSpot(w.x, w.y, f.inland || 3);
+    return { ...f, x, y, where: f.inland ? 'inland' : 'shore' };
+  });
+  const ports = def.ports.map(snap), gates = def.gates.map(snap);
+  // 2등급 이상 맵: 처음 들어갈 때 발견지 자리를 정한다. 목록과 개수는 표 그대로이고 자리만 달라진다
+  function randomFinds(rnd) {
+    const taken = [...ports, ...gates], out = [];
+    const clear = (x, y) => taken.every((q) => Math.hypot(q.x - x, q.y - y) > 45) && out.every((q) => Math.hypot(q.x - x, q.y - y) > 40);
+    def.finds.forEach((f, i) => {
+      let done = null;
+      for (let t = 0; t < 600 && !done; t++) {
+        const x = bx0 + rnd() * (bx1 - bx0), y = by0 + rnd() * (by1 - by0), d = dist(x, y);
+        if (d < 12) continue; // 물 위에서 고른 뒤
+        if (f.art === 'wreck') { if (clear(x, y)) done = { ...f, x, y, where: 'water' }; continue; }
+        if (d > 34) continue; // 물가 가까이에서 뭍으로 들어간다
+        const depth = f.inland || 3, [px, py] = landSpot(x, y, depth), q = dist(px, py);
+        if (q > -depth + 1 || q < -depth - 8 || !clear(px, py)) continue;
+        done = { ...f, x: px, y: py, where: f.inland ? 'inland' : 'shore' };
+      }
+      out.push(done || finds[i]);
+    });
+    return out;
+  }
 
-  return { id: def.id, def, dist, isWater: (x, y) => dist(x, y) > 0, gradient, lineClear, nearestWater, findPath, outlines, scatter, flowAt, depthAt, ports, gates, finds, bounds: [bx0, by0, bx1, by1], river };
+  return { id: def.id, def, randomFinds, dist, isWater: (x, y) => dist(x, y) > 0, gradient, lineClear, nearestWater, findPath, outlines, scatter, flowAt, depthAt, ports, gates, finds, bounds: [bx0, by0, bx1, by1], river };
 }
 
 const cache = {};

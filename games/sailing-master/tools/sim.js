@@ -30,8 +30,10 @@ function shop() {
   if (S.res.coin < wantCoin && S.res.wood > keepW) G.sell(S, 'wood', Math.min(S.res.wood - keepW, (wantCoin - S.res.coin) * 2));
   if (S.hull < 0.75) G.repair(S);
   if (H === 'raft' && G.buildHull(S, 'rowboat').ok) mark('나룻배');
-  if (H === 'rowboat' && S.visited.lake && S.blueprints.mast_m && G.buildHull(S, 'sloop').ok) mark('슬루프');
-  const list = S.ship.hull === 'raft' ? [] : S.ship.hull === 'rowboat' ? ['mast_s', 'hold', 'food', 'hammock', 'awning'] : ['mast_m', 'hold', 'food', 'hammock', 'awning', 'ballast'];
+  // 슬루프는 돛대 값까지 있을 때 짓는다(돛대 없이 강에 가면 노로만 가야 한다)
+  const m = MODULES.mast_m.cost;
+  if (H === 'rowboat' && S.visited.lake && S.blueprints.mast_m && Object.entries(HULLS.sloop.price).every(([k, v]) => S.res[k] >= v + (m[k] || 0)) && G.buildHull(S, 'sloop').ok) mark('슬루프');
+  const list = S.ship.hull === 'raft' ? [] : S.ship.hull === 'rowboat' ? ['mast_s', 'telescope', 'hold', 'food', 'hammock', 'awning'] : ['mast_m', 'telescope', 'hold', 'food', 'hammock', 'awning', 'ballast'];
   for (const id of list) tryPlace(id);
   if (S.crew.length < G.stats(S).crewCap) for (const r of G.hireList(S)) if (S.res.coin > ROLES[r.role].hire * 2 && G.hire(S, r.role).ok) { mark(`고용 ${r.role}`); break; }
   const need = Math.min(G.stats(S).foodCap - S.food, S.res.coin - 5);
@@ -47,18 +49,20 @@ function think() {
     const want = S.weather.gustOn || S.weather.gustSoon ? 1 : 2;
     if (b.sailLevel !== want && !S.cap.to) G.setSail(S, want);
   }
-  const low = S.food < persons * 0.7 || S.hull < 0.4 || S.vigor < 0.3 || G.holdUsed(S) >= st.holdCap;
+  // 수리비가 없으면 항구로 가도 소용없으니 벌러 나간다. 다음 배 재료가 모이면 바로 돌아간다
+  const wantBuild = S.ship.hull === 'raft' && G.canAffordHull(S, G.nextHull(S));
+  const low = wantBuild || S.food < persons * 0.7 || (S.hull < 0.4 && S.res.coin + S.hold.coin >= G.repairCost(S)) || S.vigor < 0.3 || G.holdUsed(S) >= st.holdCap;
   if (low) {
     if (!(S.route && S.route.target && S.route.target.type === 'port')) { const p = nearestPort(); G.setDest(S, p.x, p.y, { type: 'port', id: p.id }); }
     return;
   }
   if (S.route) return;
   const gate = w.gates[0], status = G.gateStatus(S, gate);
-  if (status.ok && (S.ship.hull === (S.region === 'pond' ? 'rowboat' : 'sloop'))) {
+  if (status.ok && (S.region === 'pond' ? S.ship.hull === 'rowboat' : S.ship.hull === 'sloop' && st.sailArea)) {
     if (Math.hypot(gate.x - b.x, gate.y - b.y) < 30) { G.passGate(S, gate); return; }
     G.setDest(S, gate.x, gate.y, { type: 'gate', id: gate.id }); return;
   }
-  const find = w.finds.filter((f) => !S.found[f.id]).sort((p, q) => Math.hypot(p.x - b.x, p.y - b.y) - Math.hypot(q.x - b.x, q.y - b.y))[0];
+  const find = G.findsOf(S).filter((f) => !S.found[f.id] && (!f.inland || st.telescope)).sort((p, q) => Math.hypot(p.x - b.x, p.y - b.y) - Math.hypot(q.x - b.x, q.y - b.y))[0];
   if (find) { G.setDest(S, find.x, find.y); return; }
   const fl = G.flotsamOf(S).slice().sort((p, q) => Math.hypot(p.x - b.x, p.y - b.y) - Math.hypot(q.x - b.x, q.y - b.y))[0];
   if (fl) G.setDest(S, fl.x, fl.y, { type: 'pick' });
