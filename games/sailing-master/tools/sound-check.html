@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>소리 점검</title>
+<pre id="out">렌더 중…</pre>
+<script type="module">
+// 소리를 오프라인으로 렌더해 크기를 잰다: 바람·배 속도별 환경음과 효과음마다 RMS·최고값(1을 넘으면 찢어짐). 결과는 window.RESULT.
+import { buildAmbient, FX, makeNoise } from '../sound.js';
+const SR = 44100;
+const rmsPeak = (d, a = 0, b = d.length) => { let s = 0, p = 0; for (let i = a; i < b; i++) { s += d[i] * d[i]; p = Math.max(p, Math.abs(d[i])); } return { rms: +Math.sqrt(s / (b - a)).toFixed(4), peak: +p.toFixed(3) }; };
+async function ambient(wind, boat, sec = 16) {
+  const ac = new OfflineAudioContext(1, SR * sec, SR), noise = makeNoise(ac);
+  buildAmbient(ac, ac.destination, noise).set(wind, boat);
+  const d = (await ac.startRendering()).getChannelData(0), win = [];
+  for (let i = 4; i < sec; i++) win.push(rmsPeak(d, i * SR, (i + 1) * SR).rms); // 처음 4초는 값이 자리 잡는 시간
+  return { ...rmsPeak(d, 4 * SR), minWindow: Math.min(...win), maxWindow: Math.max(...win) };
+}
+async function fx(name) {
+  const ac = new OfflineAudioContext(1, SR * 2, SR), noise = makeNoise(ac);
+  FX[name](ac, noise, ac.destination, 0.02);
+  return rmsPeak((await ac.startRendering()).getChannelData(0));
+}
+const R = { ambient: {}, fx: {} };
+for (const [name, w, b] of [['잔잔·정지', 6, 0], ['보통·순항', 9, 5], ['강풍·전속', 13, 7.5]]) R.ambient[name] = await ambient(w, b);
+for (const name of Object.keys(FX)) R.fx[name] = await fx(name);
+window.RESULT = R;
+document.getElementById('out').textContent = JSON.stringify(R, null, 1);
+</script>
