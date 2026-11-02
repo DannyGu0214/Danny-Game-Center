@@ -5,6 +5,7 @@
 <script type="module">
 // 소리를 오프라인으로 렌더해 크기를 잰다: 바람·배 속도별 환경음과 효과음마다 RMS·최고값(1을 넘으면 찢어짐). 결과는 window.RESULT.
 import { buildAmbient, FX, makeNoise } from '../sound.js';
+import { createMusic, TRACK_IDS } from '../music.js';
 const SR = 44100;
 const rmsPeak = (d, a = 0, b = d.length) => { let s = 0, p = 0; for (let i = a; i < b; i++) { s += d[i] * d[i]; p = Math.max(p, Math.abs(d[i])); } return { rms: +Math.sqrt(s / (b - a)).toFixed(4), peak: +p.toFixed(3) }; };
 async function ambient(wind, boat, sec = 16) {
@@ -22,6 +23,15 @@ async function fx(name) {
 const R = { ambient: {}, fx: {} };
 for (const [name, w, b] of [['잔잔·정지', 6, 0], ['보통·순항', 9, 5], ['강풍·전속', 13, 7.5]]) R.ambient[name] = await ambient(w, b);
 for (const name of Object.keys(FX)) R.fx[name] = await fx(name);
+// 배경음악: 곡마다 24초
+R.music = {};
+for (const id of TRACK_IDS) {
+  const ac = new OfflineAudioContext(2, SR * 24, SR);
+  createMusic({ rand: () => 0.5 }).renderInto(ac, id, 22);
+  R.music[id] = rmsPeak((await ac.startRendering()).getChannelData(0));
+}
+// 바람만 따로(2026-11-02 대니님 요청으로 줄임): 파도·찰랑임을 뺀 비교는 아래 FX와 함께 본다
+
 window.RESULT = R;
 document.getElementById('out').textContent = JSON.stringify(R, null, 1);
 </script>

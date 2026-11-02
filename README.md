@@ -10,6 +10,7 @@
 |---|---|---|---|---|
 | Zombie Outpost (좀비 아웃포스트) | 세로 화면·쿼터뷰 모바일 웹 게임. 좀비 서바이벌, 수동 파밍, 기지 건설, 동료, 전진기지, 로그라이크 | 플레이 가능 | [바로 하기](https://dannygu0214.github.io/Danny-Game-Center/games/zombie-outpost/) | [`games/zombie-outpost`](games/zombie-outpost) |
 | Animal World (애니멀 월드) | 세로 화면·쿼터뷰 관찰형 게임. 동물 입양, 지역 꾸미기, 발전도·티어, 순간 포착 | 4지역(초원·바닷가·사막·남극) 플레이 가능 | [바로 하기](https://dannygu0214.github.io/Danny-Game-Center/games/animal-world/) | [`games/animal-world`](games/animal-world) |
+| Sailing Master (세일링 마스터) | 세로 화면 항해 게임. 배 설계·꾸미기, 선원, 자연 위협, 도감, 전투 없음 | 담수 3수역(작은 호수·큰 호수·강) 플레이 가능 | [바로 하기](https://dannygu0214.github.io/Danny-Game-Center/games/sailing-master/) | [`games/sailing-master`](games/sailing-master) |
 
 ## 공통 규칙
 

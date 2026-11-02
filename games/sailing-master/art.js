@@ -1,5 +1,5 @@
-import { VIEW } from './data.js';
-import { outlines, scatter, dist } from './world.js';
+import { VIEW, RES } from './data.js';
+import { worldOf } from './world.js';
 // 물·땅·나무 그림. 파일 없이 코드로 그리고, 반복되는 것은 오프스크린에 미리 그려 찍는다(매 프레임 비용을 낮추려고).
 
 const TAU = Math.PI * 2;
@@ -66,7 +66,7 @@ const LAND_LAYERS = [
   { d: 5.5, lift: 1.5, tex: 'grass' },
 ];
 
-function landPath(d) {
+function landPath(outlines, d) {
   const p = new Path2D();
   // 바깥 큰 사각형 + 호수 구멍(evenodd) + 섬은 다시 채워진다
   p.rect(-3000, -3000, 6000, 6000);
@@ -131,22 +131,40 @@ function treeSprite(kind, v) {
   return { c, W, H, ox: W / 2, oy: H - 0.4 };
 }
 
-export function createScene() {
-  const tiles = { a: waveTile(512, 150, 3, 1.3, true), b: waveTile(512, 90, 5, 4.1, false) };
-  const paw = pawSprite();
-  const grass = grassTile(), sand = sandTile();
-  const layers = LAND_LAYERS.map((l) => ({ ...l, path: landPath(l.d) }));
-  const sprites = {
-    pine: [treeSprite('pine', 0.2), treeSprite('pine', 0.8)],
-    oak: [treeSprite('oak', 0.2), treeSprite('oak', 0.8)],
-    bush: [treeSprite('bush', 0.5)],
-    reed: [treeSprite('reed', 0.1), treeSprite('reed', 0.7)],
-    rock: [treeSprite('rock', 0.5)],
+// 수역이 바뀌어도 그대로 쓰는 그림(물 무늬·나무)
+let shared = null;
+function sharedArt() {
+  if (shared) return shared;
+  shared = {
+    tiles: { a: waveTile(512, 150, 3, 1.3, true), b: waveTile(512, 90, 5, 4.1, false) },
+    paw: pawSprite(), grass: grassTile(), sand: sandTile(),
+    sprites: {
+      pine: [treeSprite('pine', 0.2), treeSprite('pine', 0.8)],
+      oak: [treeSprite('oak', 0.2), treeSprite('oak', 0.8)],
+      bush: [treeSprite('bush', 0.5)],
+      reed: [treeSprite('reed', 0.1), treeSprite('reed', 0.7)],
+      rock: [treeSprite('rock', 0.5)],
+      pier: pierSprite(), hut: hutSprite(), sign: signSprite(), stone: stoneSprite(), stump: stumpSprite(), wreck: wreckSprite(), tower: towerSprite(),
+    },
+    flot: { wood: flotSprite('wood'), cloth: flotSprite('cloth'), coin: flotSprite('coin') },
   };
-  const props = scatter();
-  const shore = outlines(-0.7, 420); // 찰랑이는 물가 선
+  return shared;
+}
+
+export function createScene(regionId) {
+  const w = worldOf(regionId), art = sharedArt();
+  const layers = LAND_LAYERS.map((l) => ({ ...l, path: landPath(w.outlines, l.d) }));
+  // 항구·수문·발견지는 물가 쪽 땅에 그림을 세운다
+  const marks = [];
+  const shore = (p) => { const [gx, gy] = w.gradient(p.x, p.y); return [p.x - gx * (w.dist(p.x, p.y) + 2.5), p.y - gy * (w.dist(p.x, p.y) + 2.5), gx, gy]; };
+  for (const p of w.ports) { const [x, y, gx, gy] = shore(p); marks.push({ kind: 'hut', x: x - gx * 3, y: y - gy * 3, size: 1, name: p.name, port: p }); marks.push({ kind: 'pier', x: (x + p.x) / 2, y: (y + p.y) / 2, size: 1, ang: Math.atan2(gy, gx) }); }
+  for (const g of w.gates) { const [x, y] = shore(g); marks.push({ kind: 'sign', x, y, size: 1, name: g.name, gate: g }); }
+  for (const f of w.finds) { const [x, y, gx, gy] = shore(f); marks.push({ kind: f.art, x: f.art === 'wreck' ? f.x + gx * -1 : x - gx * 1.5, y: f.art === 'wreck' ? f.y + gy * -1 : y - gy * 1.5, size: 1, find: f }); }
+  const trees = w.scatter().filter((t) => !marks.some((m) => (m.port || m.find || m.gate) && Math.hypot(m.x - t.x, m.y - t.y) < 9));
+  const props = [...trees, ...marks].sort((a, b) => a.y - b.y);
+  const foam = w.outlines(-0.7, 420);
   const paws = Array.from({ length: 9 }, (_, i) => ({ s: i * 0.7, rx: hash(i, 3), ry: hash(5, i), size: 0.6 + hash(i, 8) * 0.9 }));
-  return { tiles, paw, grass, sand, layers, sprites, props, shore, paws, buf: null, patterns: null };
+  return { id: regionId, world: w, ...art, layers, props, shore: foam, paws, buf: null, patterns: null, shoals: w.def.shoals || [], bakedAt: null, bakedDry: false };
 }
 
 // 물 무늬 패턴은 캔버스 문맥마다 만들어 둔다
@@ -212,7 +230,7 @@ export function drawWater(g, sc, cam, W, H, t, wind, dpr) {
 }
 
 // 땅과 얕은 물은 화면보다 크게 한 장 그려 두고 카메라가 많이 움직였을 때만 다시 그린다
-function bakeLand(sc, cam, W, H, dpr) {
+function bakeLand(sc, cam, W, H, dpr, dry) {
   const m = 0.45, bw = W * (1 + m * 2), bh = H * (1 + m * 2);
   if (!sc.buf) sc.buf = canvas(bw * dpr, bh * dpr);
   const [c, g] = sc.buf;
@@ -222,6 +240,14 @@ function bakeLand(sc, cam, W, H, dpr) {
   const z = cam.zoom, k = VIEW.tiltY;
   // 이 그림의 왼쪽 위가 세상 어디인지 기억한다
   const ox = bw / 2, oy = cam.cy + H * m;
+  // 여울: 얕은 곳이 밝게 비친다. 가뭄이면 모래가 드러난다
+  for (const q of sc.shoals) {
+    const sx = ox + (q.x - cam.x) * z, sy = oy + (q.y - cam.y) * z * k, r = q.r * z;
+    g.setTransform(dpr, 0, 0, dpr * k, sx * dpr, sy * dpr);
+    const gr = g.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
+    gr.addColorStop(0, dry ? 'rgba(232,214,160,.72)' : 'rgba(190,226,206,.38)'); gr.addColorStop(0.7, dry ? 'rgba(220,214,170,.42)' : 'rgba(170,220,206,.2)'); gr.addColorStop(1, 'rgba(170,220,206,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+  }
   for (const l of sc.layers) {
     const lift = l.lift ? l.lift * VIEW.tiltZ * z : 0;
     g.setTransform(z * dpr, 0, 0, z * k * dpr, (ox - cam.x * z) * dpr, (oy - cam.y * z * k - lift) * dpr);
@@ -235,13 +261,14 @@ function bakeLand(sc, cam, W, H, dpr) {
     g.fill(l.path, 'evenodd');
   }
   sc.bakedAt = { x: cam.x, y: cam.y, zoom: z, ox, oy, W, H, m };
+  sc.bakedDry = dry;
 }
 
-export function drawLand(g, sc, cam, W, H, dpr, zooming) {
+export function drawLand(g, sc, cam, W, H, dpr, zooming, dry = false) {
   const b = sc.bakedAt;
   const moved = b && (Math.abs(cam.x - b.x) * cam.zoom > W * b.m * 0.8 || Math.abs(cam.y - b.y) * cam.zoom * VIEW.tiltY > H * b.m * 0.8);
   const rezoom = b && Math.abs(cam.zoom / b.zoom - 1) > (zooming ? 0.3 : 0.001);
-  if (!b || moved || rezoom || b.W !== W || b.H !== H) bakeLand(sc, cam, W, H, dpr);
+  if (!b || moved || rezoom || b.W !== W || b.H !== H || sc.bakedDry !== dry) bakeLand(sc, cam, W, H, dpr, dry);
   const q = sc.bakedAt, [c] = sc.buf, s = cam.zoom / q.zoom;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   // 구운 그림 위의 세상 점 (cam.x, cam.y)가 화면 (W/2, cam.cy)에 오게 찍는다
@@ -326,7 +353,7 @@ export class Wake {
 const r0life = 1.6;
 
 // 뱃머리 물보라
-export function drawBowFoam(g, cam, W, dpr, b, spdK, t) {
+export function drawBowFoam(g, cam, W, dpr, b, spdK, t, len = 9) {
   if (spdK < 0.1) return;
   const z = cam.zoom, k = VIEW.tiltY, ch = Math.cos(b.h), sh = Math.sin(b.h);
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -334,7 +361,7 @@ export function drawBowFoam(g, cam, W, dpr, b, spdK, t) {
   g.strokeStyle = `rgba(245,253,252,${0.5 + 0.35 * spdK})`; g.lineWidth = Math.max(0.8, 0.28 * z); g.lineCap = 'round';
   for (const side of [-1, 1]) {
     const w = 1 + Math.sin(t * 5 + side) * 0.15;
-    const a = P(4.3, 0), c = P(3 - spdK * 1.4, side * (1.35 + spdK * 0.6) * w), m = P(3.9, side * 0.95 * w);
+    const L = len / 2, a = P(L - 0.2, 0), c = P(L * 0.67 - spdK * 1.4, side * (L * 0.3 + spdK * 0.6) * w), m = P(L * 0.87, side * L * 0.21 * w);
     g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo(m[0], m[1], c[0], c[1]); g.stroke();
   }
 }
@@ -356,9 +383,117 @@ export function visibleProps(sc, cam, W, H) {
   return out;
 }
 export function drawProp(g, sc, cam, W, p, t) {
-  const list = sc.sprites[p.kind], sp = list[Math.floor(p.v * list.length) % list.length];
+  const list = sc.sprites[p.kind], sp = Array.isArray(list) ? list[Math.floor(p.v * list.length) % list.length] : list;
   const z = cam.zoom * p.size, k = VIEW.tiltY;
   const sx = W / 2 + (p.x - cam.x) * cam.zoom, sy = cam.cy + (p.y - cam.y) * cam.zoom * k;
   g.drawImage(sp.c, sx - sp.ox * z, sy - sp.oy * z, sp.W * z, sp.H * z);
-  void t; void dist;
+  void t;
+}
+
+// ── 항구·표지·발견지 그림 ──
+function pierSprite() {
+  const S = 22, W = 8, H = 5, [c, g] = canvas(W * S, H * S);
+  g.fillStyle = 'rgba(14,50,70,.25)'; g.fillRect(S * 1, S * 3.3, S * 6, S * 0.5);
+  for (const x of [1.4, 3.4, 5.4, 6.6]) { g.fillStyle = '#5a4228'; g.fillRect(x * S, S * 2.5, S * 0.35, S * 1.4); }
+  g.fillStyle = '#9c7648'; g.fillRect(S * 1, S * 2, S * 6, S * 0.7);
+  g.strokeStyle = '#7a5a35'; g.lineWidth = 1.4;
+  for (let x = 1.4; x < 7; x += 0.5) { g.beginPath(); g.moveTo(x * S, S * 2); g.lineTo(x * S, S * 2.7); g.stroke(); }
+  return { c, W, H, ox: W / 2, oy: 3 };
+}
+function hutSprite() {
+  const S = 22, W = 8.5, H = 8, [c, g] = canvas(W * S, H * S), cx = W * S / 2, by = H * S - S * 0.8;
+  g.fillStyle = 'rgba(18,50,40,.28)'; g.beginPath(); g.ellipse(cx + S * 0.3, by + 2, W * S * 0.42, S * 0.7, 0, 0, TAU); g.fill();
+  g.fillStyle = '#d9c29a'; g.fillRect(cx - S * 2.7, by - S * 2.9, S * 5.4, S * 2.9);
+  g.fillStyle = '#7a5a35'; g.fillRect(cx - S * 0.5, by - S * 1.7, S * 1, S * 1.7);
+  g.fillStyle = '#35566a'; g.fillRect(cx + S * 1, by - S * 2.1, S * 1, S * 0.9); g.fillRect(cx - S * 2.1, by - S * 2.1, S * 1, S * 0.9);
+  g.fillStyle = '#a84f3b'; g.beginPath(); g.moveTo(cx - S * 3.4, by - S * 2.8); g.lineTo(cx, by - S * 5.2); g.lineTo(cx + S * 3.4, by - S * 2.8); g.closePath(); g.fill();
+  g.fillStyle = '#c4644d'; g.beginPath(); g.moveTo(cx - S * 3.4, by - S * 2.8); g.lineTo(cx, by - S * 5.2); g.lineTo(cx - S * 0.3, by - S * 2.8); g.closePath(); g.fill();
+  return { c, W, H, ox: W / 2, oy: H - 0.8 };
+}
+function signSprite() {
+  const S = 22, W = 4, H = 6, [c, g] = canvas(W * S, H * S), cx = W * S / 2, by = H * S - S * 0.5;
+  g.fillStyle = '#5a4228'; g.fillRect(cx - 3, by - S * 4.4, 6, S * 4.4);
+  g.fillStyle = '#e7b64a'; g.beginPath(); g.moveTo(cx - S * 1.5, by - S * 4.6); g.lineTo(cx + S * 1.1, by - S * 4.6); g.lineTo(cx + S * 1.7, by - S * 3.95); g.lineTo(cx + S * 1.1, by - S * 3.3); g.lineTo(cx - S * 1.5, by - S * 3.3); g.closePath(); g.fill();
+  g.strokeStyle = '#8a6a22'; g.lineWidth = 2; g.stroke();
+  return { c, W, H, ox: W / 2, oy: H - 0.5 };
+}
+function stoneSprite() {
+  const S = 22, W = 4, H = 5, [c, g] = canvas(W * S, H * S), cx = W * S / 2, by = H * S - S * 0.5;
+  g.fillStyle = 'rgba(18,50,40,.25)'; g.beginPath(); g.ellipse(cx + 3, by, S * 1.5, S * 0.4, 0, 0, TAU); g.fill();
+  for (const [y, w, col] of [[0, 1.35, '#8c8f88'], [0.95, 1, '#a3a69e'], [1.75, 0.75, '#8c8f88'], [2.4, 0.5, '#b4b7ad']]) { g.fillStyle = col; g.beginPath(); g.ellipse(cx, by - y * S, w * S, 0.5 * S, 0, 0, TAU); g.fill(); }
+  return { c, W, H, ox: W / 2, oy: H - 0.5 };
+}
+function stumpSprite() {
+  const S = 22, W = 5, H = 6, [c, g] = canvas(W * S, H * S), cx = W * S / 2, by = H * S - S * 0.5;
+  g.fillStyle = 'rgba(18,50,40,.25)'; g.beginPath(); g.ellipse(cx + 3, by, S * 2, S * 0.5, 0, 0, TAU); g.fill();
+  g.fillStyle = '#6b4c2c'; g.beginPath(); g.moveTo(cx - S * 1.5, by); g.lineTo(cx - S * 1, by - S * 3.6); g.lineTo(cx + S * 1, by - S * 3.8); g.lineTo(cx + S * 1.5, by); g.closePath(); g.fill();
+  g.fillStyle = '#2a1d10'; g.beginPath(); g.ellipse(cx, by - S * 1.6, S * 0.55, S * 0.8, 0, 0, TAU); g.fill();
+  g.fillStyle = '#5f9a4a'; g.beginPath(); g.ellipse(cx - S * 0.3, by - S * 3.8, S * 1.15, S * 0.45, 0, 0, TAU); g.fill();
+  return { c, W, H, ox: W / 2, oy: H - 0.5 };
+}
+function wreckSprite() {
+  const S = 22, W = 8, H = 4.4, [c, g] = canvas(W * S, H * S), cx = W * S / 2, by = H * S - S * 0.7;
+  g.fillStyle = 'rgba(14,50,70,.3)'; g.beginPath(); g.ellipse(cx, by, W * S * 0.44, S * 0.7, 0, 0, TAU); g.fill();
+  g.fillStyle = '#5e4a34'; g.beginPath(); g.moveTo(cx - S * 3.3, by - S * 1.1); g.quadraticCurveTo(cx, by + S * 0.8, cx + S * 3.3, by - S * 1.7); g.lineTo(cx + S * 2.8, by - S * 0.3); g.lineTo(cx - S * 2.7, by + S * 0.1); g.closePath(); g.fill();
+  g.strokeStyle = '#463525'; g.lineWidth = 3; for (const x of [-1.6, 0, 1.5]) { g.beginPath(); g.moveTo(cx + x * S, by + S * 0.1); g.lineTo(cx + x * S + 3, by - S * 1.4); g.stroke(); }
+  return { c, W, H, ox: W / 2, oy: H - 0.7 };
+}
+function towerSprite() {
+  const S = 22, W = 5.4, H = 11, [c, g] = canvas(W * S, H * S), cx = W * S / 2, by = H * S - S * 0.6;
+  g.fillStyle = 'rgba(18,50,40,.28)'; g.beginPath(); g.ellipse(cx + 4, by, S * 2, S * 0.55, 0, 0, TAU); g.fill();
+  g.fillStyle = '#efe7d4'; g.beginPath(); g.moveTo(cx - S * 1.4, by); g.lineTo(cx - S * 0.9, by - S * 7.2); g.lineTo(cx + S * 0.9, by - S * 7.2); g.lineTo(cx + S * 1.4, by); g.closePath(); g.fill();
+  g.fillStyle = '#c0533f'; g.fillRect(cx - S * 1.2, by - S * 2.6, S * 2.4, S * 0.9); g.fillRect(cx - S * 1, by - S * 5.4, S * 2, S * 0.9);
+  g.fillStyle = '#35566a'; g.fillRect(cx - S * 0.75, by - S * 8.2, S * 1.5, S * 1);
+  g.fillStyle = '#a84f3b'; g.beginPath(); g.moveTo(cx - S * 1.1, by - S * 8.2); g.lineTo(cx, by - S * 9.5); g.lineTo(cx + S * 1.1, by - S * 8.2); g.closePath(); g.fill();
+  return { c, W, H, ox: W / 2, oy: H - 0.6 };
+}
+
+// 표류물: 물에 뜬 통나무·천 뭉치·상자
+function flotSprite(k) {
+  const [c, g] = canvas(64, 48), cx = 32, cy = 28;
+  g.fillStyle = 'rgba(14,50,70,.3)'; g.beginPath(); g.ellipse(cx, cy + 5, 21, 7, 0, 0, TAU); g.fill();
+  if (k === 'wood') {
+    for (const [y, c2] of [[0, '#8c6a3f'], [-7, '#a58150']]) { g.fillStyle = c2; g.beginPath(); g.roundRect(cx - 19, cy + y - 3.5, 38, 7, 3.5); g.fill(); g.fillStyle = '#d8bb8a'; g.beginPath(); g.ellipse(cx + 18, cy + y, 3, 3.5, 0, 0, TAU); g.fill(); }
+  } else if (k === 'cloth') {
+    g.fillStyle = '#e4d5b0'; g.beginPath(); g.ellipse(cx, cy - 3, 16, 10, 0, 0, TAU); g.fill();
+    g.strokeStyle = '#a4845a'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 8, cy - 12); g.lineTo(cx - 8, cy + 5); g.moveTo(cx + 7, cy - 12); g.lineTo(cx + 7, cy + 5); g.stroke();
+  } else {
+    g.fillStyle = '#8a6236'; g.fillRect(cx - 14, cy - 12, 28, 18);
+    g.fillStyle = '#a47a48'; g.fillRect(cx - 14, cy - 16, 28, 6);
+    g.fillStyle = '#e7b64a'; g.fillRect(cx - 3, cy - 12, 6, 7);
+  }
+  return c;
+}
+export function drawFlotsam(g, sc, list, cam, W, H, t, dpr) {
+  const z = cam.zoom, k = VIEW.tiltY;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const size = Math.max(14, 3.3 * z);
+  for (const f of list) {
+    const sx = W / 2 + (f.x - cam.x) * z, sy = cam.cy + (f.y - cam.y) * z * k + Math.sin(t * 1.4 + f.ph) * 0.12 * z;
+    if (sx < -size || sx > W + size || sy < -size || sy > H + size) continue;
+    const pulse = 1 + 0.5 * ((t * 0.5 + f.ph) % 1), a = 0.55 * (1 - ((t * 0.5 + f.ph) % 1));
+    g.strokeStyle = `rgba(255,255,240,${a})`; g.lineWidth = 1;
+    g.beginPath(); g.ellipse(sx, sy + size * 0.1, size * 0.5 * pulse, size * 0.5 * pulse * k, 0, 0, TAU); g.stroke();
+    g.drawImage(sc.flot[f.k], sx - size / 2, sy - size * 0.55, size, size * 0.75);
+  }
+  
+}
+
+// 날씨 덧칠: 돌풍 전조·비, 무더위
+export function drawWeather(g, weather, W, H, t, dpr, seedDrops) {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (weather.heat) { g.fillStyle = 'rgba(255,186,90,.11)'; g.fillRect(0, 0, W, H); }
+  if (weather.gustSoon || weather.gustOn) {
+    g.fillStyle = weather.gustOn ? 'rgba(20,40,62,.3)' : 'rgba(20,40,62,.14)'; g.fillRect(0, 0, W, H);
+  }
+  if (weather.gustOn) {
+    g.strokeStyle = 'rgba(214,232,240,.42)'; g.lineWidth = 1; g.lineCap = 'round';
+    g.beginPath();
+    for (let i = 0; i < 70; i++) {
+      const sp = 420 + hash(i, 2) * 240, x = (hash(i, 1) * W * 1.3 + t * sp * 0.34) % (W * 1.3) - W * 0.15, y = (hash(3, i) * H + t * sp) % H;
+      g.moveTo(x, y); g.lineTo(x + 5, y + 15);
+    }
+    g.stroke();
+  }
+  void seedDrops;
 }

@@ -35,7 +35,7 @@ export function buildAmbient(ac, dest, noise) {
   lfo(0.43, 0.34, lapB.gain); lfo(0.29, 0.2, lapB.gain); lfo(0.17, 240, lapF.frequency);
 
   // 바람: 풍속이 세면 소리가 커지고 높아진다
-  const windF = filter('bandpass', 620, 0.65), windG = gain(0.12);
+  const windF = filter('bandpass', 620, 0.65), windG = gain(0.05);
   loop(1, 2.1).connect(windF); windF.connect(windG); windG.connect(dest);
   lfo(0.23, 90, windF.frequency);
 
@@ -47,7 +47,7 @@ export function buildAmbient(ac, dest, noise) {
     set(windSpeed, boatSpeed) {
       const t = ac.currentTime, w = Math.min(1.4, windSpeed / 10), b = Math.min(1, boatSpeed / 7.5);
       swellG.gain.setTargetAtTime(0.28 + w * 0.1, t, 1.2);
-      windG.gain.setTargetAtTime(0.05 + w * w * 0.1, t, 0.8);
+      windG.gain.setTargetAtTime(0.02 + w * w * 0.045, t, 0.8); // 2026-11-02 대니님 요청으로 줄임(노 소리는 그대로)
       windF.frequency.setTargetAtTime(460 + w * 420, t, 0.8);
       washG.gain.setTargetAtTime(b * b * 0.2, t, 0.5);
       lapG.gain.setTargetAtTime(0.13 + b * 0.09, t, 0.6);
@@ -93,12 +93,23 @@ export const FX = {
   ground(ac, noise, d, t) { tone(ac, d, t, { f: 90, to: 46, dur: 0.4, peak: 0.28 }); burst(ac, noise, d, t, { type: 'lowpass', f: 700, to: 200, dur: 0.46, peak: 0.2 }); },
   tap(ac, _n, d, t) { tone(ac, d, t, { f: 880, to: 840, dur: 0.22, peak: 0.05 }); tone(ac, d, t + 0.06, { f: 1320, to: 1280, dur: 0.3, peak: 0.028 }); },
   arrive(ac, _n, d, t) { for (const [at, f] of [[0, 659], [0.14, 784], [0.28, 988]]) tone(ac, d, t + at, { f, dur: 0.7, peak: 0.05 }); },
+  pick(ac, noise, d, t) { burst(ac, noise, d, t, { f: 1500, to: 700, q: 0.8, dur: 0.16, peak: 0.1 }); tone(ac, d, t + 0.04, { f: 720, to: 980, dur: 0.14, peak: 0.05 }); },
+  found(ac, _n, d, t) { for (const [at, f] of [[0, 523], [0.12, 659], [0.24, 784], [0.36, 1047]]) tone(ac, d, t + at, { f, type: 'triangle', dur: 0.8, peak: 0.055 }); },
+  ach(ac, _n, d, t) { for (const [at, f] of [[0, 659], [0.1, 880], [0.2, 1175]]) tone(ac, d, t + at, { f, dur: 0.6, peak: 0.05 }); },
+  record(ac, _n, d, t) { tone(ac, d, t, { f: 1175, dur: 0.3, peak: 0.04 }); tone(ac, d, t + 0.09, { f: 1568, dur: 0.4, peak: 0.03 }); },
+  build(ac, noise, d, t) { for (const at of [0, 0.16, 0.32]) { tone(ac, d, t + at, { f: 180, to: 110, type: 'triangle', dur: 0.08, peak: 0.08 }); burst(ac, noise, d, t + at, { f: 2200, dur: 0.05, peak: 0.04 }); } },
+  place(ac, noise, d, t) { tone(ac, d, t, { f: 210, to: 140, type: 'triangle', dur: 0.08, peak: 0.08 }); burst(ac, noise, d, t, { f: 1800, dur: 0.04, peak: 0.03 }); },
+  dock(ac, _n, d, t) { for (const [at, f] of [[0, 880], [0.22, 880]]) { tone(ac, d, t + at, { f, dur: 0.9, peak: 0.045 }); tone(ac, d, t + at, { f: f * 2.76, dur: 0.4, peak: 0.012 }); } },
+  gust(ac, noise, d, t) { burst(ac, noise, d, t, { f: 500, to: 1300, q: 0.5, dur: 2.2, peak: 0.13, attack: 0.9 }); tone(ac, d, t + 0.3, { f: 58, to: 38, dur: 1.5, peak: 0.1, attack: 0.1 }); },
+  warn(ac, _n, d, t) { for (const at of [0, 0.3]) tone(ac, d, t + at, { f: 392, dur: 0.24, peak: 0.05 }); },
+  disaster(ac, noise, d, t) { tone(ac, d, t, { f: 196, to: 98, type: 'triangle', dur: 1.4, peak: 0.12 }); burst(ac, noise, d, t, { type: 'lowpass', f: 900, to: 200, dur: 1.2, peak: 0.2 }); },
   sail(ac, noise, d, t) { burst(ac, noise, d, t, { f: 1500, to: 3200, q: 0.8, dur: 0.5, peak: 0.08, attack: 0.1 }); },
 };
 
 export function createSound() {
   let ac = null, master = null, noise = null, amb = null, on = true, fxBus = null;
   return {
+    get ac() { return ac; },
     get on() { return on; },
     unlock() {
       if (ac) { if (ac.state === 'suspended') ac.resume(); return; }

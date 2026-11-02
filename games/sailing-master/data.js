@@ -1,37 +1,27 @@
-// M0 손맛 시제품 상수. 길이는 m, 속도는 m/s(게임용으로 실제보다 빠르게), 각도는 라디안이다.
+// 게임 표. 길이는 m, 속도는 m/s(게임용으로 실제보다 빠르게), 각도는 라디안이다.
 const D = Math.PI / 180;
 
 // 3/4 시점: 땅 y를 tiltY로 눌러 그리고 높이 z는 tiltZ만큼 위로 올린다(약 38° 기울임)
 export const VIEW = { tiltY: 0.62, tiltZ: 0.785, zoomMin: 2.6, zoomDefault: 8, zoomMax: 14 };
 
 export const BOAT = {
-  len: 9, beam: 3,
-  maxSail: 7.5,        // 돛으로 낼 수 있는 최고 속도
-  rowSpeed: 2.8,       // 노 속도
+  staminaDrain: 1 / 240, // 초당 체력 감소(4분이면 지침)
+  staminaRest: 1 / 30,
+  tired: 0.6,          // 지쳤을 때 노 속도 배율
   rowPeriod: 1.7,      // 노 한 번 젓는 시간(초)
-  staminaDrain: 1 / 100, // 초당 체력 감소(100초면 지침)
-  staminaRest: 1 / 40,
-  tired: 0.45,         // 지쳤을 때 노 속도 배율
   accel: 3.2, coast: 7, // 속도가 목표로 가까워지는 시간 상수(가속, 관성)
-  maxTurn: 0.62,       // 최대 회전(라디안/초)
   turnLag: 0.55,
   minSteer: 0.34,      // 멈춰 있어도 남는 키 힘(맞바람에 갇혀 영영 못 도는 일을 막는다)
   fullSteerSpd: 3.5,
   rowSteer: 0.8,
   clear: 3.2,          // 배 중심과 물가의 최소 거리
+  walk: 2.2,           // 선장 걷는 속도
 };
 
 // 상대 바람각(0 = 정면) → 돛 효율. 맞바람 금지 구역 안은 0이다.
 export const POLAR = [[0, 0], [40 * D, 0], [46 * D, 0.5], [60 * D, 0.82], [90 * D, 1], [120 * D, 0.97], [150 * D, 0.82], [180 * D, 0.68]];
 export const NO_GO = 40 * D;
-export const SAIL_K = 0.72; // 풍속 × 효율 × 이 값 = 목표 속도
-
-export const WIND = {
-  from: -22 * D,  // 기본 풍향(바람이 불어오는 쪽, 0 = 동쪽, y가 남쪽이라 음수가 북쪽)
-  speed: 9,
-  swing: 0.5,     // 풍향이 천천히 흔들리는 폭
-};
-
+export const SAIL_K = 0.72; // 풍속 × 효율 × 돛 넓이 × 이 값 = 목표 속도
 export const SAIL_LEVELS = [0, 0.55, 1]; // 내림 · 줄임(축범) · 전체
 
 export const NAV = {
@@ -39,7 +29,168 @@ export const NAV = {
   lay: 32 * D,       // 목적지가 반대쪽으로 이만큼 넘어가면 태킹
   minTack: 7,        // 태킹 사이 최소 시간(초)
   look: 26,          // 물가를 미리 보는 거리
-  arrive: 14, waypoint: 16,
+  arrive: 14, waypoint: 16, dock: 18,
 };
 
-export const LAKE = { ax: 170, ay: 280 };
+// 달력: 하루 = 항해 3분, 계절 = 7일. 항구에 있는 동안은 흐르지 않는다
+export const CAL = { day: 180, seasonDays: 7 };
+export const SEASONS = [
+  { id: 'spring', name: '봄', icon: '🌱', gust: 0.45 },
+  { id: 'summer', name: '여름', icon: '☀️', gust: 0.25, heat: 0.6 },
+  { id: 'autumn', name: '가을', icon: '🍂', gust: 0.55 },
+  { id: 'winter', name: '겨울', icon: '❄️', gust: 0.35 },
+];
+export const WEATHER = {
+  gustLen: 40, gustWarn: 25,
+  heelSafe: 0.38,        // 이 기울기를 넘으면 선체가 상해요
+  heelHurt: 0.175,       // 넘은 만큼 초당 선체 피해
+  heatVigor: 1 / 300,    // 무더위에 그늘이 없을 때 초당 기력 감소
+  hungerVigor: 1 / 80,   // 식량이 없을 때 초당 기력 감소
+  restVigor: 1 / 120,
+  droughtDepth: 0.55,    // 가뭄 때 여울 수심 배율
+  hitHurt: 0.012,        // 물가 충돌: 속도 × 이 값
+  shoalHurt: 0.012,      // 여울에 걸린 채 움직일 때 초당 피해
+};
+
+// 선체(배 평면 격자는 cols × rows, 칸 한 변 cell m. x0: 0행 앞쪽 끝의 배 좌표)
+export const HULLS = {
+  raft: { id: 'raft', grade: 1, name: '뗏목', len: 4.6, beam: 3.1, deck: 0.34, cols: 3, rows: 4, cell: 1, x0: 2, drag: 0.55, row: 1.9, turn: 0.8, stability: 1.4, buoy: 26, draft: 0.2, crew: 0, foodBase: 4, holdBase: 14, helmX: -1.45, price: {} },
+  rowboat: { id: 'rowboat', grade: 2, name: '나룻배', len: 6.4, beam: 2.1, deck: 0.5, cols: 2, rows: 6, cell: 0.8, x0: 2.4, drag: 0.9, row: 2.8, turn: 0.82, stability: 0.8, buoy: 30, draft: 0.3, crew: 1, foodBase: 5, holdBase: 18, helmX: -2.65, price: { wood: 40, coin: 15 } },
+  sloop: { id: 'sloop', grade: 3, name: '슬루프', len: 9, beam: 3, deck: 1, cols: 3, rows: 7, cell: 0.72, x0: 3.1, drag: 1, row: 2.2, turn: 0.62, stability: 1, buoy: 70, draft: 0.68, crew: 2, foodBase: 6, holdBase: 24, helmX: -3.1, price: { wood: 150, cloth: 50, coin: 90 } },
+};
+export const HULL_ORDER = ['raft', 'rowboat', 'sloop'];
+
+// 모듈. w·h: 차지하는 칸(가로 × 세로), kg: 무게 단위, z: 그림 높이(m). need: 해금 조건
+export const MODULES = {
+  oar: { name: '노 자리', icon: '🚣', w: 1, h: 1, kg: 1, z: 0.1, color: '#8a5b34', cost: { wood: 4 }, desc: '노를 저을 수 있어요. 둘이면 25% 빨라요', need: {} },
+  food: { name: '식량 창고', icon: '🍖', w: 1, h: 1, kg: 3, z: 0.5, color: '#b98a52', cost: { wood: 8 }, desc: '식량 +6', need: {} },
+  hold: { name: '화물칸', icon: '📦', w: 1, h: 2, kg: 3, z: 0.42, color: '#9b7443', cost: { wood: 12 }, desc: '화물 +20', need: {} },
+  telescope: { name: '망원경', icon: '🔭', w: 1, h: 1, kg: 1, z: 0.9, color: '#c2a14a', cost: { wood: 6, coin: 20 }, desc: '건지기·발견 거리 증가', need: { blueprint: 'telescope' } },
+  mast_s: { name: '작은 돛대', icon: '⛵', w: 1, h: 1, kg: 3, z: 0.2, color: '#6b4a2e', cost: { wood: 10, cloth: 8 }, desc: '작은 돛. 바람으로 가요', need: { region: 'lake' }, sail: 0.6, mastH: 7, boom: 2.6 },
+  mast_m: { name: '돛대', icon: '⛵', w: 1, h: 1, kg: 8, z: 0.2, color: '#6b4a2e', cost: { wood: 30, cloth: 26, coin: 15 }, desc: '큰 돛. 빠르지만 잘 기울어요', need: { blueprint: 'mast_m' }, sail: 1, mastH: 12.6, boom: 4.2 },
+  hammock: { name: '해먹', icon: '🛏', w: 1, h: 1, kg: 1, z: 0.3, color: '#d9c9a0', cost: { wood: 4, cloth: 4 }, desc: '선원 1명 잠자리', need: { region: 'lake' } },
+  cabin: { name: '선실', icon: '🏠', w: 2, h: 2, kg: 5, z: 0.72, color: '#fbf7ee', cost: { wood: 30, cloth: 8 }, desc: '선원 1명 잠자리, 쉬는 곳. 슬루프부터 맞아요', need: { region: 'lake' }, crew: 1 },
+  awning: { name: '그늘막', icon: '⛱', w: 2, h: 1, kg: 1, z: 1.05, color: '#d8634f', cost: { wood: 6, cloth: 12 }, desc: '무더위에 기력이 줄지 않아요', need: { region: 'lake' } },
+  net: { name: '어망', icon: '🎣', w: 1, h: 1, kg: 1, z: 0.25, color: '#7fa39a', cost: { cloth: 6, coin: 5 }, desc: '항해 중 식량이 조금씩 늘어요', need: { region: 'lake' } },
+  ballast: { name: '바닥짐', icon: '🪨', w: 1, h: 1, kg: 6, z: 0.12, color: '#777d7a', cost: { coin: 8 }, desc: '복원력 +25%, 무거워요', need: { region: 'lake' } },
+  barometer: { name: '기압계', icon: '🌡', w: 1, h: 1, kg: 1, z: 0.8, color: '#c9c3a8', cost: { coin: 25 }, desc: '예보 +2일', need: { blueprint: 'barometer' } },
+};
+
+export const ROLES = {
+  deckhand: { name: '갑판원', icon: '🪢', desc: '돛을 맡아요. 선장이 돛대로 걷지 않아도 되고, 돌풍이 오면 알아서 줄여요', hire: 15, wage: 2, region: 'lake', z: 1 },
+  lookout: { name: '견시', icon: '🔭', desc: '건질 것을 더 멀리서 줍고, 해도를 더 넓게 밝혀요', hire: 15, wage: 2, region: 'lake', z: 1 },
+  helmsman: { name: '조타수', icon: '☸️', desc: '선장이 키를 떠나도 항로를 지켜요. 돛·노를 오가도 배가 안 헤매요', hire: 25, wage: 3, region: 'river', z: 1 },
+};
+export const CREW_NAMES = ['민호', '수빈', '지안', '하람', '도윤', '서아', '태오', '나래', '준서', '보라', '건우', '다온'];
+
+// 자원. 항해 중엔 화물칸에 담고, 입항하면 창고로 옮겨요
+export const RES = { wood: { name: '목재', icon: '🪵' }, cloth: { name: '천', icon: '🧵' }, coin: { name: '코인', icon: '🪙' } };
+
+export const SPECIES = {
+  crucian: { name: '붕어', kind: 'fish', region: 'pond', color: '#9c8a55', len: 0.5, reward: 3 },
+  minnow: { name: '피라미', kind: 'fish', region: 'pond', color: '#a9c3b8', len: 0.3, school: 5, reward: 3 },
+  duck: { name: '오리', kind: 'duck', region: 'pond', color: '#7c5c3a', head: '#2f6b4a', reward: 4 },
+  heron: { name: '왜가리', kind: 'wader', region: 'pond', color: '#8d9aa6', reward: 5 },
+  frog: { name: '개구리', kind: 'frog', region: 'pond', color: '#6da04a', reward: 4 },
+  otter: { name: '수달', kind: 'swimmer', region: 'pond', color: '#6f4f33', reward: 8 },
+  carp: { name: '잉어', kind: 'fish', region: 'lake', color: '#c48b3f', len: 0.8, reward: 5 },
+  trout: { name: '송어', kind: 'fish', region: 'lake', color: '#88a07f', len: 0.6, reward: 5 },
+  catfish: { name: '큰 메기', kind: 'fish', region: 'lake', color: '#4e5346', len: 1.3, reward: 10 },
+  swan: { name: '백조', kind: 'duck', region: 'lake', color: '#f4f2ea', head: '#f4f2ea', neck: 1.5, size: 1.5, reward: 8 },
+  osprey: { name: '물수리', kind: 'bird', region: 'lake', color: '#6d5a48', wing: 1.5, reward: 8 },
+  beaver: { name: '비버', kind: 'swimmer', region: 'lake', color: '#7a5636', reward: 8 },
+  deer: { name: '사슴', kind: 'land', region: 'lake', color: '#a97a4a', height: 1.5, antler: true, reward: 8 },
+  salmon: { name: '연어', kind: 'fish', region: 'river', color: '#c26a59', len: 0.9, reward: 8 },
+  lamprey: { name: '칠성장어', kind: 'fish', region: 'river', color: '#5a5d57', len: 0.8, thin: true, reward: 10 },
+  turtle: { name: '민물거북', kind: 'turtle', region: 'river', color: '#55703f', reward: 8 },
+  kingfisher: { name: '물총새', kind: 'bird', region: 'river', color: '#2a86b8', wing: 0.5, reward: 10 },
+  bear: { name: '곰', kind: 'land', region: 'river', color: '#5d4530', height: 1.7, reward: 15 },
+  ottercub: { name: '수달 가족', kind: 'swimmer', region: 'river', color: '#7f5c3e', group: 3, reward: 12 },
+};
+
+export const REGIONS = {
+  pond: {
+    id: 'pond', name: '작은 호수', order: 0, wind: { from: -70 * D, speed: 6.5, swing: 0.7 }, gustK: 1.35,
+    shape: { kind: 'lake', ax: 96, ay: 150, ph: 0.4 },
+    islands: [{ x: 28, y: -42, r: 13, ph: 1.4 }],
+    start: 'reed',
+    ports: [{ id: 'reed', name: '갈대 나루', x: -8, y: 118 }],
+    gates: [{ id: 'toLake', name: '북쪽 수로', x: 0, y: -135, to: 'lake', entry: 'southGate', req: { grade: 2, found: 2 } }],
+    finds: [
+      { id: 'stone', name: '이끼 낀 표지석', x: -72, y: 18, coin: 12, wood: 8, art: 'stone' },
+      { id: 'hollow', name: '속이 빈 고목', x: 58, y: 62, coin: 10, wood: 14, art: 'stump' },
+      { id: 'skiff', name: '가라앉은 쪽배', x: 18, y: -84, coin: 18, cloth: 8, blueprint: 'telescope', art: 'wreck' },
+    ],
+    flot: { cap: 9, table: [['wood', 5, 3, 6], ['cloth', 1, 1, 3], ['coin', 2, 2, 4]] },
+  },
+  lake: {
+    id: 'lake', name: '큰 호수', order: 1, wind: { from: -22 * D, speed: 9, swing: 0.5 }, gustK: 1.7, heat: true,
+    shape: { kind: 'lake', ax: 170, ay: 280, ph: 0 },
+    islands: [{ x: 54, y: -118, r: 30, ph: 0.6 }, { x: -62, y: 26, r: 21, ph: 2.2 }, { x: 44, y: 112, r: 13, ph: 4 }],
+    start: 'southGate',
+    ports: [{ id: 'southGate', name: '남쪽 물목', x: -30, y: 262 }, { id: 'pine', name: '솔숲 마을', x: -150, y: -70 }],
+    gates: [{ id: 'toRiver', name: '강 어귀', x: 16, y: -285, to: 'river', entry: 'head', req: { grade: 3, found: 3, draft: 1.05 } }],
+    finds: [
+      { id: 'lighthouse', name: '작은 등대', x: 118, y: -30, coin: 30, cloth: 20, blueprint: 'mast_m', art: 'tower' },
+      { id: 'cove', name: '조용한 만', x: -128, y: 118, coin: 22, wood: 30, art: 'stump' },
+      { id: 'isleStone', name: '섬의 돌탑', x: 0, y: -88, coin: 25, cloth: 15, art: 'stone' },
+      { id: 'barge', name: '버려진 바지선', x: 118, y: 170, coin: 40, wood: 40, art: 'wreck' },
+      { id: 'hut', name: '어부의 빈 오두막', x: -68, y: -212, coin: 30, blueprint: 'barometer', art: 'tower' },
+    ],
+    flot: { cap: 14, table: [['wood', 4, 4, 9], ['cloth', 3, 3, 7], ['coin', 2, 4, 8]] },
+  },
+  river: {
+    id: 'river', name: '강', order: 2, wind: { from: -100 * D, speed: 8, swing: 0.8 }, gustK: 1.5, heat: true, flow: 1.1,
+    shape: { kind: 'river', pts: [[0, 1000], [70, 840], [-50, 660], [-110, 470], [20, 290], [130, 120], [50, -70], [-100, -240], [-70, -440], [60, -620], [20, -800], [-30, -1000]], width: 62 },
+    islands: [{ x: 96, y: 66, r: 11, ph: 1.2 }],
+    start: 'head',
+    ports: [{ id: 'head', name: '강머리 나루', x: 8, y: 960 }, { id: 'mill', name: '물방아 마을', x: -110, y: 400 }, { id: 'ferry', name: '나루터 언덕', x: -60, y: -320 }],
+    gates: [{ id: 'toSea', name: '넓어지는 강', x: -24, y: -972, to: null, req: { grade: 3, found: 4 } }],
+    finds: [
+      { id: 'rapidsStone', name: '여울목 표지', x: 70, y: 760, coin: 30, wood: 30, art: 'stone' },
+      { id: 'mill2', name: '멈춘 물레방아', x: -40, y: 540, coin: 35, cloth: 20, art: 'tower' },
+      { id: 'hermit', name: '강가의 은둔처', x: 120, y: 170, coin: 40, art: 'stump' },
+      { id: 'oldBridge', name: '무너진 옛 다리', x: -90, y: -180, coin: 50, wood: 40, art: 'wreck' },
+      { id: 'cairn', name: '순례자의 돌무지', x: 50, y: -560, coin: 45, art: 'stone' },
+      { id: 'beacon', name: '강 끝 봉화대', x: 12, y: -860, coin: 60, cloth: 30, art: 'tower' },
+    ],
+    shoals: [{ x: 40, y: 760, r: 34, depth: 1.1 }, { x: -70, y: 520, r: 40, depth: 1.05 }, { x: 110, y: 170, r: 42, depth: 1 }, { x: -60, y: -300, r: 34, depth: 1.1 }, { x: 50, y: -640, r: 50, depth: 0.95 }],
+    flot: { cap: 18, table: [['wood', 4, 6, 12], ['cloth', 3, 4, 9], ['coin', 3, 6, 12]] },
+  },
+};
+export const REGION_ORDER = ['pond', 'lake', 'river'];
+
+// 도전과제. check는 logic.js가 S로 판단하고, 보상은 코인과 꾸미기 해금이에요
+export const ACHIEVEMENTS = [
+  { id: 'firstRow', name: '첫 노 젓기', desc: '노로 100m 가기', coin: 5 },
+  { id: 'firstPort', name: '무사 귀항', desc: '처음 입항하기', coin: 5, decor: 'lantern' },
+  { id: 'rowboat', name: '내 나룻배', desc: '나룻배 짓기', coin: 10 },
+  { id: 'pondAll', name: '호숫가 탐험가', desc: '작은 호수 발견지 모두 찾기', coin: 15, decor: 'flowerpot' },
+  { id: 'firstSail', name: '바람을 타다', desc: '돛으로 200m 가기', coin: 10 },
+  { id: 'firstTack', name: '바람을 거슬러', desc: '처음 태킹하기', coin: 10 },
+  { id: 'paint', name: '우리 배', desc: '배 색이나 이름 바꾸기', coin: 5, decor: 'pennant' },
+  { id: 'gustSafe', name: '돌풍을 넘기다', desc: '돌풍을 피해 없이 넘기기', coin: 15 },
+  { id: 'heatSafe', name: '시원한 그늘', desc: '그늘막으로 무더위 하루 넘기기', coin: 15 },
+  { id: 'crew3', name: '한 배를 탄 사람들', desc: '갑판원·견시·조타수 모두 고용해 본 적 있기', coin: 20, decor: 'cat' },
+  { id: 'sloop', name: '진짜 항해', desc: '슬루프 짓기', coin: 20 },
+  { id: 'lakeAll', name: '큰 호수의 지도', desc: '큰 호수 발견지 모두 찾기', coin: 25 },
+  { id: 'species5', name: '관찰 일지', desc: '생물 5종 기록', coin: 10 },
+  { id: 'speciesAll', name: '민물 박물학자', desc: '민물 생물 모두 기록', coin: 50, decor: 'garland' },
+  { id: 'riverEnd', name: '강이 끝나는 곳', desc: '강 끝에 닿기', coin: 50 },
+];
+
+// 칭호(수역 도달)
+export const TITLES = ['뱃사공', '사공', '강 안내인'];
+
+export const DECOR = {
+  lantern: { name: '랜턴', icon: '🏮' },
+  flowerpot: { name: '화분', icon: '🌼' },
+  pennant: { name: '삼각기 줄', icon: '🎏' },
+  cat: { name: '배 고양이', icon: '🐈' },
+  garland: { name: '꽃 장식', icon: '💐' },
+};
+export const PAINTS = {
+  hull: ['#f6f1e6', '#3f6f8f', '#b54a3d', '#2f5d4a', '#e7b64a', '#3a3f4a'],
+  sail: [[250, 243, 226], [232, 214, 170], [226, 120, 96], [120, 170, 196], [238, 202, 96]],
+  flag: ['#d6443a', '#2f7fb8', '#e7b64a', '#3f8a55', '#ffffff'],
+};

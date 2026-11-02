@@ -5,75 +5,152 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sailing Master</title>
 <meta name="theme-color" content="#123a4c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sailing Master">
 <style>
-:root { color-scheme: dark; --ink: #10303e; --panel: rgba(13,42,56,.82); --line: rgba(190,226,232,.22); --text: #f1f6f2; --muted: #a6c4cb; --on: #f2c14e; --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); }
+:root { color-scheme: dark; --ink: #10303e; --panel: rgba(13,42,56,.84); --sheet: #12303f; --card: #1a4052; --line: rgba(190,226,232,.22); --text: #f1f6f2; --muted: #a6c4cb; --on: #f2c14e; --bad: #f08a6e; --ok: #8fdc9a; --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden; color: var(--text); font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; user-select: none; -webkit-user-select: none; overscroll-behavior: none; word-break: keep-all; }
 button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; touch-action: manipulation; }
+button:disabled { opacity: .45; }
+input { font: inherit; user-select: text; -webkit-user-select: text; }
 #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-
-#hud { position: absolute; left: 10px; right: 10px; top: calc(10px + var(--safe-t)); display: flex; gap: 8px; align-items: stretch; pointer-events: none; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-#windCard { display: flex; align-items: center; gap: 9px; padding: 6px 12px 6px 7px; }
-#compass { width: 46px; height: 46px; position: relative; border-radius: 50%; background: rgba(255,255,255,.08); flex: none; }
-#compass span { position: absolute; left: 50%; top: 2px; transform: translateX(-50%); font-size: 9px; color: var(--muted); line-height: 1; }
+
+#hud { position: absolute; left: 10px; right: 10px; top: calc(8px + var(--safe-t)); display: grid; gap: 6px; pointer-events: none; }
+#hudTop { display: flex; gap: 6px; align-items: stretch; }
+#windCard { display: flex; align-items: center; gap: 7px; padding: 4px 10px 4px 5px; }
+#compass { width: 40px; height: 40px; position: relative; border-radius: 50%; background: rgba(255,255,255,.08); flex: none; }
+#compass span { position: absolute; left: 50%; top: 1px; transform: translateX(-50%); font-size: 8px; color: var(--muted); line-height: 1; }
 #arrow { position: absolute; inset: 0; transition: transform .4s linear; }
-.num { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.2; }
-#speedCard { padding: 8px 13px; display: flex; flex-direction: column; justify-content: center; min-width: 86px; }
-#staminaWrap { flex: 1; padding: 8px 12px; display: none; flex-direction: column; justify-content: center; min-width: 0; }
-#staminaWrap.on { display: flex; }
-#staminaBar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); margin-top: 6px; overflow: hidden; }
-#staminaFill { height: 100%; width: 100%; background: #7fd18c; transition: width .3s; }
-#snd { margin-left: auto; width: 46px; pointer-events: auto; font-size: 20px; flex: none; }
+.num { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.2; }
+#speedCard { padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; min-width: 62px; }
+#dateCard { padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; flex: 1; min-width: 0; }
+.iconBtn { width: 38px; pointer-events: auto; font-size: 17px; flex: none; }
+#chips { display: flex; gap: 8px; padding: 5px 10px; align-items: center; justify-content: space-between; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+#chips b { font-weight: 600; }
+#chips .low { color: var(--bad); }
 
-#hint { position: absolute; left: 50%; top: calc(82px + var(--safe-t)); transform: translateX(-50%); max-width: calc(100% - 28px); width: max-content; padding: 7px 14px; border-radius: 14px; background: rgba(9,30,42,.72); font-size: 13.5px; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#hint { position: absolute; left: 50%; top: calc(104px + var(--safe-t)); transform: translateX(-50%); max-width: calc(100% - 28px); width: max-content; padding: 7px 13px; border-radius: 14px; background: rgba(9,30,42,.8); font-size: 13.5px; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; }
 #hint.on { opacity: 1; }
+#hint.warn { background: rgba(120,40,22,.9); }
+#toasts { position: absolute; right: 10px; top: calc(104px + var(--safe-t)); display: grid; gap: 4px; justify-items: end; pointer-events: none; }
+.toast { padding: 3px 9px; border-radius: 10px; background: rgba(9,30,42,.72); font-size: 12.5px; animation: toast 1.7s forwards; }
+@keyframes toast { 0% { opacity: 0; transform: translateY(6px);} 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
 
-#panel { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 12px calc(12px + var(--safe-b)); background: linear-gradient(to top, rgba(10,34,46,.94) 70%, rgba(10,34,46,0)); }
-#controls { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 11px; align-items: stretch; }
+#panel { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px calc(8px + var(--safe-b)); background: linear-gradient(to top, rgba(10,34,46,.95) 72%, rgba(10,34,46,0)); }
+#context { display: flex; justify-content: center; gap: 8px; margin-bottom: 7px; min-height: 0; }
+#context button { padding: 9px 16px; background: var(--on); color: #203038; font-weight: 700; border-radius: 12px; font-size: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.3); }
+#controls { display: grid; grid-template-columns: 1fr auto; gap: 7px; margin-bottom: 7px; align-items: stretch; }
 .seg { display: grid; grid-template-columns: auto 1fr 1fr 1fr; align-items: center; border-radius: 12px; overflow: hidden; }
-.seg .lab { padding: 0 11px; font-size: 12.5px; color: var(--muted); }
-.seg button { height: 44px; font-size: 14px; border-left: 1px solid var(--line); }
+.seg .lab { padding: 0 9px; font-size: 12px; color: var(--muted); }
+.seg button { height: 40px; font-size: 13.5px; border-left: 1px solid var(--line); }
 .seg button.on { background: var(--on); color: #203038; font-weight: 700; }
-#oar { width: 72px; height: 46px; font-size: 14px; border-radius: 12px; }
+#oar { width: 66px; height: 42px; font-size: 13.5px; border-radius: 12px; }
 #oar.on { background: var(--on); color: #203038; font-weight: 700; border-color: var(--on); }
-#rudderWrap { position: relative; height: 56px; touch-action: none; display: flex; align-items: center; border-radius: 14px; }
+#rudderWrap { position: relative; height: 46px; touch-action: none; display: flex; align-items: center; border-radius: 14px; margin-bottom: 7px; }
 #rudderWrap .lab { position: absolute; font-size: 12px; color: var(--muted); top: 50%; transform: translateY(-50%); pointer-events: none; }
 #track { position: absolute; left: 30px; right: 30px; top: 50%; height: 4px; margin-top: -2px; background: rgba(255,255,255,.2); border-radius: 2px; }
 #notch { position: absolute; left: 50%; top: -6px; width: 2px; height: 16px; background: rgba(255,255,255,.45); margin-left: -1px; }
-#knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #f5eedd; color: #3a3224; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: 0 2px 8px rgba(0,0,0,.35); pointer-events: none; }
+#knob { position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; background: #f5eedd; color: #3a3224; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.35); pointer-events: none; }
 #rudderWrap.auto #knob { background: #b9d7d8; }
-#routeBtn { display: none; }
+#tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+#tabs button { height: 38px; border-radius: 11px; font-size: 13px; background: rgba(255,255,255,.08); }
+
+#sheet { position: absolute; left: 0; right: 0; bottom: 0; top: calc(92px + var(--safe-t)); background: var(--sheet); border-radius: 18px 18px 0 0; display: none; flex-direction: column; box-shadow: 0 -6px 24px rgba(0,0,0,.4); }
+#sheet.on { display: flex; }
+#sheetHead { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; }
+#sheetHead h2 { margin: 0; font-size: 18px; flex: 1; min-width: 0; }
+#sheetClose { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.1); font-size: 16px; }
+#sheetTabs { display: flex; gap: 6px; padding: 0 14px 8px; overflow-x: auto; flex: none; }
+#sheetTabs button { padding: 7px 12px; border-radius: 10px; background: rgba(255,255,255,.08); font-size: 13.5px; white-space: nowrap; }
+#sheetTabs button.on { background: var(--on); color: #203038; font-weight: 700; }
+#sheetBody { flex: 1; overflow-y: auto; padding: 2px 14px 16px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+#sheetFoot { padding: 10px 14px calc(12px + var(--safe-b)); border-top: 1px solid var(--line); display: none; gap: 8px; }
+#sheetFoot.on { display: flex; }
+.big { flex: 1; padding: 13px; border-radius: 12px; background: var(--on); color: #203038; font-weight: 700; font-size: 15.5px; }
+.ghost { padding: 13px 14px; border-radius: 12px; background: rgba(255,255,255,.1); font-size: 14px; }
+.row { background: var(--card); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; display: flex; gap: 10px; align-items: center; }
+.row .grow { flex: 1; min-width: 0; }
+.row .ttl { font-weight: 600; font-size: 14.5px; }
+.row .txt { color: var(--muted); font-size: 12.5px; line-height: 1.4; margin-top: 2px; }
+.row .act { padding: 8px 12px; border-radius: 10px; background: var(--on); color: #203038; font-weight: 700; font-size: 13.5px; white-space: nowrap; flex: none; }
+.row .act.off { background: rgba(255,255,255,.14); color: var(--muted); font-weight: 500; }
+.note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 10px; }
+.check { font-size: 13.5px; line-height: 1.7; }
+.check .ok { color: var(--ok); } .check .no { color: var(--bad); } .check .warn { color: var(--on); }
+.h3 { font-size: 13px; color: var(--muted); margin: 12px 0 6px; font-weight: 600; }
+
+#chart { width: 100%; display: block; border-radius: 12px; touch-action: none; background: #0d2a38; }
+.days { display: flex; gap: 5px; margin: 8px 0; }
+.days div { flex: 1; background: var(--card); border-radius: 9px; padding: 5px 2px; text-align: center; font-size: 11.5px; line-height: 1.35; }
+
+#plan { display: block; width: 100%; touch-action: none; border-radius: 12px; background: #0f3a4e; }
+.gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; margin: 10px 0; font-size: 12.5px; }
+.gauges b { float: right; font-variant-numeric: tabular-nums; }
+.gauges .bad b { color: var(--bad); }
+.palette { display: flex; gap: 7px; overflow-x: auto; padding: 4px 0 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+.mod { flex: none; width: 104px; background: var(--card); border-radius: 11px; padding: 8px; text-align: left; border: 2px solid transparent; }
+.mod.on { border-color: var(--on); }
+.mod.lock { opacity: .45; }
+.mod .ic { font-size: 18px; }
+.mod .nm { font-size: 12.5px; font-weight: 600; margin-top: 1px; }
+.mod .ct { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.sw { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); }
+.sw.on { border: 3px solid var(--on); }
+#nameInput { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.2); color: var(--text); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.sp { background: var(--card); border-radius: 11px; padding: 6px; text-align: center; font-size: 12px; }
+.sp canvas { width: 100%; height: 58px; display: block; }
+.sp.unk { color: var(--muted); }
+
+#overlay { position: absolute; inset: 0; background: rgba(6,24,34,.72); display: none; align-items: center; justify-content: center; padding: 22px; }
+#overlay.on { display: flex; }
+#ovBox { background: var(--sheet); border-radius: 18px; padding: 20px; max-width: 360px; width: 100%; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+#ovBox h3 { margin: 0 0 8px; font-size: 20px; }
+#ovBox p { margin: 0 0 8px; color: #d3e4e6; font-size: 14px; line-height: 1.55; }
+#ovBox .big { width: 100%; margin-top: 10px; }
 
 #title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: linear-gradient(to bottom, rgba(10,44,62,.78), rgba(10,44,62,.34) 45%, rgba(10,44,62,.78)); }
 #title h1 { margin: 0; font-size: 42px; letter-spacing: .01em; font-weight: 800; text-shadow: 0 3px 16px rgba(0,0,0,.35); }
 #title p { margin: 10px 0 0; color: #d8ebec; font-size: 15px; }
-#title .go { margin-top: 34px; font-size: 16px; font-weight: 700; color: var(--on); animation: blink 1.8s infinite; }
+#title .go { margin-top: 30px; font-size: 16px; font-weight: 700; color: var(--on); animation: blink 1.8s infinite; }
 #title .tag { position: absolute; bottom: calc(26px + var(--safe-b)); font-size: 12px; color: var(--muted); }
 @keyframes blink { 50% { opacity: .35; } }
 body.intro #hud, body.intro #panel { visibility: hidden; }
-#fps { position: absolute; right: 12px; top: calc(74px + var(--safe-t)); font: 11px ui-monospace, monospace; background: rgba(0,0,0,.55); padding: 3px 6px; border-radius: 6px; display: none; }
+#fps { position: absolute; right: 12px; top: calc(100px + var(--safe-t)); font: 11px ui-monospace, monospace; background: rgba(0,0,0,.55); padding: 3px 6px; border-radius: 6px; display: none; }
 </style>
 </head>
 <body class="intro">
 <canvas id="view"></canvas>
 
 <div id="hud">
-  <div class="card" id="windCard">
-    <div id="compass"><span>북</span>
-      <svg id="arrow" viewBox="0 0 46 46"><path d="M23 9 L30 30 L23 25 L16 30 Z" fill="#9fd9ea"/></svg>
+  <div id="hudTop">
+    <div class="card" id="windCard">
+      <div id="compass"><span>북</span>
+        <svg id="arrow" viewBox="0 0 46 46"><path d="M23 9 L30 30 L23 25 L16 30 Z" fill="#9fd9ea"/></svg>
+      </div>
+      <div><div class="num" id="windNum">0</div><div class="sub" id="windDir">바람</div></div>
     </div>
-    <div><div class="num" id="windNum">0</div><div class="sub" id="windDir">바람</div></div>
+    <div class="card" id="speedCard"><div class="num" id="spdNum">0.0</div><div class="sub">노트</div></div>
+    <div class="card" id="dateCard"><div class="num" id="dateNum" style="font-size:13.5px"></div><div class="sub" id="regionName"></div></div>
+    <button class="card iconBtn" id="mus" aria-label="음악">🎵</button>
+    <button class="card iconBtn" id="snd" aria-label="소리">🔊</button>
   </div>
-  <div class="card" id="speedCard"><div class="num" id="spdNum">0.0</div><div class="sub">노트</div></div>
-  <div class="card" id="staminaWrap"><div class="sub" style="margin:0">체력</div><div id="staminaBar"><div id="staminaFill"></div></div></div>
-  <button class="card" id="snd" aria-label="소리">🔊</button>
+  <div class="card" id="chips"></div>
 </div>
 <div id="hint"></div>
+<div id="toasts"></div>
 <div id="fps"></div>
 
 <div id="panel">
+  <div id="context"></div>
   <div id="controls">
     <div class="seg card" id="sailSeg">
       <span class="lab">돛</span>
@@ -86,88 +163,125 @@ body.intro #hud, body.intro #panel { visibility: hidden; }
     <div id="track"><div id="notch"></div></div>
     <div id="knob">☸</div>
   </div>
+  <div id="tabs">
+    <button data-t="chart">🗺 해도</button><button data-t="ship">⛵ 배</button><button data-t="crew">🧑‍✈️ 선원</button><button data-t="log">📖 기록</button>
+  </div>
 </div>
+
+<div id="sheet">
+  <div id="sheetHead"><h2 id="sheetTitle"></h2><button id="sheetClose" aria-label="닫기">✕</button></div>
+  <div id="sheetTabs"></div>
+  <div id="sheetBody"></div>
+  <div id="sheetFoot"></div>
+</div>
+
+<div id="overlay"><div id="ovBox"></div></div>
 
 <div id="title">
   <h1>Sailing Master</h1>
   <p>작은 호수에서 시작하는 항해</p>
-  <div class="go">화면을 눌러 출항</div>
-  <div class="tag">M0 손맛 시제품 · Danny Soft</div>
+  <div class="go" id="titleGo">화면을 눌러 시작</div>
+  <div class="tag">M1 담수 · Danny Soft</div>
 </div>
 
 <script type="module">
 import * as G from './logic.js';
 import * as A from './art.js';
 import * as SA from './art-ship.js';
+import * as SH from './ship.js';
+import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound } from './sound.js';
-import { VIEW, BOAT, NO_GO, SAIL_LEVELS } from './data.js';
+import { createMusic } from './music.js';
+import { worldOf } from './world.js';
+import { VIEW, NO_GO, HULLS, HULL_ORDER, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view'), ctx = view.getContext('2d', { alpha: false });
 const query = new URLSearchParams(location.search);
-const S = G.newGame(Number(query.get('seed')) || 1);
-const sc = A.createScene();
-const bakeT0 = performance.now();
-const sprite = SA.bakeShip();
-const bakeMs = performance.now() - bakeT0;
+const SAVE_KEY = 'sailing-master-v1', AUDIO_KEY = 'sailing-master-audio';
+
+// ── 저장 ──
+function loadSave() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch { return null; }
+  if (!raw) return null;
+  const s = G.deserialize(raw);
+  if (!s) { try { localStorage.setItem(SAVE_KEY + '.bad', raw); } catch { /* 무시 */ } }
+  return s;
+}
+function save() { if (!started) return; try { localStorage.setItem(SAVE_KEY, G.serialize(S)); } catch { /* 저장 불가 환경에서도 게임은 계속 */ } }
+
+const saved = loadSave();
+let S = saved || G.newGame(Number(query.get('seed')) || (Date.now() % 100000));
+let sc = A.createScene(S.region), creatures = createCreatures(worldOf(S.region)), sprite = SA.bakeShip(S.ship), bakedRev = S.rev;
 const wake = new A.Wake();
-const snd = createSound();
+const snd = createSound(), music = createMusic();
+music.setRegion(S.region);
+try { const a = JSON.parse(localStorage.getItem(AUDIO_KEY) || '{}'); if (a.snd === false) { snd.setOn(false); $('snd').textContent = '🔇'; } if (a.mus === false) { music.setOn(false); $('mus').style.opacity = 0.45; } } catch { /* 무시 */ }
+const saveAudio = () => { try { localStorage.setItem(AUDIO_KEY, JSON.stringify({ snd: snd.on, mus: music.on })); } catch { /* 무시 */ } };
 
 let W = 0, H = 0, DPR = 1;
 const cam = { x: S.boat.x, y: S.boat.y, zoom: Number(query.get('zoom')) || VIEW.zoomDefault, cy: 0 };
-const pan = { x: 0, y: 0, idle: 99 }; // 끌어서 둘러본 만큼
+const pan = { x: 0, y: 0, idle: 99 };
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   DPR = Math.min(2, window.devicePixelRatio || 1);
   view.width = Math.round(W * DPR); view.height = Math.round(H * DPR);
-  sc.patterns = null;
-  cam.cy = H * 0.5;
+  sc.patterns = null; sc.bakedAt = null; sc.buf = null;
+  cam.cy = H * 0.46;
 }
 window.addEventListener('resize', resize);
 resize();
-
 const toWorld = (sx, sy) => [cam.x + (sx - W / 2) / cam.zoom, cam.y + (sy - cam.cy) / (cam.zoom * VIEW.tiltY)];
+const fmt = (o) => Object.entries(o).filter(([, v]) => v).map(([k, v]) => `${RES[k].icon}${v}`).join(' ') || '없음';
 
+// ── 시작 ──
 let started = false, paused = false;
+$('titleGo').textContent = saved ? '화면을 눌러 이어 하기' : '화면을 눌러 시작';
 $('title').addEventListener('pointerdown', () => {
   started = true; $('title').style.display = 'none'; document.body.classList.remove('intro');
-  snd.unlock();
-  G.setSail(S, 2); syncButtons(); snd.play('sail');
-  showHint('물을 탭하거나 아래 키로 몰아요', 5);
+  snd.unlock(); music.start(snd.ac);
+  if (S.disaster) showDisaster(S.disaster.cause);
+  else if (S.docked) { openPort(); if (!saved) overlay('<h3>🌅 갈대 나루</h3><p>뗏목과 노 한 쌍으로 시작해요.</p><p>물에 뜬 목재와 천을 건져 항구로 가져오면 더 큰 배를 지을 수 있어요.</p>', '알겠어요', null); } else showHint('물을 탭하거나 아래 키로 몰아요', 4);
 });
 
-// ── 항구 없는 시제품이라 저장은 하지 않아요 ──
+// ── 안내 ──
 let hintT = 0;
-function showHint(text, sec = 3) { $('hint').textContent = text; $('hint').classList.add('on'); hintT = sec; }
+function showHint(text, sec = 3, warn = false) { const h = $('hint'); h.textContent = text; h.classList.add('on'); h.classList.toggle('warn', warn); hintT = sec; }
+function toast(text) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; $('toasts').append(t); setTimeout(() => t.remove(), 1700); }
+function overlay(html, btn, fn) {
+  const box = $('ovBox'); box.innerHTML = html;
+  const b = document.createElement('button'); b.className = 'big'; b.textContent = btn; box.append(b);
+  b.addEventListener('click', () => { $('overlay').classList.remove('on'); fn && fn(); });
+  $('overlay').classList.add('on');
+}
+const overlayOpen = () => $('overlay').classList.contains('on');
 
-// 돛·노·소리 버튼
+// ── 조종 버튼 ──
 function syncButtons() {
-  for (const b of $('sailSeg').querySelectorAll('button')) b.classList.toggle('on', Number(b.dataset.lv) === S.boat.sailLevel);
-  $('oar').classList.toggle('on', S.boat.row);
-  $('staminaWrap').classList.toggle('on', S.boat.row || S.boat.stamina < 0.99);
+  const st = G.stats(S), lv = S.cap.then && S.cap.then.type === 'sail' ? S.cap.then.level : S.boat.sailLevel;
+  for (const b of $('sailSeg').querySelectorAll('button')) { b.classList.toggle('on', Number(b.dataset.lv) === lv); b.disabled = !st.sailArea; }
+  $('oar').classList.toggle('on', S.boat.row || !!(S.cap.then && S.cap.then.type === 'row'));
+  $('oar').disabled = !st.oars;
 }
 $('sailSeg').addEventListener('pointerdown', (e) => {
-  const b = e.target.closest('button'); if (!b) return;
-  G.setSail(S, Number(b.dataset.lv)); snd.play(S.boat.sailLevel ? 'sail' : 'flap'); syncButtons();
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (G.setSail(S, Number(b.dataset.lv))) { snd.play(Number(b.dataset.lv) ? 'sail' : 'flap'); syncButtons(); }
 });
-$('oar').addEventListener('pointerdown', () => { G.setRow(S, !S.boat.row); syncButtons(); });
-$('snd').addEventListener('pointerdown', () => { snd.unlock(); snd.setOn(!snd.on); $('snd').textContent = snd.on ? '🔊' : '🔇'; });
-syncButtons();
+$('oar').addEventListener('pointerdown', () => { if ($('oar').disabled) return; G.setRow(S, !S.boat.row); syncButtons(); });
+$('snd').addEventListener('pointerdown', () => { snd.unlock(); snd.setOn(!snd.on); $('snd').textContent = snd.on ? '🔊' : '🔇'; saveAudio(); });
+$('mus').addEventListener('pointerdown', () => { snd.unlock(); music.start(snd.ac); music.setOn(!music.on); $('mus').style.opacity = music.on ? 1 : 0.45; saveAudio(); });
 
-// 키 슬라이더: 끄는 동안만 돌고, 놓으면 가운데로 돌아와요
+// 키 슬라이더: 끄는 동안만 돌고, 놓으면 가운데로
 const wrap = $('rudderWrap'), knob = $('knob');
 let rudderPtr = null;
-function rudderFrom(e) {
-  const r = wrap.getBoundingClientRect(), half = r.width / 2 - 30;
-  return Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / half));
-}
+function rudderFrom(e) { const r = wrap.getBoundingClientRect(), half = r.width / 2 - 30; return Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / half)); }
 wrap.addEventListener('pointerdown', (e) => { rudderPtr = e.pointerId; wrap.setPointerCapture(e.pointerId); G.setRudder(S, rudderFrom(e)); });
 wrap.addEventListener('pointermove', (e) => { if (e.pointerId === rudderPtr) G.setRudder(S, rudderFrom(e)); });
 const rudderEnd = (e) => { if (e.pointerId === rudderPtr) { rudderPtr = null; G.setRudder(S, 0); } };
-wrap.addEventListener('pointerup', rudderEnd);
-wrap.addEventListener('pointercancel', rudderEnd);
+wrap.addEventListener('pointerup', rudderEnd); wrap.addEventListener('pointercancel', rudderEnd);
 
-// 물 화면: 탭 = 목적지, 끌기 = 둘러보기, 두 손가락 = 확대
+// 물 화면: 탭 = 기록·항구·목적지, 끌기 = 둘러보기, 두 손가락 = 확대
 const ptrs = new Map();
 let tapStart = null, pinch = null, zoomingUntil = 0;
 function zoomAbout(zNew, sx, sy) {
@@ -179,69 +293,469 @@ function zoomAbout(zNew, sx, sy) {
   pan.idle = 0;
   zoomingUntil = performance.now() + 220;
 }
+function tapWorld(sx, sy) {
+  if (S.docked) return;
+  const c = creatures.at(sx, sy, cam, W);
+  if (c) {
+    const def = SPECIES[c.sp], got = G.recordSpecies(S, c.sp);
+    snd.play('record');
+    if (got) drainEvents(); else toast(`${def.name}`);
+    return;
+  }
+  const [x, y] = toWorld(sx, sy), w = worldOf(S.region), R = 24 / cam.zoom + 8;
+  const port = w.ports.find((p) => Math.hypot(p.x - x, p.y - y) < R);
+  if (port) { if (G.setDest(S, port.x, port.y, { type: 'port', id: port.id })) { snd.play('tap'); showHint(`${port.name}(으)로 가요`, 2); } return; }
+  const gate = w.gates.find((g) => Math.hypot(g.x - x, g.y - y) < R);
+  if (gate) { if (G.setDest(S, gate.x, gate.y, { type: 'gate', id: gate.id })) { snd.play('tap'); showHint(`${gate.name}(으)로 가요`, 2); } return; }
+  const fl = G.flotsamOf(S).find((f) => Math.hypot(f.x - x, f.y - y) < 18 / cam.zoom + 3);
+  if (G.setDest(S, fl ? fl.x : x, fl ? fl.y : y, fl ? { type: 'pick' } : null)) { snd.play('tap'); syncButtons(); }
+}
 view.addEventListener('pointerdown', (e) => {
   view.setPointerCapture(e.pointerId);
   ptrs.set(e.pointerId, [e.clientX, e.clientY]);
-  if (ptrs.size === 1) tapStart = { x: e.clientX, y: e.clientY, moved: false, t: performance.now() };
-  if (ptrs.size === 2) {
-    const [a, b] = [...ptrs.values()];
-    pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: cam.zoom };
-    tapStart = null;
-  }
+  if (ptrs.size === 1) tapStart = { x: e.clientX, y: e.clientY, moved: false };
+  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: cam.zoom }; tapStart = null; }
 });
 view.addEventListener('pointermove', (e) => {
   if (!ptrs.has(e.pointerId)) return;
   const prev = ptrs.get(e.pointerId);
   ptrs.set(e.pointerId, [e.clientX, e.clientY]);
-  if (ptrs.size === 2 && pinch) {
-    const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-    zoomAbout(pinch.z * d / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
-    return;
-  }
+  if (ptrs.size === 2 && pinch) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); zoomAbout(pinch.z * d / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); return; }
   if (tapStart && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) > 10) tapStart.moved = true;
-  if (tapStart && tapStart.moved) {
-    pan.x -= (e.clientX - prev[0]) / cam.zoom;
-    pan.y -= (e.clientY - prev[1]) / (cam.zoom * VIEW.tiltY);
-    pan.idle = 0;
-  }
+  if (tapStart && tapStart.moved) { pan.x -= (e.clientX - prev[0]) / cam.zoom; pan.y -= (e.clientY - prev[1]) / (cam.zoom * VIEW.tiltY); pan.idle = 0; }
 });
 const pointerEnd = (e) => {
   if (!ptrs.has(e.pointerId)) return;
   ptrs.delete(e.pointerId);
   if (ptrs.size < 2) pinch = null;
-  if (tapStart && !tapStart.moved && ptrs.size === 0) {
-    const [x, y] = toWorld(e.clientX, e.clientY);
-    if (G.setDest(S, x, y)) {
-      snd.play('tap'); syncButtons();
-      if (!S.boat.row) showHint('바람에 맞춰 알아서 가요', 2.5);
-    }
-  }
+  if (tapStart && !tapStart.moved && ptrs.size === 0) tapWorld(e.clientX, e.clientY);
   if (ptrs.size === 0) tapStart = null;
 };
-view.addEventListener('pointerup', pointerEnd);
-view.addEventListener('pointercancel', pointerEnd);
-view.addEventListener('wheel', (e) => { e.preventDefault(); if (e.ctrlKey) zoomAbout(cam.zoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY); else zoomAbout(cam.zoom * Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY); }, { passive: false });
+view.addEventListener('pointerup', pointerEnd); view.addEventListener('pointercancel', pointerEnd);
+view.addEventListener('wheel', (e) => { e.preventDefault(); zoomAbout(cam.zoom * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX, e.clientY); }, { passive: false });
 for (const evt of ['gesturestart', 'gesturechange']) document.addEventListener(evt, (e) => e.preventDefault(), { passive: false });
 
-// 이벤트 → 소리·안내
+// ── 이벤트 → 소리·안내 ──
+function changeRegionArt() {
+  sc = A.createScene(S.region); creatures = createCreatures(worldOf(S.region)); resize();
+  wake.pts.length = 0; wake.rings.length = 0;
+  music.setRegion(S.region);
+  cam.x = S.boat.x; cam.y = S.boat.y; pan.x = pan.y = 0;
+}
 function drainEvents() {
-  for (const ev of S.events) {
-    if (ev.type === 'stroke') {
-      snd.play('stroke');
-      const b = S.boat, ch = Math.cos(b.h), sh = Math.sin(b.h);
-      for (const side of [-1, 1]) { const [lx, ly] = SA.oarBladeLocal(b.rowPhase, side); wake.ring(b.x + lx * ch - ly * sh, b.y + lx * sh + ly * ch, 1); }
-    } else if (ev.type === 'tack') {
-      showHint('지그재그로 맞바람을 거슬러 가요', 2.4);
-    } else if (ev.type === 'swing') snd.play('swing');
-    else if (ev.type === 'ground') { snd.play('ground'); showHint('물가에 닿았어요. 키를 돌려요', 2.6); }
-    else if (ev.type === 'arrive') { snd.play('arrive'); syncButtons(); showHint('도착했어요', 2); }
-  }
+  const list = S.events.slice();
   S.events.length = 0;
+  for (const ev of list) {
+    switch (ev.type) {
+      case 'stroke': {
+        snd.play('stroke');
+        const b = S.boat, ch = Math.cos(b.h), sh = Math.sin(b.h);
+        for (const side of [-1, 1]) { const [lx, ly] = SA.oarBladeLocal(sprite, b.rowPhase, side); wake.ring(b.x + lx * ch - ly * sh, b.y + lx * sh + ly * ch, 1); }
+        break;
+      }
+      case 'tack': showHint('지그재그로 맞바람을 거슬러 가요', 2.4); break;
+      case 'swing': snd.play('swing'); break;
+      case 'ground': snd.play('ground'); showHint('물가에 닿았어요. 선체가 조금 상해요', 2.6, true); break;
+      case 'pick': snd.play('pick'); wake.ring(ev.x, ev.y, 1); toast(`${RES[ev.k].icon} +${ev.n}`); break;
+      case 'holdFull': showHint('화물칸이 찼어요. 항구로 돌아가요', 3); break;
+      case 'found': snd.play('found'); overlay(`<h3>🗺 ${ev.name}</h3><p>새로운 곳을 찾았어요!</p><p>${fmt({ wood: ev.wood, cloth: ev.cloth, coin: ev.coin })}${ev.blueprint ? `<br>📜 설계도: ${MODULES[ev.blueprint].name}` : ''}</p>`, '계속 항해', null); break;
+      case 'species': toast(`📖 새 기록 ${SPECIES[ev.id].name} 🪙+${ev.reward}`); showHint(`새 기록: ${SPECIES[ev.id].name}`, 2); break;
+      case 'ach': { snd.play('ach'); const a = ACHIEVEMENTS.find((q) => q.id === ev.id); toast(`🏆 ${a.name} 🪙+${a.coin}`); showHint(`🏆 ${a.name}${a.decor ? ` · ${DECOR[a.decor].name} 꾸미기 열림` : ''}`, 3); break; }
+      case 'gustSoon': snd.play('warn'); showHint('돌풍이 다가와요. 돛을 줄여요', 4, true); break;
+      case 'gustOn': snd.play('gust'); showHint('돌풍!', 2, true); break;
+      case 'gustOff': showHint(ev.hurt > 0.005 ? `돌풍이 지나갔어요. 선체 -${Math.round(ev.hurt * 100)}%` : '돌풍을 무사히 넘겼어요', 3); break;
+      case 'heatOn': showHint(ev.shade ? '무더위지만 그늘막이 있어요' : '무더위예요. 기력이 줄어요. 그늘막이 필요해요', 4, !ev.shade); break;
+      case 'droughtOn': snd.play('warn'); showHint('가뭄이에요. 여울이 얕아져요', 4, true); break;
+      case 'shoal': snd.play('ground'); showHint('여울에 걸렸어요. 짐을 덜면 뜨기 쉬워요', 3.5, true); break;
+      case 'shoalRisk': showHint('여울을 피할 길이 없어 그대로 가요', 3, true); break;
+      case 'foodLow': snd.play('warn'); showHint('식량이 곧 떨어져요', 3, true); break;
+      case 'heel': snd.play('creak'); showHint('너무 기울어요! 돛을 줄여요', 2.5, true); break;
+      case 'arrive': snd.play('arrive'); syncButtons(); break;
+      case 'atGate': openGate(worldOf(S.region).gates.find((g) => g.id === ev.id)); break;
+      case 'docked': snd.play('dock'); openPort(ev); break;
+      case 'crewLeft': toast(`${ev.name}이(가) 임금을 못 받아 떠났어요`); break;
+      case 'wages': toast(`임금 🪙-${ev.pay}`); break;
+      case 'built': snd.play('build'); break;
+      case 'disaster': snd.play('disaster'); showDisaster(ev.cause); break;
+      case 'region': changeRegionArt(); openRegion(ev); break;
+      case 'ended': showEnding(); break;
+      default: break;
+    }
+  }
+}
+function showDisaster(cause) {
+  closeSheet();
+  const why = cause === 'sink' ? '선체가 버티지 못하고 가라앉기 시작했어요.' : '기력이 다해 선장이 쓰러졌어요.';
+  overlay(`<h3>🆘 구조 신호</h3><p>${why}</p><p>지나가던 배가 신호를 보고 가까운 나루로 끌어다 줘요.</p>`, '구조받기', () => {
+    const r = G.rescue(S); bakeIfNeeded(); changeRegionArt();
+    const lost = fmt(r.lost);
+    overlay(`<h3>구조되었어요</h3><p>잃은 화물: ${lost}</p>${r.broke.length ? `<p>부서진 모듈: ${r.broke.map((m) => MODULES[m].name).join(', ')}</p>` : ''}${r.left ? `<p>${r.left}이(가) 배를 떠났어요.</p>` : ''}<p>구조 비용 🪙${r.fee} · 선체 35%</p>`, '항구로', () => openPort());
+  });
+}
+function showEnding() {
+  closeSheet();
+  overlay(`<h3>🏞 강이 끝나는 곳</h3><p>${S.ship.name}이(가) 작은 호수에서 강 끝까지 왔어요.</p><p>저 너머 큰 강과 바다는 다음 항해에서 이어져요.</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 강에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
 }
 
+// ── 시트 ──
+let sheet = null;
+function openSheet(title, tabs, active, foot) {
+  sheet = { title, tabs, active, foot, port: sheet?.port };
+  $('sheetTitle').textContent = title;
+  const bar = $('sheetTabs'); bar.innerHTML = '';
+  bar.style.display = tabs.length > 1 ? 'flex' : 'none';
+  for (const t of tabs) {
+    const b = document.createElement('button'); b.textContent = t.name; b.classList.toggle('on', t.id === active);
+    b.addEventListener('click', () => { sheet.active = t.id; openSheet(title, tabs, t.id, foot); });
+    bar.append(b);
+  }
+  $('sheet').classList.add('on');
+  renderSheet();
+}
+function renderSheet() {
+  if (!sheet) return;
+  const t = sheet.tabs.find((q) => q.id === sheet.active), body = $('sheetBody'), top = body.scrollTop;
+  body.innerHTML = '';
+  t.render(body);
+  body.scrollTop = top;
+  const foot = $('sheetFoot'); foot.innerHTML = '';
+  const f = sheet.foot && sheet.foot();
+  foot.classList.toggle('on', !!f);
+  if (f) foot.append(...f);
+  $('sheetClose').style.visibility = sheet.port ? 'hidden' : 'visible';
+  syncTop();
+}
+function closeSheet() { sheet = null; $('sheet').classList.remove('on'); }
+$('sheetClose').addEventListener('click', () => { if (sheet?.port) return; closeSheet(); });
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+function row(ttl, txt, actText, fn, off = false, leftIcon = '') {
+  const r = el('div', 'row', `${leftIcon ? `<div style="font-size:22px">${leftIcon}</div>` : ''}<div class="grow"><div class="ttl">${ttl}</div><div class="txt">${txt}</div></div>`);
+  if (actText) { const b = el('button', `act${off ? ' off' : ''}`, actText); b.addEventListener('click', fn); r.append(b); }
+  return r;
+}
+const costText = (c) => Object.entries(c).map(([k, v]) => `${RES[k].icon}${v}`).join(' ') || '무료';
+const canAfford = (c) => Object.entries(c).every(([k, v]) => S.res[k] >= v);
+
+// ── 항구 ──
+function portTabs() {
+  return [
+    { id: 'port', name: '⚓ 항구', render: renderPort },
+    { id: 'design', name: '🛠 설계', render: renderDesign },
+    { id: 'paint', name: '🎨 꾸미기', render: renderPaint },
+    { id: 'crew', name: '🧑‍✈️ 선원', render: renderCrew },
+    { id: 'chart', name: '🗺 해도', render: renderChart },
+    { id: 'log', name: '📖 기록', render: renderLog },
+  ];
+}
+function portFoot() {
+  const b = el('button', 'big', '⛵ 출항');
+  b.addEventListener('click', () => {
+    const r = G.undock(S);
+    if (!r.ok) { showHint(r.why, 3, true); return; }
+    sheet.port = false; closeSheet(); syncButtons(); snd.play('sail');
+    if (chartPick) { const p = chartPick; chartPick = null; G.setDest(S, p.x, p.y, p.target); }
+    showHint('물을 탭하면 그곳으로 가요', 3);
+  });
+  return [b];
+}
+function openPort(ev) {
+  const port = worldOf(S.region).ports.find((p) => p.id === S.docked);
+  sheet = { port: true };
+  openSheet(port ? port.name : '항구', portTabs(), 'port', portFoot);
+  if (ev && (ev.got?.wood || ev.got?.cloth || ev.got?.coin)) toast(`창고로: ${fmt(ev.got)}`);
+  if (ev?.gift) toast('마을에서 하루치 식량을 나눠 줬어요');
+}
+function renderPort(body) {
+  const st = G.stats(S), c = G.departureCheck(S), cost = G.repairCost(S), room = Math.floor(st.foodCap - S.food);
+  body.append(el('p', 'note', `창고 ${fmt(S.res)}`));
+  const buy = Math.min(room, S.res.coin);
+  body.append(row('🍖 식량', `${S.food.toFixed(1)} / ${st.foodCap} · 하루 ${1 + S.crew.length}개씩 먹어요`, buy > 0 ? `채우기 🪙${buy}` : '가득', () => { G.buyFood(S, buy); renderSheet(); }, buy <= 0));
+  body.append(row('🛠 선체', `${Math.round(S.hull * 100)}%`, cost > 0 ? `수리 🪙${cost}` : '멀쩡', () => { if (G.repair(S)) { snd.play('place'); renderSheet(); } else showHint('코인이 모자라요', 2); }, cost <= 0 || S.res.coin < cost));
+  body.append(row('🪵 목재 팔기', `2개에 🪙1 · ${S.res.wood}개`, '10개', () => { G.sell(S, 'wood', 10); renderSheet(); }, S.res.wood < 2));
+  body.append(row('🧵 천 팔기', `1개에 🪙1 · ${S.res.cloth}개`, '5개', () => { G.sell(S, 'cloth', 5); renderSheet(); }, S.res.cloth < 1));
+  body.append(row('🌙 하루 묵기', '임금을 내고 날짜를 넘겨요. 날씨를 기다릴 때 써요', '기다리기', () => { G.waitDay(S); drainEvents(); renderSheet(); }));
+  const fc = G.forecast(S), days = el('div', 'days');
+  fc.forEach((d, i) => days.append(el('div', '', `${i === 0 ? '오늘' : `+${i}일`}<br>${weatherIcon(d)}`)));
+  body.append(el('div', 'h3', '예보'), days);
+  const chk = el('div', 'check');
+  if (!c.warns.length && !c.blockers.length) chk.innerHTML = '<span class="ok">✓ 출항 준비 완료</span>';
+  chk.innerHTML += c.blockers.map((b) => `<div class="no">✗ ${b}</div>`).join('') + c.warns.map((w) => `<div class="warn">⚠ ${w}</div>`).join('');
+  body.append(el('div', 'h3', '출항 점검'), chk);
+}
+const weatherIcon = (d) => ((d.gust !== null ? '💨' : '') + (d.heat && REGIONS[S.region].heat ? '🥵' : '') + (d.drought && S.region === 'river' ? '🏜' : '')) || '☀️';
+
+// ── 설계 ──
+const design = { sel: null, rot: 0, armed: null };
+function renderDesign(body) {
+  const st = G.stats(S), Hl = st.hull, docked = !!S.docked;
+  for (const id of HULL_ORDER) {
+    const h = HULLS[id];
+    if (h.grade <= Hl.grade) continue;
+    const ok = canAfford(h.price) && (id !== 'sloop' || S.visited.lake);
+    body.append(row(`${h.name} 짓기`, `${costText(h.price)} · ${id === 'sloop' && !S.visited.lake ? '큰 호수 항구에서 지어요' : `칸 ${SH.validCells(id).length} · 정원 ${h.crew} · 모듈은 값 절반 돌려받아요`}`, docked ? '짓기' : '', () => {
+      const r = G.buildHull(S, id);
+      if (!r.ok) { showHint(r.why, 2.5); return; }
+      design.armed = null; bakeIfNeeded(); drainEvents(); renderSheet();
+    }, !ok, '🛠'));
+    break;
+  }
+  const cssW = Math.min(window.innerWidth, 560) - 28, scale = Math.min(cssW / (Hl.beam + 2.4), 300 / (Hl.len + 0.8));
+  const cv = el('canvas'); cv.id = 'plan';
+  const cssH = Math.round((Hl.len + 0.8) * scale), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = cssW * dpr; cv.height = cssH * dpr; cv.style.height = `${cssH}px`;
+  body.append(cv);
+  const g = cv.getContext('2d'), ox = cssW / 2 * dpr, oy = cssH / 2 * dpr, px = scale * dpr;
+  const paintCol = PAINTS.hull[S.ship.paint.hull] || PAINTS.hull[0];
+  const draw = () => {
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
+    SA.drawHullTop(g, S.ship.hull, px, ox, oy, paintCol);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    // 칸: 배 x → 화면 위, 배 y → 화면 오른쪽
+    const cellPx = Hl.cell * px;
+    for (const [c, r] of SH.validCells(S.ship.hull)) {
+      const x = ox + SH.cellY(Hl, c) * px - cellPx / 2, y = oy - SH.cellX(Hl, r) * px - cellPx / 2;
+      g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1; g.strokeRect(x + 1, y + 1, cellPx - 2, cellPx - 2);
+    }
+    for (const m of S.ship.mods) {
+      SA.drawModuleTop(g, m, S.ship.hull, px, ox, oy);
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      const [mx, my] = SH.modulePos(S.ship.hull, m), M = MODULES[m.id];
+      if (design.armed === m) { const [w, h] = SH.sizeOf(m); g.strokeStyle = '#f08a6e'; g.lineWidth = 3; g.strokeRect(ox + my * px - w * cellPx / 2, oy - mx * px - h * cellPx / 2, w * cellPx, h * cellPx); }
+      g.font = `${Math.round(cellPx * 0.42)}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#fff'; g.fillText(M.icon, ox + my * px, oy - mx * px);
+    }
+  };
+  draw();
+  const cellAt = (e) => {
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * dpr - ox, y = (e.clientY - r.top) * dpr - oy;
+    return [Math.floor((x / px + Hl.cols * Hl.cell / 2) / Hl.cell), Math.floor((Hl.x0 + y / px) / Hl.cell)];
+  };
+  cv.addEventListener('pointerdown', (e) => {
+    if (!docked) { showHint('항구에서만 고칠 수 있어요', 2); return; }
+    const [col, r] = cellAt(e);
+    if (design.sel) {
+      const res = G.placeModule(S, design.sel, col, r, design.rot);
+      if (res.ok) { snd.play('place'); bakeIfNeeded(); drainEvents(); renderSheet(); } else showHint(res.why, 2);
+      return;
+    }
+    const m = SH.moduleAt(S.ship, col, r);
+    if (!m) return;
+    if (design.armed === m) { G.removeModule(S, col, r); design.armed = null; snd.play('place'); bakeIfNeeded(); renderSheet(); } else { design.armed = m; draw(); showHint('한 번 더 누르면 치워요(값 절반)', 2); }
+  });
+  const gauge = (label, val, bad) => `<div class="${bad ? 'bad' : ''}">${label}<b>${val}</b></div>`;
+  body.append(el('div', 'gauges',
+    gauge('적재', `${Math.round(st.load * 100)}%`, st.load > 0.9) + gauge('흘수', `${st.draft.toFixed(2)}m`, st.draft > 1) +
+    gauge('복원력', `${Math.round(st.stability * 100)}%`, st.stability < 0.8) + gauge('쏠림', st.listing < 0.15 ? '균형' : `${Math.round(st.listing * 100)}%`, st.listing > 0.5) +
+    gauge('돛', st.sailArea ? (st.sailArea >= 1 ? '큰 돛' : '작은 돛') : '없음') + gauge('노', st.oars ? `${st.oars}자리` : '없음', !st.oars && !st.sailArea) +
+    gauge('최고 속도', `${(st.maxSpeed * 1.94).toFixed(1)} kt`) + gauge('화물·식량', `${st.holdCap} · ${st.foodCap}`)));
+  if (!docked) { body.append(el('p', 'note', '배를 고치려면 항구에 들러요.')); return; }
+  body.append(el('p', 'note', design.sel ? `${MODULES[design.sel].name}: 칸을 눌러 놓아요` : '모듈을 고르고 칸을 눌러요. 놓인 모듈을 두 번 누르면 치워요'));
+  if (design.sel && MODULES[design.sel].w !== MODULES[design.sel].h) {
+    const rotBtn = el('button', 'ghost', `↻ 돌리기(지금 ${design.rot ? '돌림' : '기본'})`);
+    rotBtn.style.padding = '7px 12px'; rotBtn.style.marginBottom = '4px';
+    rotBtn.addEventListener('click', () => { design.rot = design.rot ? 0 : 1; renderSheet(); });
+    body.append(rotBtn);
+  }
+  const pal = el('div', 'palette');
+  for (const [id, M] of Object.entries(MODULES)) {
+    const open = G.isUnlocked(S, id);
+    const need = M.need.blueprint ? '📜 설계도 필요' : M.need.region ? `${REGIONS[M.need.region].name}부터` : '';
+    const b = el('button', `mod${design.sel === id ? ' on' : ''}${open ? '' : ' lock'}`, `<div class="ic">${M.icon}</div><div class="nm">${M.name}</div><div class="ct">${open ? costText(M.cost) : need}</div><div class="ct">${open ? M.desc : ''}</div>`);
+    b.addEventListener('click', () => { if (!open) { showHint(need, 2); return; } design.sel = design.sel === id ? null : id; design.armed = null; renderSheet(); });
+    pal.append(b);
+  }
+  body.append(pal);
+}
+
+// ── 꾸미기 ──
+let previewCanvas = null;
+function renderPaint(body) {
+  const pv = el('canvas'); pv.style.cssText = 'width:100%;height:190px;display:block;border-radius:12px;background:#2b86a0';
+  const dpr = Math.min(2, devicePixelRatio || 1), cw = Math.min(window.innerWidth, 560) - 28;
+  pv.width = cw * dpr; pv.height = 190 * dpr;
+  body.append(pv);
+  previewCanvas = { g: pv.getContext('2d'), cw, dpr };
+  const name = el('input'); name.id = 'nameInput'; name.value = S.ship.name; name.maxLength = 12; name.placeholder = '배 이름';
+  name.addEventListener('change', () => { G.setName(S, name.value); name.value = S.ship.name; drainEvents(); });
+  body.append(el('div', 'h3', '배 이름'), name);
+  const swatch = (key, colors, css) => {
+    const w = el('div', 'swatches');
+    colors.forEach((col, i) => {
+      const b = el('button', `sw${S.ship.paint[key] === i ? ' on' : ''}`); b.style.background = css(col);
+      b.addEventListener('click', () => { G.setPaint(S, key, i); bakeIfNeeded(); drainEvents(); renderSheet(); });
+      w.append(b);
+    });
+    return w;
+  };
+  body.append(el('div', 'h3', '선체 색'), swatch('hull', PAINTS.hull, (c) => c));
+  body.append(el('div', 'h3', '돛 색'), swatch('sail', PAINTS.sail, (c) => `rgb(${c.join(',')})`));
+  body.append(el('div', 'h3', '깃발 색'), swatch('flag', PAINTS.flag, (c) => c));
+  body.append(el('div', 'h3', '소품(도전과제로 열려요)'));
+  for (const [id, d] of Object.entries(DECOR)) {
+    const open = G.decorOpen(S, id), on = S.ship.decor.includes(id), a = ACHIEVEMENTS.find((q) => q.decor === id);
+    body.append(row(d.name, open ? (on ? '달았어요' : '') : `🏆 ${a.name}: ${a.desc}`, open ? (on ? '떼기' : '달기') : '', () => { G.toggleDecor(S, id); bakeIfNeeded(); renderSheet(); }, on, d.icon));
+  }
+}
+
+// ── 선원 ──
+function renderCrew(body) {
+  const st = G.stats(S), docked = !!S.docked;
+  body.append(el('p', 'note', `정원 ${S.crew.length} / ${st.crewCap}${st.crewCap < st.hull.crew ? ` (해먹·선실을 놓으면 ${st.hull.crew}명까지)` : ''}. 임금은 입항할 때 내요${S.owed > 0.5 ? ` · 밀린 임금 🪙${Math.ceil(S.owed)}` : ''}.`));
+  for (const c of S.crew) {
+    const R = ROLES[c.role];
+    body.append(row(`${c.name} · ${R.name}`, `${R.desc}<br>하루 🪙${c.wage}`, docked ? '내보내기' : '', () => { G.dismiss(S, c.role); renderSheet(); }, true, R.icon));
+  }
+  if (!S.crew.length) body.append(el('p', 'note', '아직 혼자예요. 선장이 키와 돛을 오가는 동안에는 배가 잠깐 곧게만 가요.'));
+  if (!docked) return;
+  const list = G.hireList(S);
+  if (list.length) body.append(el('div', 'h3', '이 항구에서 일할 사람'));
+  for (const r of list) {
+    const full = S.crew.length >= st.crewCap;
+    body.append(row(r.name, `${r.desc}<br>고용 🪙${r.hire} · 하루 🪙${r.wage}`, '고용', () => {
+      const res = G.hire(S, r.role);
+      if (!res.ok) { showHint(res.why, 2.5); return; }
+      snd.play('place'); toast(`${res.name}이(가) 탔어요`); drainEvents(); renderSheet();
+    }, full || S.res.coin < r.hire, r.icon));
+  }
+}
+
+// ── 해도 ──
+let chartPick = null;
+function renderChart(body) {
+  const w = worldOf(S.region), [x0, y0, x1, y1] = w.bounds, cw = Math.min(window.innerWidth, 560) - 28, wide = x1 - x0, tall = y1 - y0;
+  const maxH = Math.max(240, Math.min(window.innerHeight * 0.5, cw * 1.25));
+  const k = Math.min(cw / wide, maxH / tall), ch = tall * k, dpr = Math.min(2, devicePixelRatio || 1);
+  const cv = el('canvas'); cv.id = 'chart'; cv.width = cw * dpr; cv.height = ch * dpr; cv.style.height = `${ch}px`;
+  body.append(cv);
+  const ox = (cw - wide * k) / 2, toX = (x) => ox + (x - x0) * k, toY = (y) => (y - y0) * k;
+  const g = cv.getContext('2d');
+  const draw = () => {
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = '#0d2a38'; g.fillRect(0, 0, cw, ch);
+    g.fillStyle = '#2f8aa5'; g.fillRect(ox, 0, wide * k, ch);
+    const polys = w.outlines(0, 140);
+    g.beginPath(); g.rect(ox, 0, wide * k, ch);
+    for (const p of polys) { g.moveTo(toX(p[0][0]), toY(p[0][1])); for (const q of p) g.lineTo(toX(q[0]), toY(q[1])); g.closePath(); }
+    g.fillStyle = '#6a9c58'; g.fill('evenodd');
+    for (const q of w.def.shoals || []) { g.fillStyle = 'rgba(230,214,160,.5)'; g.beginPath(); g.arc(toX(q.x), toY(q.y), q.r * k, 0, Math.PI * 2); g.fill(); }
+    // 안개
+    const fg = G.fogInfo(S.region), fog = G.fogOf(S, S.region);
+    g.fillStyle = '#0d2a38';
+    for (let j = 0; j < fg.rows; j++) for (let i = 0; i < fg.cols; i++) if (fog[j * fg.cols + i] === '0') g.fillRect(toX(fg.x0 + i * fg.cell) - 0.5, toY(fg.y0 + j * fg.cell) - 0.5, fg.cell * k + 1, fg.cell * k + 1);
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '13px system-ui'; g.fillStyle = '#fff';
+    for (const f of w.finds) if (S.found[f.id]) g.fillText('📍', toX(f.x), toY(f.y));
+    for (const p of w.ports) g.fillText('⚓', toX(p.x), toY(p.y));
+    for (const q of w.gates) g.fillText('🚪', toX(q.x), toY(q.y));
+    if (S.route || chartPick) {
+      const pts = chartPick ? [chartPick] : S.route.pts.slice(S.route.i);
+      g.strokeStyle = '#fff'; g.setLineDash([3, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(toX(S.boat.x), toY(S.boat.y));
+      for (const q of pts) g.lineTo(toX(q.x), toY(q.y));
+      g.stroke(); g.setLineDash([]);
+      const e = pts[pts.length - 1]; g.fillText('🚩', toX(e.x) + 3, toY(e.y) - 6);
+    }
+    g.fillStyle = '#fff'; g.strokeStyle = '#0d2a38'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(toX(S.boat.x), toY(S.boat.y), 4.5, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(toX(S.boat.x), toY(S.boat.y)); g.lineTo(toX(S.boat.x) + Math.cos(S.boat.h) * 10, toY(S.boat.y) + Math.sin(S.boat.h) * 10); g.stroke();
+  };
+  draw();
+  const info = el('div');
+  body.append(info);
+  const updateInfo = () => {
+    info.innerHTML = '';
+    const c = G.clock(S), st = G.stats(S), fc = G.forecast(S), days = el('div', 'days');
+    fc.forEach((d, i) => { const si = Math.floor(d.day / CAL.seasonDays) % 4; days.append(el('div', '', `${i === 0 ? '오늘' : `+${i}일`}<br>${weatherIcon(d)} ${['🌱', '☀️', '🍂', '❄️'][si]}`)); });
+    info.append(el('div', 'h3', `${c.season.icon} ${c.season.name} ${c.dayOfSeason + 1}일 · 예보 ${st.forecast}일${st.forecast < 3 ? ' (기압계로 늘어나요)' : ''}`), days);
+    const left = w.finds.filter((f) => !S.found[f.id]).length;
+    info.append(el('p', 'note', `발견지 ${w.finds.length - left}/${w.finds.length}. 안개 속 어딘가에 있어요. ${w.gates[0].to ? `${w.gates[0].name}(🚪)로 ${REGIONS[w.gates[0].to].name}에 가요` : `${w.gates[0].name}(🚪)이 이 수역의 끝이에요`}. 지도를 탭하면 항해 계획이 나와요.`));
+    if (!chartPick) return;
+    const dist = Math.hypot(chartPick.x - S.boat.x, chartPick.y - S.boat.y), spd = Math.max(1.2, st.sailArea ? st.maxSpeed * 0.55 : st.rowSpeed * 0.9), sec = dist / spd, persons = 1 + S.crew.length, needFood = persons * sec / CAL.day;
+    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div><div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어요</div>' : ''}${fc.some((d) => d.gust !== null) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보가 있어요. 돛을 줄일 준비를 해요</div>' : ''}${fc.some((d) => d.heat && REGIONS[S.region].heat) && !st.awning ? '<div class="warn">⚠ 무더위 예보, 그늘막이 없어요</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
+    info.append(el('div', 'h3', '항해 계획'), chk);
+    const go = el('button', 'big', S.docked ? '이 항로로 출항' : '이 항로로 가기');
+    go.style.width = '100%'; go.style.marginTop = '8px';
+    go.addEventListener('click', () => {
+      const pick = chartPick;
+      if (S.docked) { const r = G.undock(S); if (!r.ok) { showHint(r.why, 3, true); return; } }
+      if (sheet) sheet.port = false;
+      closeSheet(); chartPick = null;
+      G.setDest(S, pick.x, pick.y, pick.target); syncButtons(); snd.play('tap');
+    });
+    info.append(go);
+  };
+  cv.addEventListener('pointerdown', (e) => {
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left - ox) / k + x0, y = (e.clientY - r.top) / k + y0, R = 16 / k;
+    const p = w.ports.find((q) => Math.hypot(q.x - x, q.y - y) < R), gt = w.gates.find((q) => Math.hypot(q.x - x, q.y - y) < R);
+    if (p) chartPick = { x: p.x, y: p.y, name: p.name, target: { type: 'port', id: p.id } };
+    else if (gt) chartPick = { x: gt.x, y: gt.y, name: gt.name, gate: gt, target: { type: 'gate', id: gt.id } };
+    else { const [nx, ny] = w.nearestWater(x, y); chartPick = { x: nx, y: ny, target: null }; }
+    draw(); updateInfo();
+  });
+  updateInfo();
+}
+
+// ── 기록 ──
+function renderLog(body) {
+  const seen = Object.keys(S.seen).length, all = Object.keys(SPECIES).length, ach = Object.keys(S.ach).length;
+  const title = TITLES[REGION_ORDER.filter((r) => S.visited[r]).length - 1];
+  body.append(el('p', 'note', `칭호 <b>${title}</b> · 항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번`));
+  body.append(el('div', 'h3', `도감 ${seen}/${all} (물에서 지나가는 생물을 탭해요)`));
+  const grid = el('div', 'grid');
+  for (const id of Object.keys(SPECIES)) {
+    const known = S.seen[id], def = SPECIES[id];
+    const cell = el('div', `sp${known ? '' : ' unk'}`);
+    const cv = el('canvas'), dpr = Math.min(2, devicePixelRatio || 1); cv.width = 92 * dpr; cv.height = 58 * dpr;
+    cell.append(cv, el('div', '', known ? def.name : `??? · ${REGIONS[def.region].name}`));
+    if (known) {
+      const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (['fish', 'duck', 'turtle', 'swimmer', 'frog'].includes(def.kind)) { g.fillStyle = 'rgba(60,150,180,.3)'; g.fillRect(0, 0, 92, 58); }
+      drawSpeciesIcon(g, id, 46, 29, 36);
+    }
+    grid.append(cell);
+  }
+  body.append(grid);
+  body.append(el('div', 'h3', `도전과제 ${ach}/${ACHIEVEMENTS.length}`));
+  for (const a of ACHIEVEMENTS) body.append(row(`${S.ach[a.id] ? '🏆' : '⬜'} ${a.name}`, `${a.desc} · 🪙${a.coin}${a.decor ? ` · ${DECOR[a.decor].icon}` : ''}`));
+  const reset = el('button', 'ghost', '새 게임(두 번 눌러 확인)');
+  reset.style.cssText = 'margin-top:14px;width:100%;color:var(--muted)';
+  reset.addEventListener('click', () => {
+    if (reset.dataset.arm) { started = false; try { localStorage.removeItem(SAVE_KEY); } catch { /* 무시 */ } location.reload(); return; }
+    reset.dataset.arm = '1'; reset.textContent = '정말 처음부터 할까요? 한 번 더 눌러요';
+  });
+  body.append(reset);
+}
+
+// ── 수문·수역 ──
+function openGate(gate) {
+  const st = G.gateStatus(S, gate), name = gate.to ? REGIONS[gate.to].name : '강 끝';
+  sheet = null;
+  openSheet(`${gate.name}: ${name}`, [{ id: 'g', name: '', render(body) {
+    body.append(el('p', 'note', gate.to ? `이 물길을 지나면 ${name}(으)로 가요. 다음 수역의 첫 항구에 닿아요.` : '여기서 강이 넓어지며 끝나요. 담수 항해의 마지막이에요.'));
+    body.append(el('div', 'check', st.list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('')));
+    if (!st.ok) body.append(el('p', 'note', '<br>조건을 채우고 다시 와요. 해도에서 발견지를 찾아보거나 항구에서 배를 키워요.'));
+  } }], 'g', () => {
+    const go = el('button', 'big', st.ok ? '지나가기' : '아직 못 가요'); go.disabled = !st.ok;
+    go.addEventListener('click', () => { closeSheet(); G.passGate(S, gate); bakeIfNeeded(); drainEvents(); });
+    return [go];
+  });
+}
+function openRegion(ev) {
+  snd.play('found');
+  const R = REGIONS[ev.to];
+  const tips = { lake: '돛을 달 수 있어요! 항구 설계에서 작은 돛대를 놓아 보세요. 돌풍이 오면 돛을 줄여요. 여름 무더위엔 그늘막이 필요해요.', river: '물살이 북쪽 하류로 흘러요. 밝은 곳은 여울이에요. 가뭄이면 깊은 배는 걸려요.' };
+  overlay(`<h3>🌊 ${R.name}</h3><p>${tips[ev.to] || ''}</p>`, '입항', () => openPort());
+}
+
+// ── HUD ──
 const DIRS = ['동', '남동', '남', '남서', '서', '북서', '북', '북동'];
-function compassName(a) { return DIRS[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8]; }
+const compassName = (a) => DIRS[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
 let hudT = 0, flapT = 0, creakT = 0, lastLuffHint = -99;
+const pct = (v) => Math.round(v * 100);
+function syncTop() {
+  const st = G.stats(S), persons = 1 + S.crew.length, c = G.clock(S);
+  $('dateNum').textContent = `${c.season.icon} ${c.season.name} ${c.dayOfSeason + 1}일`;
+  $('regionName').textContent = `${REGIONS[S.region].name}${S.weather.gustOn ? ' · 돌풍' : S.weather.heat ? ' · 무더위' : ''}`;
+  $('chips').innerHTML = `<b>${fmt(S.res)}</b><span>📦${G.holdUsed(S)}/${st.holdCap}</span><span class="${S.food < persons ? 'low' : ''}">🍖${S.food.toFixed(0)}</span><span class="${S.hull < 0.4 ? 'low' : ''}">🛠${pct(S.hull)}</span><span class="${S.vigor < 0.4 ? 'low' : ''}">💪${pct(S.vigor)}</span>`;
+}
 function updateHud(dt) {
   hudT -= dt;
   if (hintT > 0) { hintT -= dt; if (hintT <= 0) $('hint').classList.remove('on'); }
@@ -250,54 +764,73 @@ function updateHud(dt) {
   const b = S.boat, w = S.wind;
   $('windNum').textContent = `${(w.speed * 1.94).toFixed(0)} kt`;
   $('windDir').textContent = `${compassName(w.from)}풍`;
-  // 화살표는 바람이 불어 가는 쪽(from + 180°). 위를 보는 화살표라 90°를 더한다
   $('arrow').style.transform = `rotate(${w.from * 180 / Math.PI + 270}deg)`;
   $('spdNum').textContent = (b.spd * 1.94).toFixed(1);
-  $('staminaFill').style.width = `${b.stamina * 100}%`;
-  $('staminaWrap').classList.toggle('on', b.row || b.stamina < 0.99);
+  syncTop();
   wrap.classList.toggle('auto', !!S.route);
   const shown = S.route ? b.rudder : (rudderPtr !== null ? b.rudder : 0);
-  const half = wrap.clientWidth / 2 - 30;
-  knob.style.transform = `translateX(${shown * half}px) rotate(${shown * 70}deg)`;
-  if (!S.route && !b.row && b.luff && b.spd < 2.2 && S.t - lastLuffHint > 9) { lastLuffHint = S.t; showHint('맞바람이에요. 옆으로 틀어요', 3); }
+  knob.style.transform = `translateX(${shown * (wrap.clientWidth / 2 - 30)}px) rotate(${shown * 70}deg)`;
+  if (!S.route && !b.row && b.luff && b.spd < 2.2 && S.t - lastLuffHint > 9 && !S.docked) { lastLuffHint = S.t; showHint('맞바람이에요. 옆으로 틀어요', 3); }
   if (b.stamina <= 0 && b.row && hintT <= 0) showHint('지쳐서 노가 느려져요', 3);
-  snd.ambient(w.speed, b.spd);
+  if (rudderPtr !== null && !b.row && b.sailNow < 0.05 && !S.cap.then && b.spd < 0.5 && hintT <= 0) showHint(G.stats(S).sailArea ? '돛을 올리거나 노를 켜야 움직여요' : '노를 켜야 움직여요', 2.5);
+  snd.ambient(S.docked ? w.speed * 0.6 : w.speed, S.docked ? 0 : b.spd);
   syncButtons();
+  // 상황 단추
+  const ctxBox = $('context');
+  const near = !S.docked && !S.disaster ? G.nearPort(S) : null, gate = !S.docked && !S.disaster ? G.nearGate(S) : null;
+  const key = `${near ? near.id : ''}|${gate ? gate.id : ''}`;
+  if (ctxBox.dataset.key !== key) {
+    ctxBox.dataset.key = key; ctxBox.innerHTML = '';
+    if (near) { const x = el('button', '', `⚓ ${near.name} 입항`); x.addEventListener('click', () => { G.dockHere(S, near); drainEvents(); }); ctxBox.append(x); }
+    if (gate) { const x = el('button', '', `🚪 ${gate.name}`); x.addEventListener('click', () => openGate(gate)); ctxBox.append(x); }
+  }
 }
+for (const b of $('tabs').querySelectorAll('button')) b.addEventListener('click', () => {
+  const t = b.dataset.t;
+  const tabs = { chart: { id: 'chart', name: '해도', render: renderChart }, ship: { id: 'ship', name: '배', render: renderDesign }, crew: { id: 'crew', name: '선원', render: renderCrew }, log: { id: 'log', name: '기록', render: renderLog } };
+  sheet = null;
+  openSheet(`${tabs[t].name}${t === 'ship' ? `: ${S.ship.name}` : ''}`, [tabs[t]], t, null);
+});
 
-// 고정 시간 단계 + 누적기
+function bakeIfNeeded() { if (S.rev !== bakedRev) { sprite = SA.bakeShip(S.ship, sprite); bakedRev = S.rev; } }
+
+// ── 고정 시간 단계 ──
 const STEP = G.FIXED_DT;
 let acc = 0, last = performance.now();
-function tick(dt) {
+function tick() {
   const b = S.boat;
   G.step(S, STEP);
-  const ch = Math.cos(b.h), sh = Math.sin(b.h);
-  if (b.spd > 0.25) wake.update(STEP, b, b.x - ch * 4.5, b.y - sh * 4.5);
+  const ch = Math.cos(b.h), sh = Math.sin(b.h), L = sprite.hull.len / 2;
+  if (b.spd > 0.25) wake.update(STEP, b, b.x - ch * L, b.y - sh * L);
   else wake.update(STEP, { ...b, spd: 0 }, b.x, b.y);
-  void dt;
 }
-
 function camera(dt) {
-  const b = S.boat, vx = Math.cos(b.h) * b.spd, vy = Math.sin(b.h) * b.spd;
+  const b = S.boat, moving = !S.docked, vx = moving ? Math.cos(b.h) * b.spd : 0, vy = moving ? Math.sin(b.h) * b.spd : 0;
   pan.idle += dt;
   if (pan.idle > 3.5) { const k = 1 - Math.exp(-dt / 1.1); pan.x -= pan.x * k; pan.y -= pan.y * k; }
-  // 시작 화면에서는 제목 아래로 배가 보이게 카메라를 북쪽으로 둔다
   const introY = started ? 0 : -H * 0.26 / (cam.zoom * VIEW.tiltY);
   const tx = b.x + vx * 1.6 + pan.x, ty = b.y + vy * 1.6 + pan.y + introY;
   const k = 1 - Math.exp(-dt / 0.75);
   cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
 }
 
-// 프레임: 물 → 땅 → 항로·항적 → 나무와 배(깊이 순)
-function render(dt) {
+// ── 그리기 ──
+function shipState(x, y, h, t, heelV, zoom, still = false) {
+  const b = S.boat, swell = 0.6 + S.wind.speed / 16;
+  const bob = still ? 0 : Math.sin(t * 1.25) * 0.09 * swell + Math.sin(t * 0.73 + 1) * 0.05 * swell;
+  const pitch = still ? 0 : Math.sin(t * 1.1 + 0.6) * 0.022 * swell + Math.min(0.03, b.spd * 0.004);
+  const heel = heelV + (still ? 0 : Math.sin(t * 0.93) * 0.015 * swell);
+  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: S.crew };
+}
+function render() {
   const b = S.boat, t = S.t;
   A.drawWater(ctx, sc, cam, W, H, t, S.wind, DPR);
-  A.drawLand(ctx, sc, cam, W, H, DPR, performance.now() < zoomingUntil);
+  A.drawLand(ctx, sc, cam, W, H, DPR, performance.now() < zoomingUntil, S.region === 'river' && S.weather.drought);
   A.drawShoreFoam(ctx, sc, cam, W, H, t, DPR);
+  A.drawFlotsam(ctx, sc, G.flotsamOf(S), cam, W, H, t, DPR);
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   const sx = (x) => W / 2 + (x - cam.x) * cam.zoom, sy = (y) => cam.cy + (y - cam.y) * cam.zoom * VIEW.tiltY;
-  // 자동 항로 표시
   if (S.route) {
     const r = S.route;
     ctx.setLineDash([3, 8]); ctx.lineCap = 'round'; ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.55)';
@@ -310,80 +843,99 @@ function render(dt) {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - 20); ctx.stroke();
     ctx.fillStyle = '#d6443a'; ctx.beginPath(); ctx.moveTo(fx, fy - 20); ctx.lineTo(fx + 11, fy - 16); ctx.lineTo(fx, fy - 12); ctx.closePath(); ctx.fill();
   }
-  // 맞바람 구역: 직접 몰 때 다가가면 보여 줘요
-  if (!S.route && !b.row && b.sailNow > 0.1 && b.twa < NO_GO + 0.45) {
+  if (!S.route && !b.row && b.sailNow > 0.1 && b.twa < NO_GO + 0.45 && !S.docked) {
     const a = 1 - (b.twa - NO_GO) / 0.45, R = 13 * cam.zoom;
-    ctx.save();
-    ctx.translate(sx(b.x), sy(b.y)); ctx.scale(1, VIEW.tiltY);
+    ctx.save(); ctx.translate(sx(b.x), sy(b.y)); ctx.scale(1, VIEW.tiltY);
     ctx.fillStyle = `rgba(255,120,90,${0.13 * Math.min(1, a)})`;
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, S.wind.from - NO_GO, S.wind.from + NO_GO); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
-
   wake.draw(ctx, cam, W, DPR);
 
-  // 배의 자세: 물 위에서 천천히 흔들린다(바람이 셀수록 크게)
-  const swell = 0.6 + S.wind.speed / 16;
-  const bob = Math.sin(t * 1.25) * 0.09 * swell + Math.sin(t * 0.73 + 1) * 0.05 * swell;
-  const pitch = Math.sin(t * 1.1 + 0.6) * 0.022 * swell + Math.min(0.03, b.spd * 0.004);
-  const heel = b.heel + Math.sin(t * 0.93) * 0.015 * swell;
-  const bx = sx(b.x), by = sy(b.y);
-  const P = SA.makeProjector(bx, by, b.h, heel, pitch, cam.zoom, bob);
-  const st = { P, h: b.h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder };
-
-  SA.drawShipOnWater(ctx, st, cam.zoom, bx, by);
-  A.drawBowFoam(ctx, cam, W, DPR, b, Math.min(1, b.spd / 6), t);
+  const bx = sx(b.x), by = sy(b.y), st = shipState(bx, by, b.h, t, b.heel, cam.zoom);
+  SA.drawShipOnWater(ctx, sprite, st, cam.zoom, bx, by);
+  if (!S.docked) A.drawBowFoam(ctx, cam, W, DPR, b, Math.min(1, b.spd / 6), t, sprite.hull.len);
+  creatures.draw(ctx, cam, W, H, DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-  // 깊이 순서: 나무(땅)와 배
   const props = A.visibleProps(sc, cam, W, H);
   let shipDone = false;
   for (const p of props) {
     if (!shipDone && p.y > b.y) { SA.drawShip(ctx, sprite, st, cam.zoom, bx, by); shipDone = true; }
     A.drawProp(ctx, sc, cam, W, p, t);
+    if (p.name && cam.zoom > 3.2) {
+      ctx.font = '600 12px system-ui'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,30,40,.75)'; ctx.fillStyle = '#fff';
+      const lx = sx(p.x), ly = sy(p.y) - (p.port ? 6.5 : 5) * cam.zoom;
+      ctx.strokeText(p.name, lx, ly); ctx.fillText(p.name, lx, ly);
+    }
   }
   if (!shipDone) SA.drawShip(ctx, sprite, st, cam.zoom, bx, by);
-  void dt;
+  A.drawWeather(ctx, S.docked ? {} : S.weather, W, H, t, DPR);
 }
-
-// 짧은 효과음: 펄럭임은 맞바람일 때, 삐걱임은 가끔
+function renderPreview(t) {
+  if (!previewCanvas || !sheet || sheet.active !== 'paint' || !document.body.contains(previewCanvas.g.canvas)) return;
+  const { g, cw, dpr } = previewCanvas, z = 11;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#2b86a0'; g.fillRect(0, 0, cw, 190);
+  const h = t * 0.35, x = cw / 2, y = 150;
+  const st = shipState(x, y, h, t, 0, z, true);
+  st.sailNow = G.stats(S).sailArea ? 1 : 0; st.boom = 0.6; st.luff = false; st.row = false; st.capX = sprite.hull.helmX; st.flagFrom = 0.4;
+  SA.drawShipOnWater(g, sprite, st, z, x, y);
+  SA.drawShip(g, sprite, st, z, x, y);
+}
 function fxTimers(dt) {
   const b = S.boat;
   flapT -= dt;
-  if (b.luff && flapT <= 0) { snd.play('flap'); flapT = 1.3 + Math.random() * 1.6; }
+  if (b.luff && flapT <= 0 && !S.docked) { snd.play('flap'); flapT = 1.3 + Math.random() * 1.6; }
   creakT -= dt;
   if (creakT <= 0) { snd.play('creak'); creakT = 3.5 + Math.random() * 6; }
 }
 
 const fpsBox = $('fps');
 if (query.get('fps')) fpsBox.style.display = 'block';
-let fN = 0, fT = 0;
+let fN = 0, fT = 0, saveT = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   const raw = Math.min(0.25, (now - last) / 1000);
   last = now;
   if (paused) return;
-  if (started) {
+  const hold = !started || !!sheet || overlayOpen();
+  if (!hold) {
     acc += raw;
     let n = 0;
-    while (acc >= STEP && n < 12) { tick(STEP); acc -= STEP; n++; }
+    while (acc >= STEP && n < 12) { tick(); acc -= STEP; n++; }
     if (n === 12) acc = 0;
     drainEvents();
     fxTimers(raw);
-  } else S.t += raw; // 시작 화면에서도 물은 흐른다
+    creatures.update(raw, cam, W, H, S.boat);
+    saveT += raw;
+    if (saveT > 5) { saveT = 0; save(); }
+  } else { S.t += raw * 0.6; S.wind = G.windAt(S); if (S.weather.gustOn) S.wind.speed *= REGIONS[S.region].gustK; } // 시트가 떠 있어도 물은 흐른다
   camera(raw);
-  render(raw);
+  render();
+  renderPreview(now / 1000);
   updateHud(raw);
   if (query.get('fps')) { fN++; fT += raw; if (fT >= 1) { fpsBox.textContent = `${Math.round(fN / fT)} fps`; fN = 0; fT = 0; } }
 }
 document.addEventListener('visibilitychange', () => {
   paused = document.hidden;
-  if (paused) snd.pause(); else { snd.resume(); last = performance.now(); acc = 0; }
+  if (paused) { save(); snd.pause(); music.pause(); } else { snd.resume(); music.resume(); last = performance.now(); acc = 0; }
 });
+window.addEventListener('pagehide', save);
+syncButtons(); syncTop();
 requestAnimationFrame(frame);
 
+// 서비스 워커(독립 실행)
+if ('serviceWorker' in navigator && !query.get('dbg') && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.serviceWorker.controller) {
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; save(); location.reload(); });
+  }
+}
+
 // 점검용 창구(?dbg=1): 자동 확인이 상태를 읽고 조작할 때 씁니다
-if (query.get('dbg')) window.SM = { S, G, cam, snd, BOAT, SAIL_LEVELS, wake, render, bakeMs };
+if (query.get('dbg')) window.SM = { get S() { return S; }, G, SH, cam, snd, music, render, worldOf, get sheet() { return sheet; }, drainEvents, bakeIfNeeded, openPort, closeSheet, renderSheet, changeRegionArt, openGate, tapWorld };
 </script>
 </body>
 </html>
