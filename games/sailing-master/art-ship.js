@@ -445,3 +445,25 @@ export function drawHullTop(g, hullId, px, ox, oy, paint) {
   }
   g.restore();
 }
+
+// 선장 고르기 얼굴(머리·모자·옷). 머리 모양과 색으로 네 사람을 구분한다
+export function drawCaptainPortrait(g, C, x, y, s, hat = true) {
+  const skin = '#f0c8a0';
+  g.fillStyle = C.coat; g.beginPath(); g.moveTo(x - 24 * s, y + 38 * s); g.quadraticCurveTo(x - 22 * s, y + 8 * s, x, y + 8 * s); g.quadraticCurveTo(x + 22 * s, y + 8 * s, x + 24 * s, y + 38 * s); g.closePath(); g.fill();
+  if (C.style === 'long') { g.fillStyle = C.hair; g.beginPath(); g.ellipse(x, y - 4 * s, 16 * s, 21 * s, 0, 0, TAU); g.fill(); }
+  g.fillStyle = skin; g.fillRect(x - 5 * s, y, 10 * s, 11 * s);
+  g.beginPath(); g.ellipse(x, y - 8 * s, 12.5 * s, 14 * s, 0, 0, TAU); g.fill();
+  g.fillStyle = C.hair;
+  if (C.style === 'short') { g.beginPath(); g.ellipse(x, y - 15 * s, 13 * s, 8 * s, 0, PI, TAU); g.fill(); g.fillRect(x - 13 * s, y - 16 * s, 3.5 * s, 8 * s); g.fillRect(x + 9.5 * s, y - 16 * s, 3.5 * s, 8 * s); }
+  if (C.style === 'long') { g.beginPath(); g.ellipse(x - 3 * s, y - 16 * s, 12 * s, 7 * s, -0.2, PI, TAU); g.fill(); }
+  if (C.style === 'perm') for (const [a, b] of [[-12, -12], [-6, -17], [1, -18], [8, -16], [12, -11]]) { g.beginPath(); g.arc(x + a * s, y + b * s, 5 * s, 0, TAU); g.fill(); }
+  if (C.style === 'bald') { g.fillRect(x - 13 * s, y - 11 * s, 3 * s, 8 * s); g.fillRect(x + 10 * s, y - 11 * s, 3 * s, 8 * s); g.fillRect(x - 8 * s, y + 0.5 * s, 16 * s, 2.5 * s); }
+  g.fillStyle = '#2a2320';
+  for (const q of [-1, 1]) { g.beginPath(); g.arc(x + q * 4.6 * s, y - 8 * s, 1.5 * s, 0, TAU); g.fill(); }
+  g.strokeStyle = '#a0603f'; g.lineWidth = 1.2 * s; g.beginPath(); g.arc(x, y - 3.6 * s, 3.4 * s, 0.25, PI - 0.25); g.stroke();
+  if (C.style === 'perm') { g.strokeStyle = '#3a3a3a'; g.lineWidth = 1 * s; for (const q of [-1, 1]) { g.beginPath(); g.arc(x + q * 4.6 * s, y - 8 * s, 3.6 * s, 0, TAU); g.stroke(); } }
+  if (!hat) return;
+  // 선장 모자
+  g.fillStyle = '#fbfbf6'; g.beginPath(); g.ellipse(x, y - 21 * s, 15 * s, 5.5 * s, 0, 0, TAU); g.fill();
+  g.fillStyle = '#1b3550'; g.fillRect(x - 12 * s, y - 20 * s, 24 * s, 3 * s);
+}

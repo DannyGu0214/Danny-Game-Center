@@ -5,7 +5,9 @@ import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
 import { advanceFlow, waveAngle, FLOW_LAYERS } from '../art.js';
 import { createCreatures, hitRadius } from '../creatures.js';
-import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS } from '../data.js';
+import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS, ROLES, CAPTAINS, STORIES } from '../data.js';
+import { isJourney } from '../art-story.js';
+import { TRACKS, TRACK_IDS } from '../music.js';
 
 const D = Math.PI / 180;
 const run = (S, sec) => { for (let i = 0; i < sec * 30; i++) G.step(S, G.FIXED_DT); return S; };
@@ -265,6 +267,162 @@ test('발견지: 1등급 맵은 고정, 2등급 맵은 처음 들어갈 때 판�
   assert.ok(seen.size >= 7, `판마다 달라야 해요: ${seen.size}`);
 });
 
+test('자동 항로: 바람이 물가로 부는 나루에서도 돛으로 빠져나온다', () => {
+  // 시드 2의 갈대 마을: 맞바람에 서서 뱃길만 뒤집다 물가에 붙어 버리던 자리
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const S = sloopAt('lake', seed), w = worldOf('lake'), a = w.ports.find((p) => p.id === 'reedTown'), f = w.finds.find((q) => q.id === 'lighthouse'), [x, y] = w.nearestWater(f.x, f.y);
+    S.boat.x = a.x; S.boat.y = a.y; S.boat.sailLevel = 2; S.boat.sailNow = 1;
+    assert.ok(G.setDest(S, x, y));
+    let sec = 0, flips = 0;
+    while (S.route && sec < 400) { G.step(S, G.FIXED_DT); sec += G.FIXED_DT; S.hull = 1; S.vigor = 1; flips += drain(S).filter((e) => e.type === 'tack').length; }
+    assert.equal(S.route, null, `시드 ${seed} ${S.boat.x | 0},${S.boat.y | 0}에서 못 감`);
+    assert.ok(flips < sec / 7, `시드 ${seed} 뱃길을 너무 자주 뒤집음 ${flips}번 / ${sec | 0}초`);
+  }
+});
+
+test('선원 후보: 항구마다 1~3명, 능력치는 ±25%, 이름·성별이 있고 날이 지나면 바뀐다', () => {
+  const counts = new Set();
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+    const S = G.newGame(seed); S.res.coin = 999;
+    for (const r of ['pond', 'lake', 'river']) {
+      S.region = r; S.visited[r] = 1;
+      for (const p of worldOf(r).ports) {
+        G.dock(S, p.id);
+        const list = G.candidatesAt(S);
+        counts.add(list.length);
+        assert.ok(list.length >= 1 && list.length <= 3, `${r} ${p.id} ${list.length}명`);
+        assert.equal(new Set(list.map((c) => c.name)).size, list.length, '이름이 겹치지 않아요');
+        for (const c of list) {
+          const R = ROLES[c.role];
+          assert.ok(['남', '여'].includes(c.gender) && c.name);
+          for (const v of [c.skill, c.humor, c.drink]) assert.ok(v >= 75 && v <= 125, `능력치 ${v}`);
+          assert.ok(c.hireCost >= Math.floor(R.hire * 0.75) && c.hireCost <= Math.ceil(R.hire * 1.25), `고용비 ${c.hireCost}`);
+          assert.ok(REGIONS[R.region].order <= REGIONS[r].order, `${r}에 ${c.role}`);
+        }
+      }
+    }
+    assert.ok(worldOf('pond').ports[0]);
+  }
+  assert.deepEqual([...counts].sort(), [1, 2, 3], '1명, 2명, 3명이 모두 나와요');
+  // 같은 날 다시 보면 같고, 3일 지나면 바뀌고, 다 뽑아도 최소 1명은 있다
+  const S = G.newGame(4); S.res.coin = 999;
+  S.ship = { hull: 'sloop', mods: [{ id: 'hammock', col: 0, row: 3, rot: 0 }, { id: 'hammock', col: 2, row: 3, rot: 0 }], name: 'x', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] };
+  const a = G.candidatesAt(S).map((c) => c.id);
+  assert.deepEqual(G.candidatesAt(S).map((c) => c.id), a);
+  for (let i = 0; i < 3; i++) G.waitDay(S);
+  assert.notDeepEqual(G.candidatesAt(S).map((c) => c.id), a);
+  const b = G.candidatesAt(S);
+  G.checkAch(S); // 이미 받을 수 있는 업적 보상을 먼저 받아 둬요
+  const coin = S.res.coin;
+  assert.ok(G.hire(S, b[0].id).ok);
+  assert.equal(S.res.coin, coin - b[0].hireCost, '고용비를 그 사람 값대로 내요');
+  assert.equal(G.hire(S, 999999).ok, false, '없는 사람은 못 뽑아요');
+  S.cands[S.docked].list = [{ ...b[0], id: 777 }];
+  assert.equal(G.hire(S, 777).ok, false, '같은 역할은 한 명만');
+  S.cands[S.docked].list = [];
+  assert.ok(G.candidatesAt(S).length >= 1);
+  // 항해술은 속도에 더해지고 유머·주량은 효과가 없다
+  const T = G.newGame(1), plain = G.stats(T).speedK;
+  T.crew = [{ role: 'lookout', skill: 125, humor: 75, drink: 125, wage: 1 }];
+  assert.ok(Math.abs(G.stats(T).speedK - plain * 1.025) < 1e-9);
+  const U = G.newGame(1); U.crew = [{ role: 'lookout', skill: 125, humor: 125, drink: 75, wage: 1 }];
+  assert.equal(G.stats(U).speedK, G.stats(T).speedK);
+  // 예전 저장의 선원(능력치 없음)도 그대로 돌아가요
+  const V = G.newGame(1); V.crew = [{ role: 'lookout', name: '수빈', wage: 2 }];
+  assert.equal(G.stats(V).speedK, plain);
+  const W = G.deserialize(G.serialize(V));
+  assert.deepEqual([W.crew[0].gender, W.crew[0].skill, W.crew[0].humor, W.crew[0].drink], ['여', 100, 100, 100]);
+  assert.ok(W.crew[0].id > 0);
+  G.dismiss(W, W.crew[0].id);
+  assert.equal(W.crew.length, 0);
+});
+
+test('뗏목은 선원이 탈 자리가 없고 해먹·선실도 놓을 수 없다', () => {
+  const S = G.newGame(1); S.res.coin = 999; S.res.wood = 99; S.res.cloth = 99;
+  assert.equal(S.ship.hull, 'raft');
+  assert.match(G.hire(S, G.candidatesAt(S)[0].id).why, /자리가 없다/);
+  assert.match(G.placeModule(S, 'hammock', 0, 0).why, /자리가 없다/);
+  assert.equal(S.ship.mods.some((m) => m.id === 'hammock'), false);
+});
+
+test('선술집 곡: 마디마다 박자가 맞고 조에서 벗어나지 않는다', () => {
+  assert.deepEqual(TRACK_IDS, ['pond', 'lake', 'river']);
+  for (const [id, T] of Object.entries(TRACKS)) {
+    assert.equal(T.chords.length, T.melody.length, id);
+    assert.ok(T.bpm >= 100, `${id}는 흥겨운 빠르기`);
+    T.melody.forEach((m, i) => {
+      assert.equal(m.reduce((a, [, l]) => a + l, 0), T.bar, `${id} ${i + 1}마디 길이`);
+      for (const [n] of m) if (n != null) assert.ok(T.scale.includes(((n % 12) + 12) % 12), `${id} ${i + 1}마디 음 ${n}`);
+    });
+  }
+});
+
+test('출항 이야기: 선장마다 3쪽, 마지막은 여정, 이름 조사가 맞는다', () => {
+  assert.deepEqual(Object.keys(STORIES), Object.keys(CAPTAINS));
+  for (const [id, St] of Object.entries(STORIES)) {
+    assert.equal(St.pages.length, 3, id);
+    assert.ok(isJourney(St.pages[2].scene), `${id} 3쪽은 여정`);
+    assert.ok(St.pages[2].text.includes('갈대 나루'), `${id} 도착지`);
+    for (const P of St.pages) for (const n of CAPTAINS[id].names) assert.ok(!/[{}]/.test(G.storyLine(P.text, n)), P.text);
+  }
+  assert.equal(G.storyLine('{N은} {N이} {N을}', '민준'), '민준은 민준이 민준을');
+  assert.equal(G.storyLine('{N은} {N이} {N을}', '지호'), '지호는 지호가 지호를');
+  assert.equal(G.storyLine('{N은}', 'Sam'), 'Sam은(는)');
+  assert.equal(G.storyLine('{N은}', '티아고 2세'), '티아고 2세는');
+  assert.equal(G.storyLine('{N을}', '한스'), '한스를');
+});
+
+test('기항지: 작은 호수 3곳, 큰 호수 5곳이 고루 있고 어디든 같은 일을 한다', () => {
+  for (const [id, n, far] of [['pond', 3, 90], ['lake', 5, 150]]) {
+    const w = worldOf(id);
+    assert.equal(w.ports.length, n);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) assert.ok(Math.hypot(w.ports[i].x - w.ports[j].x, w.ports[i].y - w.ports[j].y) > far, `${id} ${w.ports[i].id} ${w.ports[j].id}`);
+    for (const p of w.ports) for (const f of w.finds) assert.ok(Math.hypot(p.x - f.x, p.y - f.y) > 28, `${id} ${p.id} ${f.id} 겹침`);
+  }
+  // 맵 크기는 그대로
+  assert.equal(REGIONS.pond.shape.ax, 96); assert.equal(REGIONS.lake.shape.ax, 170);
+  // 같은 맵 안에서는 어느 나루든 값이 같고 수리·보급·고용·건조가 된다
+  const results = worldOf('lake').ports.map((p) => {
+    const S = G.newGame(1); S.region = 'lake'; S.visited.lake = 1; S.res = { wood: 500, cloth: 500, coin: 500 }; S.food = 0; S.hull = 0.5;
+    G.dock(S, p.id); S.res = { wood: 500, cloth: 500, coin: 500 }; S.hull = 0.5; S.food = 1;
+    const sold = G.sell(S, 'wood', 20), food = G.buyFood(S, 2), fixed = G.repair(S), built = G.buildHull(S, 'rowboat').ok, placed = G.placeModule(S, 'hammock', 0, 3).ok, res = { ...S.res }, hired = G.hire(S, G.candidatesAt(S)[0].id).ok;
+    return JSON.stringify({ sold, food, fixed, built, placed, hired, res });
+  });
+  assert.equal(new Set(results).size, 1, results.join());
+  assert.ok(results[0].includes('"built":true') && results[0].includes('"hired":true'));
+});
+
+test('선장 특성 4가지가 효과를 낸다', () => {
+  const mk = (id) => { const S = G.newGame(1); G.setCaptain(S, id, ''); return S; };
+  const base = G.newGame(1);
+  assert.equal(mk('sailor').captain.name, '디에고', '비우면 추천 이름');
+  G.setCaptain(base, 'trader', '  <하나>둘셋넷다섯여섯일곱 ');
+  assert.equal(base.captain.name.length, 10); assert.ok(!base.captain.name.includes('<'));
+  base.captain = undefined;
+  // 항해술: 노와 돛 모두 10% 빠르다
+  const race = (cap) => { const S = cap ? mk(cap) : G.newGame(1); G.undock(S); S.boat.x = 0; S.boat.y = 0; G.setRow(S, true); for (let i = 0; i < 12 * 30; i++) { G.step(S, G.FIXED_DT); S.boat.x = 0; S.boat.y = 0; S.boat.rowPhase = 1.5; } return S.boat.spd; };
+  const r = race('sailor') / race(null);
+  assert.ok(r > 1.08 && r < 1.12, `노 ${r}`);
+  assert.ok(Math.abs(G.stats(mk('sailor')).maxSpeed / G.stats(base).maxSpeed - 1.1) < 1e-9);
+  // 운빨: 찾는 거리 10%
+  assert.ok(Math.abs(G.sightRange(mk('lucky')) - G.sightRange(base) * 1.1) < 1e-9);
+  // 거래술: 판매 10%, 끝수는 모아 준다
+  const T = mk('trader'), N = G.newGame(1);
+  T.res.cloth = N.res.cloth = 100; const c0 = T.res.coin;
+  for (let i = 0; i < 20; i++) { G.sell(T, 'cloth', 5); G.sell(N, 'cloth', 5); }
+  assert.equal(T.res.coin - c0, 110); assert.equal(N.res.coin - c0, 100);
+  // 기능공: 재료마다 1 덜 써요(0 아래로는 안 내려가요)
+  const K = mk('crafter'); K.res = { wood: 20, cloth: 20, coin: 50 };
+  assert.deepEqual(G.moduleCost(K, 'hold'), { wood: 11 });
+  assert.equal(G.moduleCost(K, 'telescope').wood, 5); assert.equal(G.moduleCost(K, 'telescope').coin, 19);
+  assert.ok(G.placeModule(K, 'food', 0, 0).ok);
+  assert.equal(K.res.wood, 20 - 7);
+  assert.deepEqual(G.moduleCost(base, 'hold'), { wood: 12 });
+  // 특성이 없는 예전 저장도 그대로 돌아간다
+  const old = G.deserialize(G.serialize(G.newGame(3)));
+  assert.equal(old.captain, undefined); assert.equal(G.stats(old).speedK, 1);
+});
+
 test('망원경: 내륙 발견지와 뭍짐승은 망원경이 있어야 찾고, 보는 거리가 늘어난다', () => {
   const w = worldOf('pond'), f = w.finds.find((q) => q.id === 'grove'), [ax, ay] = w.nearestWater(f.x, f.y);
   const S = G.newGame(1); G.undock(S);
@@ -465,10 +623,12 @@ test('선원: 해먹이 있어야 태우고, 임금을 못 주면 떠난다', ()
   const S = G.newGame(1);
   S.region = 'lake'; S.visited.lake = 1; S.docked = 'pine'; S.res.coin = 100;
   S.ship = { hull: 'rowboat', mods: [{ id: 'oar', col: 0, row: 2, rot: 0 }], name: 'x', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] };
-  assert.equal(G.hire(S, 'lookout').ok, false);
+  const first = G.candidatesAt(S)[0];
+  assert.equal(G.hire(S, first.id).ok, false, '해먹이 없으면 못 태워요');
   S.ship.mods.push({ id: 'hammock', col: 0, row: 3, rot: 0 });
-  assert.ok(G.hire(S, 'lookout').ok);
-  assert.equal(G.hire(S, 'deckhand').ok, false, '나룻배 정원 1');
+  assert.ok(G.hire(S, first.id).ok);
+  assert.equal(S.crew[0].name, first.name);
+  assert.equal(G.hire(S, G.candidatesAt(S)[0].id).ok, false, '나룻배 정원 1');
   S.res.coin = 0; S.owed = 5;
   G.dock(S, 'pine');
   assert.equal(S.crew.length, 0);

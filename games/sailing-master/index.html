@@ -21,20 +21,44 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 
-#hud { position: absolute; left: 10px; right: 10px; top: calc(8px + var(--safe-t)); display: grid; gap: 6px; pointer-events: none; }
-#hudTop { display: flex; gap: 6px; align-items: stretch; }
-#windCard { display: flex; align-items: center; gap: 7px; padding: 4px 10px 4px 5px; }
-#compass { width: 40px; height: 40px; position: relative; border-radius: 50%; background: rgba(255,255,255,.08); flex: none; }
-#compass span { position: absolute; left: 50%; top: 1px; transform: translateX(-50%); font-size: 8px; color: var(--muted); line-height: 1; }
-#arrow { position: absolute; inset: 0; transition: transform .4s linear; }
-.num { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.2; }
-#speedCard { padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; min-width: 62px; }
-#dateCard { padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; flex: 1; min-width: 0; }
-.iconBtn { width: 38px; pointer-events: auto; font-size: 17px; flex: none; }
-#chips { display: flex; gap: 8px; padding: 5px 10px; align-items: center; justify-content: space-between; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
-#chips b { font-weight: 600; }
+/* 위쪽 정보: 칸을 나누지 않은 계기판 패널 한 장(바람·속도·날짜 + 아이템 줄) */
+#hud { position: absolute; left: 8px; right: 8px; top: calc(6px + var(--safe-t)); pointer-events: none; }
+#plate { border-radius: 16px; overflow: hidden; background: linear-gradient(to bottom, rgba(24,62,80,.9), rgba(10,34,48,.93)); border: 1px solid rgba(226,196,130,.34); box-shadow: 0 6px 18px rgba(3,16,26,.38), inset 0 1px 0 rgba(255,255,255,.1); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+#hudTop { display: flex; align-items: center; padding: 4px 4px 4px 5px; min-height: 58px; }
+#compass { width: 50px; height: 50px; position: relative; flex: none; }
+#compass svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#arrow { transition: transform .4s linear; }
+.inst { padding: 0 9px; min-width: 0; position: relative; }
+.inst + .inst::before { content: ''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 1px; background: linear-gradient(to bottom, rgba(226,196,130,0), rgba(226,196,130,.42), rgba(226,196,130,0)); }
+.num { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; letter-spacing: -.01em; white-space: nowrap; }
+.num small { font-size: 10.5px; font-weight: 600; color: #e2c482; margin-left: 2px; letter-spacing: 0; }
+.sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub.warn { color: #ffc27a; font-weight: 600; }
+#dateCard { flex: 1; }
+#dateNum { font-size: 15px; line-height: 1.27; }
+#dateNum i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 1.5px; box-shadow: 0 0 6px currentColor; }
+#hudBtns { display: grid; gap: 2px; flex: none; }
+.iconBtn { width: 34px; height: 25px; display: grid; place-items: center; border-radius: 8px; pointer-events: auto; color: #e2c482; background: rgba(255,255,255,.05); }
+.iconBtn svg { width: 15px; height: 15px; }
+.iconBtn.off { color: var(--muted); opacity: .55; }
+.iconBtn .slash { display: none; }
+.iconBtn.off .slash { display: inline; }
+#chips { display: flex; gap: 9px; padding: 5px 11px; align-items: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; background: rgba(2,14,22,.28); border-top: 1px solid rgba(226,196,130,.16); }
+#chips span { display: inline-flex; align-items: center; gap: 4px; }
+#chips svg { width: 15px; height: 15px; flex: none; }
+#chips .gap { margin-left: auto; }
 #chips .low { color: var(--bad); }
+/* 배 상태: 아이템 줄과 나눠 조종부 바로 위에 둔다 */
+#statusRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; margin-bottom: 6px; }
+#status { display: flex; gap: 11px; padding: 6px 10px; flex: none; border-radius: 12px; background: linear-gradient(to bottom, rgba(24,62,80,.9), rgba(10,34,48,.93)); border-color: rgba(226,196,130,.34); }
+.gauge { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.gauge svg { width: 14px; height: 14px; flex: none; }
+.gauge i { display: block; width: 38px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; box-shadow: inset 0 1px 1px rgba(0,0,0,.35); }
+.gauge i b { display: block; height: 100%; width: 100%; border-radius: 3px; background: linear-gradient(to right, #5fc08a, #a4e6a8); transition: width .3s; }
+.gauge i b.mid { background: linear-gradient(to right, #d9a12f, #f5d06a); }
+.gauge i b.low { background: linear-gradient(to right, #d9583f, #f59a7d); }
+.gauge span { min-width: 22px; text-align: right; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gauge span.low { color: var(--bad); font-weight: 700; }
 
 #hint { position: absolute; left: 50%; top: calc(104px + var(--safe-t)); transform: translateX(-50%); max-width: calc(100% - 28px); width: max-content; padding: 7px 13px; border-radius: 14px; background: rgba(9,30,42,.8); font-size: 13.5px; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; }
 #hint.on { opacity: 1; }
@@ -43,10 +67,10 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .toast { padding: 3px 9px; border-radius: 10px; background: rgba(9,30,42,.72); font-size: 12.5px; animation: toast 1.7s forwards; }
 @keyframes toast { 0% { opacity: 0; transform: translateY(6px);} 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
 
-#panel { position: absolute; left: 0; right: 0; bottom: var(--bar); padding: 8px 10px 0; background: linear-gradient(to top, rgba(10,34,46,.95) 70%, rgba(10,34,46,0)); }
-#context { display: flex; justify-content: center; gap: 8px; margin-bottom: 7px; min-height: 0; }
-#context:empty { margin: 0; }
-#context button { padding: 9px 16px; background: var(--on); color: #203038; font-weight: 700; border-radius: 12px; font-size: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.3); }
+#panel { position: absolute; left: 0; right: 0; bottom: var(--bar); padding: 0 10px; background: linear-gradient(to top, rgba(10,34,46,.95) 50px, rgba(10,34,46,0) 62px); pointer-events: none; }
+#controls { pointer-events: auto; }
+#context { display: flex; justify-content: flex-end; gap: 6px; min-width: 0; }
+#context button { padding: 7px 12px; background: var(--on); color: #203038; font-weight: 700; border-radius: 11px; font-size: 13.5px; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,.3); pointer-events: auto; }
 /* 돛·노·키를 한 줄에: 항해 화면을 더 보여 주려고(2026-11-02 대니님 요청) */
 #controls { display: flex; gap: 6px; height: 44px; align-items: stretch; }
 .seg { display: grid; grid-template-columns: auto repeat(3, minmax(30px, 34px)); align-items: stretch; border-radius: 12px; overflow: hidden; flex: none; }
@@ -63,11 +87,12 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 #knob { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: #f5eedd; color: #3a3224; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.35); pointer-events: none; }
 #rudderWrap.auto #knob { background: #b9d7d8; }
 /* 아래 메뉴: 어느 화면에서든 늘 보인다(2026-11-02 대니님 요청) */
-#tabs { position: absolute; left: 0; right: 0; bottom: 0; height: var(--bar); padding: 6px 10px calc(8px + var(--safe-b)); display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; background: #0a222e; }
-#tabs button { height: 36px; border-radius: 11px; font-size: 13px; background: rgba(255,255,255,.08); white-space: nowrap; }
+#tabs { position: absolute; left: 0; right: 0; bottom: 0; height: var(--bar); padding: 5px 10px calc(7px + var(--safe-b)); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 5px; background: #0a222e; }
+#tabs button { height: 38px; min-width: 0; border-radius: 10px; font-size: 10.5px; line-height: 1.1; background: rgba(255,255,255,.08); white-space: nowrap; overflow: hidden; }
+#tabs button .ic { display: block; font-size: 15px; line-height: 1.15; }
 #tabs button.on { background: var(--on); color: #203038; font-weight: 700; }
 
-#sheet { position: absolute; left: 0; right: 0; bottom: var(--bar); top: calc(92px + var(--safe-t)); background: var(--sheet); border-radius: 18px 18px 0 0; display: none; flex-direction: column; box-shadow: 0 -6px 24px rgba(0,0,0,.4); }
+#sheet { position: absolute; left: 0; right: 0; bottom: var(--bar); top: calc(98px + var(--safe-t)); background: var(--sheet); border-radius: 18px 18px 0 0; display: none; flex-direction: column; box-shadow: 0 -6px 24px rgba(0,0,0,.4); }
 #sheet.on { display: flex; }
 #sheetHead { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; }
 #sheetHead h2 { margin: 0; font-size: 18px; flex: 1; min-width: 0; }
@@ -86,6 +111,43 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .row .txt { color: var(--muted); font-size: 12.5px; line-height: 1.4; margin-top: 2px; }
 .row .act { padding: 8px 12px; border-radius: 10px; background: var(--on); color: #203038; font-weight: 700; font-size: 13.5px; white-space: nowrap; flex: none; }
 .row .act.off { background: rgba(255,255,255,.14); color: var(--muted); font-weight: 500; }
+/* 선원 명부 */
+.capCard { display: flex; align-items: center; gap: 12px; padding: 11px 13px; margin-bottom: 14px; border-radius: 14px; background: linear-gradient(120deg, #21506a, #173a4c); border: 1px solid rgba(226,196,130,.4); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+.face { flex: none; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 40% 30%, #3f7f96, #143444); box-shadow: 0 0 0 1.5px rgba(226,196,130,.75); }
+.face canvas { display: block; width: 100%; height: 100%; }
+.capCard .lab { font-size: 11px; font-weight: 700; letter-spacing: .05em; color: #e2c482; }
+.capCard .nm { font-size: 18px; font-weight: 800; line-height: 1.25; }
+.capCard .tr { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.capCard .tr b { color: var(--text); font-weight: 600; margin-right: 5px; }
+.rosterHead { display: flex; align-items: center; gap: 8px; margin: 0 2px 7px; font-size: 14px; font-weight: 700; }
+.rosterHead .cnt { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.seat { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid rgba(226,196,130,.6); }
+.seat.on { background: #e2c482; border-color: #e2c482; }
+.rosterNote { margin: -2px 2px 9px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.crewEmpty { margin-bottom: 14px; padding: 13px; border: 1px dashed rgba(190,226,232,.3); border-radius: 13px; font-size: 13px; line-height: 1.5; color: var(--muted); text-align: center; }
+.crewCard { margin-bottom: 9px; padding: 11px 12px; border-radius: 14px; background: var(--card); border: 1px solid rgba(190,226,232,.12); }
+.crewTop { display: flex; align-items: center; gap: 10px; }
+.crewTop .who { flex: 1; min-width: 0; }
+.crewTop .nm { display: flex; align-items: center; gap: 6px; font-size: 15.5px; font-weight: 700; line-height: 1.25; }
+.gender { font-size: 10.5px; font-weight: 700; padding: 1px 5px; border-radius: 5px; color: #bfe3ee; background: rgba(120,190,220,.2); }
+.gender.f { color: #ffd0d8; background: rgba(240,140,160,.2); }
+.crewTop .ds { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+.roleTag { flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 6px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #f1dca7; background: rgba(226,196,130,.15); }
+.roleTag svg { width: 13px; height: 13px; }
+.crewStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; margin: 10px 0 9px; }
+.st .l { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+.st .l b { font-size: 12.5px; color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.st .b { position: relative; height: 5px; border-radius: 3px; background: rgba(255,255,255,.13); overflow: hidden; }
+.st .b i { display: block; height: 100%; border-radius: 3px; background: var(--c); }
+.st .b::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(10,30,40,.75); }
+.crewFoot { display: flex; align-items: center; gap: 10px; padding-top: 9px; border-top: 1px solid rgba(190,226,232,.12); }
+.crewFoot .pay { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.crewFoot .pay span { display: inline-flex; align-items: center; gap: 3px; }
+.crewFoot .pay b { color: var(--text); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.crewFoot .pay svg { width: 13px; height: 13px; }
+.crewBtn { flex: none; min-width: 74px; padding: 8px 13px; border-radius: 10px; font-size: 13.5px; font-weight: 700; color: #203038; background: var(--on); }
+.crewBtn.off { color: var(--muted); font-weight: 600; background: rgba(255,255,255,.1); }
+.crewBtn.ghost { color: var(--muted); font-weight: 600; background: none; box-shadow: inset 0 0 0 1px rgba(190,226,232,.28); }
 .note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 10px; }
 .check { font-size: 13.5px; line-height: 1.7; }
 .check .ok { color: var(--ok); } .check .no { color: var(--bad); } .check .warn { color: var(--on); }
@@ -114,6 +176,12 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .sp { background: var(--card); border-radius: 11px; padding: 6px; text-align: center; font-size: 12px; }
 .sp canvas { width: 100%; height: 58px; display: block; }
 .sp.unk { color: var(--muted); }
+.achGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ach { background: var(--card); border-radius: 11px; padding: 9px 10px; opacity: .72; }
+.ach.done { opacity: 1; box-shadow: inset 0 0 0 1.5px var(--on); }
+.ach .nm { font-size: 13.5px; font-weight: 600; line-height: 1.25; }
+.ach .ds { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+.ach .rw { font-size: 11.5px; margin-top: 4px; color: var(--on); }
 
 #overlay { position: absolute; inset: 0; background: rgba(6,24,34,.72); display: none; align-items: center; justify-content: center; padding: 22px; }
 #overlay.on { display: flex; }
@@ -122,6 +190,39 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 #ovBox p { margin: 0 0 8px; color: #d3e4e6; font-size: 14px; line-height: 1.55; }
 #ovBox .big { width: 100%; margin-top: 10px; }
 
+#picker { position: absolute; inset: 0; background: #10303e; display: none; flex-direction: column; padding: calc(16px + var(--safe-t)) 14px calc(14px + var(--safe-b)); overflow-y: auto; }
+#picker.on { display: flex; }
+#picker h2 { margin: 0; font-size: 20px; }
+#picker .lead { margin: 4px 0 10px; color: var(--muted); font-size: 13.5px; }
+#capGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cap { background: var(--card); border: 2px solid transparent; border-radius: 13px; padding: 8px; text-align: center; }
+.cap.on { border-color: var(--on); }
+.cap canvas { display: block; width: 100%; height: 92px; }
+.cap .nm { font-size: 14px; font-weight: 700; margin-top: 3px; color: var(--on); }
+.cap .lk { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.cap .ds { font-size: 12px; margin-top: 3px; line-height: 1.3; }
+#capNames { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0; }
+#capNames button { padding: 7px 2px; white-space: nowrap; border-radius: 10px; background: rgba(255,255,255,.08); font-size: 13.5px; }
+#capNames button.on { background: var(--on); color: #203038; font-weight: 700; }
+#capName { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.2); color: var(--text); }
+#capGo { margin-top: 12px; flex: none; }
+@media (max-height: 640px) { .cap canvas { height: 62px; } .cap { padding: 5px; } #picker .lead { margin-bottom: 6px; } }
+/* 출항 이야기: 그림 아래로 종이 한 장이 겹친 그림책 */
+#story { position: absolute; inset: 0; background: #0b2531; display: none; flex-direction: column; padding-top: var(--safe-t); overflow-y: auto; }
+#story.on { display: flex; }
+#storyArt { display: block; width: 100%; aspect-ratio: 36 / 25; flex: none; object-fit: cover; }
+#storySkip { position: absolute; right: 10px; top: calc(10px + var(--safe-t)); padding: 6px 12px; border-radius: 999px; background: rgba(8,28,38,.62); border: 1px solid rgba(255,255,255,.22); color: #eef4f2; font-size: 12.5px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#storyPaper { flex: 1 0 auto; margin-top: -12px; position: relative; display: flex; flex-direction: column; border-radius: 18px 18px 0 0; padding: 18px 20px calc(14px + var(--safe-b)); color: #33291d; background: linear-gradient(to bottom, #f8f0dc, #f0e4c8); box-shadow: 0 -6px 18px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.7); }
+#storyKick { color: #8f6a2c; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+#story h2 { margin: 3px 0 11px; font-size: 21px; font-weight: 800; color: #24303a; letter-spacing: -.01em; padding-bottom: 10px; border-bottom: 1px solid rgba(120,90,40,.28); }
+#storyText { flex: 1 0 auto; font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; font-size: 15px; line-height: 1.68; }
+#storyText p { margin: 0 0 9px; }
+#storyText .ad { margin: 3px 0 11px; padding: 9px 12px 9px 13px; background: #fff9e8; border: 1px solid rgba(150,110,50,.34); border-left: 3px solid #b84a35; border-radius: 3px 8px 8px 3px; font-size: 14px; font-weight: 600; line-height: 1.5; color: #5b2a1e; box-shadow: 0 1px 3px rgba(80,50,10,.14); }
+#storyFoot { display: flex; align-items: center; gap: 14px; margin-top: 12px; flex: none; }
+#storyDots { display: flex; gap: 6px; flex: none; }
+#storyDots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(95,70,30,.25); }
+#storyDots i.on { background: #8f6a2c; width: 18px; border-radius: 4px; }
+#storyNext { flex: 1; background: #17394a; color: #f8f0dc; box-shadow: 0 3px 10px rgba(23,57,74,.28); }
 #title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: linear-gradient(to bottom, rgba(10,44,62,.78), rgba(10,44,62,.34) 45%, rgba(10,44,62,.78)); }
 #title h1 { margin: 0; font-size: 42px; letter-spacing: .01em; font-weight: 800; text-shadow: 0 3px 16px rgba(0,0,0,.35); }
 #title p { margin: 10px 0 0; color: #d8ebec; font-size: 15px; }
@@ -135,27 +236,48 @@ body.intro #hud, body.intro #panel, body.intro #tabs { visibility: hidden; }
 <body class="intro">
 <canvas id="view"></canvas>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-wood" viewBox="0 0 16 16"><rect x="1" y="3.6" width="11.5" height="4" rx="2" fill="#a8743f"/><rect x="2.6" y="8.6" width="11.5" height="4" rx="2" fill="#8d5f32"/><circle cx="12.4" cy="5.6" r="2" fill="#e8c78f"/><circle cx="14" cy="10.6" r="2" fill="#e8c78f"/></symbol>
+  <symbol id="i-cloth" viewBox="0 0 16 16"><path d="M5 2.8h8.6v9l-1.7-1.1-1.7 1.1-1.7-1.1-1.7 1.1L5 13.2z" fill="#f2e9d2"/><rect x="2.2" y="2.8" width="5" height="10.4" rx="2.4" fill="#cdbb94"/><ellipse cx="4.7" cy="4.8" rx="1.3" ry="1" fill="#8e7c58"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.6" fill="#eec04a"/><circle cx="8" cy="8" r="4.6" fill="none" stroke="#b78a1f" stroke-width="1.1"/><path d="M8 5.4v5.2" stroke="#a87c18" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-hold" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10.4" rx="1.3" fill="#b98c53"/><path d="M2 6.6h12M2 9.8h12" stroke="#7f5b30" stroke-width="1"/><path d="M5 3v10.4M11 3v10.4" stroke="#8d6738" stroke-width="1"/></symbol>
+  <symbol id="i-food" viewBox="0 0 16 16"><path d="M1.8 9.2C1.8 5.6 4.5 3.6 8 3.6s6.2 2 6.2 5.6v2.3a1.1 1.1 0 0 1-1.1 1.1H2.9a1.1 1.1 0 0 1-1.1-1.1z" fill="#dd9f53"/><path d="M5.2 6l1 2M8.2 5.4l.8 2.2M11 6.2l.3 1.8" stroke="#a76d2d" stroke-width="1.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-deckhand" viewBox="0 0 16 16"><path d="M3 12c3 0 3-8 6-8a3 3 0 0 1 0 6c-3 0-3-4-6-4M9 10c2 0 2.4 2 4 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-lookout" viewBox="0 0 16 16"><path d="M1.6 9.6l7.8-5 1.5 2.4-7.8 5zM10.2 3.6l2.5-1.6 2 3.2-2.5 1.6z" fill="currentColor"/><path d="M6.8 10L5 14.2M7.6 9.6l2 4.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-helmsman" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><path d="M8 1v14M1 8h14M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.1"/></symbol>
+  <symbol id="i-hull" viewBox="0 0 16 16"><path d="M1.4 9.2h13.2l-2 4.2H3.4z" fill="#b8d6df"/><path d="M7.6 1.8v7.4M8.6 2.8l4.4 5.4H8.6z" fill="#f2e9d2" stroke="#f2e9d2" stroke-width=".7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-vigor" viewBox="0 0 16 16"><path d="M8 14S1.6 10.2 1.6 5.8A3.6 3.6 0 0 1 8 3.6a3.6 3.6 0 0 1 6.4 2.2C14.4 10.2 8 14 8 14z" fill="#f08a6e"/></symbol>
+</svg>
 <div id="hud">
-  <div id="hudTop">
-    <div class="card" id="windCard">
-      <div id="compass"><span>북</span>
-        <svg id="arrow" viewBox="0 0 46 46"><path d="M23 9 L30 30 L23 25 L16 30 Z" fill="#9fd9ea"/></svg>
+  <div id="plate">
+    <div id="hudTop">
+      <div id="compass" aria-label="바람 방향">
+        <svg viewBox="0 0 50 50"><defs><linearGradient id="brass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3dfa9"/><stop offset=".5" stop-color="#b08f50"/><stop offset="1" stop-color="#7f6431"/></linearGradient><radialGradient id="face" cx=".42" cy=".36" r=".75"><stop offset="0" stop-color="#27607a"/><stop offset="1" stop-color="#0c2a39"/></radialGradient></defs><circle cx="25" cy="25" r="23" fill="url(#face)" stroke="url(#brass)" stroke-width="2.6"/><g id="ticks" stroke="#cfe3e6" stroke-opacity=".5" stroke-width="1"></g><path d="M25 3.4 L28 9 H22 Z" fill="#e8604a"/></svg>
+        <svg id="arrow" viewBox="0 0 50 50"><path d="M25 9.5 L25 28 L18.5 34 Z" fill="#eef9fc"/><path d="M25 9.5 L25 28 L31.5 34 Z" fill="#8ccbe0"/><circle cx="25" cy="25" r="2.1" fill="url(#brass)"/></svg>
       </div>
-      <div><div class="num" id="windNum">0</div><div class="sub" id="windDir">바람</div></div>
+      <div class="inst"><div class="num"><span id="windNum">0</span><small>kt</small></div><div class="sub" id="windDir">바람</div></div>
+      <div class="inst"><div class="num"><span id="spdNum">0.0</span><small>kt</small></div><div class="sub">배 속도</div></div>
+      <div class="inst" id="dateCard"><div class="num" id="dateNum"></div><div class="sub" id="regionName"></div></div>
+      <div id="hudBtns">
+        <button class="iconBtn" id="mus" aria-label="음악"><svg viewBox="0 0 16 16"><path d="M6 12.2V3.4l7-1.4v8.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="4.2" cy="12.2" rx="2.1" ry="1.7" fill="currentColor"/><ellipse cx="11.2" cy="10.6" rx="2.1" ry="1.7" fill="currentColor"/><path class="slash" d="M2 2l12 12" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        <button class="iconBtn" id="snd" aria-label="소리"><svg viewBox="0 0 16 16"><path d="M2 6v4h2.6L8 13V3L4.6 6z" fill="currentColor"/><path d="M10.2 5.6a3.4 3.4 0 0 1 0 4.8M12 3.8a6 6 0 0 1 0 8.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path class="slash" d="M2 2l12 12" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      </div>
     </div>
-    <div class="card" id="speedCard"><div class="num" id="spdNum">0.0</div><div class="sub">노트</div></div>
-    <div class="card" id="dateCard"><div class="num" id="dateNum" style="font-size:13.5px"></div><div class="sub" id="regionName"></div></div>
-    <button class="card iconBtn" id="mus" aria-label="음악">🎵</button>
-    <button class="card iconBtn" id="snd" aria-label="소리">🔊</button>
+    <div id="chips"></div>
   </div>
-  <div class="card" id="chips"></div>
 </div>
 <div id="hint"></div>
 <div id="toasts"></div>
 <div id="fps"></div>
 
 <div id="panel">
-  <div id="context"></div>
+  <div id="statusRow">
+    <div class="card" id="status">
+      <div class="gauge" title="선체 내구도"><svg><use href="#i-hull"/></svg><i><b id="hullBar"></b></i><span id="hullNum"></span></div>
+      <div class="gauge" title="기력"><svg><use href="#i-vigor"/></svg><i><b id="vigorBar"></b></i><span id="vigorNum"></span></div>
+    </div>
+    <div id="context"></div>
+  </div>
   <div id="controls">
     <div class="seg card" id="sailSeg">
       <span class="lab" aria-label="돛">⛵</span>
@@ -181,10 +303,30 @@ body.intro #hud, body.intro #panel, body.intro #tabs { visibility: hidden; }
 
 <div id="overlay"><div id="ovBox"></div></div>
 
+<div id="story">
+  <canvas id="storyArt"></canvas>
+  <button id="storySkip">건너뛰기</button>
+  <div id="storyPaper">
+    <div id="storyKick"></div>
+    <h2 id="storyTitle"></h2>
+    <div id="storyText"></div>
+    <div id="storyFoot"><div id="storyDots"></div><button class="big" id="storyNext">다음</button></div>
+  </div>
+</div>
+<div id="picker">
+  <h2>자, 선장을 골라 봐!</h2>
+  <p class="lead">어떤 선장이 될 텐가? 한번 정하면 끝까지 가는 거다!</p>
+  <div id="capGrid"></div>
+  <div class="h3">이름</div>
+  <div id="capNames"></div>
+  <input id="capName" maxlength="10" placeholder="직접 적어도 좋아!">
+  <button class="big" id="capGo">이 선장으로 출항 준비</button>
+</div>
+
 <div id="title">
   <h1>Sailing Master</h1>
   <p>작은 호수에서 시작하는 항해</p>
-  <div class="go" id="titleGo">화면을 눌러 시작</div>
+  <div class="go" id="titleGo">눌러서 출항하자!</div>
   <div class="tag">M1 담수 · Danny Soft</div>
 </div>
 
@@ -193,11 +335,12 @@ import * as G from './logic.js';
 import * as A from './art.js';
 import * as SA from './art-ship.js';
 import * as SH from './ship.js';
+import { drawStoryScene, isJourney, STORY_W, STORY_H } from './art-story.js';
 import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound } from './sound.js';
 import { createMusic } from './music.js';
 import { worldOf } from './world.js';
-import { VIEW, NO_GO, HULLS, HULL_ORDER, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL } from './data.js';
+import { VIEW, NO_GO, HULLS, HULL_ORDER, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view'), ctx = view.getContext('2d', { alpha: false });
@@ -221,7 +364,7 @@ let sc = A.createScene(S.region, G.findsOf(S)), creatures = createCreatures(worl
 const wake = new A.Wake();
 const snd = createSound(), music = createMusic();
 music.setRegion(S.region);
-try { const a = JSON.parse(localStorage.getItem(AUDIO_KEY) || '{}'); if (a.snd === false) { snd.setOn(false); $('snd').textContent = '🔇'; } if (a.mus === false) { music.setOn(false); $('mus').style.opacity = 0.45; } } catch { /* 무시 */ }
+try { const a = JSON.parse(localStorage.getItem(AUDIO_KEY) || '{}'); if (a.snd === false) { snd.setOn(false); $('snd').classList.add('off'); } if (a.mus === false) { music.setOn(false); $('mus').classList.add('off'); } } catch { /* 무시 */ }
 const saveAudio = () => { try { localStorage.setItem(AUDIO_KEY, JSON.stringify({ snd: snd.on, mus: music.on })); } catch { /* 무시 */ } };
 
 let W = 0, H = 0, DPR = 1;
@@ -241,13 +384,84 @@ const fmt = (o) => Object.entries(o).filter(([, v]) => v).map(([k, v]) => `${RES
 
 // ── 시작 ──
 let started = false, paused = false;
-$('titleGo').textContent = saved ? '화면을 눌러 이어 하기' : '화면을 눌러 시작';
+$('titleGo').textContent = saved ? '눌러서 다시 바다로!' : '눌러서 출항하자!';
 $('title').addEventListener('pointerdown', () => {
   started = true; $('title').style.display = 'none'; document.body.classList.remove('intro');
   snd.unlock(); music.start(snd.ac);
-  if (S.disaster) showDisaster(S.disaster.cause);
-  else if (S.docked) { openPort(); if (!saved) overlay('<h3>🌅 갈대 나루</h3><p>뗏목과 노 한 쌍으로 시작해요.</p><p>물에 뜬 목재와 천을 건져 항구로 가져오면 더 큰 배를 지을 수 있어요.</p>', '알겠어요', null); } else showHint('물을 탭하거나 아래 키로 몰아요', 4);
+  if (!S.captain) openPicker(); else enterGame();
 });
+// 선장 고르기: 새 게임과, 선장이 없던 예전 저장에서 한 번 뜬다
+const pick = { id: 'sailor', name: '' };
+function openPicker() {
+  const grid = $('capGrid'); grid.innerHTML = '';
+  pick.name = CAPTAINS[pick.id].names[0];
+  for (const [id, C] of Object.entries(CAPTAINS)) {
+    const b = document.createElement('button'); b.className = 'cap'; b.dataset.id = id;
+    const cv = document.createElement('canvas'), dpr = Math.min(2, devicePixelRatio || 1); cv.width = 150 * dpr; cv.height = 92 * dpr;
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); SA.drawCaptainPortrait(g, C, 75, 52, 1.05);
+    b.append(cv);
+    b.insertAdjacentHTML('beforeend', `<div class="nm">${C.name}</div><div class="lk">${C.look} · ${C.age}</div><div class="ds">${C.desc}</div>`);
+    b.addEventListener('click', () => { pick.id = id; pick.name = C.names[0]; $('capName').value = ''; syncPicker(); snd.play('tap'); });
+    grid.append(b);
+  }
+  syncPicker();
+  $('picker').classList.add('on');
+}
+function syncPicker() {
+  for (const b of $('capGrid').children) b.classList.toggle('on', b.dataset.id === pick.id);
+  const box = $('capNames'); box.innerHTML = '';
+  for (const n of CAPTAINS[pick.id].names) {
+    const b = document.createElement('button'); b.textContent = n; b.classList.toggle('on', n === pick.name && !$('capName').value);
+    b.addEventListener('click', () => { pick.name = n; $('capName').value = ''; syncPicker(); });
+    box.append(b);
+  }
+}
+$('capName').addEventListener('input', syncPicker);
+$('capGo').addEventListener('click', () => {
+  G.setCaptain(S, pick.id, $('capName').value || pick.name);
+  $('picker').classList.remove('on');
+  save(); openStory(S.captain);
+});
+// 출항 이야기: 선장을 고른 뒤 한 번, 3쪽. 마지막 쪽은 호수까지 가는 길이 그려진다
+const story = { cap: null, page: 0, raf: 0, t0: 0 };
+function openStory(cap) { story.cap = cap; story.page = 0; $('story').classList.add('on'); showStoryPage(); }
+function closeStory() { cancelAnimationFrame(story.raf); $('story').classList.remove('on'); enterGame(); }
+function drawStoryPage(t) {
+  const cv = $('storyArt'), g = cv.getContext('2d'), k = cv.width / STORY_W;
+  g.setTransform(k, 0, 0, k, 0, 0); g.clearRect(0, 0, STORY_W, STORY_H);
+  drawStoryScene(g, CAPTAINS[story.cap.id], STORIES[story.cap.id].pages[story.page].scene, t);
+}
+function showStoryPage() {
+  cancelAnimationFrame(story.raf);
+  const St = STORIES[story.cap.id], P = St.pages[story.page], last = story.page === St.pages.length - 1, cv = $('storyArt');
+  const w = Math.min(cv.parentElement.clientWidth || 360, 720), dpr = Math.min(2.5, devicePixelRatio || 1);
+  cv.width = Math.round(w * dpr); cv.height = Math.round(w * dpr * STORY_H / STORY_W);
+  $('storyKick').textContent = `${story.cap.name}의 이야기 · ${story.page + 1}장`;
+  $('storyTitle').textContent = St.title;
+  // 공고문은 종이 한 장처럼 따로 띄운다
+  $('storyText').replaceChildren(...G.storyLine(P.text, story.cap.name).split('\n').map((line) => {
+    const p = document.createElement('p'); p.textContent = line;
+    if (line.startsWith('“선장 모집')) p.className = 'ad';
+    return p;
+  }));
+  $('storyDots').innerHTML = St.pages.map((_, i) => `<i class="${i === story.page ? 'on' : ''}"></i>`).join('');
+  $('storyNext').textContent = last ? '갈대 나루에 내리기 →' : '다음 →';
+  $('storySkip').style.display = last ? 'none' : '';
+  if (isJourney(P.scene) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    story.t0 = performance.now();
+    const frame = (now) => { const t = Math.min(1, (now - story.t0) / 4500); drawStoryPage(t < 1 ? t * t * (3 - 2 * t) : 1); if (t < 1) story.raf = requestAnimationFrame(frame); };
+    story.raf = requestAnimationFrame(frame);
+  } else drawStoryPage(1);
+}
+$('storyNext').addEventListener('click', () => {
+  snd.play('tap');
+  if (story.page < STORIES[story.cap.id].pages.length - 1) { story.page++; showStoryPage(); } else closeStory();
+});
+$('storySkip').addEventListener('click', () => { snd.play('tap'); closeStory(); });
+function enterGame() {
+  if (S.disaster) showDisaster(S.disaster.cause);
+  else if (S.docked) { openPort(); if (!saved) overlay('<h3>🌅 갈대 나루</h3><p>어서 와, 선장! 뗏목 한 척에 노 한 쌍, 시작치곤 근사하지? 으하하!</p><p>물에 뜬 목재랑 천을 건져서 항구로 가져와. 그걸로 더 큰 배를 짓는 거야!</p>', '알았어!', null); } else showHint('물을 탭하든 아래 키를 잡든, 어서 몰아 보라고!', 4);
+}
 
 // ── 안내 ──
 let hintT = 0;
@@ -273,8 +487,8 @@ $('sailSeg').addEventListener('pointerdown', (e) => {
   if (G.setSail(S, Number(b.dataset.lv))) { snd.play(Number(b.dataset.lv) ? 'sail' : 'flap'); syncButtons(); }
 });
 $('oar').addEventListener('pointerdown', () => { if ($('oar').disabled) return; G.setRow(S, !S.boat.row); syncButtons(); });
-$('snd').addEventListener('pointerdown', () => { snd.unlock(); snd.setOn(!snd.on); $('snd').textContent = snd.on ? '🔊' : '🔇'; saveAudio(); });
-$('mus').addEventListener('pointerdown', () => { snd.unlock(); music.start(snd.ac); music.setOn(!music.on); $('mus').style.opacity = music.on ? 1 : 0.45; saveAudio(); });
+$('snd').addEventListener('pointerdown', () => { snd.unlock(); snd.setOn(!snd.on); $('snd').classList.toggle('off', !snd.on); saveAudio(); });
+$('mus').addEventListener('pointerdown', () => { snd.unlock(); music.start(snd.ac); music.setOn(!music.on); $('mus').classList.toggle('off', !music.on); saveAudio(); });
 
 // 키 슬라이더: 끄는 동안만 돌고, 놓으면 가운데로
 const wrap = $('rudderWrap'), knob = $('knob');
@@ -305,9 +519,9 @@ function tapWorld(sx, sy) {
   const fl = G.flotsamOf(S).find((f) => Math.hypot(f.x - x, f.y - y) < 18 / cam.zoom + 3);
   if (fl) { if (G.setDest(S, fl.x, fl.y, { type: 'pick' })) { snd.play('tap'); syncButtons(); } return; }
   const port = w.ports.find((p) => Math.hypot(p.x - x, p.y - y) < R);
-  if (port) { if (G.setDest(S, port.x, port.y, { type: 'port', id: port.id })) { snd.play('tap'); showHint(`${port.name}(으)로 가요`, 2); } return; }
+  if (port) { if (G.setDest(S, port.x, port.y, { type: 'port', id: port.id })) { snd.play('tap'); showHint(`${port.name}(으)로 간다!`, 2); } return; }
   const gate = w.gates.find((g) => Math.hypot(g.x - x, g.y - y) < R);
-  if (gate) { if (G.setDest(S, gate.x, gate.y, { type: 'gate', id: gate.id })) { snd.play('tap'); showHint(`${gate.name}(으)로 가요`, 2); } return; }
+  if (gate) { if (G.setDest(S, gate.x, gate.y, { type: 'gate', id: gate.id })) { snd.play('tap'); showHint(`${gate.name}(으)로 간다!`, 2); } return; }
   const c = creatures.at(sx, sy, cam, W);
   if (c) {
     if (G.recordSpecies(S, c.sp)) { snd.play('record'); drainEvents(); return; }
@@ -358,31 +572,31 @@ function drainEvents() {
         for (const side of [-1, 1]) { const [lx, ly] = SA.oarBladeLocal(sprite, b.rowPhase, side); wake.ring(b.x + lx * ch - ly * sh, b.y + lx * sh + ly * ch, 1); }
         break;
       }
-      case 'tack': showHint('지그재그로 맞바람을 거슬러 가요', 2.4); break;
+      case 'tack': showHint('맞바람이다! 지그재그로 뚫고 간다!', 2.4); break;
       case 'swing': snd.play('swing'); break;
-      case 'ground': snd.play('ground'); showHint('물가에 닿았어요. 선체가 조금 상해요', 2.6, true); break;
+      case 'ground': snd.play('ground'); showHint('쿵! 물가에 박았어! 선체가 좀 상했다고!', 2.6, true); break;
       case 'pick': snd.play('pick'); wake.ring(ev.x, ev.y, 1); toast(`${RES[ev.k].icon} +${ev.n}`); break;
-      case 'holdFull': showHint('화물칸이 찼어요. 항구로 돌아가요', 3); break;
-      case 'found': snd.play('found'); overlay(`<h3>🗺 ${ev.name}</h3><p>새로운 곳을 찾았어요!</p><p>${fmt({ wood: ev.wood, cloth: ev.cloth, coin: ev.coin })}${ev.blueprint ? `<br>📜 설계도: ${MODULES[ev.blueprint].name}` : ''}</p>`, '계속 항해', null); break;
-      case 'species': showHint(`📖 ${SPECIES[ev.id].name}: 도감에 기록했어요`, 2.4); break;
+      case 'holdFull': showHint('화물칸이 꽉 찼어! 항구로 돌아가자!', 3); break;
+      case 'found': snd.play('found'); overlay(`<h3>🗺 ${ev.name}</h3><p>으하하! 새로운 곳을 찾았다!</p><p>${fmt({ wood: ev.wood, cloth: ev.cloth, coin: ev.coin })}${ev.blueprint ? `<br>📜 설계도: ${MODULES[ev.blueprint].name}` : ''}</p>`, '계속 가자!', null); break;
+      case 'species': showHint(`📖 ${SPECIES[ev.id].name}! 도감에 적어 뒀어!`, 2.4); break;
       case 'ach': { snd.play('ach'); const a = ACHIEVEMENTS.find((q) => q.id === ev.id); toast(`🏆 ${a.name} 🪙+${a.coin}`); showHint(`🏆 ${a.name}${a.decor ? ` · ${DECOR[a.decor].name} 꾸미기 열림` : ''}`, 3); break; }
-      case 'gustSoon': snd.play('warn'); showHint('돌풍이 다가와요. 돛을 줄여요', 4, true); break;
-      case 'gustOn': snd.play('gust'); showHint('돌풍!', 2, true); break;
-      case 'gustOff': showHint(ev.hurt > 0.005 ? `돌풍이 지나갔어요. 선체 -${Math.round(ev.hurt * 100)}%` : '돌풍을 무사히 넘겼어요', 3); break;
-      case 'heatOn': showHint(ev.shade ? '무더위지만 그늘막이 있어요' : '무더위예요. 기력이 줄어요. 그늘막이 필요해요', 4, !ev.shade); break;
-      case 'droughtOn': snd.play('warn'); showHint('가뭄이에요. 여울이 얕아져요', 4, true); break;
-      case 'shoal': snd.play('ground'); showHint('여울에 걸렸어요. 짐을 덜면 뜨기 쉬워요', 3.5, true); break;
-      case 'shoalRisk': showHint('여울을 피할 길이 없어 그대로 가요', 3, true); break;
-      case 'foodLow': snd.play('warn'); showHint('식량이 곧 떨어져요', 3, true); break;
-      case 'heel': snd.play('creak'); showHint('너무 기울어요! 돛을 줄여요', 2.5, true); break;
+      case 'gustSoon': snd.play('warn'); showHint('돌풍이 온다! 돛 줄여, 어서!', 4, true); break;
+      case 'gustOn': snd.play('gust'); showHint('돌풍이다! 꽉 잡아!', 2, true); break;
+      case 'gustOff': showHint(ev.hurt > 0.005 ? `돌풍이 지나갔어. 선체 -${Math.round(ev.hurt * 100)}%, 손 좀 봐야겠는걸!` : '으하하! 돌풍쯤이야 거뜬하지!', 3); break;
+      case 'heatOn': showHint(ev.shade ? '푹푹 찌는군! 그래도 그늘막이 있잖아!' : '푹푹 찐다! 기력이 빠져. 그늘막이 필요해!', 4, !ev.shade); break;
+      case 'droughtOn': snd.play('warn'); showHint('가뭄이다! 여울이 얕아지니 조심해!', 4, true); break;
+      case 'shoal': snd.play('ground'); showHint('여울에 걸렸어! 짐을 덜면 뜨기 쉽다고!', 3.5, true); break;
+      case 'shoalRisk': showHint('여울을 피할 길이 없어! 그냥 밀고 간다!', 3, true); break;
+      case 'foodLow': snd.play('warn'); showHint('식량이 곧 바닥나, 선장! 굶고 항해할 순 없지!', 3, true); break;
+      case 'heel': snd.play('creak'); showHint('뒤집어지겠어! 돛 줄여!', 2.5, true); break;
       case 'arrive': snd.play('arrive'); syncButtons(); break;
       case 'atGate': openGate(worldOf(S.region).gates.find((g) => g.id === ev.id)); break;
       case 'docked': snd.play('dock'); openPort(ev); break;
-      case 'crewLeft': toast(`${ev.name}이(가) 임금을 못 받아 떠났어요`); break;
+      case 'crewLeft': toast(`${ev.name}이(가) 임금 떼였다고 내려 버렸어!`); break;
       case 'wages': toast(`임금 🪙-${ev.pay}`); break;
       case 'built': snd.play('build'); break;
-      case 'inlandHint': showHint('🔭 저 숲 안쪽은 맨눈으로 보이지 않아요. 망원경이 있으면 좋겠어요', 4.5); break;
-      case 'canBuild': snd.play('found'); showHint(`🛠 ${HULLS[ev.id].name} 재료가 모였어요. 항구 설계 탭에서 지어요`, 5); break;
+      case 'inlandHint': showHint('🔭 저 숲 안쪽은 맨눈으론 안 보여! 망원경이 있어야 해!', 4.5); break;
+      case 'canBuild': snd.play('found'); showHint(`🛠 ${HULLS[ev.id].name} 재료가 다 모였다! 항구 설계 탭에서 지어 보자고!`, 5); break;
       case 'disaster': snd.play('disaster'); showDisaster(ev.cause); break;
       case 'region': changeRegionArt(); openRegion(ev); break;
       case 'ended': showEnding(); break;
@@ -392,16 +606,16 @@ function drainEvents() {
 }
 function showDisaster(cause) {
   closeSheet();
-  const why = cause === 'sink' ? '선체가 버티지 못하고 가라앉기 시작했어요.' : '기력이 다해 선장이 쓰러졌어요.';
-  overlay(`<h3>🆘 구조 신호</h3><p>${why}</p><p>지나가던 배가 신호를 보고 가까운 나루로 끌어다 줘요.</p>`, '구조받기', () => {
+  const why = cause === 'sink' ? '선체가 못 버텨! 가라앉기 시작했어!' : '기력이 다해서 선장이 쓰러졌어!';
+  overlay(`<h3>🆘 구조 신호</h3><p>${why}</p><p>지나가던 배가 신호를 봤어! 가까운 나루까지 끌어다 준대.</p>`, '구조받기', () => {
     const r = G.rescue(S); bakeIfNeeded(); changeRegionArt();
     const lost = fmt(r.lost);
-    overlay(`<h3>구조되었어요</h3><p>잃은 화물: ${lost}</p>${r.broke.length ? `<p>부서진 모듈: ${r.broke.map((m) => MODULES[m].name).join(', ')}</p>` : ''}${r.left ? `<p>${r.left}이(가) 배를 떠났어요.</p>` : ''}<p>구조 비용 🪙${r.fee} · 선체 35%</p>`, '항구로', () => openPort());
+    overlay(`<h3>살았다!</h3><p>잃은 화물: ${lost}</p>${r.broke.length ? `<p>부서진 모듈: ${r.broke.map((m) => MODULES[m].name).join(', ')}</p>` : ''}${r.left ? `<p>${r.left}이(가) 배에서 내렸어.</p>` : ''}<p>구조 비용 🪙${r.fee} · 선체 35%</p>`, '항구로', () => openPort());
   });
 }
 function showEnding() {
   closeSheet();
-  overlay(`<h3>🏞 강이 끝나는 곳</h3><p>${S.ship.name}이(가) 작은 호수에서 강 끝까지 왔어요.</p><p>저 너머 큰 강과 바다는 다음 항해에서 이어져요.</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 강에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
+  overlay(`<h3>🏞 강이 끝나는 곳</h3><p>${S.ship.name}이(가) 작은 호수에서 강 끝까지 왔다!</p><p>저 너머 큰 강과 바다는 다음 항해에서 만나자고, 친구! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 강에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
 }
 
 // ── 시트 ──
@@ -436,13 +650,13 @@ function closeSheet() { sheet = null; $('sheet').classList.remove('on'); syncTab
 $('sheetClose').addEventListener('click', () => { if (sheet?.foot === portFoot) return; closeSheet(); });
 
 // ── 아래 메뉴: 항구에서는 항구 칸이 하나 더 생긴다 ──
-const TAB_ITEMS = () => [...(S.docked ? [['port', '⚓ 항구']] : []), ['chart', '🗺 해도'], ['ship', '⛵ 배'], ['crew', '🧑‍✈️ 선원'], ['log', '📖 기록']];
+const TAB_ITEMS = () => [...(S.docked ? [['port', '⚓', '항구']] : []), ['chart', '🗺', '해도'], ['ship', '⛵', '배'], ['crew', '🧑‍✈️', '선원'], ['book', '📖', '도감'], ['ach', '🏆', '도전과제']];
 function syncTabs() {
   const box = $('tabs'), key = S.docked ? 'port' : 'sea';
   if (box.dataset.key !== key) {
     box.dataset.key = key; box.innerHTML = '';
-    for (const [id, label] of TAB_ITEMS()) {
-      const b = el('button', '', label); b.dataset.t = id;
+    for (const [id, icon, label] of TAB_ITEMS()) {
+      const b = el('button', '', `<span class="ic">${icon}</span>${label}`); b.dataset.t = id;
       b.addEventListener('click', () => {
         if (sheet?.tab === id && !S.docked) { closeSheet(); return; } // 항해 중 같은 칸을 다시 누르면 물로 돌아간다
         openTab(id);
@@ -458,8 +672,9 @@ function openTab(id, sub) {
   sheet = { tab: id };
   if (id === 'port') openSheet(port ? port.name : '항구', [{ id: 'port', name: '항구', render: renderPort }], 'port', foot);
   else if (id === 'chart') openSheet('해도', [{ id: 'chart', name: '해도', render: renderChart }], 'chart', foot);
-  else if (id === 'crew') openSheet('선원', [{ id: 'crew', name: '선원', render: renderCrew }], 'crew', foot);
-  else if (id === 'log') openSheet('기록', [{ id: 'log', name: '기록', render: renderLog }], 'log', foot);
+  else if (id === 'crew') openSheet('선원 명부', [{ id: 'crew', name: '선원', render: renderCrew }], 'crew', foot);
+  else if (id === 'book') openSheet('도감', [{ id: 'species', name: '🐟 생물', render: renderSpecies }, { id: 'finds', name: '📍 발견물', render: renderFinds }], sub || 'species', foot);
+  else if (id === 'ach') openSheet('도전과제', [{ id: 'ach', name: '도전과제', render: renderAch }], 'ach', foot);
   else {
     const tabs = [{ id: 'design', name: '🛠 설계', render: renderDesign }];
     if (S.docked) tabs.push({ id: 'paint', name: '🎨 꾸미기', render: renderPaint });
@@ -483,25 +698,25 @@ function portFoot() {
     if (!r.ok) { showHint(r.why, 3, true); return; }
     closeSheet(); syncButtons(); snd.play('sail');
     if (chartPick) { const p = chartPick; chartPick = null; G.setDest(S, p.x, p.y, p.target); }
-    if (S.stats.taughtTap) showHint('물을 탭하면 그곳으로 가요', 3);
-    else { S.stats.taughtTap = 1; showHint('✨ 반짝이는 것은 건져요. 동물은 탭해서 기록해요', 6); }
+    if (S.stats.taughtTap) showHint('물을 탭해, 거기로 갈 테니!', 3);
+    else { S.stats.taughtTap = 1; showHint('✨ 반짝이는 건 건지고, 동물은 탭해서 기록하라고!', 6); }
   });
   return [b];
 }
 function openPort(ev) {
   openTab('port');
   if (ev && (ev.got?.wood || ev.got?.cloth || ev.got?.coin)) toast(`창고로: ${fmt(ev.got)}`);
-  if (ev?.gift) toast('마을에서 하루치 식량을 나눠 줬어요');
+  if (ev?.gift) toast('마을 사람들이 하루치 식량을 나눠 줬어. 인심 좋네!');
 }
 function renderPort(body) {
   const st = G.stats(S), c = G.departureCheck(S), cost = G.repairCost(S), room = Math.floor(st.foodCap - S.food);
   body.append(el('p', 'note', `창고 ${fmt(S.res)}`));
   const buy = Math.min(room, S.res.coin);
-  body.append(row('🍖 식량', `${S.food.toFixed(1)} / ${st.foodCap} · 하루 ${1 + S.crew.length}개씩 먹어요`, buy > 0 ? `채우기 🪙${buy}` : '가득', () => { G.buyFood(S, buy); renderSheet(); }, buy <= 0));
-  body.append(row('🛠 선체', `${Math.round(S.hull * 100)}%`, cost > 0 ? `수리 🪙${cost}` : '멀쩡', () => { if (G.repair(S)) { snd.play('place'); renderSheet(); } else showHint('코인이 모자라요', 2); }, cost <= 0 || S.res.coin < cost));
+  body.append(row('🍖 식량', `${S.food.toFixed(1)} / ${st.foodCap} · 하루 ${1 + S.crew.length}개씩 먹어치우지`, buy > 0 ? `채우기 🪙${buy}` : '가득', () => { G.buyFood(S, buy); renderSheet(); }, buy <= 0));
+  body.append(row('🛠 선체', `${Math.round(S.hull * 100)}%`, cost > 0 ? `수리 🪙${cost}` : '멀쩡', () => { if (G.repair(S)) { snd.play('place'); renderSheet(); } else showHint('코인이 모자라, 선장!', 2); }, cost <= 0 || S.res.coin < cost));
   body.append(row('🪵 목재 팔기', `2개에 🪙1 · ${S.res.wood}개`, '10개', () => { G.sell(S, 'wood', 10); renderSheet(); }, S.res.wood < 2));
   body.append(row('🧵 천 팔기', `1개에 🪙1 · ${S.res.cloth}개`, '5개', () => { G.sell(S, 'cloth', 5); renderSheet(); }, S.res.cloth < 1));
-  body.append(row('🌙 하루 묵기', '임금을 내고 날짜를 넘겨요. 날씨를 기다릴 때 써요', '기다리기', () => { G.waitDay(S); drainEvents(); renderSheet(); }));
+  body.append(row('🌙 하루 묵기', '임금 내고 하루 쉬는 거야. 날씨가 나쁘면 기다리라고!', '기다리기', () => { G.waitDay(S); drainEvents(); renderSheet(); }));
   const fc = G.forecast(S), days = el('div', 'days');
   fc.forEach((d, i) => days.append(el('div', '', `${i === 0 ? '오늘' : `+${i}일`}<br>${weatherIcon(d)}`)));
   body.append(el('div', 'h3', '예보'), days);
@@ -520,7 +735,7 @@ function renderDesign(body) {
     const h = HULLS[id];
     if (h.grade <= Hl.grade) continue;
     const ok = canAfford(h.price) && (id !== 'sloop' || S.visited.lake);
-    body.append(row(`${h.name} 짓기`, `${costText(h.price)} · ${id === 'sloop' && !S.visited.lake ? '큰 호수 항구에서 지어요' : `칸 ${SH.validCells(id).length} · 정원 ${h.crew} · 모듈은 값 절반 돌려받아요`}`, docked ? '짓기' : '', () => {
+    body.append(row(`${h.name} 짓기`, `${costText(h.price)} · ${id === 'sloop' && !S.visited.lake ? '큰 호수 항구에서 짓는다!' : `칸 ${SH.validCells(id).length} · 정원 ${h.crew} · 모듈은 값 절반 돌려받지`}`, docked ? '짓기' : '', () => {
       const r = G.buildHull(S, id);
       if (!r.ok) { showHint(r.why, 2.5); return; }
       design.armed = null; bakeIfNeeded(); drainEvents(); renderSheet();
@@ -559,7 +774,7 @@ function renderDesign(body) {
     return [Math.floor((x / px + Hl.cols * Hl.cell / 2) / Hl.cell), Math.floor((Hl.x0 + y / px) / Hl.cell)];
   };
   cv.addEventListener('pointerdown', (e) => {
-    if (!docked) { showHint('항구에서만 고칠 수 있어요', 2); return; }
+    if (!docked) { showHint('배는 항구에 대고 고치는 거야, 친구!', 2); return; }
     const [col, r] = cellAt(e);
     if (design.sel) {
       const res = G.placeModule(S, design.sel, col, r, design.rot);
@@ -568,7 +783,7 @@ function renderDesign(body) {
     }
     const m = SH.moduleAt(S.ship, col, r);
     if (!m) return;
-    if (design.armed === m) { G.removeModule(S, col, r); design.armed = null; snd.play('place'); bakeIfNeeded(); renderSheet(); } else { design.armed = m; draw(); showHint('한 번 더 누르면 치워요(값 절반)', 2); }
+    if (design.armed === m) { G.removeModule(S, col, r); design.armed = null; snd.play('place'); bakeIfNeeded(); renderSheet(); } else { design.armed = m; draw(); showHint('한 번 더 누르면 뜯어낸다(값 절반)!', 2); }
   });
   const gauge = (label, val, bad) => `<div class="${bad ? 'bad' : ''}">${label}<b>${val}</b></div>`;
   body.append(el('div', 'gauges',
@@ -576,8 +791,8 @@ function renderDesign(body) {
     gauge('복원력', `${Math.round(st.stability * 100)}%`, st.stability < 0.8) + gauge('쏠림', st.listing < 0.15 ? '균형' : `${Math.round(st.listing * 100)}%`, st.listing > 0.5) +
     gauge('돛', st.sailArea ? (st.sailArea >= 1 ? '큰 돛' : '작은 돛') : '없음') + gauge('노', st.oars ? `${st.oars}자리` : '없음', !st.oars && !st.sailArea) +
     gauge('최고 속도', `${(st.maxSpeed * 1.94).toFixed(1)} kt`) + gauge('화물·식량', `${st.holdCap} · ${st.foodCap}`)));
-  if (!docked) { body.append(el('p', 'note', '배를 고치려면 항구에 들러요.')); return; }
-  body.append(el('p', 'note', design.sel ? `${MODULES[design.sel].name}: 칸을 눌러 놓아요` : '모듈을 고르고 칸을 눌러요. 놓인 모듈을 두 번 누르면 치워요'));
+  if (!docked) { body.append(el('p', 'note', '배를 고치려면 항구로 가, 친구!')); return; }
+  body.append(el('p', 'note', design.sel ? `${MODULES[design.sel].name}: 칸을 눌러서 올려!` : '모듈을 고르고 칸을 눌러! 놓인 건 두 번 누르면 뜯어낸다!'));
   if (design.sel && MODULES[design.sel].w !== MODULES[design.sel].h) {
     const rotBtn = el('button', 'ghost', `↻ 돌리기(지금 ${design.rot ? '돌림' : '기본'})`);
     rotBtn.style.padding = '7px 12px'; rotBtn.style.marginBottom = '4px';
@@ -588,7 +803,7 @@ function renderDesign(body) {
   for (const [id, M] of Object.entries(MODULES)) {
     const open = G.isUnlocked(S, id);
     const need = M.need.blueprint ? '📜 설계도 필요' : M.need.region ? `${REGIONS[M.need.region].name}부터` : '';
-    const b = el('button', `mod${design.sel === id ? ' on' : ''}${open ? '' : ' lock'}`, `<div class="ic">${M.icon}</div><div class="nm">${M.name}</div><div class="ct">${open ? costText(M.cost) : need}</div><div class="ct">${open ? M.desc : ''}</div>`);
+    const b = el('button', `mod${design.sel === id ? ' on' : ''}${open ? '' : ' lock'}`, `<div class="ic">${M.icon}</div><div class="nm">${M.name}</div><div class="ct">${open ? costText(G.moduleCost(S, id)) : need}</div><div class="ct">${open ? M.desc : ''}</div>`);
     b.addEventListener('click', () => { if (!open) { showHint(need, 2); return; } design.sel = design.sel === id ? null : id; design.armed = null; renderSheet(); });
     pal.append(b);
   }
@@ -621,29 +836,61 @@ function renderPaint(body) {
   body.append(el('div', 'h3', '소품(도전과제로 열려요)'));
   for (const [id, d] of Object.entries(DECOR)) {
     const open = G.decorOpen(S, id), on = S.ship.decor.includes(id), a = ACHIEVEMENTS.find((q) => q.decor === id);
-    body.append(row(d.name, open ? (on ? '달았어요' : '') : `🏆 ${a.name}: ${a.desc}`, open ? (on ? '떼기' : '달기') : '', () => { G.toggleDecor(S, id); bakeIfNeeded(); renderSheet(); }, on, d.icon));
+    body.append(row(d.name, open ? (on ? '달았다!' : '') : `🏆 ${a.name}: ${a.desc}`, open ? (on ? '떼기' : '달기') : '', () => { G.toggleDecor(S, id); bakeIfNeeded(); renderSheet(); }, on, d.icon));
   }
 }
 
 // ── 선원 ──
+const HAIRS = ['#2a1c12', '#3a2a1c', '#5a3a22', '#1f1a18', '#6d4a2a'], ROLE_COAT = { deckhand: '#2f6f8f', lookout: '#3f7a5a', helmsman: '#8a5a3a' };
+// 얼굴 그림: 선장은 모자, 선원은 성별·역할에 맞춘 옷과 머리
+function faceEl(C, size, hat) {
+  const box = el('div', 'face'); box.style.cssText = `width:${size}px;height:${size}px`;
+  const cv = document.createElement('canvas'), dpr = Math.min(2.5, devicePixelRatio || 1); cv.width = cv.height = size * dpr;
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const k = size / 62; SA.drawCaptainPortrait(g, C, size / 2, 33 * k, k, hat);
+  box.append(cv); return box;
+}
+const crewLook = (c) => ({ coat: ROLE_COAT[c.role], hair: HAIRS[(c.id || 0) % HAIRS.length], style: c.gender === '여' ? 'long' : 'short' });
+const coinIcon = '<svg><use href="#i-coin"/></svg>';
+function crewCard(c, cost, act, label, cls) {
+  const R = ROLES[c.role], card = el('div', 'crewCard');
+  const top = el('div', 'crewTop');
+  top.append(faceEl(crewLook(c), 44, false));
+  const who = el('div', 'who');
+  const nm = el('div', 'nm'); nm.textContent = c.name;
+  nm.insertAdjacentHTML('beforeend', `<span class="gender${c.gender === '여' ? ' f' : ''}">${c.gender}</span>`);
+  who.append(nm, el('div', 'ds', R.brief));
+  top.append(who, el('div', 'roleTag', `<svg><use href="#i-${c.role}"/></svg>${R.name}`));
+  // 값은 기준 100에서 ±25: 막대 가운데 금이 기준값
+  const stat = (name, v, color) => `<div class="st" style="--c:${color}"><div class="l">${name}<b>${v}</b></div><div class="b"><i style="width:${(v - 75) * 2}%"></i></div></div>`;
+  const foot = el('div', 'crewFoot', `<div class="pay">${cost != null ? `<span>고용 ${coinIcon}<b>${cost}</b></span>` : ''}<span>일당 ${coinIcon}<b>${c.wage}</b></span></div>`);
+  if (label) { const b = el('button', `crewBtn ${cls}`, label); b.addEventListener('click', act); foot.append(b); }
+  card.append(top, el('div', 'crewStats', stat('항해술', c.skill, '#7fd6a0') + stat('유머', c.humor, '#f2c14e') + stat('주량', c.drink, '#8fb8e8')), foot);
+  return card;
+}
 function renderCrew(body) {
-  const st = G.stats(S), docked = !!S.docked;
-  body.append(el('p', 'note', `정원 ${S.crew.length} / ${st.crewCap}${st.crewCap < st.hull.crew ? ` (해먹·선실을 놓으면 ${st.hull.crew}명까지)` : ''}. 임금은 입항할 때 내요${S.owed > 0.5 ? ` · 밀린 임금 🪙${Math.ceil(S.owed)}` : ''}.`));
-  for (const c of S.crew) {
-    const R = ROLES[c.role];
-    body.append(row(`${c.name} · ${R.name}`, `${R.desc}<br>하루 🪙${c.wage}`, docked ? '내보내기' : '', () => { G.dismiss(S, c.role); renderSheet(); }, true, R.icon));
+  const st = G.stats(S), docked = !!S.docked, cap = S.captain;
+  if (cap) {
+    const C = CAPTAINS[cap.id], card = el('div', 'capCard'), info = el('div', 'grow');
+    info.append(el('div', 'lab', '선장')); const nm = el('div', 'nm'); nm.textContent = cap.name; info.append(nm, el('div', 'tr', `<b>${C.name}</b>${C.desc}`));
+    card.append(faceEl(C, 56, true), info); body.append(card);
   }
-  if (!S.crew.length) body.append(el('p', 'note', '아직 혼자예요. 선장이 키와 돛을 오가는 동안에는 배가 잠깐 곧게만 가요.'));
+  const seats = Array.from({ length: st.hull.crew }, (_, i) => `<i class="seat${i < S.crew.length ? ' on' : ''}"></i>`).join('');
+  body.append(el('div', 'rosterHead', `승선 선원<span class="cnt">${seats}<span style="margin-left:3px">${S.crew.length} / ${st.crewCap}</span></span>`));
+  const notes = [!st.hull.crew ? `${st.hull.name}엔 선원을 못 태워! 나룻배부터 태울 수 있어.` : st.crewCap < st.hull.crew ? `해먹·선실을 놓으면 ${st.hull.crew}명까지 태운다!` : '', S.owed > 0.5 ? `밀린 임금 ${Math.ceil(S.owed)}코인! 다음 입항 때 꼭 내라고.` : ''].filter(Boolean);
+  if (notes.length) body.append(el('p', 'rosterNote', notes.join(' ')));
+  for (const c of S.crew) body.append(crewCard(c, null, () => { G.dismiss(S, c.id); renderSheet(); }, docked ? '내보내기' : '', 'ghost'));
+  if (!S.crew.length) body.append(el('div', 'crewEmpty', '아직 혼자군! 선장이 키와 돛 사이를 뛰어다니는 동안 배는 곧게만 간다고.'));
   if (!docked) return;
-  const list = G.hireList(S);
-  if (list.length) body.append(el('div', 'h3', '이 항구에서 일할 사람'));
-  for (const r of list) {
-    const full = S.crew.length >= st.crewCap;
-    body.append(row(r.name, `${r.desc}<br>고용 🪙${r.hire} · 하루 🪙${r.wage}`, '고용', () => {
-      const res = G.hire(S, r.role);
+  const list = G.candidatesAt(S);
+  body.append(el('div', 'rosterHead', `이 항구의 구직자<span class="cnt">${list.length}명 · 며칠 뒤면 딴 녀석들이 와</span>`));
+  for (const c of list) {
+    const why = !st.hull.crew || S.crew.length >= st.crewCap ? '자리 없음' : G.hasRole(S, c.role) ? '역할 있음' : S.res.coin < c.hireCost ? '코인 부족' : '';
+    body.append(crewCard(c, c.hireCost, () => {
+      const res = G.hire(S, c.id);
       if (!res.ok) { showHint(res.why, 2.5); return; }
-      snd.play('place'); toast(`${res.name}이(가) 탔어요`); drainEvents(); renderSheet();
-    }, full || S.res.coin < r.hire, r.icon));
+      snd.play('place'); toast(`${res.name}이(가) 올라탔다!`); drainEvents(); renderSheet();
+    }, why || '고용', why ? 'off' : ''));
   }
 }
 
@@ -694,10 +941,10 @@ function renderChart(body) {
     fc.forEach((d, i) => { const si = Math.floor(d.day / CAL.seasonDays) % 4; days.append(el('div', '', `${i === 0 ? '오늘' : `+${i}일`}<br>${weatherIcon(d)} ${['🌱', '☀️', '🍂', '❄️'][si]}`)); });
     info.append(el('div', 'h3', `${c.season.icon} ${c.season.name} ${c.dayOfSeason + 1}일 · 예보 ${st.forecast}일${st.forecast < 3 ? ' (기압계로 늘어나요)' : ''}`), days);
     const allFinds = G.findsOf(S), left = allFinds.filter((f) => !S.found[f.id]).length;
-    info.append(el('p', 'note', `발견지 ${allFinds.length - left}/${allFinds.length}. 안개 속이나 뭍 어딘가에 있어요. ${w.gates[0].to ? `${w.gates[0].name}(🚪)로 ${REGIONS[w.gates[0].to].name}에 가요` : `${w.gates[0].name}(🚪)이 이 수역의 끝이에요`}. 지도를 탭하면 항해 계획이 나와요.`));
+    info.append(el('p', 'note', `발견지 ${allFinds.length - left}/${allFinds.length}. 안개 속이나 뭍 어딘가에 있다고! ${w.gates[0].to ? `${w.gates[0].name}(🚪)로 ${REGIONS[w.gates[0].to].name}에 간다` : `${w.gates[0].name}(🚪)이 이 수역의 끝이야`}. 지도를 탭하면 항해 계획이 나오지.`));
     if (!chartPick) return;
     const dist = Math.hypot(chartPick.x - S.boat.x, chartPick.y - S.boat.y), spd = Math.max(1.2, st.sailArea ? st.maxSpeed * 0.55 : st.rowSpeed * 0.9), sec = dist / spd, persons = 1 + S.crew.length, needFood = persons * sec / CAL.day;
-    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div><div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어요</div>' : ''}${fc.some((d) => d.gust !== null) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보가 있어요. 돛을 줄일 준비를 해요</div>' : ''}${fc.some((d) => d.heat && REGIONS[S.region].heat) && !st.awning ? '<div class="warn">⚠ 무더위 예보, 그늘막이 없어요</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
+    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div><div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어!</div>' : ''}${fc.some((d) => d.gust !== null) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보다! 돛 줄일 준비 해!</div>' : ''}${fc.some((d) => d.heat && REGIONS[S.region].heat) && !st.awning ? '<div class="warn">⚠ 무더위 예보인데 그늘막이 없잖아!</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
     info.append(el('div', 'h3', '항해 계획'), chk);
     const go = el('button', 'big', S.docked ? '이 항로로 출항' : '이 항로로 가기');
     go.style.width = '100%'; go.style.marginTop = '8px';
@@ -720,12 +967,10 @@ function renderChart(body) {
   updateInfo();
 }
 
-// ── 기록 ──
-function renderLog(body) {
-  const seen = Object.keys(S.seen).length, all = Object.keys(SPECIES).length, ach = Object.keys(S.ach).length;
-  const title = TITLES[REGION_ORDER.filter((r) => S.visited[r]).length - 1];
-  body.append(el('p', 'note', `칭호 <b>${title}</b> · 항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번`));
-  body.append(el('div', 'h3', `도감 ${seen}/${all} (지나가는 생물을 탭해요. 사슴·곰 같은 뭍짐승은 망원경이 있어야 보여요. 5종·10종·전체를 모으면 보상)`));
+// ── 도감: 생물과 발견물 ──
+function renderSpecies(body) {
+  const seen = Object.keys(S.seen).length, all = Object.keys(SPECIES).length;
+  body.append(el('p', 'note', `생물 ${seen}/${all}. 지나가는 놈들을 탭하면 적어 둔다! 사슴·곰 같은 뭍짐승은 망원경이 있어야 보여. 5종·10종·전체를 모으면 보상이 두둑하지.`));
   const grid = el('div', 'grid');
   for (const id of Object.keys(SPECIES)) {
     const known = S.seen[id], def = SPECIES[id];
@@ -740,13 +985,43 @@ function renderLog(body) {
     grid.append(cell);
   }
   body.append(grid);
-  body.append(el('div', 'h3', `도전과제 ${ach}/${ACHIEVEMENTS.length}`));
-  for (const a of ACHIEVEMENTS) body.append(row(`${S.ach[a.id] ? '🏆' : '⬜'} ${a.name}`, `${a.desc} · 🪙${a.coin}${a.decor ? ` · ${DECOR[a.decor].icon}` : ''}`));
+}
+function renderFinds(body) {
+  const total = REGION_ORDER.reduce((a, r) => a + REGIONS[r].finds.length, 0), got = REGION_ORDER.reduce((a, r) => a + REGIONS[r].finds.filter((f) => S.found[f.id]).length, 0);
+  body.append(el('p', 'note', `발견물 ${got}/${total}. 맵마다 발견물 수는 정해져 있어. 물 위, 물가, 내륙에 숨어 있고 내륙은 망원경이 있어야 찾지!`));
+  for (const r of REGION_ORDER) {
+    const list = REGIONS[r].finds, n = list.filter((f) => S.found[f.id]).length;
+    body.append(el('div', 'h3', `${REGIONS[r].name} ${n}/${list.length}${S.visited[r] ? '' : ' · 아직 못 가 본 곳'}`));
+    const grid = el('div', 'grid');
+    for (const f of list) {
+      const known = S.found[f.id], cell = el('div', `sp${known ? '' : ' unk'}`);
+      const cv = el('canvas'), dpr = Math.min(2, devicePixelRatio || 1); cv.width = 92 * dpr; cv.height = 58 * dpr;
+      cell.append(cv, el('div', '', known ? f.name : '???'));
+      if (known) {
+        const sp = sc.sprites[f.art], g = cv.getContext('2d'), k = Math.min(70 / sp.c.width, 52 / sp.c.height) * dpr;
+        g.drawImage(sp.c, (cv.width - sp.c.width * k) / 2, (cv.height - sp.c.height * k) / 2, sp.c.width * k, sp.c.height * k);
+      }
+      grid.append(cell);
+    }
+    body.append(grid);
+  }
+}
+
+// ── 도전과제: 내용이 짧아 좌우 2열 ──
+function renderAch(body) {
+  const ach = Object.keys(S.ach).length, title = TITLES[REGION_ORDER.filter((r) => S.visited[r]).length - 1];
+  body.append(el('p', 'note', `달성 ${ach}/${ACHIEVEMENTS.length} · 칭호 <b>${title}</b> · 항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번`));
+  const grid = el('div', 'achGrid');
+  for (const a of ACHIEVEMENTS) {
+    const done = S.ach[a.id];
+    grid.append(el('div', `ach${done ? ' done' : ''}`, `<div class="nm">${done ? '🏆' : '⬜'} ${a.name}</div><div class="ds">${a.desc}</div><div class="rw">🪙${a.coin}${a.decor ? ` · ${DECOR[a.decor].icon} ${DECOR[a.decor].name}` : ''}</div>`));
+  }
+  body.append(grid);
   const reset = el('button', 'ghost', '새 게임(두 번 눌러 확인)');
   reset.style.cssText = 'margin-top:14px;width:100%;color:var(--muted)';
   reset.addEventListener('click', () => {
     if (reset.dataset.arm) { started = false; try { localStorage.removeItem(SAVE_KEY); } catch { /* 무시 */ } location.reload(); return; }
-    reset.dataset.arm = '1'; reset.textContent = '정말 처음부터 할까요? 한 번 더 눌러요';
+    reset.dataset.arm = '1'; reset.textContent = '정말 처음부터 할 텐가? 한 번 더 눌러!';
   });
   body.append(reset);
 }
@@ -756,11 +1031,11 @@ function openGate(gate) {
   const st = G.gateStatus(S, gate), name = gate.to ? REGIONS[gate.to].name : '강 끝';
   sheet = null;
   openSheet(`${gate.name}: ${name}`, [{ id: 'g', name: '', render(body) {
-    body.append(el('p', 'note', gate.to ? `이 물길을 지나면 ${name}(으)로 가요. 다음 수역의 첫 항구에 닿아요.` : '여기서 강이 넓어지며 끝나요. 담수 항해의 마지막이에요.'));
+    body.append(el('p', 'note', gate.to ? `이 물길을 지나면 ${name}(으)로 간다! 다음 수역의 첫 항구에 닿을 거야.` : '여기서 강이 넓어지며 끝난다. 담수 항해의 마지막이야!'));
     body.append(el('div', 'check', st.list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('')));
-    if (!st.ok) body.append(el('p', 'note', '<br>조건을 채우고 다시 와요. 해도에서 발견지를 찾아보거나 항구에서 배를 키워요.'));
+    if (!st.ok) body.append(el('p', 'note', '<br>조건을 채우고 다시 와, 선장! 해도에서 발견지를 찾거나 항구에서 배를 키우라고.'));
   } }], 'g', () => {
-    const go = el('button', 'big', st.ok ? '지나가기' : '아직 못 가요'); go.disabled = !st.ok;
+    const go = el('button', 'big', st.ok ? '지나가기' : '아직 못 가!'); go.disabled = !st.ok;
     go.addEventListener('click', () => { closeSheet(); G.passGate(S, gate); bakeIfNeeded(); drainEvents(); });
     return [go];
   });
@@ -768,7 +1043,7 @@ function openGate(gate) {
 function openRegion(ev) {
   snd.play('found');
   const R = REGIONS[ev.to];
-  const tips = { lake: '돛을 달 수 있어요! 항구 설계에서 작은 돛대를 놓아 보세요. 돌풍이 오면 돛을 줄여요. 여름 무더위엔 그늘막이 필요해요.', river: '물살이 북쪽 하류로 흘러요. 밝은 곳은 여울이에요. 가뭄이면 깊은 배는 걸려요.' };
+  const tips = { lake: '이제 돛을 달 수 있다! 항구 설계에서 작은 돛대를 올려 봐. 돌풍이 오면 돛을 줄이고, 여름 무더위엔 그늘막을 챙기라고!', river: '물살이 북쪽 하류로 흐른다! 밝은 곳은 여울이니 조심해. 가뭄이면 깊은 배는 걸린다고!' };
   overlay(`<h3>🌊 ${R.name}</h3><p>${tips[ev.to] || ''}</p>`, '입항', () => openPort());
 }
 
@@ -777,11 +1052,24 @@ const DIRS = ['동', '남동', '남', '남서', '서', '북서', '북', '북동'
 const compassName = (a) => DIRS[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
 let hudT = 0, flapT = 0, creakT = 0, lastLuffHint = -99;
 const pct = (v) => Math.round(v * 100);
+function setGauge(id, v) {
+  const bar = $(`${id}Bar`), num = $(`${id}Num`), n = pct(v), state = v < 0.3 ? 'low' : v < 0.6 ? 'mid' : '';
+  bar.style.width = `${n}%`; bar.className = state;
+  num.textContent = n; num.className = state === 'low' ? 'low' : '';
+}
+const SEASON_COLOR = { spring: '#9ee07a', summer: '#ffd257', autumn: '#f0955a', winter: '#a9dcf2' };
+$('ticks').innerHTML = Array.from({ length: 12 }, (_, i) => `<line x1="25" y1="${i % 3 ? 5.5 : 5}" x2="25" y2="${i % 3 ? 8 : 10}" transform="rotate(${i * 30} 25 25)"/>`).join('');
 function syncTop() {
   const st = G.stats(S), persons = 1 + S.crew.length, c = G.clock(S);
-  $('dateNum').textContent = `${c.season.icon} ${c.season.name} ${c.dayOfSeason + 1}일`;
-  $('regionName').textContent = `${REGIONS[S.region].name}${S.weather.gustOn ? ' · 돌풍' : S.weather.heat ? ' · 무더위' : ''}`;
-  $('chips').innerHTML = `<b>${fmt(S.res)}</b><span>📦${G.holdUsed(S)}/${st.holdCap}</span><span class="${S.food < persons ? 'low' : ''}">🍖${S.food.toFixed(0)}</span><span class="${S.hull < 0.4 ? 'low' : ''}">🛠${pct(S.hull)}</span><span class="${S.vigor < 0.4 ? 'low' : ''}">💪${pct(S.vigor)}</span>`;
+  const color = SEASON_COLOR[c.season.id], alert = S.weather.gustOn ? '돌풍' : S.weather.heat ? '무더위' : '';
+  $('dateNum').innerHTML = `<i style="background:${color};color:${color}"></i>${c.season.name} ${c.dayOfSeason + 1}일`;
+  $('regionName').textContent = `${REGIONS[S.region].name}${alert ? ` · ${alert}` : ''}`;
+  $('regionName').classList.toggle('warn', !!alert);
+  // 윗줄은 아이템, 배 상태는 조종부 위 게이지
+  const item = (icon, text, cls = '') => `<span class="${cls}"><svg><use href="#i-${icon}"/></svg>${text}</span>`;
+  $('chips').innerHTML = Object.entries(S.res).filter(([k, v]) => v || k === 'coin').map(([k, v]) => item(k, v)).join('')
+    + item('hold', `${G.holdUsed(S)}/${st.holdCap}`, 'gap') + item('food', S.food.toFixed(0), S.food < persons ? 'low' : '');
+  setGauge('hull', S.hull); setGauge('vigor', S.vigor);
 }
 function updateHud(dt) {
   hudT -= dt;
@@ -789,7 +1077,7 @@ function updateHud(dt) {
   if (hudT > 0) return;
   hudT = 0.15;
   const b = S.boat, w = S.wind;
-  $('windNum').textContent = `${(w.speed * 1.94).toFixed(0)} kt`;
+  $('windNum').textContent = (w.speed * 1.94).toFixed(0);
   $('windDir').textContent = `${compassName(w.from)}풍`;
   $('arrow').style.transform = `rotate(${w.from * 180 / Math.PI + 270}deg)`;
   $('spdNum').textContent = (b.spd * 1.94).toFixed(1);
@@ -797,9 +1085,9 @@ function updateHud(dt) {
   wrap.classList.toggle('auto', !!S.route);
   const shown = S.route ? b.rudder : (rudderPtr !== null ? b.rudder : 0);
   knob.style.transform = `translateX(${shown * (wrap.clientWidth / 2 - KNOB_MARGIN)}px) rotate(${shown * 70}deg)`;
-  if (!S.route && !b.row && b.luff && b.spd < 2.2 && S.t - lastLuffHint > 9 && !S.docked) { lastLuffHint = S.t; showHint('맞바람이에요. 옆으로 틀어요', 3); }
-  if (b.stamina <= 0 && b.row && hintT <= 0) showHint('지쳐서 노가 느려져요', 3);
-  if (rudderPtr !== null && !b.row && b.sailNow < 0.05 && !S.cap.then && b.spd < 0.5 && hintT <= 0) showHint(G.stats(S).sailArea ? '돛을 올리거나 노를 켜야 움직여요' : '노를 켜야 움직여요', 2.5);
+  if (!S.route && !b.row && b.luff && b.spd < 2.2 && S.t - lastLuffHint > 9 && !S.docked) { lastLuffHint = S.t; showHint('맞바람이야! 옆으로 틀어!', 3); }
+  if (b.stamina <= 0 && b.row && hintT <= 0) showHint('팔이 떨어지겠어! 노가 느려진다!', 3);
+  if (rudderPtr !== null && !b.row && b.sailNow < 0.05 && !S.cap.then && b.spd < 0.5 && hintT <= 0) showHint(G.stats(S).sailArea ? '돛을 올리든 노를 젓든 해야 움직이지!' : '노를 저어야 움직이지!', 2.5);
   snd.ambient(S.docked ? w.speed * 0.6 : w.speed, S.docked ? 0 : b.spd);
   syncButtons();
   // 상황 단추
@@ -808,7 +1096,7 @@ function updateHud(dt) {
   const key = `${near ? near.id : ''}|${gate ? gate.id : ''}`;
   if (ctxBox.dataset.key !== key) {
     ctxBox.dataset.key = key; ctxBox.innerHTML = '';
-    if (near) { const x = el('button', '', `⚓ ${near.name} 입항`); x.addEventListener('click', () => { G.dockHere(S, near); drainEvents(); }); ctxBox.append(x); }
+    if (near) { const x = el('button', '', '⚓ 입항'); x.addEventListener('click', () => { G.dockHere(S, near); drainEvents(); }); ctxBox.append(x); }
     if (gate) { const x = el('button', '', `🚪 ${gate.name}`); x.addEventListener('click', () => openGate(gate)); ctxBox.append(x); }
   }
 }
@@ -920,7 +1208,7 @@ function frame(now) {
   const raw = Math.min(0.25, (now - last) / 1000);
   last = now;
   if (paused) return;
-  const hold = !started || !!sheet || overlayOpen();
+  const hold = !started || !!sheet || overlayOpen() || $('picker').classList.contains('on') || $('story').classList.contains('on');
   if (!hold) {
     acc += raw;
     let n = 0;
@@ -957,7 +1245,7 @@ if ('serviceWorker' in navigator && !query.get('dbg') && (location.protocol === 
 }
 
 // 점검용 창구(?dbg=1): 자동 확인이 상태를 읽고 조작할 때 씁니다
-if (query.get('dbg')) window.SM = { openTab, get S() { return S; }, get creatures() { return creatures; }, get sc() { return sc; }, G, SH, cam, snd, music, render, worldOf, get sheet() { return sheet; }, drainEvents, bakeIfNeeded, openPort, closeSheet, renderSheet, changeRegionArt, openGate, tapWorld };
+if (query.get('dbg')) window.SM = { openStory, showStoryPage, story, openTab, get S() { return S; }, get creatures() { return creatures; }, get sc() { return sc; }, G, SH, cam, snd, music, render, worldOf, get sheet() { return sheet; }, drainEvents, bakeIfNeeded, openPort, closeSheet, renderSheet, changeRegionArt, openGate, tapWorld };
 </script>
 </body>
 </html>

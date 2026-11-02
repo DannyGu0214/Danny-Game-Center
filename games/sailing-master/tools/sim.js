@@ -35,7 +35,7 @@ function shop() {
   if (H === 'rowboat' && S.visited.lake && S.blueprints.mast_m && Object.entries(HULLS.sloop.price).every(([k, v]) => S.res[k] >= v + (m[k] || 0)) && G.buildHull(S, 'sloop').ok) mark('슬루프');
   const list = S.ship.hull === 'raft' ? [] : S.ship.hull === 'rowboat' ? ['mast_s', 'telescope', 'hold', 'food', 'hammock', 'awning'] : ['mast_m', 'telescope', 'hold', 'food', 'hammock', 'awning', 'ballast'];
   for (const id of list) tryPlace(id);
-  if (S.crew.length < G.stats(S).crewCap) for (const r of G.hireList(S)) if (S.res.coin > ROLES[r.role].hire * 2 && G.hire(S, r.role).ok) { mark(`고용 ${r.role}`); break; }
+  if (S.crew.length < G.stats(S).crewCap) for (const c of G.candidatesAt(S)) if (!G.hasRole(S, c.role) && S.res.coin > c.hireCost * 2 && G.hire(S, c.id).ok) { mark(`고용 ${c.role}`); break; }
   const need = Math.min(G.stats(S).foodCap - S.food, S.res.coin - 5);
   if (need > 0) G.buyFood(S, Math.floor(need));
 }

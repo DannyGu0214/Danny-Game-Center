@@ -1,4 +1,4 @@
-import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR } from './data.js';
+import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW } from './data.js';
 import { worldOf } from './world.js';
 import * as SH from './ship.js';
 // 게임 규칙 전부. 화면이 없고, 시드와 고정 시간 단계만으로 결과가 같다.
@@ -88,7 +88,30 @@ export function findsOf(S, region = S.region) {
   return S.findPos[region];
 }
 const rnd = (S) => { S.rng = (S.rng + 0x6D2B79F5) >>> 0; let t = S.rng; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-export const stats = (S) => SH.statsOf(S.ship, holdUsed(S), S.food);
+// 선장 특성이 계기 값에 들어간다. 항해술은 돛·노 모두 10% 빠르다
+export function stats(S) {
+  const st = SH.statsOf(S.ship, holdUsed(S), S.food);
+  // 선원의 항해술도 속도에 더해진다(유머 감각·주량은 효과가 없는 개성)
+  const crewK = S.crew.reduce((a, c) => a + ((c.skill ?? CREW.baseStat) / CREW.baseStat - 1) * CREW.speedPerSkill, 0);
+  st.speedK = (hasTrait(S, 'sailor') ? 1.1 : 1) * (1 + crewK);
+  st.maxSpeed *= st.speedK; st.rowSpeed *= st.speedK;
+  return st;
+}
+export const hasTrait = (S, id) => !!S.captain && S.captain.id === id;
+// 선장 고르기. 이름은 비우면 첫 추천 이름이 붙는다
+export function setCaptain(S, id, name) {
+  const C = CAPTAINS[id];
+  if (!C) return false;
+  const clean = String(name ?? '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 10);
+  S.captain = { id, name: clean || C.names[0] };
+  return true;
+}
+// 기능공은 모듈 값이 재료마다 1 줄어든다
+export function moduleCost(S, id) {
+  const cost = { ...MODULES[id].cost };
+  if (hasTrait(S, 'crafter')) for (const k of Object.keys(cost)) cost[k] = Math.max(0, cost[k] - 1);
+  return cost;
+}
 export const holdUsed = (S) => S.hold.wood + S.hold.cloth + S.hold.coin;
 export const isUnlocked = (S, id) => { const n = MODULES[id].need; return (!n.region || S.visited[n.region]) && (!n.blueprint || S.blueprints[n.blueprint]); };
 export const hasRole = (S, role) => S.crew.some((c) => c.role === role);
@@ -201,17 +224,17 @@ export function undock(S) {
 // 출항 점검: blockers는 못 나가는 이유, warns는 위험하지만 나갈 수 있는 것
 export function departureCheck(S, days = 2) {
   const st = stats(S), blockers = [], warns = [];
-  if (!st.canMove) blockers.push('노 자리나 돛대가 있어야 움직여요');
-  if (st.overload) blockers.push('너무 무거워요. 짐이나 모듈을 줄여요');
+  if (!st.canMove) blockers.push('노 자리나 돛대가 있어야 움직이지!');
+  if (st.overload) blockers.push('너무 무거워! 짐이나 모듈을 덜어 내!');
   if (S.crew.length < 0) blockers.push('');
   const persons = 1 + S.crew.length;
-  if (S.food < persons * days) warns.push(`식량이 ${Math.floor(S.food / persons)}일치뿐이에요`);
-  if (S.hull < 0.5) warns.push('선체가 많이 상했어요');
-  if (st.load > 0.9) warns.push('짐이 많아 느려요');
+  if (S.food < persons * days) warns.push(`식량이 ${Math.floor(S.food / persons)}일치뿐이야!`);
+  if (S.hull < 0.5) warns.push('선체가 많이 상했어!');
+  if (st.load > 0.9) warns.push('짐이 많아서 느려 터졌어');
   const fc = forecast(S);
-  if (fc.some((d) => d.gust !== null) && st.sailArea) warns.push('예보에 돌풍이 있어요');
-  if (REGIONS[S.region].heat && fc.some((d) => d.heat) && !st.awning) warns.push('무더위 예보: 그늘막이 없어요');
-  if (S.region === 'river' && fc.some((d) => d.drought) && st.draft > 0.75) warns.push('가뭄 예보: 배가 깊어 여울에 걸려요');
+  if (fc.some((d) => d.gust !== null) && st.sailArea) warns.push('예보에 돌풍이 있다!');
+  if (REGIONS[S.region].heat && fc.some((d) => d.heat) && !st.awning) warns.push('무더위 예보: 그늘막이 없잖아!');
+  if (S.region === 'river' && fc.some((d) => d.drought) && st.draft > 0.75) warns.push('가뭄 예보: 배가 깊어서 여울에 걸린다!');
   return { ok: !blockers.length, blockers, warns };
 }
 
@@ -232,7 +255,10 @@ export function sell(S, k, n) {
   n = Math.min(n, S.res[k]);
   if (k === 'wood') n -= n % 2;
   if (n <= 0) return 0;
-  const coin = Math.floor(n * SELL_RATE[k]);
+  // 거래술 +10%는 끝수를 모아 두었다 1코인이 되면 준다(적게 팔아도 손해가 없게)
+  S.sellCarry = (S.sellCarry || 0) + n * SELL_RATE[k] * (hasTrait(S, 'trader') ? 1.1 : 1);
+  const coin = Math.floor(S.sellCarry + 1e-9);
+  S.sellCarry -= coin;
   S.res[k] -= n; S.res.coin += coin;
   return coin;
 }
@@ -250,31 +276,54 @@ export function waitDay(S) {
   payWages(S);
   return true;
 }
-export function hireList(S, region = S.region) {
-  return Object.entries(ROLES).filter(([id, r]) => !hasRole(S, id) && REGIONS[r.region].order <= REGIONS[region].order).map(([id, r]) => ({ role: id, ...r }));
+// 기준값의 ±25% 안에서 고른다
+const vary = (S, base) => Math.max(1, Math.round(base * (1 - CREW.spread + rnd(S) * 2 * CREW.spread)));
+function makeCandidate(S, taken) {
+  const open = Object.entries(ROLES).filter(([, r]) => REGIONS[r.region].order <= REGIONS[S.region].order);
+  const fresh = open.filter(([id]) => !hasRole(S, id)), roles = fresh.length ? fresh : open; // 아직 없는 역할부터 온다
+  const [role, R] = roles[Math.floor(rnd(S) * roles.length)];
+  const gender = rnd(S) < 0.5 ? '남' : '여', pool = CREW_NAMES[gender].filter((n) => !taken.has(n));
+  const list = pool.length ? pool : CREW_NAMES[gender], name = list[Math.floor(rnd(S) * list.length)];
+  taken.add(name);
+  S.crewSeq = (S.crewSeq || 0) + 1;
+  return { id: S.crewSeq, role, name, gender, skill: vary(S, CREW.baseStat), hireCost: vary(S, R.hire), humor: vary(S, CREW.baseStat), drink: vary(S, CREW.baseStat), wage: R.wage };
 }
-export function hire(S, role) {
-  const R = ROLES[role], st = stats(S);
-  if (!S.docked || S.crew.length >= st.crewCap) return { ok: false, why: '잠자리(해먹)가 모자라요' };
-  if (hasRole(S, role)) return { ok: false, why: '이미 있어요' };
-  if (S.res.coin < R.hire) return { ok: false, why: '코인이 모자라요' };
-  S.res.coin -= R.hire;
-  const name = CREW_NAMES[Math.floor(rnd(S) * CREW_NAMES.length)];
-  S.crew.push({ role, name, wage: R.wage });
-  S.hiredEver[role] = 1;
+// 지금 항구의 선원 후보(1~3명). 날이 지나거나 다 뽑으면 새로 온다
+export function candidatesAt(S) {
+  if (!S.docked) return [];
+  if (!S.cands) S.cands = {};
+  const day = clock(S).day, cur = S.cands[S.docked];
+  if (cur && cur.list.length && day - cur.day < CREW.refreshDays) return cur.list;
+  const n = CREW.minCands + Math.floor(rnd(S) * (CREW.maxCands - CREW.minCands + 1)), taken = new Set(S.crew.map((c) => c.name)), list = [];
+  for (let i = 0; i < n; i++) list.push(makeCandidate(S, taken));
+  S.cands[S.docked] = { day, list };
+  return list;
+}
+export function hire(S, id) {
+  const st = stats(S), list = candidatesAt(S), c = list.find((q) => q.id === id);
+  if (!S.docked || !c) return { ok: false, why: '그런 녀석은 이 항구에 없어, 선장!' };
+  if (!st.hull.crew) return { ok: false, why: `${st.hull.name}엔 선원 태울 자리가 없다고!` };
+  if (S.crew.length >= st.crewCap) return { ok: false, why: '재울 데가 없잖아! 해먹부터 달아, 선장!' };
+  if (hasRole(S, c.role)) return { ok: false, why: `${ROLES[c.role].name}은(는) 이미 있다고!` };
+  if (S.res.coin < c.hireCost) return { ok: false, why: '코인이 모자라, 선장! 주머니가 가볍다고!' };
+  S.res.coin -= c.hireCost;
+  S.crew.push(c);
+  S.cands[S.docked].list = list.filter((q) => q !== c);
+  S.hiredEver[c.role] = 1;
   checkAch(S);
-  return { ok: true, name };
+  return { ok: true, name: c.name };
 }
-export function dismiss(S, role) { S.crew = S.crew.filter((c) => c.role !== role); }
+export function dismiss(S, id) { S.crew = S.crew.filter((c) => (c.id ?? c.role) !== id); }
 
 export function placeModule(S, id, col, row, rot = 0) {
-  if (!S.docked) return { ok: false, why: '항구에서만 고칠 수 있어요' };
-  const M = MODULES[id];
-  if (!isUnlocked(S, id)) return { ok: false, why: '아직 잠겨 있어요' };
-  if (!canPay(S, M.cost)) return { ok: false, why: '재료가 모자라요' };
+  if (!S.docked) return { ok: false, why: '배는 항구에 대고 고치는 거야, 친구!' };
+  const M = MODULES[id], cost = moduleCost(S, id);
+  if (!isUnlocked(S, id)) return { ok: false, why: '아직 손댈 수 없는 물건이야!' };
+  if ((id === 'hammock' || id === 'cabin') && !HULLS[S.ship.hull].crew) return { ok: false, why: `${HULLS[S.ship.hull].name}엔 선원 태울 자리가 없다고!` };
+  if (!canPay(S, cost)) return { ok: false, why: '재료가 모자라! 더 건져 오라고!' };
   const m = { id, col, row, rot };
-  if (!SH.canPlace(S.ship, m)) return { ok: false, why: M.sail && S.ship.mods.some((o) => MODULES[o.id].sail) ? '돛대는 하나만 세워요' : '그 자리엔 안 들어가요' };
-  pay(S, M.cost);
+  if (!SH.canPlace(S.ship, m)) return { ok: false, why: M.sail && S.ship.mods.some((o) => MODULES[o.id].sail) ? '돛대는 하나면 족해, 선장!' : '거긴 안 들어간다고!' };
+  pay(S, cost);
   S.ship.mods.push(m); S.rev++;
   return { ok: true };
 }
@@ -282,20 +331,19 @@ export function removeModule(S, col, row) {
   if (!S.docked) return false;
   const m = SH.moduleAt(S.ship, col, row);
   if (!m) return false;
-  const cost = MODULES[m.id].cost;
-  for (const [k, v] of Object.entries(cost)) S.res[k] += Math.ceil(v / 2);
+  for (const [k, v] of Object.entries(moduleCost(S, m.id))) S.res[k] += Math.ceil(v / 2);
   S.ship.mods = S.ship.mods.filter((o) => o !== m); S.rev++;
   return true;
 }
 // 새 선체: 모듈은 값 절반을 돌려받는다
 export function buildHull(S, id) {
   const H = HULLS[id];
-  if (!S.docked) return { ok: false, why: '항구에서만 지어요' };
-  if (H.grade <= HULLS[S.ship.hull].grade) return { ok: false, why: '이미 더 큰 배예요' };
-  if (id === 'sloop' && !S.visited.lake) return { ok: false, why: '큰 호수에서 지을 수 있어요' };
-  if (!canPay(S, H.price)) return { ok: false, why: '재료가 모자라요' };
+  if (!S.docked) return { ok: false, why: '배는 항구에서 짓는 거야!' };
+  if (H.grade <= HULLS[S.ship.hull].grade) return { ok: false, why: '지금 배가 더 크잖아, 친구!' };
+  if (id === 'sloop' && !S.visited.lake) return { ok: false, why: '그 배는 큰 호수에 가야 지을 수 있어!' };
+  if (!canPay(S, H.price)) return { ok: false, why: '재료가 모자라! 더 건져 오라고!' };
   pay(S, H.price);
-  for (const m of S.ship.mods) for (const [k, v] of Object.entries(MODULES[m.id].cost)) S.res[k] += Math.ceil(v / 2);
+  for (const m of S.ship.mods) for (const [k, v] of Object.entries(moduleCost(S, m.id))) S.res[k] += Math.ceil(v / 2);
   S.ship.hull = id; S.ship.mods = [];
   // 노 자리 하나는 달아 준다(움직일 수 있게)
   const free = SH.validCells(id).find(([c, r]) => r >= Math.floor(H.rows / 2) && c === Math.floor(H.cols / 2)) || SH.validCells(id)[0];
@@ -445,7 +493,7 @@ function collectFlot(S) {
 
 // ── 발견 ──
 // 망원경: 볼 수 있는 거리가 26m에서 70m로 늘고, 내륙 발견지와 뭍짐승을 찾을 수 있다
-export const sightRange = (S) => (stats(S).telescope ? 70 : 26) + (hasRole(S, 'lookout') ? 14 : 0);
+export const sightRange = (S) => ((stats(S).telescope ? 70 : 26) + (hasRole(S, 'lookout') ? 14 : 0)) * (hasTrait(S, 'lucky') ? 1.1 : 1);
 // 내륙 발견지는 찾기 전까지 그림도 보이지 않는다(끌어서 둘러봐도 미리 알 수 없게)
 export function canSeeFind(S, f) {
   if (S.found[f.id] || !f.inland) return true;
@@ -501,9 +549,11 @@ export function rescue(S) {
 function blocked(S, x, y, a, L, clear = 9) {
   const w = W(S), dx = Math.cos(a), dy = Math.sin(a), draft = stats(S).draft, k = S.weather.drought ? WEATHER.droughtDepth : 1, n = Math.ceil(L / 2);
   const shoals = !(S.route && S.route.noShoal);
-  for (let i = 0; i <= n; i++) {
+  // 이미 물가에 붙어 있으면 지금보다 더 가까워지는 쪽만 막힌 것으로 본다(떠나는 길까지 막히면 못 빠져나온다)
+  const lim = Math.min(clear, w.dist(x, y) - 0.5);
+  for (let i = 1; i <= n; i++) {
     const px = x + dx * i * 2, py = y + dy * i * 2;
-    if (w.dist(px, py) < clear) return true;
+    if (w.dist(px, py) < lim) return true;
     if (shoals && w.depthAt(px, py) * k < draft) return true;
   }
   return false;
@@ -530,9 +580,11 @@ function autopilot(S, dt) {
   if (sailing && Math.abs(rel) < NAV.tackAngle) {
     if (!r.side) r.side = angDiff(b.h, up) >= 0 ? 1 : -1;
     const past = r.side > 0 ? rel < -NAV.lay : rel > NAV.lay;
-    if (past && r.since > NAV.minTack) tack(S, r, -r.side);
+    // 맞바람에 서 있을 때 뱃길을 또 뒤집으면 영영 바람을 못 받는다. 속도가 붙은 뒤에만 뒤집는다
+    const ready = r.since > NAV.minTack && ((b.twa > NO_GO && b.spd > 1.2) || r.since > 30);
+    if (past && ready) tack(S, r, -r.side);
     want = up + r.side * NAV.tackAngle;
-    if (blocked(S, b.x, b.y, want, NAV.look) && r.since > NAV.minTack) { tack(S, r, -r.side); want = up + r.side * NAV.tackAngle; }
+    if (blocked(S, b.x, b.y, want, NAV.look) && ready) { tack(S, r, -r.side); want = up + r.side * NAV.tackAngle; }
   } else {
     r.side = 0;
     if (blocked(S, b.x, b.y, want, NAV.look)) {
@@ -602,7 +654,7 @@ export function step(S, dt) {
   const twa = Math.abs(windSide);
   b.twa = twa;
   b.luff = twa < NO_GO && b.sailNow > 0.03;
-  const sailT = Math.min(st.maxSpeed, polar(twa) * wspd * SAIL_K * (0.45 + 0.55 * st.sailArea)) * Math.pow(b.sailNow, 0.7);
+  const sailT = Math.min(st.maxSpeed, polar(twa) * wspd * SAIL_K * (0.45 + 0.55 * st.sailArea) * st.speedK) * Math.pow(b.sailNow, 0.7);
 
   let rowT = 0;
   if (b.row) {
@@ -693,12 +745,25 @@ export function step(S, dt) {
 }
 
 // ── 저장 ──
+const OLD_WOMEN = ['수빈', '서아', '나래', '보라', '다온', '지안', '하람']; // 이름을 바꾸기 전 저장의 선원
+// 이야기 문장의 {N은}·{N이}·{N을}을 이름 받침에 맞춰 채운다
+export function storyLine(text, name) {
+  const code = name.charCodeAt(name.length - 1) - 0xac00, hangul = code >= 0 && code <= 11171, batchim = hangul && code % 28 !== 0;
+  const pair = { 은: ['은', '는'], 이: ['이', '가'], 을: ['을', '를'] };
+  return text.replace(/\{N([은이을])\}/g, (_, j) => name + (hangul ? pair[j][batchim ? 0 : 1] : `${pair[j][0]}(${pair[j][1]})`));
+}
 export function serialize(S) { const { events, ...rest } = S; return JSON.stringify(rest); }
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
     if (!o || o.v !== 1 || !o.boat || !o.ship) return null;
     o.events = [];
+    // 능력치가 없던 예전 선원은 기준값으로 채운다
+    for (const c of o.crew || []) {
+      if (c.id == null) { o.crewSeq = (o.crewSeq || 0) + 1; c.id = o.crewSeq; }
+      c.gender ??= OLD_WOMEN.includes(c.name) ? '여' : '남';
+      c.skill ??= CREW.baseStat; c.humor ??= CREW.baseStat; c.drink ??= CREW.baseStat;
+    }
     return o;
   } catch { return null; }
 }

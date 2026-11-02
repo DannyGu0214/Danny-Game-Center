@@ -218,10 +218,13 @@ const DRAW = {
 
 // 도감 그림: 한 칸에 맞춰 그린다
 export function drawSpeciesIcon(g, id, x, y, size) {
-  const def = SPECIES[id], z = 8, k = size / 16;
+  const def = SPECIES[id], z = 8;
   const c = { h: 0, ph: 1, act: def.kind === 'fish' ? 0.45 : 0, life: 1, size: def.size || 1 };
+  // 종류마다 몸이 그려지는 높이가 달라 칸 안에 들어오게 크기와 기준 높이를 맞춘다
+  const fit = { fish: [0.05, size * 0.42], duck: [0.05 / (def.neck || 1) / (def.size || 1), size * 0.34], wader: [0.042, size * 0.72], frog: [0.08, size * 0.22], swimmer: [0.08, size * 0.14], turtle: [0.08, 0], bird: [0.05, 0], land: [0.075 / (def.height || 1), size * 0.5] }[def.kind];
+  const k = size * fit[0], lift = def.kind === 'bird' ? 7 * z * k : fit[1];
   g.save();
-  g.translate(x, y + (def.kind === 'wader' || def.kind === 'land' ? size * 0.42 : def.kind === 'bird' ? size * 0.75 : size * 0.2));
+  g.translate(x, y + lift);
   g.scale(k, k);
   DRAW[def.kind](g, c, 0, 0, z, def);
   g.restore();
