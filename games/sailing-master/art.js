@@ -6,8 +6,6 @@ const TAU = Math.PI * 2;
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = Math.ceil(w); c.height = Math.ceil(h); return [c, c.getContext('2d')]; }
 function hash(x, y) { let s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
 
-export const WATER = { deep: '#2c8aa4', mid: '#3a9fb4' };
-
 // 이어 붙여도 이음새가 없는 물결 무늬 한 장
 function waveTile(size, count, strokeW, seed, light) {
   const [c, g] = canvas(size, size);

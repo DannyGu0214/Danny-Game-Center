@@ -185,7 +185,6 @@ export function setDest(S, x, y, target = null) {
   if (!hasRole(S, 'helmsman') && !S.cap.to && S.cap.at === 'mast') walkTo(S, 'helm');
   return true;
 }
-export const clearRoute = (S) => { S.route = null; S.boat.rudder = 0; };
 
 // 입항: 항구 근처면 바로, 아니면 항로로 간다
 export function nearPort(S, r = NAV.dock + 8) { return W(S).ports.find((p) => Math.hypot(p.x - S.boat.x, p.y - S.boat.y) < r) || null; }
