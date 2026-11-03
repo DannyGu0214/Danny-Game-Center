@@ -1,4 +1,4 @@
-import { HULLS, MODULES } from './data.js';
+import { HULLS, MODULES, NO_GO } from './data.js';
 // 배 설계 규칙: 선체 윤곽, 칸 검사, 무게·복원력·속도·항속 계산. 화면이 없다.
 // 설계: { hull, mods: [{ id, col, row, rot }] }. 0행이 뱃머리 쪽, 0열이 좌현이다.
 
@@ -7,8 +7,8 @@ const PI = Math.PI;
 // 선체 윤곽의 반폭. s: -1 고물 ~ 1 뱃머리
 export function planW(hullId, s) {
   const H = HULLS[hullId];
-  if (hullId === 'raft') return Math.abs(s) <= 1 ? H.beam / 2 : 0;
-  if (hullId === 'rowboat') return (H.beam / 2) * Math.pow(Math.max(0, 1 - Math.abs(s * 0.98) ** 2.4), 0.8);
+  if (H.kind === 'raft') return Math.abs(s) <= 1 ? H.beam / 2 : 0;
+  if (H.kind === 'rowboat') return (H.beam / 2) * Math.pow(Math.max(0, 1 - Math.abs(s * 0.98) ** 2.4), 0.8);
   return (H.beam / 2) * Math.pow(Math.max(0, Math.sin(PI * (0.2 + 0.8 * (s + 1) / 2))), 0.72);
 }
 
@@ -78,6 +78,7 @@ export function statsOf(design, cargo = 0, food = 0) {
     oars, sailArea, mast, mastId: mast ? mast.id : null,
     mastX: mast ? modulePos(design.hull, mast)[0] : 0,
     stability, listing,
+    noGo: NO_GO - (H.pointing || 0), leeK: H.leeK || 1,
     holdCap: H.holdBase + 20 * (cnt.hold || 0),
     foodCap: H.foodBase + 6 * (cnt.food || 0),
     crewCap: Math.min(H.crew, (cnt.hammock || 0) + (cnt.cabin || 0)),

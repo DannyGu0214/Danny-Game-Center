@@ -248,7 +248,6 @@ test('발견지: 1등급 맵은 고정, 2등급 맵은 처음 들어갈 때 판�
   for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
     const S = G.newGame(seed);
     S.ship.hull = 'sloop'; S.ship.mods = [{ id: 'oar', col: 1, row: 4, rot: 0 }]; S.region = 'lake';
-    for (const f of worldOf('lake').finds) S.found[f.id] = 1;
     assert.ok(G.passGate(S, worldOf('lake').gates[0]));
     const list = G.findsOf(S, 'river');
     assert.deepEqual(list.map((f) => f.id), ids, '목록과 순서가 같아요');
@@ -518,19 +517,38 @@ test('다음 배 재료가 모이면 한 번만 알려 준다', () => {
   assert.equal(drain(S).filter((e) => e.type === 'canBuild').length, 0);
 });
 
-test('수문: 조건이 안 되면 못 넘고, 되면 다음 수역 항구에 닿는다', () => {
+test('수문: 호수끼리는 뗏목으로 가고, 강은 2등급부터, 강 끝은 3등급부터다', () => {
   const S = G.newGame(1);
-  const g = worldOf('pond').gates[0];
-  assert.equal(G.passGate(S, g), false);
-  S.ship.hull = 'rowboat'; S.ship.mods = [{ id: 'oar', col: 0, row: 2, rot: 0 }];
-  S.found.stone = 1; S.found.hollow = 1;
+  const toLake = worldOf('pond').gates[0], toRiver = worldOf('lake').gates[0], toSea = worldOf('river').gates[0];
+  assert.ok(G.gateStatus(S, toLake).ok, '같은 호수 공간이라 조건이 없어요');
   S.hold.wood = 3; const wood = S.res.wood;
-  assert.ok(G.gateStatus(S, g).ok);
-  assert.ok(G.passGate(S, g));
+  assert.ok(G.passGate(S, toLake));
   assert.equal(S.region, 'lake');
   assert.equal(S.docked, 'southGate');
   assert.equal(S.res.wood, wood + 3);
   assert.ok(G.isUnlocked(S, 'mast_s'));
+  assert.equal(G.passGate(S, toRiver), false, '뗏목은 강에 못 들어가요');
+  S.ship.hull = 'rowboat'; S.ship.mods = [{ id: 'oar', col: 0, row: 2, rot: 0 }];
+  assert.ok(G.passGate(S, toRiver));
+  assert.equal(S.region, 'river');
+  assert.equal(G.passGate(S, toSea), false, '나룻배는 강 끝을 못 넘어요');
+  S.ship.hull = 'sloop3';
+  assert.ok(G.gateStatus(S, toSea).ok, '높은 등급 배도 들어가요');
+});
+
+test('수문: 온 길로 돌아갈 수 있고, 돌아간 수역을 처음 간 것처럼 알리지 않는다', () => {
+  const S = G.newGame(1);
+  G.passGate(S, worldOf('pond').gates[0]);
+  assert.equal(drain(S).find((e) => e.type === 'region').first, true);
+  const back = worldOf('lake').gates.find((g) => g.to === 'pond');
+  assert.ok(G.passGate(S, back));
+  assert.equal(S.region, 'pond');
+  assert.equal(S.docked, 'stonePier');
+  assert.equal(drain(S).find((e) => e.type === 'region').first, false);
+  const R = sloopAt('river');
+  assert.ok(G.passGate(R, worldOf('river').gates.find((g) => g.to === 'lake')));
+  assert.equal(R.region, 'lake');
+  assert.equal(R.docked, 'northPier');
 });
 
 test('달력·예보: 하루 3분, 계절 7일, 같은 시드면 예보대로 온다', () => {
@@ -633,7 +651,7 @@ test('굶으면 쓰러져 구조된다', () => {
   assert.equal(S.disaster.cause, 'faint');
 });
 
-test('선원: 해먹이 있어야 태우고, 임금을 못 주면 떠난다', () => {
+test('선원: 해먹이 있어야 태우고, 보수를 못 주면 떠난다', () => {
   const S = G.newGame(1);
   S.region = 'lake'; S.visited.lake = 1; S.docked = 'pine'; S.res.coin = 100;
   S.ship = { hull: 'rowboat', mods: [{ id: 'oar', col: 0, row: 2, rot: 0 }], name: 'x', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] };
@@ -660,14 +678,163 @@ test('경제: 재료를 팔아 코인을 얻고, 굶으면 입항 때 하루치�
   assert.equal(S.food, 1);
 });
 
-test('큰 배 짓기: 재료를 내고, 모듈은 값 절반을 돌려받으며, 슬루프는 큰 호수부터 지어요', () => {
+test('사다리: 1~3등급 별 9칸의 칸 수·내구도가 기획 표와 같다', () => {
+  const cells = (id) => SH.validCells(id).length;
+  assert.deepEqual(['raft', 'raft2', 'raft3', 'rowboat', 'rowboat2', 'rowboat3', 'sloop', 'sloop2', 'sloop3'].map(cells), [12, 15, 15, 8, 12, 12, 17, 26, 26]);
+  assert.deepEqual(['raft', 'rowboat', 'sloop'].map((id) => HULLS[id].hp), [40, 70, 120]);
+  assert.deepEqual(['raft3', 'rowboat3', 'sloop3'].map((id) => HULLS[id].hp), [52, 91, 156]);
+  // 별을 올리면 더 빠르고 둔해진다. 등급이 오를수록 최고 속도도 오른다
+  for (const k of ['raft', 'rowboat', 'sloop']) {
+    const a = SH.statsOf({ hull: k, mods: [] }), b = SH.statsOf({ hull: `${k}2`, mods: [] });
+    assert.ok(b.maxSpeed > a.maxSpeed && HULLS[`${k}2`].turn < HULLS[k].turn, k);
+  }
+  assert.ok(HULLS.sloop.row > HULLS.raft.row && HULLS.sloop.row < HULLS.rowboat.row, '슬루프 노가 뗏목보다 느리지 않아요');
+});
+
+test('별 올리기: 선원과 모듈이 그대로 가고, 값을 내고, 안 맞는 모듈만 절반 돌려받는다', () => {
+  for (const [from, to] of [['raft', 'raft2'], ['raft2', 'raft3'], ['rowboat', 'rowboat2'], ['rowboat2', 'rowboat3'], ['sloop', 'sloop2'], ['sloop2', 'sloop3']]) {
+    const S = G.newGame(1); S.region = 'river'; S.docked = 'head'; S.res = { wood: 900, cloth: 900, coin: 900 }; S.hull = 0.5;
+    S.ship.hull = from; S.ship.mods = [];
+    // 칸을 모듈로 다 채워도 ★1에 놓인 것이 어긋나지 않아야 해요
+    for (const [c, r] of SH.validCells(from)) S.ship.mods.push({ id: 'food', col: c, row: r, rot: 0 });
+    S.crew = HULLS[from].crew ? [{ id: 1, role: 'lookout', name: 'x', wage: 1 }] : [];
+    const n = S.ship.mods.length, crew = S.crew.length;
+    G.checkAch(S); // 이미 받을 수 있는 업적 보상을 먼저 받아 둬요
+    const coin = S.res.coin;
+    assert.ok(G.buildHull(S, to).ok, to);
+    assert.equal(S.ship.hull, to);
+    assert.equal(S.ship.mods.length, n, `${to} 모듈이 그대로`);
+    assert.equal(S.crew.length, crew);
+    assert.equal(S.res.coin, coin - (HULLS[to].price.coin || 0));
+    assert.equal(S.hull, 1);
+    assert.equal(S.cap.x, HULLS[to].helmX);
+    for (const m of S.ship.mods) assert.ok(SH.validCells(to).some(([c, r]) => c === m.col && r === m.row), `${to} ${m.col},${m.row}`);
+  }
+  // 윤곽에 안 맞게 된 모듈은 값 절반을 돌려준다(오래된 저장의 어긋난 모듈 대비)
+  const T = G.newGame(1); T.res = { wood: 100, cloth: 0, coin: 0 };
+  T.ship.mods = [{ id: 'food', col: 9, row: 9, rot: 0 }];
+  assert.ok(G.buildHull(T, 'raft2').ok);
+  assert.equal(T.ship.mods.length, 0);
+  assert.equal(T.res.wood, 100 - 12 + Math.ceil(MODULES.food.cost.wood / 2));
+});
+
+test('등급 올리기: 뗏목은 바로, 2등급부터 ★2가 먼저고, 슬루프는 강에서 설계도로 짓는다', () => {
   const S = G.newGame(1);
-  S.res = { wood: 500, cloth: 500, coin: 500 };
-  assert.equal(G.buildHull(S, 'sloop').ok, false);
-  assert.ok(G.buildHull(S, 'rowboat').ok);
+  S.res = { wood: 900, cloth: 900, coin: 900 };
+  assert.equal(G.buildHull(S, 'sloop').ok, false, '두 칸은 못 건너요');
+  assert.equal(G.buildHull(S, 'raft3').ok, false, '별도 한 칸씩');
+  assert.ok(G.buildHull(S, 'rowboat').ok, '뗏목은 별 없이 나룻배로');
   assert.equal(S.ship.hull, 'rowboat');
   assert.ok(G.stats(S).oars >= 1, '노 자리를 달아 준다');
   assert.equal(G.buildHull(S, 'raft').ok, false);
+  assert.match(G.buildHull(S, 'sloop').why, /★2/);
+  assert.equal(G.nextHull(S).id, 'rowboat2');
+  assert.ok(G.buildHull(S, 'rowboat2').ok);
+  assert.equal(G.nextHull(S).id, 'sloop');
+  assert.match(G.buildHull(S, 'sloop').why, /강 항구/, '호수에서는 못 지어요');
+  assert.equal(G.buildHull(S, 'rowboat3').ok, false, '작은 호수 조선소로는 ★3을 못 지어요');
+  S.region = 'lake'; S.docked = 'pine';
+  assert.ok(G.buildHull(S, 'rowboat3').ok, '큰 호수에서 지어요');
+  S.region = 'river'; S.docked = 'head';
+  assert.match(G.buildHull(S, 'sloop').why, /설계도/);
+  S.blueprints.sloop = 1;
+  const crew = { id: 1, role: 'lookout', name: 'x', wage: 1 }; S.crew = [crew];
+  S.ship.mods.push({ id: 'food', col: 0, row: 1, rot: 0 });
+  const wood = S.res.wood;
+  assert.ok(G.buildHull(S, 'sloop').ok);
+  assert.equal(S.res.wood, wood - HULLS.sloop.price.wood + 2 + Math.ceil(MODULES.food.cost.wood / 2), '옮겨 타면 모듈은 값 절반');
+  assert.equal(S.crew.length, 0);
+  assert.equal(S.ship.mods.length, 1);
+  assert.ok(S.ach.sloop);
+  assert.equal(G.buildHull(S, 'sloop3').ok, false);
+  assert.ok(G.buildHull(S, 'sloop2').ok); assert.ok(G.buildHull(S, 'sloop3').ok);
+  assert.equal(G.buildSteps(S).length, 0, '지금은 슬루프 ★3이 끝');
+  assert.equal(G.nextHull(S), null);
+  // 강 물레방아에서 슬루프 설계도가 나온다
+  assert.equal(REGIONS.river.finds.filter((f) => f.blueprint === 'sloop').length, 1);
+});
+
+test('내구도: 피해는 절대값이라 큰 배가 잘 버티고, 수리비도 잃은 내구도만큼이다', () => {
+  const hit = (hull) => {
+    const S = sloopAt('lake');
+    S.ship.hull = hull; S.boat.x = 0; S.boat.y = 0; S.boat.spd = 5; S.boat.h = Math.atan2(-worldOf('lake').gradient(0, 0)[1], 0);
+    const w = worldOf('lake'), I = REGIONS.lake.islands[0];
+    let x = I.x, y = I.y + I.r * 1.6;
+    while (w.dist(x, y) > 1) y -= 0.5;
+    S.boat.x = x; S.boat.y = y; S.boat.spd = 5; S.boat.h = -Math.PI / 2;
+    G.step(S, G.FIXED_DT);
+    assert.ok(S.boat.grounded);
+    return 1 - S.hull;
+  };
+  const a = hit('raft'), b = hit('sloop');
+  assert.ok(a > b * 2.5, `뗏목 ${a} 슬루프 ${b}`);
+  const S = G.newGame(1); S.res.coin = 999; S.hull = 0.5;
+  assert.equal(G.repairCost(S), 20);
+  S.ship.hull = 'sloop';
+  assert.equal(G.repairCost(S), 60);
+});
+
+test('고유 개조: 노걸이는 노를 빠르게, 센터보드는 맞바람에 붙게, 윈치는 돛을 빨리 바꾼다', () => {
+  const row = (h) => SH.statsOf({ hull: h, mods: [{ id: 'oar', col: 1, row: 1, rot: 0 }] }).rowSpeed;
+  assert.ok(Math.abs(row('raft3') / row('raft2') - 1.15) < 1e-9);
+  // 센터보드: 38° 옆바람에서 일반 나룻배는 돛이 펄럭이고 ★3은 간다
+  const at = (hull) => {
+    const S = sloopAt('lake'); S.ship.hull = hull; S.ship.mods = [{ id: 'mast_s', col: 0, row: 2, rot: 0 }];
+    S.boat.x = 0; S.boat.y = 0; S.boat.sailLevel = 2; S.boat.sailNow = 1;
+    for (let i = 0; i < 20 * 30; i++) { G.step(S, G.FIXED_DT); S.boat.h = S.wind.from + 38 * D; S.boat.x = 0; S.boat.y = 0; S.boat.rudder = 0; S.boat.turn = 0; }
+    return S.boat;
+  };
+  assert.equal(at('rowboat2').luff, true);
+  const cb = at('rowboat3');
+  assert.equal(cb.luff, false);
+  assert.ok(cb.spd > at('rowboat2').spd);
+  assert.ok(SH.statsOf({ hull: 'rowboat3', mods: [] }).leeK < 1);
+  // 윈치: 돛이 다 오르는 시간이 절반이고 걷는 거리도 절반이다
+  const rise = (hull) => {
+    const S = sloopAt('lake'); S.ship.hull = hull; S.boat.x = 0; S.boat.y = 0; S.boat.sailLevel = 2; S.boat.sailNow = 0;
+    let n = 0;
+    while (S.boat.sailNow < 0.99 && n < 300) { G.step(S, G.FIXED_DT); n++; }
+    return n;
+  };
+  const r2 = rise('sloop2'), r3 = rise('sloop3');
+  assert.ok(Math.abs(r3 / r2 - 0.5) < 0.05, `${r2} ${r3}`);
+  const walk = (hull) => { const S = sloopAt('lake'); S.ship.hull = hull; S.cap.x = HULLS[hull].helmX; S.boat.x = 0; S.boat.y = 0; G.setSail(S, 2); let n = 0; while (S.cap.at !== 'mast' && n < 900) { G.step(S, G.FIXED_DT); n++; } return n; };
+  assert.ok(Math.abs(walk('sloop3') / walk('sloop2') - 0.5) < 0.05);
+});
+
+test('뗏목에는 돛대를 못 세운다', () => {
+  const S = G.newGame(1); S.visited.lake = 1; S.res = { wood: 99, cloth: 99, coin: 99 };
+  assert.match(G.placeModule(S, 'mast_s', 1, 2).why, /돛대/);
+  assert.ok(G.buildHull(S, 'rowboat').ok);
+  assert.ok(G.placeModule(S, 'mast_s', 0, 2).ok);
+});
+
+test('가장 높은 배 기록: 고치면 따라오고, 구조로 모듈을 잃어도 남는다', () => {
+  const S = G.newGame(1); S.res = { wood: 900, cloth: 900, coin: 900 };
+  assert.equal(S.best.hull, 'raft');
+  G.buildHull(S, 'raft2'); assert.equal(S.best.hull, 'raft2');
+  G.placeModule(S, 'food', 0, 0); assert.ok(S.best.mods.some((m) => m.id === 'food'));
+  G.setPaint(S, 'hull', 2); assert.equal(S.best.paint.hull, 2);
+  S.best.mods = S.ship.mods.map((m) => ({ ...m }));
+  S.docked = null; S.disaster = { cause: 'sink' }; S.lastPort = { region: 'pond', id: 'reed' };
+  const n = S.best.mods.length;
+  G.rescue(S);
+  assert.ok(S.ship.mods.length < n);
+  assert.equal(S.best.mods.length, n);
+});
+
+test('저장 v1 → v2: 예전 배는 ★1, 슬루프로 있던 판도 그대로, 찾아 둔 물레방아는 설계도를 준다', () => {
+  const old = JSON.parse(G.serialize(sloopAt('lake')));
+  old.v = 1; delete old.best; old.found = { mill2: 1 };
+  const T = G.deserialize(JSON.stringify(old));
+  assert.equal(T.v, 2);
+  assert.equal(T.ship.hull, 'sloop');
+  assert.equal(HULLS[T.ship.hull].star, 1);
+  assert.equal(T.best.hull, 'sloop');
+  assert.ok(T.blueprints.sloop);
+  assert.ok(G.stats(T).sailArea > 0);
+  run(T, 2);
+  assert.equal(G.nextHull(T).id, 'sloop2');
 });
 
 test('꾸미기: 도전과제로 열리고, 칠과 이름이 바뀐다', () => {
@@ -710,9 +877,8 @@ test('동물 탭 범위는 몸에 맞고, 떨어진 곳은 잡지 않는다', ()
   assert.ok(hitRadius(cr.list[0], zoom) < 34);
 });
 
-test('강 끝: 조건을 채우면 엔딩', () => {
+test('강 끝: 슬루프로 닿으면 엔딩', () => {
   const S = sloopAt('river');
-  for (const f of G.findsOf(S, 'river')) S.found[f.id] = 1;
   const g = worldOf('river').gates[0];
   assert.ok(G.passGate(S, g));
   assert.ok(S.ended && S.ach.riverEnd);

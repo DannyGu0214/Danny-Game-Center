@@ -33,8 +33,22 @@ function hullPath(g, id, z, inset = 0, from = -1) {
 }
 
 // 선체 단면
-function sliceRaft(g, z) {
-  const H = HULLS.raft, L = H.len / 2, W2 = H.beam / 2;
+// ★3 고유 개조 그림: 뗏목 노걸이, 나룻배 센터보드, 슬루프 윈치
+function drawPerk(g, H) {
+  if (H.kind === 'raft') {
+    g.fillStyle = '#6f7478';
+    for (const x of [-1, 1]) for (const y of [-1, 1]) { g.beginPath(); g.arc(x * 0.5, y * (H.beam / 2 - 0.1), 0.12, 0, TAU); g.fill(); }
+  } else if (H.kind === 'rowboat') {
+    g.beginPath(); roundRect(g, -0.85, -0.08, 0.75, 0.08, 0.04); g.fillStyle = '#5a3f22'; g.fill();
+    g.fillStyle = '#d9b265'; g.fillRect(-0.7, -0.015, 1.3, 0.03);
+  } else {
+    const x = H.cockpit[1] + 0.25;
+    for (const y of [-1, 1]) { g.beginPath(); g.arc(x, y * 1.02, 0.13, 0, TAU); g.fillStyle = '#d9b265'; g.fill(); g.beginPath(); g.arc(x, y * 1.02, 0.05, 0, TAU); g.fillStyle = '#6b4a2e'; g.fill(); }
+  }
+}
+
+function sliceRaft(g, z, H) {
+  const L = H.len / 2, W2 = H.beam / 2;
   if (z > H.deck) return;
   // 통나무 다섯 개를 옆으로 나란히
   const n = 5, w = H.beam / n, top = z > H.deck - DZ * 1.2;
@@ -46,55 +60,58 @@ function sliceRaft(g, z) {
   if (top) {
     // 묶은 밧줄
     g.fillStyle = '#d9c9a0';
-    for (const x of [-L * 0.68, L * 0.68]) g.fillRect(x - 0.05, -W2, 0.1, H.beam);
+    for (const x of H.star === 1 ? [-L * 0.68, L * 0.68] : [-L * 0.72, 0, L * 0.72]) g.fillRect(x - 0.05, -W2, 0.1, H.beam);
+    if (H.star === 3) { g.fillStyle = '#6f7478'; for (const x of [-L * 0.36, L * 0.36]) g.fillRect(x - 0.04, -W2, 0.08, H.beam); drawPerk(g, H); }
   }
 }
-function sliceRowboat(g, z, paint) {
-  const H = HULLS.rowboat, deck = H.deck;
+function sliceRowboat(g, z, paint, H) {
+  const deck = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap; // ★3 보강재는 쇠붙이 색
   if (z > deck) return;
-  const color = z < 0.06 ? BOTTOM : z < 0.1 ? BOOT : z > deck - DZ ? WOOD.cap : paint;
-  hullPath(g, 'rowboat', z);
+  const color = z < 0.06 ? BOTTOM : z < 0.1 ? BOOT : z > deck - DZ ? cap : paint;
+  hullPath(g, H.id, z);
   g.fillStyle = color; g.fill();
   if (z > 0.17) {
     // 안쪽을 비워 벽만 남긴다
     g.save(); g.globalCompositeOperation = 'destination-out';
-    hullPath(g, 'rowboat', z, 0.13); g.fill(); g.restore();
+    hullPath(g, H.id, z, 0.13); g.fill(); g.restore();
   } else if (z > 0.1) {
-    hullPath(g, 'rowboat', z, 0.05); g.fillStyle = WOOD.floor; g.fill();
+    hullPath(g, H.id, z, 0.05); g.fillStyle = WOOD.floor; g.fill();
     g.strokeStyle = 'rgba(40,24,10,.3)'; g.lineWidth = 0.02;
-    for (let y = -0.8; y < 0.9; y += 0.2) { g.beginPath(); g.moveTo(-3, y); g.lineTo(3, y); g.stroke(); }
+    for (let y = -0.8; y < 0.9; y += 0.2) { g.beginPath(); g.moveTo(-H.len / 2, y); g.lineTo(H.len / 2, y); g.stroke(); }
   }
   if (z > 0.2 && z < 0.34) {
     g.fillStyle = WOOD.deck; // 가로 의자
-    for (const x of [-1.5, 1.1]) g.fillRect(x - 0.17, -planW('rowboat', x / (H.len / 2)) * 0.9, 0.34, planW('rowboat', x / (H.len / 2)) * 1.8);
+    for (const x of H.star === 1 ? [-1.5, 1.1] : [-2, -0.2, 1.6]) g.fillRect(x - 0.17, -planW(H.id, x / (H.len / 2)) * 0.9, 0.34, planW(H.id, x / (H.len / 2)) * 1.8);
   }
+  if (H.star === 3 && z > 0.2 && z < 0.3) drawPerk(g, H);
 }
-function sliceSloop(g, z, paint) {
-  const H = HULLS.sloop, DECK = H.deck;
+function sliceSloop(g, z, paint, H) {
+  const DECK = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap, [ck0, ck1] = H.cockpit;
   let from = -1;
   if (z > DECK) from = Math.pow((z - DECK) / 0.42, 1 / 2.2);
   if (from >= 0.98) return;
-  const color = z < 0.08 ? BOTTOM : z < 0.17 ? BOOT : z < 0.72 ? paint : z < 0.83 ? STRIPE : z < DECK - 0.05 ? paint : WOOD.cap;
-  hullPath(g, 'sloop', z, 0, from);
+  const color = z < 0.08 ? BOTTOM : z < 0.17 ? BOOT : z < 0.72 ? paint : z < 0.83 ? STRIPE : z < DECK - 0.05 ? paint : cap;
+  hullPath(g, H.id, z, 0, from);
   g.fillStyle = color; g.fill();
   if (z > DECK - 0.05) {
-    hullPath(g, 'sloop', z, 0.14, from);
+    hullPath(g, H.id, z, 0.14, from);
     g.fillStyle = WOOD.deck; g.fill();
-    g.save(); hullPath(g, 'sloop', z, 0.14, from); g.clip();
+    g.save(); hullPath(g, H.id, z, 0.14, from); g.clip();
     g.strokeStyle = WOOD.deckDark; g.lineWidth = 0.025;
-    for (let y = -1.6; y < 1.6; y += 0.22) { g.beginPath(); g.moveTo(-5, y); g.lineTo(5, y); g.stroke(); }
+    for (let y = -1.6; y < 1.6; y += 0.22) { g.beginPath(); g.moveTo(-H.len / 2, y); g.lineTo(H.len / 2, y); g.stroke(); }
     g.restore();
   }
   // 고물 쪽 움푹한 조종석
   if (z >= 0.6 && z <= DECK + 0.02) {
     g.save(); g.globalCompositeOperation = 'destination-out';
-    g.beginPath(); roundRect(g, -3.95, -0.72, -2.2, 0.72, 0.28); g.fill(); g.restore();
+    g.beginPath(); roundRect(g, ck0, -0.72, ck1, 0.72, 0.28); g.fill(); g.restore();
   }
   if (Math.abs(z - 0.56) < DZ * 0.6) {
-    g.beginPath(); roundRect(g, -4.05, -0.8, -2.1, 0.8, 0.3); g.fillStyle = WOOD.floor; g.fill();
+    g.beginPath(); roundRect(g, ck0 - 0.1, -0.8, ck1 + 0.1, 0.8, 0.3); g.fillStyle = WOOD.floor; g.fill();
     g.strokeStyle = 'rgba(40,24,10,.35)'; g.lineWidth = 0.02;
-    for (let x = -3.9; x < -2.1; x += 0.2) { g.beginPath(); g.moveTo(x, -0.75); g.lineTo(x, 0.75); g.stroke(); }
+    for (let x = ck0 + 0.05; x < ck1 + 0.1; x += 0.2) { g.beginPath(); g.moveTo(x, -0.75); g.lineTo(x, 0.75); g.stroke(); }
   }
+  if (H.star === 3 && z > DECK && z < DECK + 0.16) drawPerk(g, H);
 }
 
 // 모듈 단면: z는 갑판에서 잰 높이
@@ -179,13 +196,13 @@ function sliceDecor(g, ship, z) {
 // 설계가 바뀔 때 방향마다 층을 쌓아 한 장에 굽는다. 조명은 세상 기준이라 칸마다 입힌다
 export function bakeShip(ship, reuse = null) {
   const H = HULLS[ship.hull], paint = PAINTS.hull[ship.paint?.hull ?? 0] || PAINTS.hull[0];
-  const tall = Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + (ship.hull === 'sloop' ? 0.45 : 0.1);
+  const tall = Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + (H.kind === 'sloop' ? 0.45 : 0.1);
   const zMax = H.deck + tall, layers = [], size = CELL;
   for (let z = 0; z <= zMax; z += DZ) {
     const c = document.createElement('canvas'); c.width = c.height = size;
     const g = c.getContext('2d');
     g.setTransform(PX, 0, 0, PX, size / 2, size / 2);
-    if (ship.hull === 'raft') sliceRaft(g, z); else if (ship.hull === 'rowboat') sliceRowboat(g, z, paint); else sliceSloop(g, z, paint);
+    if (H.kind === 'raft') sliceRaft(g, z, H); else if (H.kind === 'rowboat') sliceRowboat(g, z, paint, H); else sliceSloop(g, z, paint, H);
     for (const m of ship.mods) sliceModule(g, m, ship.hull, z - H.deck);
     sliceDecor(g, ship, z - H.deck);
     layers.push({ c, z });
@@ -385,7 +402,7 @@ export function drawShip(g, sprite, st, zoom, sx, sy) {
     } });
   }
   // 사람들
-  const floor = hull.id === 'sloop' ? 0.72 : hull.id === 'rowboat' ? 0.22 : deck;
+  const floor = hull.kind === 'sloop' ? 0.72 : hull.kind === 'rowboat' ? 0.22 : deck;
   const capX = st.capX ?? hull.helmX;
   const manP = P(capX, 0, floor);
   items.push({ d: manP[2], draw() {
@@ -439,9 +456,11 @@ export function drawHullTop(g, hullId, px, ox, oy, paint) {
   g.setTransform(px, 0, 0, px, ox, oy);
   g.transform(0, -1, 1, 0, 0, 0);
   const H = HULLS[hullId];
-  if (hullId === 'raft') { sliceRaft(g, H.deck); } else {
-    hullPath(g, hullId, H.deck); g.fillStyle = paint; g.fill();
-    hullPath(g, hullId, H.deck, 0.12); g.fillStyle = hullId === 'sloop' ? WOOD.deck : WOOD.floor; g.fill();
+  if (H.kind === 'raft') { sliceRaft(g, H.deck, H); } else {
+    hullPath(g, hullId, H.deck); g.fillStyle = H.star === 3 ? '#b98f45' : paint; g.fill(); // ★3은 테두리에 보강재
+    if (H.star === 3) { hullPath(g, hullId, H.deck, 0.05); g.fillStyle = paint; g.fill(); }
+    hullPath(g, hullId, H.deck, 0.12); g.fillStyle = H.kind === 'sloop' ? WOOD.deck : WOOD.floor; g.fill();
+    if (H.star === 3) drawPerk(g, H);
   }
   g.restore();
 }

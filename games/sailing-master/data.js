@@ -43,22 +43,45 @@ export const SEASONS = [
 export const WEATHER = {
   gustLen: 40, gustWarn: 25,
   heelSafe: 0.38,        // 이 기울기를 넘으면 선체가 상해요
-  heelHurt: 0.175,       // 넘은 만큼 초당 선체 피해
+  heelHurt: 21,          // 넘은 만큼 초당 내구도 피해
   heatVigor: 1 / 300,    // 무더위에 그늘이 없을 때 초당 기력 감소
   hungerVigor: 1 / 80,   // 식량이 없을 때 초당 기력 감소
   restVigor: 1 / 120,
   droughtDepth: 0.55,    // 가뭄 때 여울 수심 배율
-  hitHurt: 0.012,        // 물가 충돌: 속도 × 이 값
-  shoalHurt: 0.012,      // 여울에 걸린 채 움직일 때 초당 피해
+  hitHurt: 0.48,         // 물가 충돌: 속도 × 이 값만큼 내구도가 깎인다
+  shoalHurt: 1.44,       // 여울에 걸린 채 움직일 때 초당 내구도 피해
 };
 
-// 선체(배 평면 격자는 cols × rows, 칸 한 변 cell m. x0: 0행 앞쪽 끝의 배 좌표)
+// 선체(배 평면 격자는 cols × rows, 칸 한 변 cell m. x0: 0행 앞쪽 끝의 배 좌표). id는 등급과 별을 함께 나타낸다: sloop = 슬루프 ★1, sloop2 = ★2
+// hp: 내구도(피해는 절대값으로 들어온다), yard: 필요한 조선소 등급
+const raft = { id: 'raft', kind: 'raft', star: 1, grade: 1, name: '뗏목', len: 4.6, beam: 3.1, deck: 0.34, cols: 3, rows: 4, cell: 1, x0: 2, drag: 0.55, row: 3.8, turn: 0.8, stability: 1.4, buoy: 26, draft: 0.2, crew: 0, foodBase: 4, holdBase: 14, helmX: -1.45, hp: 40, yard: 1, price: {} };
+const rowboat = { id: 'rowboat', kind: 'rowboat', star: 1, grade: 2, name: '나룻배', len: 6.4, beam: 2.1, deck: 0.5, cols: 2, rows: 6, cell: 0.8, x0: 2.4, drag: 0.9, row: 4.6, turn: 0.82, stability: 0.8, buoy: 30, draft: 0.3, crew: 1, foodBase: 5, holdBase: 18, helmX: -2.65, hp: 70, yard: 1, price: { wood: 40, coin: 15 } };
+const sloop = { id: 'sloop', kind: 'sloop', star: 1, grade: 3, name: '슬루프', len: 9, beam: 3, deck: 1, cols: 3, rows: 7, cell: 0.72, x0: 3.1, drag: 1, row: 4, turn: 0.62, stability: 1, buoy: 70, draft: 0.68, crew: 2, foodBase: 6, holdBase: 24, helmX: -3.1, cockpit: [-3.95, -2.2], hp: 120, yard: 3, blueprint: 'sloop', price: { wood: 160, cloth: 60, coin: 110 } };
+// ★2 선체 연장: 길이·칸·부력이 늘고 회전은 조금 느려진다. rowOff: 놓인 모듈을 뒤로 미는 행 수
+const star2 = (b, over) => ({ ...b, id: `${b.kind}2`, star: 2, turn: b.turn * 0.93, blueprint: undefined, ...over });
+// ★3 보강: 내구·복원력이 늘고 등급 고유 개조가 붙는다
+const star3 = (b, over) => ({ ...b, id: `${b.kind}3`, star: 3, hp: Math.round(b.hp * 1.3), stability: b.stability * 1.15, rowOff: 0, ...over });
+const raft2 = star2(raft, { len: 5.6, rows: 5, x0: 2.5, buoy: 32, helmX: -1.95, price: { wood: 12 } });
+const rowboat2 = star2(rowboat, { len: 7.6, beam: 2.3, x0: 2.45, buoy: 45, helmX: -3.2, price: { wood: 40, cloth: 15, coin: 20 } });
+const sloop2 = star2(sloop, { len: 11, rows: 10, x0: 3.8, rowOff: 1, buoy: 107, crew: 3, helmX: -4.2, cockpit: [-4.95, -3.45], price: { wood: 80, cloth: 40, coin: 100 } });
 export const HULLS = {
-  raft: { id: 'raft', grade: 1, name: '뗏목', len: 4.6, beam: 3.1, deck: 0.34, cols: 3, rows: 4, cell: 1, x0: 2, drag: 0.55, row: 3.8, turn: 0.8, stability: 1.4, buoy: 26, draft: 0.2, crew: 0, foodBase: 4, holdBase: 14, helmX: -1.45, price: {} },
-  rowboat: { id: 'rowboat', grade: 2, name: '나룻배', len: 6.4, beam: 2.1, deck: 0.5, cols: 2, rows: 6, cell: 0.8, x0: 2.4, drag: 0.9, row: 4.6, turn: 0.82, stability: 0.8, buoy: 30, draft: 0.3, crew: 1, foodBase: 5, holdBase: 18, helmX: -2.65, price: { wood: 40, coin: 15 } },
-  sloop: { id: 'sloop', grade: 3, name: '슬루프', len: 9, beam: 3, deck: 1, cols: 3, rows: 7, cell: 0.72, x0: 3.1, drag: 1, row: 2.2, turn: 0.62, stability: 1, buoy: 70, draft: 0.68, crew: 2, foodBase: 6, holdBase: 24, helmX: -3.1, price: { wood: 150, cloth: 50, coin: 90 } },
+  raft, raft2,
+  raft3: star3(raft2, { row: raft2.row * 1.15, price: { wood: 18, cloth: 4 }, perk: '노걸이 보강', perkDesc: '노 속도 +15%' }),
+  rowboat, rowboat2,
+  rowboat3: star3(rowboat2, { pointing: 4 * D, leeK: 0.6, yard: 2, price: { wood: 60, cloth: 40, coin: 50 }, perk: '센터보드', perkDesc: '맞바람 금지 구역 40° → 36°, 옆으로 덜 밀림' }),
+  sloop, sloop2,
+  sloop3: star3(sloop2, { winch: true, price: { wood: 120, cloth: 90, coin: 150 }, perk: '돛줄 윈치', perkDesc: '돛 바꾸는 시간 절반, 선장 걷는 거리도 절반' }),
 };
-export const HULL_ORDER = ['raft', 'rowboat', 'sloop'];
+export const HULL_ORDER = Object.keys(HULLS);
+// 조선소 사다리에 보이는 다섯 등급. 스쿠너와 탐사선은 그 바다가 열릴 때 짓는다
+export const HULL_TIERS = [
+  { grade: 1, kind: 'raft', name: '뗏목', space: '호수' },
+  { grade: 2, kind: 'rowboat', name: '나룻배', space: '강' },
+  { grade: 3, kind: 'sloop', name: '슬루프', space: '앞바다' },
+  { grade: 4, kind: null, name: '스쿠너', space: '큰 바다' },
+  { grade: 5, kind: null, name: '대양 탐사선', space: '대양' },
+];
+export const STAR_STEPS = { 2: { name: '선체 연장', desc: '배가 길어져! 칸이 늘고 더 빠르지만 조금 둔해진다고' }, 3: { name: '보강', desc: '내구도 +30%, 복원력 +15%' } };
 
 // 모듈. w·h: 차지하는 칸(가로 × 세로), kg: 무게 단위, z: 그림 높이(m). need: 해금 조건
 export const MODULES = {
@@ -145,12 +168,12 @@ export const SPECIES = {
 
 export const REGIONS = {
   pond: {
-    id: 'pond', name: '작은 호수', order: 0, grade: 1, wind: { from: -70 * D, speed: 6.5, swing: 0.7 }, gustK: 1.35,
+    id: 'pond', name: '작은 호수', order: 0, grade: 1, yard: 1, wind: { from: -70 * D, speed: 6.5, swing: 0.7 }, gustK: 1.35,
     shape: { kind: 'lake', ax: 96, ay: 150, ph: 0.4 },
     islands: [{ x: 28, y: -42, r: 13, ph: 1.4 }],
     start: 'reed',
     ports: [{ id: 'reed', name: '갈대 나루', x: -8, y: 118 }, { id: 'willow', name: '버들 나루', x: -88, y: -40 }, { id: 'stonePier', name: '돌담 나루', x: 84, y: -60 }],
-    gates: [{ id: 'toLake', name: '북쪽 수로', x: 0, y: -135, to: 'lake', entry: 'southGate', req: { grade: 2, found: 2 } }],
+    gates: [{ id: 'toLake', name: '북쪽 수로', x: 0, y: -135, to: 'lake', entry: 'southGate', req: {} }],
     finds: [
       // 뗏목은 느리니 발견지 보상만으로 나룻배 값을 빨리 모으게 한다(나루 가까이에 먼저 놓음)
       { id: 'logpile', name: '물가의 통나무 더미', x: -56, y: 92, coin: 4, wood: 8, art: 'stump' },
@@ -166,12 +189,12 @@ export const REGIONS = {
     flot: { cap: 9, table: [['wood', 5, 3, 6], ['cloth', 1, 1, 3], ['coin', 2, 2, 4]] },
   },
   lake: {
-    id: 'lake', name: '큰 호수', order: 1, grade: 1, wind: { from: -22 * D, speed: 9, swing: 0.5 }, gustK: 1.7, heat: true,
+    id: 'lake', name: '큰 호수', order: 1, grade: 1, yard: 2, wind: { from: -22 * D, speed: 9, swing: 0.5 }, gustK: 1.7, heat: true,
     shape: { kind: 'lake', ax: 170, ay: 280, ph: 0 },
     islands: [{ x: 54, y: -118, r: 30, ph: 0.6 }, { x: -62, y: 26, r: 21, ph: 2.2 }, { x: 44, y: 112, r: 13, ph: 4 }],
     start: 'southGate',
     ports: [{ id: 'southGate', name: '남쪽 물목', x: -30, y: 262 }, { id: 'pine', name: '솔숲 마을', x: -150, y: -70 }, { id: 'northPier', name: '북동 나루', x: 110, y: -195 }, { id: 'eastTown', name: '동쪽 마을', x: 158, y: 90 }, { id: 'reedTown', name: '갈대 마을', x: -152, y: 112 }],
-    gates: [{ id: 'toRiver', name: '강 어귀', x: 16, y: -285, to: 'river', entry: 'head', req: { grade: 3, found: 3, draft: 1.05 } }],
+    gates: [{ id: 'toRiver', name: '강 어귀', x: 16, y: -285, to: 'river', entry: 'head', req: { grade: 2 } }, { id: 'toPond', name: '남쪽 수로', x: 24, y: 276, to: 'pond', entry: 'stonePier', req: {} }],
     finds: [
       { id: 'lighthouse', name: '작은 등대', x: 118, y: -30, coin: 30, cloth: 20, blueprint: 'mast_m', art: 'tower' },
       { id: 'cove', name: '조용한 만', x: -166, y: 45, coin: 22, wood: 30, art: 'stump' },
@@ -185,15 +208,15 @@ export const REGIONS = {
     flot: { cap: 14, table: [['wood', 4, 4, 9], ['cloth', 3, 3, 7], ['coin', 2, 4, 8]] },
   },
   river: {
-    id: 'river', name: '강', order: 2, grade: 2, wind: { from: -100 * D, speed: 8, swing: 0.8 }, gustK: 1.5, heat: true, flow: 1.1,
+    id: 'river', name: '강', order: 2, grade: 2, yard: 3, wind: { from: -100 * D, speed: 8, swing: 0.8 }, gustK: 1.5, heat: true, flow: 1.1,
     shape: { kind: 'river', pts: [[0, 1000], [70, 840], [-50, 660], [-110, 470], [20, 290], [130, 120], [50, -70], [-100, -240], [-70, -440], [60, -620], [20, -800], [-30, -1000]], width: 62 },
     islands: [{ x: 96, y: 66, r: 11, ph: 1.2 }],
     start: 'head',
     ports: [{ id: 'head', name: '강머리 나루', x: 8, y: 960 }, { id: 'mill', name: '물방아 마을', x: -110, y: 400 }, { id: 'ferry', name: '나루터 언덕', x: -60, y: -320 }],
-    gates: [{ id: 'toSea', name: '넓어지는 강', x: -24, y: -972, to: null, req: { grade: 3, found: 4 } }],
+    gates: [{ id: 'toSea', name: '넓어지는 강', x: -24, y: -972, to: null, req: { grade: 3 } }, { id: 'toLake', name: '호수 어귀', x: -20, y: 985, to: 'lake', entry: 'northPier', req: {} }],
     finds: [
       { id: 'rapidsStone', name: '여울목 표지', x: 70, y: 760, coin: 30, wood: 30, art: 'stone' },
-      { id: 'mill2', name: '멈춘 물레방아', x: -40, y: 540, coin: 35, cloth: 20, art: 'tower' },
+      { id: 'mill2', name: '멈춘 물레방아', x: -40, y: 540, coin: 35, cloth: 20, blueprint: 'sloop', art: 'tower' },
       { id: 'hermit', name: '강가의 은둔처', x: 120, y: 170, coin: 40, art: 'stump' },
       { id: 'oldBridge', name: '무너진 옛 다리', x: -90, y: -180, coin: 50, wood: 40, art: 'wreck' },
       { id: 'cairn', name: '순례자의 돌무지', x: 50, y: -560, coin: 45, art: 'stone' },

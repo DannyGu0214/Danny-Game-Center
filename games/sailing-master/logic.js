@@ -1,4 +1,4 @@
-import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW } from './data.js';
+import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS } from './data.js';
 import { worldOf } from './world.js';
 import * as SH from './ship.js';
 // 게임 규칙 전부. 화면이 없고, 시드와 고정 시간 단계만으로 결과가 같다.
@@ -59,7 +59,7 @@ export function windAt(S) {
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 1, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 2, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: { heat: false, drought: false, gustOn: false, gustSoon: false },
@@ -74,6 +74,7 @@ export function newGame(seed = 1) {
     stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0 },
     ended: false, rev: 0,
   };
+  S.best = JSON.parse(JSON.stringify(S.ship));
   S.wind = windAt(S);
   placeAtPort(S, 'reed');
   return S;
@@ -128,7 +129,7 @@ function placeAtPort(S, portId) {
 // ── 조작 ──
 const stationX = (S, where) => {
   const st = stats(S);
-  if (where === 'mast' && st.mast) return st.mastX - 0.55;
+  if (where === 'mast' && st.mast) { const x = st.mastX - 0.55; return st.hull.winch ? (x + st.hull.helmX) / 2 : x; } // 윈치가 있으면 반만 걷는다
   if (where === 'oar') { const o = S.ship.mods.find((m) => m.id === 'oar'); if (o) return SH.modulePos(S.ship.hull, o)[0]; }
   return HULLS[S.ship.hull].helmX;
 };
@@ -262,7 +263,7 @@ export function sell(S, k, n) {
   S.res[k] -= n; S.res.coin += coin;
   return coin;
 }
-export const repairCost = (S) => Math.ceil((1 - S.hull) * 40 * HULLS[S.ship.hull].grade);
+export const repairCost = (S) => Math.ceil((1 - S.hull) * HULLS[S.ship.hull].hp); // 잃은 내구도 1에 금화 한 닢
 export function repair(S) {
   const c = repairCost(S);
   if (!S.docked || c <= 0 || S.res.coin < c) return false;
@@ -324,11 +325,12 @@ export function placeModule(S, id, col, row, rot = 0) {
   const M = MODULES[id], cost = moduleCost(S, id);
   if (!isUnlocked(S, id)) return { ok: false, why: '아직 손댈 수 없는 물건이야!' };
   if ((id === 'hammock' || id === 'cabin') && !HULLS[S.ship.hull].crew) return { ok: false, why: `${HULLS[S.ship.hull].name}엔 선원 태울 자리가 없다고!` };
+  if (M.sail && HULLS[S.ship.hull].grade < 2) return { ok: false, why: `${HULLS[S.ship.hull].name}엔 돛대를 못 세운다고! 나룻배부터야!` };
   if (!canPay(S, cost)) return { ok: false, why: '재료가 모자라! 더 건져 오라고!' };
   const m = { id, col, row, rot };
   if (!SH.canPlace(S.ship, m)) return { ok: false, why: M.sail && S.ship.mods.some((o) => MODULES[o.id].sail) ? '돛대는 하나면 족해, 선장!' : '거긴 안 들어간다고!' };
   pay(S, cost);
-  S.ship.mods.push(m); S.rev++;
+  S.ship.mods.push(m); S.rev++; noteBest(S);
   return { ok: true };
 }
 export function removeModule(S, col, row) {
@@ -336,51 +338,86 @@ export function removeModule(S, col, row) {
   const m = SH.moduleAt(S.ship, col, row);
   if (!m) return false;
   for (const [k, v] of Object.entries(moduleCost(S, m.id))) S.res[k] += Math.ceil(v / 2);
-  S.ship.mods = S.ship.mods.filter((o) => o !== m); S.rev++;
+  S.ship.mods = S.ship.mods.filter((o) => o !== m); S.rev++; noteBest(S);
   return true;
 }
-// 새 선체: 모듈은 값 절반을 돌려받는다
+// ── 조선소 ──
+const refundHalf = (S, m) => { for (const [k, v] of Object.entries(moduleCost(S, m.id))) S.res[k] += Math.ceil(v / 2); };
+// 타이틀에 보여 줄 가장 높은 배. 구조로 모듈을 잃어도 그대로 두고, 직접 고칠 때만 새로 적어 둔다
+function noteBest(S) {
+  if (!S.best || HULL_ORDER.indexOf(S.ship.hull) >= HULL_ORDER.indexOf(S.best.hull)) S.best = JSON.parse(JSON.stringify(S.ship));
+}
+// 지금 배에서 지을 수 있는 칸: 같은 배의 다음 별, 다음 등급의 ★1
+export function buildSteps(S) {
+  const C = HULLS[S.ship.hull], out = [];
+  if (C.star < 3) out.push(HULLS[`${C.kind}${C.star + 1}`]);
+  const up = Object.values(HULLS).find((H) => H.grade === C.grade + 1 && H.star === 1);
+  if (up) out.push(up);
+  return out;
+}
+const yardName = (n) => (n >= 3 ? '강' : n === 2 ? '큰 호수' : '호수');
+// 짓기 조건 목록. 뗏목은 별 없이 나룻배로 넘어가고(서두르게 하려고), 2등급부터는 ★2까지 키워야 다음 등급이다
+export function buildStatus(S, id) {
+  const H = HULLS[id], C = HULLS[S.ship.hull], list = [];
+  const legal = buildSteps(S).includes(H);
+  if (H.kind !== C.kind && C.grade >= 2) list.push({ text: `${C.name} ★2까지 키우기`, ok: C.star >= 2 });
+  list.push({ text: `${yardName(H.yard)} 항구${H.yard < 3 ? ' 이상' : ''}에서 짓기`, ok: REGIONS[S.region].yard >= H.yard });
+  if (H.blueprint) list.push({ text: `${H.name} 설계도(강에서 찾아)`, ok: !!S.blueprints[H.blueprint] });
+  const short = !canPay(S, H.price);
+  return { legal, list, ok: legal && !short && list.every((q) => q.ok), short };
+}
 export function buildHull(S, id) {
-  const H = HULLS[id];
+  const H = HULLS[id], C = HULLS[S.ship.hull];
   if (!S.docked) return { ok: false, why: '배는 항구에서 짓는 거야!' };
-  if (H.grade <= HULLS[S.ship.hull].grade) return { ok: false, why: '지금 배가 더 크잖아, 친구!' };
-  if (id === 'sloop' && !S.visited.lake) return { ok: false, why: '그 배는 큰 호수에 가야 지을 수 있어!' };
-  if (!canPay(S, H.price)) return { ok: false, why: '재료가 모자라! 더 건져 오라고!' };
+  const st = buildStatus(S, id);
+  if (!st.legal) return { ok: false, why: H.grade <= C.grade ? '지금 배가 더 크잖아, 친구!' : '한 번에 한 칸씩 올라가는 거야, 친구!' };
+  const miss = st.list.find((q) => !q.ok);
+  if (miss) return { ok: false, why: `아직 안 돼! ${miss.text}` };
+  if (st.short) return { ok: false, why: '재료가 모자라! 더 건져 오라고!' };
   pay(S, H.price);
-  for (const m of S.ship.mods) for (const [k, v] of Object.entries(moduleCost(S, m.id))) S.res[k] += Math.ceil(v / 2);
-  S.ship.hull = id; S.ship.mods = [];
-  // 노 자리 하나는 달아 준다(움직일 수 있게)
-  const free = SH.validCells(id).find(([c, r]) => r >= Math.floor(H.rows / 2) && c === Math.floor(H.cols / 2)) || SH.validCells(id)[0];
-  S.ship.mods.push({ id: 'oar', col: free[0], row: free[1], rot: 0 });
-  S.food = Math.min(S.food, SH.statsOf(S.ship, 0, 0).foodCap);
-  S.crew = S.crew.slice(0, 0);
+  if (H.kind === C.kind) {
+    // 별 올리기: 선원과 모듈이 그대로 간다. 새 윤곽에 안 맞는 모듈만 값 절반으로 돌려받는다
+    const kept = { hull: id, mods: [] };
+    for (const m of S.ship.mods) {
+      const moved = { ...m, row: m.row + (H.rowOff || 0) };
+      if (SH.canPlace(kept, moved)) kept.mods.push(moved); else refundHalf(S, m);
+    }
+    S.ship.hull = id; S.ship.mods = kept.mods;
+  } else {
+    for (const m of S.ship.mods) refundHalf(S, m);
+    S.ship.hull = id; S.ship.mods = [];
+    // 노 자리 하나는 달아 준다(움직일 수 있게)
+    const free = SH.validCells(id).find(([c, r]) => r >= Math.floor(H.rows / 2) && c === Math.floor(H.cols / 2)) || SH.validCells(id)[0];
+    S.ship.mods.push({ id: 'oar', col: free[0], row: free[1], rot: 0 });
+    S.food = Math.min(S.food, SH.statsOf(S.ship, 0, 0).foodCap);
+    S.crew = [];
+  }
   S.hull = 1; S.cap.x = H.helmX; S.rev++;
+  noteBest(S);
   checkAch(S);
   emit(S, 'built', { id });
   return { ok: true };
 }
-export function setPaint(S, key, i) { S.ship.paint[key] = i; S.stats.painted = 1; S.rev++; checkAch(S); }
-export function setName(S, name) { S.ship.name = String(name).replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 12) || S.ship.name; S.stats.painted = 1; checkAch(S); }
+export function setPaint(S, key, i) { S.ship.paint[key] = i; S.stats.painted = 1; S.rev++; noteBest(S); checkAch(S); }
+export function setName(S, name) { S.ship.name = String(name).replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 12) || S.ship.name; S.stats.painted = 1; noteBest(S); checkAch(S); }
 export function toggleDecor(S, id) {
   if (!DECOR[id] || !decorOpen(S, id)) return false;
   S.ship.decor = S.ship.decor.includes(id) ? S.ship.decor.filter((d) => d !== id) : [...S.ship.decor, id];
-  S.rev++;
+  S.rev++; noteBest(S);
   return true;
 }
 export const decorOpen = (S, id) => ACHIEVEMENTS.some((a) => a.decor === id && S.ach[a.id]);
 
 // 수문: 조건을 보여 주고 넘어간다
 export function gateStatus(S, gate) {
-  const r = gate.req, st = stats(S), list = [];
-  if (r.grade) list.push({ text: `${['', '뗏목', '나룻배', '슬루프'][r.grade]} 이상`, ok: HULLS[S.ship.hull].grade >= r.grade });
-  if (r.found) { const n = findsOf(S).filter((f) => S.found[f.id]).length; list.push({ text: `이 수역 발견지 ${r.found}곳(${n})`, ok: n >= r.found }); }
-  if (r.draft) list.push({ text: `흘수 ${r.draft}m 이하(${st.draft.toFixed(2)}m)`, ok: st.draft <= r.draft });
+  const r = gate.req, list = [];
+  if (r.grade) list.push({ text: `${r.grade}등급(${HULL_TIERS[r.grade - 1].name}) 이상`, ok: HULLS[S.ship.hull].grade >= r.grade });
   return { list, ok: list.every((x) => x.ok) };
 }
 export function passGate(S, gate) {
   if (!gateStatus(S, gate).ok) return false;
   if (!gate.to) { S.ended = true; S.ach.riverEnd || giveAch(S, 'riverEnd'); emit(S, 'ended'); return true; }
-  const from = S.region;
+  const from = S.region, first = !S.visited[gate.to];
   // 화물은 그대로 싣고 넘어간다. 도착 항구에 들르면 창고로 옮겨요
   S.region = gate.to; S.visited[gate.to] = 1;
   findsOf(S, gate.to);
@@ -389,7 +426,7 @@ export function passGate(S, gate) {
   S.cap.x = HULLS[S.ship.hull].helmX; S.cap.at = 'helm'; S.cap.to = null;
   const got = { ...S.hold };
   for (const k of Object.keys(S.hold)) { S.res[k] += S.hold[k]; S.hold[k] = 0; }
-  emit(S, 'region', { from, to: gate.to, got });
+  emit(S, 'region', { from, to: gate.to, got, first });
   checkAch(S);
   return true;
 }
@@ -411,14 +448,16 @@ function giveAch(S, id) {
   emit(S, 'ach', { id });
 }
 const worldDone = (S, region) => worldOf(region).def.finds.every((f) => S.found[f.id]);
-// 다음 등급 배의 재료가 모이면 한 번 알려 준다(창고 + 화물칸). 뗏목은 느려서 빨리 짓고 싶어 하니까
+// 다음 배의 재료가 모이면 한 번 알려 준다(창고 + 화물칸). 2등급부터는 ★2가 먼저다
 export function nextHull(S) {
-  const g = HULLS[S.ship.hull].grade;
-  return Object.values(HULLS).find((H) => H.grade === g + 1) || null;
+  const C = HULLS[S.ship.hull];
+  if (C.grade >= 2 && C.star < 2) return HULLS[`${C.kind}2`];
+  return Object.values(HULLS).find((H) => H.grade === C.grade + 1 && H.star === 1) || null;
 }
 export function canAffordHull(S, H) {
-  if (!H || (H.id === 'sloop' && !S.visited.lake)) return false;
-  return Object.entries(H.price).every(([k, v]) => S.res[k] + S.hold[k] >= v);
+  if (!H) return false;
+  const st = buildStatus(S, H.id);
+  return st.legal && st.list.every((q) => q.ok) && Object.entries(H.price).every(([k, v]) => S.res[k] + S.hold[k] >= v);
 }
 export function checkAch(S) {
   const next = nextHull(S);
@@ -435,7 +474,7 @@ export function checkAch(S) {
   c('gustSafe', t.gusts - t.gustHurt >= 1);
   c('heatSafe', t.heatDays >= 1);
   c('crew3', Object.keys(S.hiredEver).length >= 3);
-  c('sloop', S.ship.hull === 'sloop');
+  c('sloop', HULLS[S.ship.hull].grade >= 3);
   c('lakeAll', worldDone(S, 'lake'));
   const nSeen = Object.keys(S.seen).length;
   c('species5', nSeen >= 5);
@@ -652,13 +691,14 @@ export function step(S, dt) {
 
   // 돛 올리고 내리기
   const wantSail = SAIL_LEVELS[b.sailLevel] * (st.sailArea ? 1 : 0);
-  b.sailNow += clamp(wantSail - b.sailNow, -dt * 0.7, dt * 0.7);
+  const sailRate = dt * 0.7 * (st.hull.winch ? 2 : 1);
+  b.sailNow += clamp(wantSail - b.sailNow, -sailRate, sailRate);
 
   const windSide = angDiff(from, b.h);
   const twa = Math.abs(windSide);
   b.twa = twa;
-  b.luff = twa < NO_GO && b.sailNow > 0.03;
-  const sailT = Math.min(st.maxSpeed, polar(twa) * wspd * SAIL_K * (0.45 + 0.55 * st.sailArea) * st.speedK) * Math.pow(b.sailNow, 0.7);
+  b.luff = twa < st.noGo && b.sailNow > 0.03;
+  const sailT = Math.min(st.maxSpeed, polar(twa + NO_GO - st.noGo) * wspd * SAIL_K * (0.45 + 0.55 * st.sailArea) * st.speedK) * Math.pow(b.sailNow, 0.7);
 
   let rowT = 0;
   if (b.row) {
@@ -673,7 +713,7 @@ export function step(S, dt) {
   const depth = w.depthAt(b.x, b.y) * (wx.drought ? WEATHER.droughtDepth : 1);
   const onShoal = st.draft > depth;
   let target = Math.max(sailT, rowT) + 0.25 * Math.min(sailT, rowT);
-  if (onShoal) { target = Math.min(target, 0.7); if (!b.shoal) emit(S, 'shoal'); if (b.spd > 0.25) S.hull -= WEATHER.shoalHurt * dt; }
+  if (onShoal) { target = Math.min(target, 0.7); if (!b.shoal) emit(S, 'shoal'); if (b.spd > 0.25) S.hull -= WEATHER.shoalHurt * dt / st.hull.hp; }
   b.shoal = onShoal;
   b.spd = ease(b.spd, target, dt, target > b.spd ? BOAT.accel : BOAT.coast);
 
@@ -699,13 +739,13 @@ export function step(S, dt) {
   const heelT = b.luff ? 0 : Math.sign(windSide) * b.sailNow * force;
   b.heel = ease(b.heel, heelT, dt, 1.6);
   if (Math.abs(b.heel) > WEATHER.heelSafe) {
-    const hurt = (Math.abs(b.heel) - WEATHER.heelSafe) * WEATHER.heelHurt * dt;
+    const hurt = (Math.abs(b.heel) - WEATHER.heelSafe) * WEATHER.heelHurt * dt / st.hull.hp;
     S.hull -= hurt; S.gustHurt = (S.gustHurt || 0) + hurt;
     if (!S.heelWarnAt || S.t - S.heelWarnAt > 8) { S.heelWarnAt = S.t; emit(S, 'heel'); }
   }
 
   // 이동: 뱃머리 방향 + 바람에 밀림 + 물살
-  const lee = 0.018 * wspd * (0.25 + b.sailNow) * (0.4 + Math.sin(twa));
+  const lee = 0.018 * wspd * (0.25 + b.sailNow) * (0.4 + Math.sin(twa)) * st.leeK;
   const [fx, fy] = w.flowAt(b.x, b.y);
   const vx = Math.cos(b.h) * b.spd - Math.cos(from) * lee + fx;
   const vy = Math.sin(b.h) * b.spd - Math.sin(from) * lee + fy;
@@ -714,7 +754,7 @@ export function step(S, dt) {
   if (d < BOAT.clear) {
     const [gx, gy] = w.gradient(nx, ny);
     nx += gx * (BOAT.clear - d); ny += gy * (BOAT.clear - d);
-    if (!b.grounded && b.spd > 1) { emit(S, 'ground'); S.hull -= b.spd * (b.row ? 0.5 : 1) * WEATHER.hitHurt; } // 노 속도를 2배로 올리면서 부딪힘 피해는 그대로 둔다
+    if (!b.grounded && b.spd > 1) { emit(S, 'ground'); S.hull -= b.spd * (b.row ? 0.5 : 1) * WEATHER.hitHurt / st.hull.hp; } // 노 속도를 2배로 올리면서 부딪힘 피해는 그대로 둔다
     b.grounded = true;
     // 뱃머리가 물가로 향할수록 크게 느려진다. 스치기만 하면 조금만
     const into = Math.max(0, -(Math.cos(b.h) * gx + Math.sin(b.h) * gy));
@@ -760,8 +800,12 @@ export function serialize(S) { const { events, ...rest } = S; return JSON.string
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || o.v !== 1 || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
+    // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
+    o.v = 2;
+    o.best ??= JSON.parse(JSON.stringify(o.ship));
+    if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다
     for (const c of o.crew || []) {
       if (c.id == null) { o.crewSeq = (o.crewSeq || 0) + 1; c.id = o.crewSeq; }
