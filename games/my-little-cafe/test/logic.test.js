@@ -87,6 +87,7 @@ test('스팀: 공기는 수면에서만 들어가고, 초록 칸에서 만점이
   assert.equal(G.steamStep(m0, 0.9, 1).foam, 0);
   assert.ok(G.steamStep(m0, 0.1, 1).foam > 0);
   assert.equal(G.scoreMilk({ temp: 62, foam: 0.35 }).score, 1);
+  assert.deepEqual([0.1, 0.35, 0.8].map(G.latteLook), ['thin', 'heart', 'foam']); // 거품이 알맞아야 하트가 떠요
   const hot = G.scoreMilk({ temp: 80, foam: 0.35 });
   assert.ok(hot.burnt && hot.score < 0.6);
   assert.ok(G.scoreMilk({ temp: 62, foam: 1 }).foamScore < 0.5);

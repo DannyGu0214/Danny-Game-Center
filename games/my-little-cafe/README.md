@@ -32,8 +32,7 @@
 | `music/` | 날씨별 배경음악 8곡(sunoapi.org 생성, 80kbps) |
 | `music.js`, `sound.js` | 음악 2곡과 제조 소리 합성 |
 | `test/` | 규칙·진행표·문구 말투·손님 동선 테스트 |
-| `tools/icon.html` | 앱 아이콘 그리기 |
-| `manifest.webmanifest`, `sw.js`, `icons/` | 독립 실행(PWA) |
+| `manifest.webmanifest`, `sw.js`, `icons/` | 독립 실행(PWA). 아이콘은 이미지 모델로 그린 커피잔 |
 
 ## 실행
 

@@ -1,7 +1,7 @@
 // 제조 화면 8가지(갈기·담기·다지기·샷·물·스팀·뜸·붓기). 판정은 logic.js, 여기는 그림과 손 조작뿐이다.
 import * as G from './logic.js';
 import { ESPRESSO, DRIP, MILK, AMERICANO, MENUS, STEP_NAME, GRIND, REAL_PER_GAME, TASTE_GOOD, TASTE_OK } from './data.js';
-import { rr, circle, lin, rad, font, TAU, drawCup } from './art.js';
+import { rr, circle, lin, rad, font, TAU } from './art.js';
 import { img } from './assets.js';
 
 let TOP = 128; // 위쪽 단계 표시와 안내 자리
@@ -58,6 +58,69 @@ function makeParticles() {
     },
     get size() { return list.length; },
   };
+}
+
+// ── 김과 잔 ──
+// 김은 부드러운 입자 하나를 미리 구워 두고 찍는다(매 프레임 그라디언트를 만들지 않는다)
+let puffTex = null;
+function puff(g, x, y, r, a) {
+  if (!puffTex) {
+    puffTex = document.createElement('canvas'); puffTex.width = puffTex.height = 64;
+    const c = puffTex.getContext('2d'), gr = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,.42)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = gr; c.fillRect(0, 0, 64, 64);
+  }
+  g.globalAlpha = a; g.drawImage(puffTex, x - r, y - r, r * 2, r * 2); g.globalAlpha = 1;
+}
+// 피어오르는 김: 줄기 n개가 흔들리며 올라가 옅어진다
+function wisps(g, x, y, w, h, t, amount, n = 3) {
+  if (amount <= 0) return;
+  for (let k = 0; k < n; k++) {
+    for (let i = 0; i < 7; i++) {
+      const p = (t * 0.2 + i / 7 + k * 0.37) % 1;
+      const px = x + (k - (n - 1) / 2) * w * 0.3 + Math.sin(p * 6 + t * 0.7 + k * 2) * w * (0.05 + p * 0.2);
+      puff(g, px, y - p * h, w * (0.09 + p * 0.2), amount * Math.sin(p * Math.PI) * 0.26);
+    }
+  }
+}
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const easeOut = (v) => 1 - (1 - clamp01(v)) ** 3;
+function mixColor(stops, x) {
+  let i = 0;
+  while (i < stops.length - 2 && x > stops[i + 1][0]) i++;
+  const [x0, a] = stops[i], [x1, b] = stops[i + 1], k = clamp01((x - x0) / (x1 - x0));
+  return `rgb(${a.map((v, j) => Math.round(v + (b[j] - v) * k)).join(',')})`;
+}
+// 옆에서 본 잔: 그림 속 입구 타원 자리를 잰 값이다. R은 입구 반지름, bottom은 받침 아래 끝
+const CUP_ART = { aspect: 526 / 720, mx: 0.486, my: 0.199, rx: 0.344, ry: 0.188 };
+function sideCup(g, cx, bottom, R) {
+  const w = R / CUP_ART.rx, h = w * CUP_ART.aspect, left = cx - CUP_ART.mx * w, top = bottom - h, im = img('sp-cup');
+  if (im) g.drawImage(im, left, top, w, h);
+  return { x: cx, y: top + CUP_ART.my * h, rx: R, ry: CUP_ART.ry * h };
+}
+// 잔 속 액체의 수면: 적을수록 낮고 좁다
+const cupSurface = (m, level) => ({ x: m.x, y: m.y + m.ry * 0.6 * (1 - level), rx: m.rx * 0.93 * (0.62 + 0.34 * level), ry: m.ry * 0.9 * (0.62 + 0.34 * level) });
+function cupLiquid(g, m, level, { body, crema = null, flecks = 0, ripple = 0, t = 0 }) {
+  if (level <= 0.01) return;
+  const s = cupSurface(m, level);
+  g.save(); g.beginPath(); g.ellipse(m.x, m.y, m.rx * 0.95, m.ry * 0.92, 0, 0, TAU); g.clip();
+  g.fillStyle = body; g.beginPath(); g.ellipse(s.x, s.y, s.rx, s.ry, 0, 0, TAU); g.fill();
+  if (crema) { // 가운데가 밝고 가장자리로 갈수록 짙어진다
+    g.save(); g.translate(s.x, s.y); g.scale(1, s.ry / s.rx);
+    g.fillStyle = rad(g, 0, 0, s.rx * 0.2, s.rx * 0.94, [[0, crema], [0.72, crema], [1, body]]); circle(g, 0, 0, s.rx * 0.94); g.fill();
+    g.restore();
+  }
+  for (let i = 0; i < flecks; i++) { // 크레마의 짙은 얼룩
+    const a = i * 2.399, r = Math.sqrt((i + 0.5) / flecks) * 0.88;
+    g.fillStyle = i % 3 ? 'rgba(92,48,18,.4)' : 'rgba(250,216,160,.42)';
+    g.beginPath(); g.ellipse(s.x + Math.cos(a) * s.rx * r, s.y + Math.sin(a) * s.ry * r, 1.3 + (i % 3), 0.8 + (i % 2), 0, 0, TAU); g.fill();
+  }
+  for (let i = 0; i < 3 && ripple > 0; i++) { // 줄기가 닿는 자리의 물결
+    const p = (t * 1.5 + i / 3) % 1;
+    g.strokeStyle = `rgba(255,236,204,${(1 - p) * 0.4 * ripple})`; g.lineWidth = 1.2;
+    g.beginPath(); g.ellipse(s.x, s.y, s.rx * p * 0.8, s.ry * p * 0.8, 0, 0, TAU); g.stroke();
+  }
+  g.restore();
 }
 
 // ── 1. 갈기 ──
@@ -250,12 +313,26 @@ function machineHead(g, cx, top, w) {
   // 그림의 브루 헤드가 cx에 오게 놓는다
   sprite(g, 'sp-machine', cx, top + 78, w * 4, 0.6, 0.75);
 }
-const coffeeColor = (x) => (x < 0.2 ? '#2a1409' : x < 0.65 ? '#7a4216' : '#c08a3e');
+// 나올수록 짙은 색에서 금빛으로, 너무 오래 뽑으면 옅어진다
+const STREAM_COLOR = [[0, [42, 20, 9]], [0.3, [96, 52, 20]], [0.7, [178, 118, 54]], [1, [205, 156, 88]], [1.5, [226, 200, 150]]];
+const CREMA_COLOR = [[0, [96, 56, 24]], [0.5, [150, 94, 40]], [1, [197, 142, 74]], [1.5, [221, 192, 140]]];
+function shotSpouts(g, x, y) { // 포터필터 아래 두 갈래 주둥이. 끝자리를 돌려준다
+  g.fillStyle = lin(g, x - 16, 0, x + 16, 0, [[0, '#70757a'], [0.45, '#e6e9ea'], [1, '#7c8185']]);
+  rr(g, x - 6, y - 4, 12, 9, 3); g.fill();
+  for (const d of [-1, 1]) { g.beginPath(); g.moveTo(x + d * 2, y + 1); g.lineTo(x + d * 13, y + 7); g.lineTo(x + d * 13, y + 13); g.lineTo(x + d * 7, y + 13); g.lineTo(x, y + 5); g.closePath(); g.fill(); }
+  return [x - 10, x + 10].map((sx) => ({ x: sx, y: y + 13 }));
+}
+function shotStream(g, a, x1, y1, col, thick, t, seed) {
+  const wob = Math.sin(t * 9 + seed) * 0.9 + Math.sin(t * 23 + seed * 2) * 0.4;
+  const line = () => { g.beginPath(); g.moveTo(a.x, a.y); g.quadraticCurveTo(a.x + (x1 - a.x) * 0.2 + wob, (a.y + y1) / 2, x1 + wob * 0.5, y1); g.stroke(); };
+  g.lineCap = 'round'; g.strokeStyle = col; g.lineWidth = thick; line();
+  g.strokeStyle = 'rgba(255,232,190,.5)'; g.lineWidth = Math.max(0.6, thick * 0.26); line();
+}
 
 async function stepExtract(ctx, st, beat) {
   const { ui, sfx } = ctx;
   const ideal = G.idealGrind(ctx.S.day, st.menu), err = G.grindError(st.grind, ideal);
-  let state = 'idle', gameT = 0, realT = 0, y = 0, fx = makeParticles();
+  let state = 'idle', gameT = 0, realT = 0, y = 0, fx = makeParticles(), entry = ctx.fast ? 1 : 0, dripT = 0;
   ui.hint(beat.tips?.extract || '샷 시작을 눌러요. 무게가 초록 칸이면 멈춰요.');
   const flowY = (rt) => G.shotYieldAt(rt, err, st.doseG) * G.channelFlowBoost(st.even);
   return new Promise((done) => {
@@ -272,24 +349,39 @@ async function stepExtract(ctx, st, beat) {
         if (beat.autoStop && y >= ESPRESSO.yield) stop();
         if (realT > 75) stop();
       }
-      machineHead(g, cx, top, w);
-      const pfY = top + 78;
-      portafilter(g, cx, pfY, w * 0.72, 1);
-      const flowing = (state === 'run' && realT > 3) || (state === 'stop');
-      const ratio = Math.min(1, y / ESPRESSO.yield), col = coffeeColor(ratio);
-      const cupY = cy0 - 58, cupS = Math.min(w * 0.68, 52);
-      if (flowing && state === 'run') {
-        g.strokeStyle = col; g.lineWidth = 2.6;
-        for (const d of [-9, 9]) { const wob = Math.sin(t * 14 + d) * 0.7; g.beginPath(); g.moveTo(cx + d, pfY + w * 0.92); g.lineTo(cx + d * 0.6 + wob, cupY + 4); g.stroke(); }
+      // 포터필터를 끼우는 움직임
+      if (entry < 1) { entry = Math.min(1, entry + dt / 0.5); if (entry === 1) sfx.play('clunk'); }
+      const e = easeOut(entry), shake = state === 'run' ? Math.sin(t * 63) * 0.6 : 0;
+      machineHead(g, cx + shake, top, w);
+      const pw = w * 0.72, pfY = top + 78 + (1 - e) * 46;
+      g.save(); g.translate(cx + shake, pfY); g.rotate((1 - e) * -0.2);
+      const tips = shotSpouts(g, 0, pw * 1.24);
+      portafilter(g, 0, 0, pw, 1);
+      g.restore();
+      // 받침과 잔
+      const R = Math.min(w * 0.9, 66);
+      g.fillStyle = lin(g, 0, cy0 - 14, 0, cy0, [[0, '#a7abad'], [1, '#55595c']]); rr(g, cx - R * 1.7, cy0 - 14, R * 3.4, 14, 4); g.fill();
+      g.fillStyle = 'rgba(20,18,16,.55)'; for (let i = -6; i <= 6; i++) { rr(g, cx + i * R * 0.24 - 2, cy0 - 11, 4, 4, 1); g.fill(); }
+      const m = sideCup(g, cx, cy0 - 9, R);
+      const ratio = y / ESPRESSO.yield, level = Math.min(1, ratio * 0.62), col = mixColor(STREAM_COLOR, ratio);
+      cupLiquid(g, m, level, { body: '#35190b', crema: ratio > 0.04 ? mixColor(CREMA_COLOR, ratio) : null, flecks: Math.round(Math.min(1, ratio) * 22), ripple: state === 'run' && realT > 5 ? 1 : 0, t });
+      // 처음엔 방울로 떨어지다 줄기가 되고, 멈추면 다시 방울이 된다
+      const s = cupSurface(m, level), from = tips.map((p) => ({ x: cx + p.x, y: pfY + p.y }));
+      const flow = state === 'run' ? clamp01((realT - 6) / 4) : 0;
+      if (flow > 0) { const thick = (1.2 + flow * 1.9) * (ratio > 1.25 ? 0.72 : 1); from.forEach((a, i) => shotStream(g, a, m.x + (i ? 3 : -3), s.y, col, thick, t, i * 2)); }
+      if ((state === 'run' && realT > 3 && flow < 1) || state === 'stop') {
+        dripT += dt;
+        if (dripT > (state === 'stop' ? 0.09 : 0.2 - flow * 0.1)) {
+          dripT = 0;
+          const a = from[Math.random() < 0.5 ? 0 : 1];
+          fx.add({ x: a.x, y: a.y, vx: 0, vy: 30, g: 900, life: Math.sqrt(2 * Math.max(4, s.y - a.y) / 900) * 0.92, r: 1.7, c: col });
+        }
       }
-      // 컵과 저울
-      g.fillStyle = '#26221f'; rr(g, cx - cupS * 1.45, cy0 - 18, cupS * 2.9, 18, 5); g.fill();
-      drawCup(g, cx, cupY, cupS, ratio > 0.05 ? '#7a4a22' : '#efe5d2');
-      if (ratio > 0.05) { g.fillStyle = 'rgba(222,171,106,.75)'; g.beginPath(); g.ellipse(cx, cupY + cupS * 0.04, cupS * 0.62 * ratio, cupS * 0.1 * ratio, 0, 0, TAU); g.fill(); }
-            // 게이지
+      fx.draw(g, dt);
+      wisps(g, m.x, m.y - m.ry * 0.9, R * 1.4, 84, t, ratio > 0.12 ? Math.min(0.85, ratio) : 0);
+      // 게이지
       gauge(g, 24, cy0 + 30, W - 48, { val: y, max: 60, lo: ESPRESSO.yield - ESPRESSO.yieldOk, hi: ESPRESSO.yield + ESPRESSO.yieldOk, label: '커피 양', text: `${y.toFixed(1)}g` });
       gauge(g, 24, cy0 + 66, W - 48, { val: realT, max: 50, lo: ESPRESSO.time - ESPRESSO.timeOk, hi: ESPRESSO.time + ESPRESSO.timeOk, label: '걸린 시간', text: `${realT.toFixed(0)}초`, h: 10 });
-      fx.draw(g, dt);
     });
     const start = () => {
       if (state !== 'idle') return;
@@ -309,16 +401,17 @@ async function stepWater(ctx, st, beat) {
   ui.hint(beat.tips?.water || '누르고 있으면 물이 나와요. 초록 칸에서 손을 떼요.');
   return new Promise((done) => {
     ctx.setView((g, W, H, t, dt) => {
-      const cy0 = bench(g, W, H), cx = W / 2, S = Math.min(W * 0.26, 104), cupY = cy0 - S - 6;
+      const cy0 = bench(g, W, H), cx = W / 2, R = Math.min(W * 0.2, 80);
       if (down) water = Math.min(water + AMERICANO.flow * dt, 320);
       g.fillStyle = lin(g, cx - 30, 0, cx + 30, 0, [[0, '#7d8180'], [0.5, '#dfe2e1'], [1, '#7d8180']]);
       rr(g, cx - 12, TOP + 8, 24, 60, 4); g.fill(); rr(g, cx - 72, TOP + 2, 96, 18, 6); g.fill();
       g.fillStyle = '#b53a2e'; circle(g, cx - 66, TOP + 11, 12); g.fill();
-      if (down) { g.strokeStyle = 'rgba(214,236,244,.85)'; g.lineWidth = 8; g.beginPath(); g.moveTo(cx, TOP + 68); g.lineTo(cx + Math.sin(t * 30), cupY + 8); g.stroke(); }
-      const r = Math.min(1, water / AMERICANO.water);
+      const m = sideCup(g, cx, cy0 + 2, R), r = Math.min(1, water / AMERICANO.water), level = 0.3 + r * 0.66;
       const col = `rgb(${Math.round(58 + r * 30)},${Math.round(34 + r * 22)},${Math.round(18 + r * 12)})`;
-      drawCup(g, cx, cupY, S, col);
-      if (down) for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(255,255,255,.5)'; circle(g, cx + Math.sin(t * 22 + i * 2) * S * 0.3, cupY + 4 + Math.cos(t * 9 + i) * 3, 2.2); g.fill(); }
+      cupLiquid(g, m, level, { body: col, ripple: down ? 1 : 0, t });
+      const sy = cupSurface(m, level).y;
+      if (down) { g.strokeStyle = 'rgba(214,236,244,.85)'; g.lineWidth = 8; g.lineCap = 'round'; g.beginPath(); g.moveTo(cx, TOP + 68); g.lineTo(cx + Math.sin(t * 30), sy); g.stroke(); g.strokeStyle = 'rgba(255,255,255,.65)'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 2, TOP + 68); g.lineTo(cx - 2 + Math.sin(t * 30), sy); g.stroke(); }
+      wisps(g, m.x, m.y - m.ry * 0.9, R * 1.4, 90, t, water > 10 ? 0.8 : 0.35);
       gauge(g, 24, cy0 + 40, W - 48, { val: water, max: 320, lo: AMERICANO.water - AMERICANO.waterOk, hi: AMERICANO.water + AMERICANO.waterOk, label: '뜨거운 물', text: `${water.toFixed(0)}g` });
     });
     ui.primary('누르고 있기', { hold: true, down: () => { down = true; sfx.loop('water', 1); }, up: () => { down = false; sfx.stopLoops(); if (water > 10) ui.secondary('다 됐어요', () => done(water)); } });
@@ -327,19 +420,73 @@ async function stepWater(ctx, st, beat) {
 }
 
 // ── 6. 스팀 ──
+// 금속 피처는 안이 안 보여서 몸통에 창을 내 우유와 막대 깊이를 보여 준다. 수치는 그림 속 몸통 자리를 잰 값이다
+const PITCHER = { aspect: 692 / 720, l: 0.043, r: 0.735, t: 0.008, b: 0.995 };
+const LATTE = { r: 0.232, cx: 0.499, cy: 0.5 }; // 위에서 본 잔 그림의 수면 자리
+const LATTE_SAY = { heart: '하트가 예쁘게 떴어요!', thin: '거품이 적어서 무늬가 흐려요.', foam: '거품이 많아서 무늬가 안 그려져요.' };
+const POUR_SEC = 2, LATTE_SEC = 3;
+
+// 우유를 샷 위에 붓는 장면. p는 0~1, 거품 상태에 따라 무늬가 달라진다
+function drawLatte(g, W, cx, cy0, sec, look, t) {
+  const room = cy0 - TOP - 10, D = Math.min(W * 0.98, room), cy = TOP + 18 + room / 2, left = cx - D / 2, top = cy - D / 2;
+  const pour = clamp01(sec / POUR_SEC), base = img('sp-latte-base'), heart = img('sp-latte-heart');
+  if (base) g.drawImage(base, left, top, D, D);
+  const L = { x: left + LATTE.cx * D, y: top + LATTE.cy * D, r: LATTE.r * D };
+  g.save(); g.beginPath(); g.arc(L.x, L.y, L.r, 0, TAU); g.clip();
+  const wash = Math.sin(Math.PI * Math.min(1, pour * 1.1)) * 0.5;
+  if (look === 'thin') { // 거품이 적으면 커피색만 옅어진다
+    g.fillStyle = '#d4a873'; g.globalAlpha = 0.25 + pour * 0.35; circle(g, L.x, L.y, L.r * easeOut(pour * 1.4)); g.fill(); g.globalAlpha = 1;
+  } else if (look === 'foam') { // 거품이 많으면 흰 거품이 덮는다
+    puff(g, L.x, L.y, L.r * 2.1 * easeOut(pour * 1.2), 0.9);
+    g.fillStyle = 'rgba(214,190,150,.55)'; for (let i = 0; i < 36 * pour; i++) { const a = i * 2.399, r = Math.sqrt((i + 0.5) / 36) * L.r * 0.8; circle(g, L.x + Math.cos(a) * r, L.y + Math.sin(a) * r, 1 + (i % 3) * 0.7); g.fill(); }
+  } else {
+    if (wash > 0) { g.fillStyle = '#e8cfa6'; g.globalAlpha = wash; circle(g, L.x, L.y, L.r * easeOut(pour * 1.5)); g.fill(); g.globalAlpha = 1; }
+    if (heart) { // 무늬가 가운데서 밀려 나오듯 커진다
+      const k = 0.35 + 0.65 * pour * (2 - pour); // 천천히 잦아들며 끝 크기에 닿는다
+      g.save(); g.translate(L.x, L.y); g.scale(k, k); g.translate(-L.x, -L.y); g.globalAlpha = clamp01(pour * 1.7 - 0.35); g.drawImage(heart, left, top, D, D); g.restore();
+    }
+  }
+  g.restore();
+  // 피처는 오른쪽 위에서 들어와 붓고 나간다
+  const pitcher = img('sp-pitcher'), inOut = (1 - easeOut(sec / 0.3)) + clamp01((sec - POUR_SEC) / 0.35);
+  const sx = L.x + L.r * 0.5 + inOut * D * 0.5, sy = L.y - L.r * 1.25 - inOut * D * 0.3;
+  if (sec < POUR_SEC) {
+    const lx = L.x + Math.sin(t * 7) * L.r * 0.2 * (1 - pour * 0.5), ly = L.y + (pour - 0.45) * L.r * 0.6;
+    g.lineCap = 'round'; g.strokeStyle = '#fbf3e4'; g.lineWidth = 5 - pour * 2; g.beginPath(); g.moveTo(sx, sy); g.quadraticCurveTo(sx - 2, (sy + ly) / 2, lx, ly); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(sx - 1, sy); g.quadraticCurveTo(sx - 3, (sy + ly) / 2, lx - 1, ly); g.stroke();
+    g.strokeStyle = 'rgba(255,245,226,.5)'; g.lineWidth = 1.2; for (let i = 0; i < 2; i++) { const q = (t * 2 + i / 2) % 1; circle(g, lx, ly, 4 + q * L.r * 0.26); g.stroke(); }
+  }
+  if (pitcher && inOut < 1) {
+    const w = D * 0.56;
+    g.save(); g.translate(sx, sy); g.rotate(-0.9); g.drawImage(pitcher, -w * 0.02, -w * 0.02, w, w * PITCHER.aspect); g.restore();
+  }
+  wisps(g, L.x, L.y - L.r * 1.05, L.r * 1.5, D * 0.26, t, 0.6);
+  if (sec > POUR_SEC && look === 'heart') { // 다 됐을 때 잠깐 반짝인다
+    const q = clamp01((sec - POUR_SEC) / 0.8);
+    for (let i = 0; i < 5; i++) {
+      const a = i * 2.399 + 0.6, r = L.r * (0.75 + (i % 3) * 0.16), s = Math.sin(Math.PI * clamp01(q * 1.6 - i * 0.12)) * 7;
+      if (s <= 0) continue;
+      const x = L.x + Math.cos(a) * r, y = L.y + Math.sin(a) * r;
+      g.fillStyle = 'rgba(255,246,214,.95)'; g.beginPath(); g.moveTo(x, y - s); g.lineTo(x + s * 0.22, y - s * 0.22); g.lineTo(x + s, y); g.lineTo(x + s * 0.22, y + s * 0.22); g.lineTo(x, y + s); g.lineTo(x - s * 0.22, y + s * 0.22); g.lineTo(x - s, y); g.lineTo(x - s * 0.22, y - s * 0.22); g.closePath(); g.fill();
+    }
+  }
+}
+
 async function stepSteam(ctx, st, beat) {
   const { ui, sfx } = ctx;
-  let m = { temp: MILK.start, foam: 0 }, depth = 0.05, on = false, last = null, alerted = false;
+  let m = { temp: MILK.start, foam: 0 }, depth = 0.05, on = false, last = null, alerted = false, sec = 0, look = 'heart', said = false, ended = false;
   const bubbles = makeParticles();
   ui.hint(beat.tips?.steam || '끌어서 위아래로 움직여요. 위쪽은 공기, 아래쪽은 데우기예요.');
   return new Promise((done) => {
-    const finish = async () => {
+    const finish = () => {
+      if (on === 'pour') return;
       sfx.stopLoops(); ui.clearActions(); ui.hint('우유를 샷 위에 부어요.');
-      on = 'pour'; sfx.loop('pour', 0.6); await wait(ctx.fast ? 20 : 1100); sfx.stopLoops();
-      done({ ...m });
+      look = G.latteLook(m.foam); on = 'pour'; sec = 0;
+      if (ctx.fast) { done({ ...m }); return; }
+      sfx.loop('pour', 0.6);
     };
     ctx.setView((g, W, H, t, dt) => {
-      const cy0 = bench(g, W, H), cx = W / 2, pw = Math.min(W * 0.27, 104), ph = Math.min((H - COUNTER - TOP) * 0.62, 260);
+      const cy0 = bench(g, W, H), cx = W / 2, room = H - COUNTER - TOP;
       if (on === true) {
         m = G.steamStep(m, depth, dt);
         const surface = depth < 0.34;
@@ -348,45 +495,74 @@ async function stepSteam(ctx, st, beat) {
         if (m.temp >= MILK.burn && alerted !== 'burn') { alerted = 'burn'; sfx.play('bad'); ui.hint('너무 뜨거워요! 얼른 끝내요.'); }
         if (m.temp >= 92) finish();
       }
-      const pourPhase = on === 'pour';
-      // 피처는 고정, 스팀 막대가 손가락을 따라 오르내린다
-      const wandX = cx - pw * 0.12, wandTop = TOP - 4;
-      const pitcherTop = Math.max(TOP + 34, cy0 - ph - 6), milkH = ph * 0.62 + m.foam * 26;
-      const wandTip = pitcherTop + ph - milkH + 6 + depth * (ph * 0.46); // 손가락을 내리면 막대가 우유 속으로 깊이 들어간다
-      // 피처 뒤쪽
-      g.save();
-      if (pourPhase) { g.translate(cx, pitcherTop + ph * 0.3); g.rotate(-0.6); g.translate(-cx, -(pitcherTop + ph * 0.3)); }
-      g.fillStyle = 'rgba(200,204,204,.28)'; rr(g, cx - pw, pitcherTop, pw * 2, ph, [6, 6, 18, 18]); g.fill();
-      // 우유
-      g.save(); rr(g, cx - pw + 4, pitcherTop, pw * 2 - 8, ph - 4, [4, 4, 15, 15]); g.clip();
-      const surfY = pitcherTop + ph - milkH;
-      g.fillStyle = lin(g, 0, surfY, 0, pitcherTop + ph, [[0, '#fffdf5'], [1, '#f2e6cf']]); g.fillRect(cx - pw, surfY, pw * 2, milkH + 4);
-      g.fillStyle = `rgba(255,255,255,${0.5 + m.foam * 0.5})`;
-      g.beginPath(); g.moveTo(cx - pw, surfY + m.foam * 22 + 2);
-      for (let i = 0; i <= 10; i++) g.lineTo(cx - pw + i * pw / 5, surfY - 2 + Math.sin(t * 5 + i) * (on === true ? 2 : 0.6));
-      g.lineTo(cx + pw, surfY + m.foam * 22 + 2); g.closePath(); g.fill();
-      if (on === true && depth >= 0.34) { // 소용돌이
-        g.strokeStyle = 'rgba(190,168,132,.5)'; g.lineWidth = 2;
-        for (let i = 0; i < 3; i++) { g.beginPath(); g.ellipse(cx, surfY + 18 + i * 28, pw * (0.72 - i * 0.14), 6 + i * 2, 0, (t * 4 + i) % TAU, ((t * 4 + i) % TAU) + 3.8); g.stroke(); }
+      if (on === 'pour') {
+        sec += dt;
+        if (sec >= POUR_SEC && !said) { said = true; sfx.stopLoops(); sfx.play(look === 'heart' ? 'ok' : 'click'); ui.hint(LATTE_SAY[look]); }
+        if (sec >= LATTE_SEC && !ended) { ended = true; done({ ...m }); }
+        drawLatte(g, W, cx, cy0, Math.min(sec, LATTE_SEC), look, t);
+      } else {
+        // 피처: 몸통 폭과 높이는 그림 비율을 따른다
+        const shake = on === true ? Math.sin(t * 58) * 0.7 : 0, bodyK = (PITCHER.aspect * (PITCHER.b - PITCHER.t)) / (PITCHER.r - PITCHER.l);
+        const pw = Math.min(W * 0.3, 112, room * 0.74 / (2 * bodyK)), ph = pw * 2 * bodyK, pitcherTop = cy0 - ph + 3;
+        const sw = pw * 2 / (PITCHER.r - PITCHER.l), left = cx - pw - PITCHER.l * sw + shake, topY = pitcherTop - PITCHER.t * sw * PITCHER.aspect;
+        const wx = cx - pw * 0.82 + shake, ww = pw * 1.64, wy = pitcherTop + ph * 0.07, wh = ph * 0.87;
+        const foamH = m.foam * ph * 0.15, surfY = wy + wh - ph * 0.48 - foamH;
+        const wandX = cx - pw * 0.12, wandTop = TOP - 4, wandTip = surfY + 4 + depth * ph * 0.34, surface = depth < 0.34;
+        const wand = () => { g.strokeStyle = lin(g, wandX - 4, 0, wandX + 4, 0, [[0, '#868a8c'], [0.5, '#f4f5f5'], [1, '#868a8c']]); g.lineWidth = 7; g.lineCap = 'round'; g.beginPath(); g.moveTo(wandX, wandTop); g.lineTo(wandX, wandTip); g.stroke(); g.fillStyle = '#6f7375'; rr(g, wandX - 5, wandTip - 2, 10, 9, 3); g.fill(); };
+        wand();
+        const pic = img('sp-pitcher');
+        if (pic) g.drawImage(pic, left, topY, sw, sw * PITCHER.aspect);
+        // 창 안쪽
+        g.save(); rr(g, wx, wy, ww, wh, 16); g.clip();
+        g.fillStyle = lin(g, wx, 0, wx + ww, 0, [[0, '#3c4042'], [0.5, '#676c6f'], [1, '#34383a']]); g.fillRect(wx, wy, ww, wh);
+        const warm = clamp01((m.temp - 20) / 45), wave = on === true ? (surface ? 3.2 : 1.1) : 0.5;
+        const edge = (x) => surfY + Math.sin(x * 0.07 + t * 6) * wave + Math.sin(x * 0.17 - t * 9) * wave * 0.45;
+        const body = () => { g.beginPath(); g.moveTo(wx, wy + wh); g.lineTo(wx, edge(wx)); for (let x = wx; x <= wx + ww; x += 6) g.lineTo(x, edge(x)); g.lineTo(wx + ww, wy + wh); g.closePath(); };
+        g.fillStyle = lin(g, 0, surfY, 0, wy + wh, [[0, mixColor([[0, [255, 252, 244]], [1, [252, 240, 216]]], warm)], [1, mixColor([[0, [244, 234, 214]], [1, [238, 214, 176]]], warm)]]); body(); g.fill();
+        if (on === true && !surface) { // 소용돌이: 깊이 넣으면 우유가 돈다
+          for (let i = 0; i < 4; i++) {
+            const yy = surfY + foamH + 18 + i * (wy + wh - surfY - foamH - 28) / 4, rx = ww * (0.42 - i * 0.05), a0 = (t * (5 - i * 0.6) + i * 1.3) % TAU;
+            g.strokeStyle = `rgba(190,162,120,${0.34 - i * 0.04})`; g.lineWidth = 2.6; g.lineCap = 'round';
+            g.beginPath(); g.ellipse(wandX + 8, yy, rx, 6 + i * 1.6, 0, a0, a0 + 3.4); g.stroke();
+          }
+        }
+        // 거품 층: 공기가 들어갈수록 두꺼워진다
+        if (foamH > 0.5) {
+          g.fillStyle = lin(g, 0, surfY - 2, 0, surfY + foamH + 6, [[0, 'rgba(255,255,255,1)'], [0.75, 'rgba(255,252,244,.92)'], [1, 'rgba(255,252,244,0)']]);
+          g.fillRect(wx, surfY - 4 - wave, ww, foamH + 12 + wave);
+          const dots = foamH < 7 ? 0 : Math.round(Math.min(70, foamH * 2.4));
+          for (let i = 0; i < dots; i++) {
+            const a = (i * 0.7549) % 1, bb = (i * 0.5698) % 1;
+            g.fillStyle = 'rgba(196,176,146,.42)'; circle(g, wx + a * ww, surfY + 2 + bb * foamH, 0.8 + (i % 3) * 0.55); g.fill();
+          }
+        }
+        g.fillStyle = 'rgba(255,255,255,.5)'; for (let x = wx; x <= wx + ww; x += 7) { circle(g, x, edge(x), 3.2 + Math.sin(x * 1.3) * 1.4); g.fill(); }
+        // 우유 속 막대는 비쳐 보인다
+        g.save(); g.globalAlpha = wandTip > surfY ? 0.62 : 1; g.beginPath(); g.rect(wx, wy, ww, wh); g.clip(); wand(); g.restore();
+        if (on === true && surface) {
+          if (Math.random() < dt * 40) bubbles.add({ x: wandX + (Math.random() - 0.5) * 26, y: surfY, vx: (Math.random() - 0.5) * 34, vy: -34 - Math.random() * 40, g: 120, life: 0.5, max: 0.5, fade: 0.25, r: 1.4 + Math.random() * 2.2, c: '#fff' });
+          puff(g, wandX, surfY - 8, 24, 0.5);
+        } else if (on === true && Math.random() < dt * 18) bubbles.add({ x: wandX + (Math.random() - 0.5) * 18, y: wandTip + 4, vx: (Math.random() - 0.5) * 16, vy: -44, life: 0.4, max: 0.4, fade: 0.2, a: 0.7, r: 1.2 + Math.random(), c: '#fff8ea' });
+        bubbles.draw(g, dt);
+        g.fillStyle = 'rgba(255,255,255,.08)'; g.beginPath(); g.moveTo(wx + ww * 0.1, wy); g.lineTo(wx + ww * 0.3, wy); g.lineTo(wx + ww * 0.06, wy + wh); g.lineTo(wx - ww * 0.14, wy + wh); g.closePath(); g.fill();
+        g.restore();
+        g.strokeStyle = '#555a5c'; g.lineWidth = 3; rr(g, wx, wy, ww, wh, 16); g.stroke();
+        g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; rr(g, wx - 2, wy - 2, ww + 4, wh + 4, 18); g.stroke();
+        // 데워질수록 김이 오른다
+        wisps(g, cx + pw * 0.15, pitcherTop - 2, pw * 1.3, ph * 0.34, t, clamp01((m.temp - 22) / 34) * (on === true ? 1 : 0.5));
+        // 왼쪽 깊이 안내: 손을 어디 대도 되지만 지금 깊이를 여기서 본다
+        const tx = Math.max(24, cx - pw - 34), ty = wy + 4, th = wh - 8, split = ty + th * 0.34, ky = ty + depth * th;
+        g.fillStyle = 'rgba(20,12,7,.72)'; rr(g, tx - 12, ty - 4, 24, th + 8, 12); g.fill();
+        g.fillStyle = '#d99f45'; rr(g, tx - 4, ty, 8, split - ty - 1, 4); g.fill();
+        g.fillStyle = '#6ea5c2'; rr(g, tx - 4, split + 1, 8, ty + th - split - 1, 4); g.fill();
+        g.fillStyle = surface ? '#ffe9b0' : '#d9eef8'; g.strokeStyle = '#201209'; g.lineWidth = 2; rr(g, tx - 10, ky - 7, 20, 14, 7); g.fill(); g.stroke();
+        g.fillStyle = '#efe3cf'; g.font = font(11, 700); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+        g.fillText('공기', tx, ty - 10); g.fillText('데우기', tx, ty + th + 18);
+        // 상태 글
+        g.fillStyle = surface ? '#ffe9b0' : '#cfe9f4'; g.font = font(13, 700);
+        const say = on === true ? (surface ? '치익, 공기가 들어가요' : '뱅글뱅글, 데우고 있어요') : on === false ? '화면을 누른 채 위아래로 끌어요' : '';
+        if (say) { const sw2 = g.measureText(say).width + 22; g.fillStyle = 'rgba(28,17,11,.78)'; rr(g, cx - sw2 / 2, pitcherTop - 34, sw2, 25, 12); g.fill(); g.fillStyle = surface ? '#ffe9b0' : '#cfe9f4'; g.fillText(say, cx, pitcherTop - 17); }
       }
-      g.restore();
-      if (on === true && depth < 0.34 && Math.random() < dt * 34) bubbles.add({ x: wandX + (Math.random() - 0.5) * 24, y: surfY + 2, vx: (Math.random() - 0.5) * 22, vy: -30 - Math.random() * 30, g: 70, life: 0.45, max: 0.45, fade: 0.25, r: 2 + Math.random() * 2.4, c: '#fff' });
-      bubbles.draw(g, dt);
-      // 피처 앞면
-      g.strokeStyle = 'rgba(225,229,229,.95)'; g.lineWidth = 4; rr(g, cx - pw, pitcherTop, pw * 2, ph, [6, 6, 18, 18]); g.stroke();
-      g.strokeStyle = '#9da1a0'; g.lineWidth = 8; g.beginPath(); g.moveTo(cx + pw, pitcherTop + ph * 0.2); g.bezierCurveTo(cx + pw + 40, pitcherTop + ph * 0.2, cx + pw + 40, pitcherTop + ph * 0.72, cx + pw, pitcherTop + ph * 0.72); g.stroke();
-      g.restore();
-      // 막대
-      if (!pourPhase) {
-        g.strokeStyle = lin(g, wandX - 4, 0, wandX + 4, 0, [[0, '#8d9190'], [0.5, '#f2f3f3'], [1, '#8d9190']]); g.lineWidth = 7; g.lineCap = 'round';
-        g.beginPath(); g.moveTo(wandX, wandTop); g.lineTo(wandX, wandTip); g.stroke();
-        if (on === true) { for (let i = 0; i < 2; i++) { g.fillStyle = 'rgba(255,255,255,.13)'; circle(g, cx + pw * 0.6 + Math.sin(t * 2 + i * 2) * 14, pitcherTop - 8 - ((t * 44 + i * 26) % 54), 11 + i * 3); g.fill(); } }
-      }
-      // 상태 글
-      const surface = depth < 0.34;
-      g.fillStyle = surface ? '#ffe9b0' : '#cfe9f4'; g.font = font(13, 700); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-      if (on === true) g.fillText(surface ? '치익, 공기가 들어가요' : '뱅글뱅글, 데우고 있어요', cx, pitcherTop - 12);
-      else if (on === false) { const r = 22 + Math.sin(t * 4) * 4; g.strokeStyle = 'rgba(255,235,190,.8)'; g.lineWidth = 3; circle(g, cx, cy0 - 70, r); g.stroke(); g.fillText('여기를 끌어요', cx, cy0 - 104); }
       // 게이지
       const half = (W - 60) / 2;
       gauge(g, 24, cy0 + 40, half, { val: m.temp, max: 85, lo: MILK.tempLo, hi: MILK.tempHi, label: '온도', text: `${m.temp.toFixed(0)}℃` });

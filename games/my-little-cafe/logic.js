@@ -64,6 +64,8 @@ export function steamStep(m, depth, dt) {
   if (surface) next.foam = clamp(m.foam + MILK.airPerSec * dt, 0, 1.2);
   return next;
 }
+// 거품 양에 따라 라떼 무늬가 달라진다
+export const latteLook = (foam) => (foam < MILK.foamLo ? 'thin' : foam > MILK.foamHi ? 'foam' : 'heart');
 export function scoreMilk({ temp, foam }) {
   const tempScore = temp < MILK.tempLo ? clamp(1 - (MILK.tempLo - temp) / 15, 0, 1)
     : temp <= MILK.tempHi ? 1
