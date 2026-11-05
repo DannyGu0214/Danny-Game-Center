@@ -62,7 +62,7 @@ const DAY1 = [
   say(O, '비뚤게 다지면 물이 한쪽으로만 흘러서 맛이 제멋대로가 돼.'),
   { t: 'brew', menu: 'espresso', do: ['dose', 'tamp', 'extract'], for: 'owner', title: '담고 다지기', grindHint: true,
     tips: { dose: '버튼을 누르고 있으면 가루가 떨어져요. 초록 칸에서 손을 떼요.',
-      tamp: '화면을 꾹 누른 채 좌우로 움직여 수평을 맞춰요. 힘이 초록 칸에 들면 손을 떼요.' } },
+      tamp: '아래 칸을 꾹 누른 채 좌우로 움직여 수평을 맞춰요. 힘이 초록 칸에 들면 손을 떼요.' } },
   { t: 'react', who: O },
   { t: 'note', id: 'tamp' },
   say(O, '마지막이 제일 중요하네. 원두를 얼마나 곱게 갈지 정하는 거야.'),

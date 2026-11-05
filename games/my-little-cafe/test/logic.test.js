@@ -78,6 +78,7 @@ test('보통 손놀림이면 별 3개가 드물어요: 무작위 오차로 2000�
 test('다지기: 수평이면 균일도가 높고 비뚤면 낮아요', () => {
   assert.ok(G.tampEvenness([0, 0.02, -0.03]) > 0.9);
   assert.ok(G.tampEvenness([0.6, 0.7, -0.6]) === 0);
+  assert.equal(G.tampEvenness([0.1, -0.08, 0.05]), 1); // 수평 칸 안쪽에서 조금 흔들리는 건 괜찮아요
   assert.ok(G.channelFlowBoost(0.2) > G.channelFlowBoost(0.9));
 });
 

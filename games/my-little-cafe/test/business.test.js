@@ -187,3 +187,28 @@ test('저장: 불러오면 그대로이고, 망가진 값은 고쳐요', () => {
   assert.equal(B.normalizeBiz({ season: 'spring', day: 999, weather: 'snow' }).day, DAYS_PER_SEASON);
   assert.equal(B.normalizeBiz({ season: 'spring', weather: 'snow' }).weather, 'sun');
 });
+
+test('가게 저장: 위치별로 따로이고, 이전 저장을 옮기고, 다른 쪽 가게는 이름만 새로 정해요', () => {
+  const known = { shot: {} };
+  const base = { choices: { hero: 'F', owner: 'M', place: 'home', cafe: '윤슬' }, notes: ['shot', '없음'], dial: { espresso: 4, drip: 7 } };
+  assert.equal(B.slotKey('office') === B.slotKey('home'), false);
+  assert.deepEqual(B.parseBase(base, known).notes, ['shot']);
+  assert.equal(B.parseBase({ choices: { hero: 'X' } }), null);
+  assert.equal(B.needsNewName(base, 'home'), false);
+  assert.equal(B.needsNewName(base, 'office'), true);
+  const c = B.slotChoices(base, 'office', '  봄볕   창가 ');
+  assert.deepEqual(c, { hero: 'F', owner: 'M', place: 'office', cafe: '봄볕 창가' });
+  assert.equal(B.slotChoices(base, 'home').cafe, '윤슬');
+  const biz = B.newBiz(seeded(1)); biz.day = 5;
+  const slot = { choices: base.choices, notes: [], dial: base.dial, biz };
+  const back = B.parseSlot(JSON.parse(JSON.stringify(slot)), 'home', known);
+  assert.equal(back.biz.day, 5);
+  assert.equal(B.parseSlot(JSON.parse(JSON.stringify(slot)), 'office', known), null); // 다른 위치의 칸으로 잘못 읽지 않아요
+  assert.equal(B.parseSlot({ ...slot, biz: null }, 'home', known), null);
+  const m = B.migrateOldBiz(JSON.parse(JSON.stringify(slot)), known);
+  assert.equal(m.base.choices.place, 'home');
+  assert.equal(m.slot.biz.day, 5);
+  const m2 = B.migrateOldBiz({ ...base, biz: null }, known);
+  assert.equal(m2.slot, null);
+  assert.equal(B.migrateOldBiz(null, known), null);
+});

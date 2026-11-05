@@ -200,3 +200,28 @@ export function normalizeBiz(raw) {
   b.finished = !!raw.finished;
   return b;
 }
+
+// ── 저장 슬롯 ──
+// 스토리를 끝내면 주인공·사장님 설정(base)이 남고, 가게는 위치별로 따로 저장한다. 어느 쪽이든 언제든 오갈 수 있다
+export const BASE_KEY = 'mlc.base.v1';
+export const OLD_BIZ_KEY = 'mlc.biz.v1';
+export const slotKey = (place) => `mlc.slot.${place}.v1`;
+const cleanNotes = (notes, known) => (Array.isArray(notes) ? notes.filter((n) => known[n]) : []);
+export function parseBase(raw, known = {}) {
+  if (!raw || !G.validChoices({ ...raw.choices })) return null;
+  return { choices: raw.choices, notes: cleanNotes(raw.notes, known), dial: raw.dial };
+}
+export function parseSlot(raw, place, known = {}) {
+  if (!raw || !G.validChoices({ ...raw.choices }) || raw.choices.place !== place || !raw.biz) return null;
+  const biz = normalizeBiz(raw.biz);
+  return biz ? { choices: raw.choices, notes: cleanNotes(raw.notes, known), dial: raw.dial, biz } : null;
+}
+// 이전 저장(가게 하나)을 새 구조로 옮긴다
+export function migrateOldBiz(raw, known = {}) {
+  const base = parseBase(raw, known);
+  if (!base) return null;
+  return { base, slot: raw.biz ? parseSlot(raw, raw.choices.place, known) : null };
+}
+// 가게를 새로 열 때의 선택: 스토리의 주인공·사장님을 쓰고, 위치와 이름만 그 가게 것이다
+export const slotChoices = (base, place, cafe) => ({ ...base.choices, place, cafe: G.cleanCafeName(cafe ?? base.choices.cafe) });
+export const needsNewName = (base, place) => base.choices.place !== place;

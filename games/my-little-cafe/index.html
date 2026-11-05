@@ -115,9 +115,12 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 #logo { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-style: italic; font-size: clamp(44px, 13.5vw, 62px); line-height: 1.02; font-weight: 700; color: #fbe6bd; letter-spacing: -.01em; text-shadow: 0 3px 22px rgba(0,0,0,.6); }
 #logo span { display: block; }
 #byline { margin-top: 9px; color: #d9c5a7; font-size: 13.5px; }
-#titleBtns { margin-top: auto; width: 100%; display: grid; gap: 9px; max-width: 340px; }
-#titleBtns button { height: 56px; border-radius: 15px; font-weight: 800; font-size: 17px; background: rgba(53,36,26,.92); border: 1px solid var(--line); }
+#titleBtns { margin-top: auto; width: 100%; display: grid; gap: 8px; max-width: 340px; }
+#titleBtns button { height: 52px; border-radius: 15px; font-weight: 800; font-size: 17px; background: rgba(53,36,26,.92); border: 1px solid var(--line); }
 #titleBtns .mainBtn { background: var(--on); color: var(--onInk); border: 0; }
+.slotRow { display: flex; gap: 6px; }
+.slotRow button:first-child { flex: 1; min-width: 0; }
+#titleBtns .slotAgain { flex: 0 0 44px; font-size: 19px; padding: 0; }
 #titleBtns small { display: block; font-weight: 600; font-size: 11.5px; opacity: .8; }
 #titleFoot { margin-top: 12px; display: flex; gap: 12px; color: var(--muted); font-size: 12.5px; }
 #titleFoot a { color: inherit; }
@@ -269,7 +272,7 @@ import { WEATHER_MUSIC } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search), DBG = q.has('dbg');
-const SAVE_KEY = 'mlc.save.v1', CLEAR_KEY = 'mlc.cleared', SOUND_KEY = 'mlc.sound', BIZ_KEY = 'mlc.biz.v1';
+const SAVE_KEY = 'mlc.save.v1', CLEAR_KEY = 'mlc.cleared', SOUND_KEY = 'mlc.sound';
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* 저장소를 못 쓰면 이번 판만 유지 */ } },
@@ -662,7 +665,7 @@ async function runBeat(b, index) {
         await shopScene(insideView, 3, b.kind === 'rush' ? '줄이 길어졌어요!' : '단골들이 하나둘 들어와요'); }
       if (b.kind === 'rush') await rushExam(); else await regularsExam();
       break;
-    case 'end': store.set(CLEAR_KEY, '1'); store.del(SAVE_KEY); S.done = true; store.set(BIZ_KEY, JSON.stringify({ choices: S.choices, notes: S.notes, dial: S.dial, biz: null })); location.href = location.pathname + (DBG ? `?${q.toString().replace(/&?auto(=[^&]*)?/, '')}` : ''); await new Promise(() => {}); break;
+    case 'end': store.set(CLEAR_KEY, '1'); store.del(SAVE_KEY); S.done = true; store.set(B.BASE_KEY, JSON.stringify({ choices: S.choices, notes: S.notes, dial: S.dial })); location.href = location.pathname + (DBG ? `?${q.toString().replace(/&?auto(=[^&]*)?/, '')}` : ''); await new Promise(() => {}); break;
     default: throw new Error(`없는 줄 ${b.t}`);
   }
 }
@@ -691,13 +694,20 @@ async function play() {
 }
 
 // ── 본게임 ──
-function loadBiz() {
-  try {
-    const raw = JSON.parse(store.get(BIZ_KEY));
-    if (!raw || !G.validChoices(raw.choices)) return null;
-    return { choices: raw.choices, notes: Array.isArray(raw.notes) ? raw.notes.filter((n) => NOTES[n]) : [], dial: raw.dial, biz: raw.biz ? B.normalizeBiz(raw.biz) : null };
-  } catch { return null; }
+const readJson = (k) => { try { return JSON.parse(store.get(k)); } catch { return null; } };
+// 이전 구조의 저장이 있으면 한 번만 옮긴다
+function migrateSaves() {
+  const old = readJson(B.OLD_BIZ_KEY);
+  if (!old) return;
+  const m = B.migrateOldBiz(old, NOTES);
+  if (m) {
+    store.set(B.BASE_KEY, JSON.stringify(m.base));
+    if (m.slot) store.set(B.slotKey(m.slot.choices.place), JSON.stringify(m.slot));
+  }
+  store.del(B.OLD_BIZ_KEY);
 }
+const loadBase = () => B.parseBase(readJson(B.BASE_KEY), NOTES);
+const loadSlot = (place) => B.parseSlot(readJson(B.slotKey(place)), place, NOTES);
 let business = null;
 const bizEnv = {
   $, sfx, ticks, ui, brewCtx,
@@ -710,7 +720,7 @@ const bizEnv = {
   showStepbar: () => { hideDialog(); $('stepbar').classList.remove('hide'); fade = 0.5; },
   leaveBrewQuiet: () => { $('stepbar').classList.add('hide'); $('hint').classList.add('hide'); $('actions').classList.add('hide'); ui.clearActions(); pointer = null; sfx.stopLoops(); },
   flash: (text) => { const t = $('toast'); t.textContent = text; t.classList.add('on'); clearTimeout(bizEnv.flashT); bizEnv.flashT = setTimeout(() => t.classList.remove('on'), 1300); },
-  save: () => { store.set(BIZ_KEY, JSON.stringify({ choices: S.choices, notes: S.notes, dial: S.dial, biz: S.biz })); },
+  save: () => { store.set(B.slotKey(S.choices.place), JSON.stringify({ choices: S.choices, notes: S.notes, dial: S.dial, biz: S.biz })); },
   toTitle: () => location.reload(),
   dayCard: (num, when, title) => new Promise((done) => {
     $('dayNum').textContent = num; $('dayWhen').textContent = when; $('dayTitle').textContent = title;
@@ -772,17 +782,38 @@ function showTitle() {
   preload(['front-home-night']);
   view = (gx, w, h, t) => drawTitleBg(gx, w, h, t);
   pointer = null; tapHandler = null;
-  const box = $('titleBtns'), saved = loadSave(), cleared = store.get(CLEAR_KEY) === '1';
+  const box = $('titleBtns'), saved = loadSave(), base = loadBase();
   box.innerHTML = '';
-  const add = (html, cls, fn, off) => { const b = document.createElement('button'); b.innerHTML = html; if (cls) b.className = cls; b.disabled = !!off; b.onclick = () => { sfx.ensure(); sfx.play('click'); fn?.(); }; box.append(b); return b; };
-  if (saved) add(`이어 하기<small>${DAY_LABEL[saved.day]} · ${saved.choices.cafe}</small>`, 'mainBtn', () => { S = saved; play(); });
-  add(saved || cleared ? '새 게임' : '시작하기', saved || cleared ? '' : 'mainBtn', async () => {
-    if ((saved || loadBiz()) && !(await confirmBox('이어 하던 기록이 지워져요. 새로 시작할까요?'))) return;
+  const add = (html, cls, fn, off, parent = box) => { const b = document.createElement('button'); b.innerHTML = html; if (cls) b.className = cls; b.disabled = !!off; b.onclick = () => { sfx.ensure(); sfx.play('click'); fn?.(); }; parent.append(b); return b; };
+  // 스토리는 공통이다
+  if (saved) add(`스토리 이어 하기<small>${DAY_LABEL[saved.day]} · ${saved.choices.cafe}</small>`, 'mainBtn', () => { S = saved; play(); });
+  add(saved ? '스토리 새로 시작' : base ? '스토리 다시 하기<small>가게 기록은 그대로예요</small>' : '시작하기', saved || base ? '' : 'mainBtn', async () => {
+    if (saved && !(await confirmBox('진행 중인 스토리가 지워져요. 가게 기록은 그대로예요. 새로 시작할까요?'))) return;
     openSetup();
   });
-  const bizSave = loadBiz();
-  const bizInfo = !bizSave ? '스토리 모드를 끝내면 열려요' : bizSave.biz?.finished ? '봄을 마쳤어요. 여름은 지금 만들고 있어요' : bizSave.biz ? `${SEASON_NAME[bizSave.biz.season]} ${bizSave.biz.day}일차 · ${bizSave.choices.cafe}` : `봄 1일차부터 · ${bizSave.choices.cafe}`;
-  add(`내 가게 운영<small>${bizInfo}</small>`, bizSave && !saved ? 'mainBtn' : '', () => startBusiness(bizSave), !bizSave || bizSave.biz?.finished);
+  // 가게는 위치별로 따로 저장하고, 언제든 오간다
+  if (!base) add('내 가게 운영<small>스토리 모드를 끝내면 열려요</small>', '', null, true);
+  else {
+    for (const [place, label] of [['office', '🏢 오피스 가게'], ['home', '🏘️ 동네 가게']]) {
+      const slot = loadSlot(place), row = document.createElement('div');
+      row.className = 'slotRow';
+      const info = !slot ? '처음 열어요' : slot.biz.finished ? `봄을 마쳤어요 · ${slot.choices.cafe}` : `${SEASON_NAME[slot.biz.season]} ${slot.biz.day}일차 · ${slot.choices.cafe}`;
+      add(`${label}<small>${info}</small>`, !saved && !slot?.biz.finished ? 'mainBtn' : '', () => {
+        if (slot) startBusiness(slot);
+        else if (B.needsNewName(base, place)) openSlotName(base, place);
+        else startBusiness({ ...base, choices: B.slotChoices(base, place), biz: null });
+      }, !!slot?.biz.finished, row);
+      if (slot) {
+        const again = add('↺', 'slotAgain', async () => {
+          if (!(await confirmBox(`${place === 'office' ? '오피스' : '동네'} 가게를 봄 1일차부터 다시 할까요? 이 가게 기록이 지워져요.`))) return;
+          store.del(B.slotKey(place));
+          showTitle();
+        }, false, row);
+        again.setAttribute('aria-label', `${place === 'office' ? '오피스' : '동네'} 가게 처음부터`);
+      }
+      box.append(row);
+    }
+  }
   $('title').classList.remove('hide');
 }
 
@@ -801,12 +832,12 @@ function picture(name) {
 }
 function renderSetup() {
   const s = SETUP[setupStep], body = $('setupBody');
-  $('setupCount').textContent = `${setupStep + 1} / ${SETUP.length}`;
+  $('setupCount').textContent = slotOnly ? PLACES[slotOnly.place].name : `${setupStep + 1} / ${SETUP.length}`;
   $('setupTitle').textContent = s.title; $('setupSub').textContent = s.sub;
   body.innerHTML = ''; body.scrollTop = 0;
   const canNext = () => { $('setupNext').disabled = s.key === 'cafe' ? !(G.cleanCafeName(CH.cafe ?? '').length) : !CH[s.key]; };
-  $('setupBack').textContent = setupStep === 0 ? '타이틀' : '이전';
-  $('setupNext').textContent = setupStep === SETUP.length - 1 ? '이 카페로 시작' : '다음';
+  $('setupBack').textContent = setupStep === 0 || slotOnly ? '타이틀' : '이전';
+  $('setupNext').textContent = slotOnly ? '이 가게 열기' : setupStep === SETUP.length - 1 ? '이 카페로 시작' : '다음';
   const select = (v) => { CH[s.key] = v; sfx.play('click'); renderSetup(); };
   if (s.key === 'hero' || s.key === 'owner') {
     const wrap = document.createElement('div'); wrap.className = 'pick2';
@@ -850,21 +881,28 @@ function renderSetup() {
   }
   canNext();
 }
-function openSetup() { setupStep = 0; Object.assign(CH, { hero: null, owner: null, place: null, cafe: null, custom: '' }); $('title').classList.add('hide'); $('setup').classList.remove('hide'); renderSetup(); }
-$('setupBack').onclick = () => { sfx.play('click'); if (setupStep === 0) { $('setup').classList.add('hide'); showTitle(); } else { setupStep -= 1; renderSetup(); } };
+// 스토리에서 고르지 않은 쪽 가게를 처음 열 때는 이름만 정한다
+let slotOnly = null;
+function openSlotName(base, place) {
+  slotOnly = { base, place }; setupStep = SETUP.length - 1;
+  Object.assign(CH, { cafe: null, custom: '' });
+  $('title').classList.add('hide'); $('setup').classList.remove('hide'); renderSetup();
+}
+function openSetup() { slotOnly = null; setupStep = 0; Object.assign(CH, { hero: null, owner: null, place: null, cafe: null, custom: '' }); $('title').classList.add('hide'); $('setup').classList.remove('hide'); renderSetup(); }
+$('setupBack').onclick = () => { sfx.play('click'); if (setupStep === 0 || slotOnly) { slotOnly = null; $('setup').classList.add('hide'); showTitle(); } else { setupStep -= 1; renderSetup(); } };
 $('setupNext').onclick = () => {
   sfx.ensure(); sfx.play('click');
+  if (slotOnly) {
+    const { base, place } = slotOnly;
+    if (!G.cleanCafeName(CH.cafe ?? '')) return;
+    slotOnly = null;
+    startBusiness({ ...base, choices: B.slotChoices(base, place, CH.cafe), biz: null });
+    return;
+  }
   if (setupStep < SETUP.length - 1) { setupStep += 1; renderSetup(); return; }
   const choices = { hero: CH.hero, owner: CH.owner, place: CH.place, cafe: CH.cafe };
   if (!G.validChoices(choices)) return;
-  store.del(SAVE_KEY); store.del(BIZ_KEY);
-  if (store.get(CLEAR_KEY) === '1') { // 스토리를 끝낸 적이 있으면 건너뛸 수 있다
-    confirmBox('스토리를 건너뛰고 바로 가게를 열까요? 아니요를 누르면 스토리부터 해요.').then((skip) => {
-      if (skip) startBusiness({ choices, notes: Object.keys(NOTES).filter((n) => !n.startsWith('reg')), dial: { espresso: 6, drip: 5 }, biz: null });
-      else { S = G.newGame(choices); save(); play(); }
-    });
-    return;
-  }
+  store.del(SAVE_KEY);
   S = G.newGame(choices); save(); play();
 };
 
@@ -877,7 +915,7 @@ if (AUTO) {
   S = G.newGame({ hero: q.get('hero') || 'F', owner: q.get('owner') || 'M', place: q.get('place') || 'home', cafe: q.get('cafe') || '윤슬' });
   window.MLC_done = false;
   play();
-} else showTitle();
+} else { migrateSaves(); showTitle(); }
 </script>
 </body>
 </html>

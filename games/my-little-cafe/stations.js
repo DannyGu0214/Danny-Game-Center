@@ -186,7 +186,7 @@ async function stepTamp(ctx, st, beat) {
   const { ui, sfx } = ctx;
   let down = false, press = 0, startX = 0, fingerX = 0, tilt = 0, phase = Math.random() * 6, samples = [], kicked = 0;
   const easy = ctx.S.day <= 1 ? 0.3 : 0.5;
-  ui.hint(beat.tips?.tamp || '화면을 꾹 누른 채 좌우로 움직여 수평을 맞춰요.');
+  ui.hint(beat.tips?.tamp || '꾹 누른 채 좌우로 움직여 수평을 맞춰요. 힘이 초록 칸에 들면 손을 떼요.');
   return new Promise((done) => {
     ctx.setView((g, W, H, t, dt) => {
       const cy0 = bench(g, W, H), cx = W / 2, w = Math.min(W * 0.25, 92), baseY = cy0 - w * 1.38, topArea = TOP + 18;
@@ -205,16 +205,25 @@ async function stepTamp(ctx, st, beat) {
       sprite(g, 'sp-tamper', 0, 22, w * 1.72, 0.5, 1);
       g.restore();
       // 수평계
-      const lw = Math.min(W - 80, 280), lx = cx - lw / 2, ly = topArea + 6, lh = 30;
-      g.fillStyle = 'rgba(16,9,5,.65)'; rr(g, lx, ly, lw, lh, lh / 2); g.fill();
-      const green = Math.abs(tilt) < 0.12;
-      g.fillStyle = green ? '#7be37f' : '#5ca86a'; rr(g, cx - lw * 0.07, ly + 2, lw * 0.14, lh - 4, 8); g.fill();
+      const lw = Math.min(W - 80, 280), lx = cx - lw / 2, ly = topArea + 24, lh = 30; // 두 줄 안내 아래에 온다
+      g.fillStyle = 'rgba(16,9,5,.82)'; rr(g, lx, ly, lw, lh, lh / 2); g.fill();
+      const green = Math.abs(tilt) < 0.22;
+      g.fillStyle = green ? '#7be37f' : '#5ca86a'; rr(g, cx - lw * 0.11, ly + 2, lw * 0.22, lh - 4, 8); g.fill();
       const bx = cx + tilt * (lw / 2 - 18);
       g.fillStyle = rad(g, bx - 3, ly + lh / 2 - 3, 1, 14, [[0, '#ffffff'], [1, '#d9eee0']]); circle(g, bx, ly + lh / 2, 12); g.fill();
       g.fillStyle = '#efe3cf'; g.font = font(12, 700); g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText(green ? '수평이에요!' : tilt < 0 ? '← 왼쪽으로 기울었어요' : '오른쪽으로 기울었어요 →', cx, ly + lh + 18);
       gauge(g, 24, cy0 + 40, W - 48, { val: press, max: 1.1, lo: 0.55, hi: 0.85, label: '누르는 힘', text: press < 0.55 ? (press ? '더요' : '') : press <= 0.85 ? '좋아요!' : '너무 세요' });
-      // 누를 자리 안내
-      if (!down && press === 0) { const r = 26 + Math.sin(t * 4) * 5; g.strokeStyle = 'rgba(255,235,190,.75)'; g.lineWidth = 3; circle(g, cx, cy0 - 90, r); g.stroke(); }
+      // 아래 조작 안내: 화면 어디를 눌러도 되지만, 여기를 보며 좌우로 움직이게 한다
+      const padH = 62, padY = H - padH - 12 - (COUNTER - 176), padX = 12, padW = W - 24; // 아래 막대가 있는 폰이면 그만큼 올린다
+      g.fillStyle = 'rgba(28,17,11,.88)'; rr(g, padX, padY, padW, padH, 16); g.fill();
+      g.strokeStyle = down ? '#f0bf68' : 'rgba(241,218,178,.35)'; g.lineWidth = 2; rr(g, padX, padY, padW, padH, 16); g.stroke();
+      g.fillStyle = 'rgba(241,218,178,.7)'; g.font = font(18, 800); g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('◀', padX + 24, padY + padH / 2); g.fillText('▶', padX + padW - 24, padY + padH / 2);
+      const off = down ? Math.max(-padW / 2 + 70, Math.min(padW / 2 - 70, fingerX - startX)) : 0;
+      if (!down) { g.fillStyle = '#efe3cf'; g.font = font(14, 700); g.fillText(press === 0 ? '꾹 누른 채 좌우로' : '다시 꾹 눌러요', cx, padY + padH / 2 + (press === 0 ? Math.sin(t * 4) * 1.5 : 0)); } else {
+        g.fillStyle = '#f0bf68'; rr(g, cx + off - 34, padY + 9, 68, padH - 18, 12); g.fill();
+        g.fillStyle = '#2a1b10'; g.font = font(13, 800); g.fillText('좌우로', cx + off, padY + padH / 2);
+      }
     });
     const finish = () => {
       const even = G.tampEvenness(samples) - (press > 0.95 ? 0.08 : 0);

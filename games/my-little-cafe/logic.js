@@ -46,7 +46,7 @@ export const realFromGame = (sec) => sec * REAL_PER_GAME;
 export function tampEvenness(tilts) {
   if (!tilts.length) return 0.5;
   const avg = tilts.reduce((s, t) => s + Math.abs(t), 0) / tilts.length;
-  return clamp(1 - avg / 0.35, 0, 1);
+  return clamp(1 - Math.max(0, avg - 0.1) / 0.45, 0, 1); // 초록 칸 절반 안에서 흔들리면 만점
 }
 // 균일도가 낮으면 물이 한쪽으로 몰린다(물길): 샷이 조금 빨라진다
 export const channelFlowBoost = (even) => 1 + (1 - clamp(even, 0, 1)) * 0.25;
