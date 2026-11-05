@@ -20,31 +20,31 @@ export const WEEKDAYS = {
 
 // 제조 기준값(DESIGN.md 4절). 실제 시간(real)과 게임 시간(game)을 나눠 둔다
 export const ESPRESSO = {
-  dose: 18, doseOk: 0.8, // g, 초록 칸 ±
-  yield: 36, yieldOk: 3,
-  time: 27.5, timeOk: 2.5, // 실제 초(25~30초)
+  dose: 18, doseOk: 0.5, // g, 초록 칸 ±
+  yield: 36, yieldOk: 1.5,
+  time: 27.5, timeOk: 2, // 실제 초(25~30초 안에서 가운데)
   gameSec: 8, // 기준 샷이 게임에서 걸리는 초
 };
 export const REAL_PER_GAME = ESPRESSO.time / ESPRESSO.gameSec;
 export const DRIP = {
-  dose: 20, doseOk: 1,
+  dose: 20, doseOk: 0.6,
   bloomWater: 40, bloomOk: 12, bloomReal: 30,
-  water: 320, waterOk: 20,
-  time: 180, timeOk: 35, // 실제 초(약 3분)
+  water: 320, waterOk: 12,
+  time: 180, timeOk: 20, // 실제 초(약 3분)
   gameSec: 35,
   bedRadius: 1, // 정규화한 원두 층 반지름
 };
 export const MILK = {
   start: 6, tempLo: 60, tempHi: 65, burn: 71, // ℃
-  foamLo: 0.25, foamHi: 0.5, // 공기 양(0~1)
+  foamLo: 0.28, foamHi: 0.44, // 공기 양(0~1)
   heatPerSec: 8, airPerSec: 0.16, // 게임 1초에
 };
-export const AMERICANO = { water: 180, waterOk: 25, flow: 70 }; // g, g/게임초
+export const AMERICANO = { water: 180, waterOk: 14, flow: 70 }; // g, g/게임초
 export const GRIND = { min: 1, max: 10 }; // 낮을수록 곱다
 
 // 맛 저울: -1 시큼 … 0 좋음 … +1 씀
-export const TASTE_GOOD = 0.22;
-export const TASTE_OK = 0.5;
+export const TASTE_GOOD = 0.12;
+export const TASTE_OK = 0.42;
 
 export const MENUS = {
   espresso: { name: '에스프레소', price: 3500, steps: ['grind', 'dose', 'tamp', 'extract'] },
@@ -102,10 +102,10 @@ export const RUSH = {
     { who: 'kim', menu: 'americano' },
   ],
   patience: 45, // 게임 초: 한 잔을 만드는 동안 손님이 기다려 주는 시간
-  passStars: 9, // 5잔 15별 중
+  passStars: 8, // 5잔 15별 중
   maxLate: 2, // 오래 기다리게 해도 되는 손님 수
 };
-export const HOME_PASS_STARS = 6; // 3잔 9별 중
+export const HOME_PASS_STARS = 5; // 3잔 9별 중
 
 // ── 본게임 ───────────────────────────────
 export const SEASON_NAME = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' };

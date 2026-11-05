@@ -77,7 +77,7 @@ export function autoCup(menu, grindErr) {
   while (t < 100 && G.shotYieldAt(t, grindErr, ESPRESSO.dose) < ESPRESSO.yield) t += 0.1;
   const taste = G.shotTaste({ realT: t, yieldG: ESPRESSO.yield }), band = G.tasteBand(taste);
   const score = clamp(0.72 - Math.abs(taste) * 0.5, 0, 0.72);
-  return { menu, taste, band, score, target: 0, stars: Math.min(2, G.starsOf(score, band)), detail: '자동', auto: true };
+  return { menu, taste, band, score, target: 0, stars: band === 'good' ? 2 : G.starsOf(score, band), detail: '자동', auto: true };
 }
 export const canAuto = (menu, equip) => menu === 'americano' || menu === 'espresso' || menu === 'iced' || (menu === 'latte' && !!equip.pitcher);
 export const isInstant = (menu) => menu === 'coldbrew';
@@ -126,7 +126,7 @@ export function sellSide(biz, stats, ctx, rand = Math.random) {
 // 하루 마감: 돈과 평판을 반영한다. 평판은 별 평균과 놓친 손님으로 움직인다
 export function closeDay(biz, stats) {
   const avg = stats.served ? stats.stars / stats.served : 0;
-  const repDelta = stats.served ? clamp((avg - 1.8) * 0.16 - stats.lost * 0.025, -0.3, 0.3) : -0.1;
+  const repDelta = stats.served ? clamp((avg - 1.5) * 0.16 - stats.lost * 0.025, -0.3, 0.3) : -0.1;
   const net = stats.sales + stats.tips - stats.cost;
   biz.money += net;
   biz.rep = clamp(biz.rep + repDelta, 0, 5);

@@ -76,7 +76,7 @@ export function createBusiness(env) {
   }
 
   function finishCup(t, cup) {
-    const st = cup.stars ?? G.starsOf(cup.score, cup.band), waited = t.maxPatience - t.patience;
+    const st = cup.stars, waited = t.maxPatience - t.patience;
     const { price, tip } = B.sellCup(biz(), day.stats, { menu: cup.menu, stars: st, waited, place: day.place });
     if (cup.menu === 'coldbrew') biz().stock.coldbrew = Math.max(0, biz().stock.coldbrew - 1);
     day.tickets = day.tickets.filter((x) => x !== t); day.sig = null;
@@ -134,7 +134,6 @@ export function createBusiness(env) {
     const steps = MENUS[R.menu].steps;
     env.showStepbar();
     const res = await runBrew(brewCtx, { menu: R.menu, do: steps, title: `${PEOPLE[id].name} · ${MENUS[R.menu].name}` }, { target: R.taste });
-    res.stars = G.starsOf(res.score, res.band);
     await env.showResult(res, { goLabel: '내주기', canAgain: false, stars: res.stars, extra: R.taste ? `▼ 표시가 ${PEOPLE[id].name} 입맛이에요.` : '' });
     B.regularDone(biz(), id, res);
     env.leaveBrewQuiet();

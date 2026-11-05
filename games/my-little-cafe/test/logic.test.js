@@ -34,7 +34,7 @@ test('샷: 일찍 멈추면 시큼, 늦게 멈추면 써요', () => {
 });
 
 test('별: 잘 만든 잔은 3개, 망친 잔은 적어요', () => {
-  const good = G.scoreShot({ doseG: 18, even: 0.9, ...pullShot(0) });
+  const good = G.scoreShot({ doseG: 18, even: 0.92, ...pullShot(0) });
   assert.equal(G.starsOf(good.score), 3);
   const bad = G.scoreShot({ doseG: 12, even: 0.2, ...pullShot(4) });
   assert.ok(G.starsOf(bad.score) <= 1, `${bad.score}`);
@@ -44,6 +44,35 @@ test('별: 맛이 빗나가면 다른 걸 잘해도 별이 제한돼요', () => 
   assert.equal(G.starsOf(1, 'good'), 3);
   assert.equal(G.starsOf(1, 'sour'), 2);
   assert.equal(G.starsOf(1, 'veryBitter'), 1);
+});
+
+test('별 3개는 전부 잘해야 나와요: 양을 벗어나면 맛이 괜찮아도 안 돼요', () => {
+  assert.equal(G.starsOf(G.scoreShot({ doseG: 18, even: 0.92, realT: 27, yieldG: 36 }).score), 3);
+  const over = G.scoreShot({ doseG: 18, even: 0.9, realT: 27, yieldG: 44.5 });
+  assert.ok(G.starsOf(over.score, G.tasteBand(over.taste)) < 3, `${over.score}`);
+  const crooked = G.scoreShot({ doseG: 18, even: 0.4, realT: 27, yieldG: 36 });
+  assert.ok(G.starsOf(crooked.score) < 3, `${crooked.score}`);
+  const dose = G.scoreShot({ doseG: 20, even: 0.9, realT: 27, yieldG: 36 });
+  assert.ok(G.starsOf(dose.score) < 3, `${dose.score}`);
+  assert.equal(G.hit(0.4, 0.5, 3), 1);
+  assert.ok(G.hit(2, 0.5, 3) < 0.6);
+  assert.ok(G.mixScore([1, 1, 1, 0]) < 0.5);
+});
+
+test('보통 손놀림이면 별 3개가 드물어요: 무작위 오차로 2000잔', () => {
+  let s = 12345; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  const noise = (a) => (rnd() * 2 - 1) * a;
+  const count = [0, 0, 0, 0], n = 2000;
+  for (let i = 0; i < n; i++) {
+    const err = noise(0.6), doseG = 18 + noise(0.3) * 2.2, even = 0.55 + rnd() * 0.4;
+    let t = 0; while (G.shotYieldAt(t, err, doseG) < 36 && t < 90) t += 0.05;
+    const realT = t + noise(0.35) * 3.44, yieldG = G.shotYieldAt(realT, err, doseG);
+    const r = G.scoreShot({ doseG, even, realT, yieldG });
+    count[G.starsOf(r.score, G.tasteBand(r.taste))] += 1;
+  }
+  const three = count[3] / n;
+  assert.ok(three > 0.03 && three < 0.25, `별 3개 비율 ${three} ${count}`);
+  assert.ok(count[2] > count[3], `${count}`);
 });
 
 test('다지기: 수평이면 균일도가 높고 비뚤면 낮아요', () => {
@@ -60,6 +89,7 @@ test('스팀: 공기는 수면에서만 들어가고, 초록 칸에서 만점이
   const hot = G.scoreMilk({ temp: 80, foam: 0.35 });
   assert.ok(hot.burnt && hot.score < 0.6);
   assert.ok(G.scoreMilk({ temp: 62, foam: 1 }).foamScore < 0.5);
+  assert.ok(G.scoreMilk({ temp: 62, foam: 0.6 }).foamScore < 1);
 });
 
 // 드립: 고르게 원을 그리며 다 붓는 봇
@@ -77,14 +107,11 @@ function pourDrip(grindErr, { circle = true, water = DRIP.water } = {}) {
   return d;
 }
 
-test('드립: 정답 칸으로 고르게 부으면 약 3분 + 좋은 맛이에요', () => {
+test('드립: 뜸 없이 고르게 부으면 시간은 조금 짧고 물은 고르게 닿아요', () => {
   const d = pourDrip(0), real = G.dripRealTime(d.t);
   assert.ok(real > 145 && real < 215, `${real}초`);
   const even = G.dripEvenness(d.wet);
   assert.ok(even > 0.5, `균일 ${even}`);
-  const r = G.scoreDrip({ gameT: d.t, water: d.poured, even, bloom: 1 });
-  assert.equal(G.tasteBand(r.taste), 'good');
-  assert.ok(G.starsOf(r.score) >= 2, `${r.score}`);
 });
 
 test('드립: 한가운데만 부으면 균일도가 낮고, 굵으면 시큼 곱게 쓰다', () => {
@@ -109,7 +136,20 @@ test('드립: 뜸을 들이고 초록 칸(320g)까지 부으면 약 3분 + 좋�
   while (d.level > 2) G.dripStep(d, null, dt);
   const real = G.dripRealTime(d.t);
   assert.ok(real > 145 && real < 215, `${real}초`);
-  assert.equal(G.tasteBand(G.dripTaste({ gameT: d.t, water: d.poured })), 'good');
+  const taste = G.dripTaste({ gameT: d.t, water: d.poured });
+  assert.equal(G.tasteBand(taste), 'good', `${taste} ${real}`);
+  const r = G.scoreDrip({ gameT: d.t, water: d.poured, even: G.dripEvenness(d.wet), bloom: 1 });
+  assert.ok(G.starsOf(r.score, G.tasteBand(r.taste)) >= 2, `${r.score}`);
+});
+
+test('뜸: 40g까지 약 6초 걸리고, 그만큼 추출 시간이 늘지는 않아요', () => {
+  const d = G.newDrip(0);
+  let sec = 0;
+  while (d.poured < DRIP.bloomWater) { G.dripStep(d, { x: 0.3, y: 0 }, 1 / 30); sec += 1 / 30; }
+  assert.ok(sec > 5.5 && sec < 7, `${sec}초`);
+  assert.ok(d.t < 2.5, `시계 ${d.t}`);
+  // 초록 칸을 지나가는 시간도 3초 넘게 있어요
+  assert.ok((DRIP.bloomOk * 2) / G.BLOOM_POUR_RATE > 3);
 });
 
 test('드립 칸: 원 안은 칸 번호, 밖은 -1', () => {

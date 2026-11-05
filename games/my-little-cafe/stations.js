@@ -1,6 +1,6 @@
 // 제조 화면 8가지(갈기·담기·다지기·샷·물·스팀·뜸·붓기). 판정은 logic.js, 여기는 그림과 손 조작뿐이다.
 import * as G from './logic.js';
-import { ESPRESSO, DRIP, MILK, AMERICANO, MENUS, STEP_NAME, GRIND, REAL_PER_GAME } from './data.js';
+import { ESPRESSO, DRIP, MILK, AMERICANO, MENUS, STEP_NAME, GRIND, REAL_PER_GAME, TASTE_GOOD, TASTE_OK } from './data.js';
 import { rr, circle, lin, rad, font, TAU, drawCup } from './art.js';
 import { img } from './assets.js';
 
@@ -185,30 +185,30 @@ async function stepDose(ctx, st, beat) {
 async function stepTamp(ctx, st, beat) {
   const { ui, sfx } = ctx;
   let down = false, press = 0, startX = 0, fingerX = 0, tilt = 0, phase = Math.random() * 6, samples = [], kicked = 0;
-  const easy = ctx.S.day <= 1 ? 0.2 : 0.34;
+  const easy = ctx.S.day <= 1 ? 0.3 : 0.5;
   ui.hint(beat.tips?.tamp || '화면을 꾹 누른 채 좌우로 움직여 수평을 맞춰요.');
   return new Promise((done) => {
     ctx.setView((g, W, H, t, dt) => {
       const cy0 = bench(g, W, H), cx = W / 2, w = Math.min(W * 0.25, 92), baseY = cy0 - w * 1.38, topArea = TOP + 18;
       if (down) {
-        press = Math.min(1.1, press + dt * 0.62);
+        press = Math.min(1.1, press + dt * 0.28); // 초록 칸까지 약 2초, 지나치기까지 약 3초: 수평을 잡을 시간을 준다
         phase += dt * 1.25;
-        tilt = Math.sin(phase) * easy + Math.sin(phase * 2.3) * easy * 0.3 + (fingerX - startX) / W * 3;
+        tilt = Math.sin(phase) * easy + Math.sin(phase * 2.3) * easy * 0.45 + (fingerX - startX) / W * 3;
         tilt = Math.max(-1, Math.min(1, tilt));
         samples.push(tilt);
       } else if (press > 0 && !kicked) tilt *= 0.9;
       // 포터필터
       portafilter(g, cx, baseY, w, 1);
       // 탬퍼
-      const py = baseY - w * 0.16 - (1 - Math.min(press, 1)) * 60 - 26;
+      const py = baseY - w * 0.16 - (1 - Math.min(press, 1)) * 90 - 26;
       g.save(); g.translate(cx, py); g.rotate(tilt * 0.3);
       sprite(g, 'sp-tamper', 0, 22, w * 1.72, 0.5, 1);
       g.restore();
       // 수평계
       const lw = Math.min(W - 80, 280), lx = cx - lw / 2, ly = topArea + 6, lh = 30;
       g.fillStyle = 'rgba(16,9,5,.65)'; rr(g, lx, ly, lw, lh, lh / 2); g.fill();
-      const green = Math.abs(tilt) < 0.18;
-      g.fillStyle = green ? '#7be37f' : '#5ca86a'; rr(g, cx - lw * 0.1, ly + 2, lw * 0.2, lh - 4, 8); g.fill();
+      const green = Math.abs(tilt) < 0.12;
+      g.fillStyle = green ? '#7be37f' : '#5ca86a'; rr(g, cx - lw * 0.07, ly + 2, lw * 0.14, lh - 4, 8); g.fill();
       const bx = cx + tilt * (lw / 2 - 18);
       g.fillStyle = rad(g, bx - 3, ly + lh / 2 - 3, 1, 14, [[0, '#ffffff'], [1, '#d9eee0']]); circle(g, bx, ly + lh / 2, 12); g.fill();
       g.fillStyle = '#efe3cf'; g.font = font(12, 700); g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText(green ? '수평이에요!' : tilt < 0 ? '← 왼쪽으로 기울었어요' : '오른쪽으로 기울었어요 →', cx, ly + lh + 18);
@@ -438,7 +438,8 @@ async function stepBloom(ctx, st, beat) {
       const cy0 = bench(g, W, H), { cx, cy, R } = dripLayout(W, H);
       if (phase === 'pour') {
         if (finger && d.poured < 110) { G.dripStep(d, { x: (finger.x - cx) / R, y: (finger.y - cy) / R }, dt); idle = 0; sfx.loop('pour', 0.7); } else { sfx.loop('pour', 0); if (d.poured > 8) idle += dt; G.dripStep(d, null, dt); }
-        if (d.poured > 8 && idle > 0.7) { phase = 'wait'; sfx.stopLoops(); ui.hint('기다려요. 가루가 빵처럼 부풀어 올라요.'); }
+        // 초록 칸 전에 손을 잠깐 떼도 바로 끝나지 않게 더 기다려 준다
+        if (d.poured > 8 && idle > (d.poured >= DRIP.bloomWater - DRIP.bloomOk ? 0.7 : 2.5)) { phase = 'wait'; sfx.stopLoops(); ui.hint('기다려요. 가루가 빵처럼 부풀어 올라요.'); }
       } else if (phase === 'wait') {
         waiting += dt; swell = Math.min(1, waiting / 1.8);
         G.dripStep(d, null, dt);
@@ -579,17 +580,41 @@ export async function runBrew(ctx, beat, opts = {}) {
     ctx.sfx.play('click');
   }
   ctx.setPointer(null); ctx.ui.clearActions(); ctx.sfx.stopLoops();
-  let taste, score, detail = '';
+  // 플레이어가 직접 한 단계만 항목으로 삼는다. 사장님이 대신한 단계는 점수에 넣지 않는다
+  const did = (x) => beat.do.includes(x), parts = [];
+  const part = (label, value, sc) => parts.push({ label, value, sc });
+  const shotAssisted = !opts.useDial && opts.autoErr == null;
+  const assisted = shotAssisted && (steps.some((x) => !did(x)) || !!beat.grindHint || beat.lockGrind != null);
+  let taste, detail = '';
   if (isDrip) {
-    const d = st.drip, even = G.dripEvenness(d.wet);
-    ({ taste, score } = G.scoreDrip({ gameT: d.t, water: d.poured, even, bloom: st.bloom, over: d.over }, target));
-    detail = `${d.poured.toFixed(0)}g · ${mmss(G.dripRealTime(d.t))} · 고르게 부은 정도 ${Math.round(even * 100)}%`;
+    const d = st.drip, even = G.dripEvenness(d.wet), real = G.dripRealTime(d.t);
+    taste = G.dripTaste({ gameT: d.t, water: d.poured });
+    if (did('dose')) part('담기', `${st.doseG.toFixed(1)}g`, G.hit(Math.abs(st.doseG - DRIP.dose), DRIP.doseOk, 4));
+    if (did('bloom')) part('뜸', `${Math.round(st.bloom * 100)}점`, st.bloom);
+    part('고르게 붓기', `${Math.round(even * 100)}%`, G.evenHit(even));
+    part('물 양', `${d.poured.toFixed(0)}g`, G.hit(Math.abs(d.poured - DRIP.water), DRIP.waterOk, 60));
+    part('걸린 시간', mmss(real), G.hit(Math.abs(real - DRIP.time), DRIP.timeOk, 60));
+    detail = `${d.poured.toFixed(0)}g · ${mmss(real)}`;
+    if (d.over > 20) part('넘친 물', `${d.over.toFixed(0)}g`, G.hit(d.over, 20, 80));
   } else {
-    ({ taste, score } = G.scoreShot({ doseG: st.doseG, even: st.even, ...shot }, target));
+    taste = G.shotTaste(shot);
+    if (menu === 'americano') taste = Math.max(-1, Math.min(1, taste + G.waterTasteShift(water)));
+    if (did('dose')) part('담기', `${st.doseG.toFixed(1)}g`, G.hit(Math.abs(st.doseG - ESPRESSO.dose), ESPRESSO.doseOk, 3));
+    if (did('tamp')) part('다지기', `수평 ${Math.round(st.even * 100)}%`, G.evenHit(st.even));
+    if (did('extract')) part('커피 양', `${shot.yieldG.toFixed(1)}g`, G.hit(Math.abs(shot.yieldG - ESPRESSO.yield), ESPRESSO.yieldOk, 10));
+    if (did('extract') || did('grind')) part('걸린 시간', `${shot.realT.toFixed(0)}초`, G.hit(Math.abs(shot.realT - ESPRESSO.time), ESPRESSO.timeOk, 9));
+    if (did('water')) part('물', `${water.toFixed(0)}g`, G.scoreWater(water));
     detail = `${shot.yieldG.toFixed(1)}g · ${shot.realT.toFixed(0)}초`;
-    if (menu === 'americano') { taste = Math.max(-1, Math.min(1, taste + G.waterTasteShift(water))); const ws = G.scoreWater(water); const again = G.scoreShot({ doseG: st.doseG, even: st.even, ...shot }, target - G.waterTasteShift(water)); score = again.score * 0.82 + ws * 0.18; detail += ` · 물 ${water.toFixed(0)}g`; }
-    if (menu === 'latte') { const ms = G.scoreMilk(milk); score = score * 0.55 + ms.score * 0.45; detail += ` · 우유 ${milk.temp.toFixed(0)}℃`; }
+    if (did('steam')) {
+      const ms = G.scoreMilk(milk);
+      part('우유 온도', `${milk.temp.toFixed(0)}℃`, ms.tempScore);
+      part('거품', ms.foamScore >= 1 ? '좋아요' : milk.foam > MILK.foamHi ? '많아요' : '적어요', ms.foamScore);
+    }
   }
-  return { menu, taste, score, band: G.tasteBand(taste, target), target, detail, grind: st.grind, milk: menu === 'latte' ? milk : null };
+  if (isDrip || did('extract') || did('grind') || opts.autoErr != null) part('맛', tasteWord(taste, target), G.hit(Math.abs(taste - target), TASTE_GOOD, 0.5));
+  const score = G.mixScore(parts.map((p) => p.sc)), band = G.tasteBand(taste, target);
+  const stars = Math.min(G.starsOf(score, band), assisted ? 2 : 3);
+  return { menu, taste, score, stars, band, target, detail, parts, assisted, grind: st.grind, milk: did('steam') ? milk : null };
 }
+const tasteWord = (taste, target) => { const d = taste - target; return Math.abs(d) <= TASTE_GOOD ? '딱 좋아요' : d < 0 ? (d < -TASTE_OK ? '많이 시큼' : '살짝 시큼') : (d > TASTE_OK ? '많이 씀' : '살짝 씀'); };
 export { STEP_NAME };

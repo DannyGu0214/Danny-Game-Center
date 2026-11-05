@@ -26,12 +26,18 @@ export function shotTaste({ realT, yieldG }) {
   const t = (realT - ESPRESSO.time) / 14, y = (yieldG - ESPRESSO.yield) / 24;
   return clamp(t * 0.75 + y * 0.6, -1, 1);
 }
+// 한 항목의 점수: 초록 칸 안이면 1, 벗어난 만큼 span에 걸쳐 0까지 떨어진다
+export const hit = (err, ok, span) => (err <= ok ? 1 : clamp(1 - (err - ok) / span, 0, 1));
+export const evenHit = (even) => clamp((even - 0.4) / 0.5, 0, 1); // 수평·고른 정도 90%면 만점
+// 평균만 보면 한 군데를 망쳐도 높게 나온다. 가장 못한 항목을 함께 본다
+export function mixScore(parts) {
+  if (!parts.length) return 0;
+  return clamp(parts.reduce((a, b) => a + b, 0) / parts.length * 0.6 + Math.min(...parts) * 0.4, 0, 1);
+}
 export function scoreShot({ doseG, even, realT, yieldG }, target = 0) {
   const taste = shotTaste({ realT, yieldG }), doseErr = Math.abs(doseG - ESPRESSO.dose);
-  const tasteScore = 1 - clamp(Math.abs(taste - target) / 0.9, 0, 1);
-  const doseScore = 1 - clamp((doseErr - ESPRESSO.doseOk) / 4, 0, 1);
-  const score = tasteScore * 0.72 + doseScore * 0.1 + clamp(even, 0, 1) * 0.18;
-  return { taste, score: clamp(score, 0, 1) };
+  const parts = [hit(doseErr, ESPRESSO.doseOk, 3), hit(Math.abs(yieldG - ESPRESSO.yield), ESPRESSO.yieldOk, 10), hit(Math.abs(realT - ESPRESSO.time), ESPRESSO.timeOk, 9), hit(Math.abs(taste - target), TASTE_GOOD, 0.5), evenHit(even)];
+  return { taste, score: mixScore(parts) };
 }
 export const realFromGame = (sec) => sec * REAL_PER_GAME;
 
@@ -40,16 +46,13 @@ export const realFromGame = (sec) => sec * REAL_PER_GAME;
 export function tampEvenness(tilts) {
   if (!tilts.length) return 0.5;
   const avg = tilts.reduce((s, t) => s + Math.abs(t), 0) / tilts.length;
-  return clamp(1 - avg / 0.55, 0, 1);
+  return clamp(1 - avg / 0.35, 0, 1);
 }
 // 균일도가 낮으면 물이 한쪽으로 몰린다(물길): 샷이 조금 빨라진다
 export const channelFlowBoost = (even) => 1 + (1 - clamp(even, 0, 1)) * 0.25;
 
 // ── 아메리카노 ─────────────────────────────
-export function scoreWater(waterG) {
-  const err = Math.abs(waterG - AMERICANO.water);
-  return 1 - clamp((err - AMERICANO.waterOk) / 90, 0, 1);
-}
+export const scoreWater = (waterG) => hit(Math.abs(waterG - AMERICANO.water), AMERICANO.waterOk, 50);
 // 물을 너무 적게 넣으면 진해서 씀 쪽으로, 많으면 연해서 시큼한 쪽으로 조금 움직인다
 export const waterTasteShift = (waterG) => clamp((AMERICANO.water - waterG) / 300, -0.3, 0.3);
 
@@ -62,13 +65,13 @@ export function steamStep(m, depth, dt) {
   return next;
 }
 export function scoreMilk({ temp, foam }) {
-  const tempScore = temp < MILK.tempLo ? clamp(1 - (MILK.tempLo - temp) / 25, 0, 1)
+  const tempScore = temp < MILK.tempLo ? clamp(1 - (MILK.tempLo - temp) / 15, 0, 1)
     : temp <= MILK.tempHi ? 1
-      : clamp(1 - (temp - MILK.tempHi) / 12, 0, 1);
-  const foamScore = foam < MILK.foamLo ? clamp(1 - (MILK.foamLo - foam) / 0.3, 0, 1)
+      : clamp(1 - (temp - MILK.tempHi) / 9, 0, 1);
+  const foamScore = foam < MILK.foamLo ? clamp(1 - (MILK.foamLo - foam) / 0.2, 0, 1)
     : foam <= MILK.foamHi ? 1
-      : clamp(1 - (foam - MILK.foamHi) / 0.45, 0, 1);
-  return { tempScore, foamScore, score: tempScore * 0.55 + foamScore * 0.45, burnt: temp >= MILK.burn };
+      : clamp(1 - (foam - MILK.foamHi) / 0.3, 0, 1);
+  return { tempScore, foamScore, score: mixScore([tempScore, foamScore]), burnt: temp >= MILK.burn };
 }
 
 // ── 핸드드립 ───────────────────────────────
@@ -85,14 +88,17 @@ export function dripCell(x, y) {
   return ring * 8 + Math.floor(a / (Math.PI * 2) * 8) % 8;
 }
 export const DRIP_POUR_RATE = 18; // g/게임 초(실제로는 물줄기가 흐르는 속도)
-export const dripDrain = (grindErr) => 10.2 * Math.exp(grindErr * 0.2); // g/게임 초
+export const BLOOM_POUR_RATE = 6.5; // 뜸은 천천히 붓는 맛이 나게 느리게 찬다(40g까지 약 6초)
+export const dripDrain = (grindErr) => 11.2 * Math.exp(grindErr * 0.2); // g/게임 초
 export const DRIP_MAX_LEVEL = 130; // 넘치면 벽을 타고 그냥 빠져나간다
 
 // 게임 dt 진행. pour: {x, y} 또는 null
 export function dripStep(d, pour, dt) {
-  d.t += dt;
+  // 뜸을 오래 붓는다고 추출 시간이 늘어나 맛이 쓰게 변하지 않도록, 시계는 보통 붓는 속도로 센다
+  const bloomPour = d.phase === 'bloom' && pour;
+  d.t += bloomPour ? dt * BLOOM_POUR_RATE / DRIP_POUR_RATE : dt;
   if (pour) {
-    const add = DRIP_POUR_RATE * dt, cell = dripCell(pour.x, pour.y);
+    const add = (d.phase === 'bloom' ? BLOOM_POUR_RATE : DRIP_POUR_RATE) * dt, cell = dripCell(pour.x, pour.y);
     d.poured += add; d.level += add;
     if (cell >= 0) d.wet[cell] += add;
     else d.over += add; // 원두 밖으로 부으면 그냥 흘러내려요
@@ -109,13 +115,11 @@ export function dripEvenness(wet) {
   if (total <= 0) return 0;
   let dev = 0;
   wet.forEach((w, i) => { dev += Math.abs(w / total - ringArea[Math.floor(i / 8)]); });
-  return clamp(1 - (dev / 2 - 0.1) / 0.6, 0, 1);
+  return clamp(1 - (dev / 2 - 0.1) / 0.35, 0, 1);
 }
 // 뜸: 알맞은 물을 붓고 잠깐 기다렸는지
 export function bloomScore(water, waitReal) {
-  const w = 1 - clamp((Math.abs(water - DRIP.bloomWater) - DRIP.bloomOk) / 30, 0, 1);
-  const t = 1 - clamp(Math.abs(waitReal - DRIP.bloomReal) / 40, 0, 1);
-  return w * 0.5 + t * 0.5;
+  return hit(Math.abs(water - DRIP.bloomWater), DRIP.bloomOk, 30) * 0.7 + hit(Math.abs(waitReal - DRIP.bloomReal), 0, 40) * 0.3;
 }
 export function dripRealTime(gameT) { return gameT * (DRIP.time / DRIP.gameSec); }
 export function dripTaste({ gameT, water }) {
@@ -124,16 +128,14 @@ export function dripTaste({ gameT, water }) {
 }
 export function scoreDrip({ gameT, water, even, bloom, over = 0 }, target = 0) {
   const taste = dripTaste({ gameT, water });
-  const tasteScore = 1 - clamp(Math.abs(taste - target) / 0.9, 0, 1);
-  const waterScore = 1 - clamp((Math.abs(water - DRIP.water) - DRIP.waterOk) / 90, 0, 1);
-  const overPen = clamp(over / 80, 0, 0.3);
-  return { taste, score: clamp(tasteScore * 0.5 + even * 0.25 + bloom * 0.1 + waterScore * 0.15 - overPen, 0, 1) };
+  const parts = [hit(Math.abs(taste - target), TASTE_GOOD, 0.5), evenHit(even), bloom, hit(Math.abs(water - DRIP.water), DRIP.waterOk, 60), hit(Math.abs(dripRealTime(gameT) - DRIP.time), DRIP.timeOk, 60)];
+  return { taste, score: clamp(mixScore(parts) - clamp(over / 80, 0, 0.3), 0, 1) };
 }
 
 // ── 별과 반응 ──────────────────────────────
 // 맛이 빗나가면 다른 걸 잘해도 별이 제한된다: 살짝 빗나가면 2개까지, 많이 빗나가면 1개까지
 export function starsOf(score, band = 'good') {
-  const base = score >= 0.78 ? 3 : score >= 0.55 ? 2 : score >= 0.3 ? 1 : 0;
+  const base = score >= 0.92 ? 3 : score >= 0.65 ? 2 : score >= 0.35 ? 1 : 0;
   return Math.min(base, band === 'good' ? 3 : band === 'sour' || band === 'bitter' ? 2 : 1);
 }
 // 저울 위치의 말: 사람 반응과 안내 문구가 같이 쓴다
@@ -180,7 +182,7 @@ export function addNote(S, id) {
   if (!S.notes.includes(id)) S.notes.push(id);
 }
 export function recordCup(S, cup) {
-  S.cups.push({ day: S.day, menu: cup.menu, stars: starsOf(cup.score, cup.band), taste: +cup.taste.toFixed(2) });
+  S.cups.push({ day: S.day, menu: cup.menu, stars: cup.stars ?? starsOf(cup.score, cup.band), taste: +cup.taste.toFixed(2) });
 }
 // S.day: 0 프롤로그, 1~5 수업, 6 엔딩. 표는 1~5일차만 있어서 범위 밖은 가까운 날을 쓴다
 export const dailyOf = (day) => DAILY_GRIND[clamp(day - 1, 0, DAILY_GRIND.length - 1)];
