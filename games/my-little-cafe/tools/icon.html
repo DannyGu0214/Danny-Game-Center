@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- 앱 아이콘 그리기: ?s=크기(px)&m=1(마스커블: 가운데 80% 안에만 그림). 헤드리스 Chrome으로 찍어 icons/에 저장한다 -->
+<meta charset="utf-8">
+<style>html, body { margin: 0; overflow: hidden; background: #000; } canvas { display: block; }</style>
+<canvas id="c"></canvas>
+<script type="module">
+import { drawCup, lin, rad } from '../art.js';
+const q = new URLSearchParams(location.search), S = Number(q.get('s') || 512), mask = q.get('m') === '1';
+const c = document.getElementById('c');
+c.width = S; c.height = S; c.style.width = `${S}px`; c.style.height = `${S}px`;
+const g = c.getContext('2d'), u = S / 512, k = mask ? 0.76 : 1;
+g.fillStyle = lin(g, 0, 0, 0, S, [[0, '#7c5237'], [0.62, '#4f3224'], [1, '#2a1a10']]); g.fillRect(0, 0, S, S);
+g.fillStyle = rad(g, S / 2, S * 0.3, 8 * u, S * 0.62, [[0, 'rgba(255,214,150,.62)'], [1, 'rgba(255,214,150,0)']]); g.fillRect(0, 0, S, S);
+g.translate(S / 2, S * 0.5); g.scale(k * u, k * u); g.translate(-256, -256);
+// 김
+g.strokeStyle = 'rgba(255,245,226,.8)'; g.lineWidth = 15; g.lineCap = 'round';
+for (const [x, h] of [[206, 88], [262, 112], [318, 84]]) { g.beginPath(); g.moveTo(x, 214); g.bezierCurveTo(x - 32, 214 - h * 0.35, x + 32, 214 - h * 0.65, x, 214 - h); g.stroke(); }
+drawCup(g, 250, 236, 150, '#6b3f1f');
+// 크레마와 작은 하트
+g.fillStyle = '#c28a4c'; g.beginPath(); g.ellipse(250, 242, 92, 16, 0, 0, Math.PI * 2); g.fill();
+g.fillStyle = '#fff3dc'; g.beginPath(); g.moveTo(250, 252); g.bezierCurveTo(226, 238, 228, 228, 240, 230); g.bezierCurveTo(246, 231, 250, 236, 250, 238); g.bezierCurveTo(250, 236, 254, 231, 260, 230); g.bezierCurveTo(272, 228, 274, 238, 250, 252); g.fill();
+document.title = 'ready';
+</script>

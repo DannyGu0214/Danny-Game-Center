@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Little Cafe</title>
+<meta name="theme-color" content="#2a1c14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My Little Cafe">
+<style>
+:root { color-scheme: dark; --ink: #1d130d; --panel: #2f2017; --panel2: #3d2b1f; --line: rgba(241,218,178,.2); --text: #f8efe0; --muted: #c9b59a; --on: #f0bf68; --onInk: #2a1b10; --good: #8fe39a; --bad: #f0927a; --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: #120b07; overflow: hidden; color: var(--text); font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; user-select: none; -webkit-user-select: none; word-break: keep-all; }
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; touch-action: manipulation; }
+button:disabled { opacity: .45; cursor: default; }
+input { font: inherit; user-select: text; -webkit-user-select: text; }
+#stage { position: relative; width: 100%; max-width: 500px; height: 100%; margin: 0 auto; overflow: hidden; background: var(--ink); }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hide { display: none !important; }
+#safeProbe { position: absolute; width: 0; height: 0; visibility: hidden; padding: var(--safe-t) 0 var(--safe-b); }
+
+#hud { position: absolute; left: 10px; right: 10px; top: calc(8px + var(--safe-t)); display: flex; align-items: center; gap: 6px; pointer-events: none; z-index: 5; }
+#hudDay { padding: 6px 11px; border-radius: 11px; background: rgba(28,17,11,.72); font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#hudDay small { color: var(--muted); font-weight: 600; margin-left: 5px; }
+.hudBtn { pointer-events: auto; height: 34px; min-width: 34px; padding: 0 9px; border-radius: 11px; background: rgba(28,17,11,.72); font-size: 13px; font-weight: 700; flex: none; }
+.gap { margin-left: auto; }
+
+#stepbar { position: absolute; left: 10px; right: 10px; top: calc(48px + var(--safe-t)); z-index: 4; }
+#stepTitle { font-size: 13px; font-weight: 800; color: var(--on); margin: 0 2px 4px; }
+#steps { display: flex; gap: 3px; }
+#steps span { flex: 1; min-width: 0; text-align: center; padding: 4px 2px; font-size: 11.5px; border-radius: 8px; background: rgba(28,17,11,.6); color: var(--muted); white-space: nowrap; overflow: hidden; }
+#steps span.done { color: #7c6a56; }
+#steps span.now { background: var(--on); color: var(--onInk); font-weight: 800; }
+#steps span.owner { color: #7c6a56; text-decoration: line-through; }
+#hint { position: absolute; left: 12px; right: 12px; top: calc(102px + var(--safe-t)); z-index: 4; padding: 7px 12px; border-radius: 12px; background: rgba(250,240,220,.96); color: #33241a; font-size: 14px; font-weight: 600; line-height: 1.38; box-shadow: 0 4px 14px rgba(0,0,0,.34); pointer-events: none; }
+#patience { position: absolute; left: 12px; right: 12px; top: calc(88px + var(--safe-t)); height: 8px; border-radius: 4px; background: rgba(0,0,0,.5); overflow: hidden; z-index: 4; }
+#patience b { display: block; height: 100%; width: 100%; background: #8fe39a; transition: background .3s; }
+#patience b.mid { background: #f0bf68; }
+#patience b.low { background: #f0927a; }
+
+#actions { position: absolute; left: 12px; right: 12px; bottom: calc(12px + var(--safe-b)); display: flex; gap: 8px; z-index: 4; }
+#actions button { height: 62px; border-radius: 15px; font-weight: 800; font-size: 17px; }
+#primary { flex: 1.3; background: var(--on); color: var(--onInk); box-shadow: 0 4px 0 #a97a31; touch-action: none; }
+#primary.held { transform: translateY(3px); box-shadow: 0 1px 0 #a97a31; background: #ffd488; }
+#primary.danger { background: #e66f55; color: #fff; box-shadow: 0 4px 0 #99412f; }
+#secondary { flex: 1; background: #57c26a; color: #10260f; box-shadow: 0 4px 0 #357c44; }
+
+#dialog { position: absolute; left: 10px; right: 10px; bottom: calc(10px + var(--safe-b)); min-height: 138px; padding: 12px 14px 22px; border-radius: 17px; background: rgba(36,23,15,.95); border: 1px solid var(--line); box-shadow: 0 6px 22px rgba(0,0,0,.45); z-index: 6; display: grid; grid-template-columns: auto 1fr; column-gap: 11px; cursor: pointer; touch-action: manipulation; }
+#avatar { width: 62px; height: 62px; border-radius: 14px; background: #5a4231; grid-row: span 2; }
+#dialog.noavatar { grid-template-columns: 1fr; }
+#dialog.noavatar #avatar { display: none; }
+#who { font-size: 13px; font-weight: 800; color: var(--on); min-height: 18px; margin-bottom: 3px; }
+#line { font-size: 16.5px; line-height: 1.5; font-weight: 500; white-space: pre-wrap; }
+#dialog.narr #line { color: #e6d6bf; font-style: italic; }
+#dialog.sys #line { color: #ffe3ac; font-weight: 600; }
+#more { position: absolute; right: 13px; bottom: 7px; font-size: 13px; color: var(--on); animation: bob 1s infinite; }
+@keyframes bob { 50% { transform: translateY(3px); } }
+#skip { position: absolute; right: 10px; top: calc(48px + var(--safe-t)); z-index: 7; }
+
+#daycard { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(20,12,7,.94); text-align: center; animation: fadeIn .45s; cursor: pointer; }
+#daycard h1 { margin: 0; font-size: 46px; color: var(--on); font-weight: 800; letter-spacing: -.01em; }
+#daycard p { margin: 8px 0 0; color: var(--muted); font-size: 15px; }
+#daycard h2 { margin: 18px 0 0; font-size: 24px; font-weight: 700; }
+@keyframes fadeIn { from { opacity: 0; } }
+
+#result { position: absolute; left: 14px; right: 14px; top: 50%; transform: translateY(-50%); z-index: 8; padding: 16px; border-radius: 19px; background: #33221a; border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(0,0,0,.6); animation: pop .3s; }
+@keyframes pop { from { opacity: 0; transform: translateY(-46%) scale(.96); } }
+#result h3 { margin: 0; font-size: 19px; }
+#resStars { font-size: 32px; letter-spacing: 3px; color: var(--on); margin: 7px 0 2px; }
+#resStars i { font-style: normal; color: rgba(255,255,255,.17); }
+#resDetail { font-size: 12.5px; color: var(--muted); }
+.scale { position: relative; height: 62px; margin-top: 11px; }
+.scale .bar { position: absolute; left: 0; right: 0; top: 24px; height: 14px; border-radius: 7px; background: linear-gradient(to right, #d6c04f 0%, #b9c76a 28%, #7bdb82 42%, #7bdb82 58%, #b58a55 72%, #6a3d22 100%); }
+.scale .dot { position: absolute; top: 15px; width: 18px; height: 32px; margin-left: -9px; border-radius: 9px; background: #fff; border: 3px solid #1e120a; transition: left .55s cubic-bezier(.2,1.4,.5,1); box-shadow: 0 2px 7px rgba(0,0,0,.5); }
+.scale .aim { position: absolute; top: 11px; width: 0; margin-left: -6px; border: 6px solid transparent; border-top: 9px solid var(--on); }
+.scale .l, .scale .r { position: absolute; top: 44px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.scale .l { left: 0; } .scale .r { right: 0; }
+.scale .m { position: absolute; left: 0; right: 0; top: 44px; text-align: center; font-size: 12px; color: var(--muted); font-weight: 700; }
+#resMsg { margin: 7px 0 0; font-size: 15.5px; line-height: 1.45; font-weight: 600; }
+.resBtns { display: flex; gap: 8px; margin-top: 14px; }
+.resBtns button { flex: 1; height: 52px; border-radius: 13px; font-weight: 800; font-size: 15.5px; }
+.mainBtn { background: var(--on); color: var(--onInk); }
+.subBtn { background: rgba(255,255,255,.1); }
+
+#toast { position: absolute; left: 50%; top: calc(54px + var(--safe-t)); transform: translateX(-50%); z-index: 9; padding: 8px 14px; border-radius: 14px; background: rgba(63,102,87,.97); font-size: 13.5px; font-weight: 700; white-space: nowrap; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#toast.on { opacity: 1; }
+
+#sheet { position: absolute; inset: 0; z-index: 12; background: rgba(12,7,4,.72); display: flex; align-items: flex-end; }
+#sheetIn { width: 100%; max-height: 84%; background: #2f2017; border-radius: 19px 19px 0 0; display: flex; flex-direction: column; padding-bottom: var(--safe-b); }
+#sheetHead { display: flex; align-items: center; gap: 8px; padding: 14px 16px 8px; }
+#sheetHead h2 { margin: 0; flex: 1; font-size: 18px; }
+#sheetClose { width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,.1); }
+#sheetBody { overflow-y: auto; padding: 2px 16px 18px; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; }
+.note { padding: 10px 12px; background: #f3e8d2; color: #33241a; border-radius: 10px; margin-bottom: 7px; }
+.note b { display: block; font-size: 14.5px; margin-bottom: 2px; }
+.note span { font-size: 13.5px; line-height: 1.45; }
+.empty { padding: 26px 0; color: var(--muted); text-align: center; font-size: 14px; }
+
+#choice { position: absolute; left: 12px; right: 12px; bottom: calc(14px + var(--safe-b)); z-index: 7; padding: 14px; border-radius: 17px; background: rgba(36,23,15,.97); border: 1px solid var(--line); }
+#choice p { margin: 0 0 10px; font-weight: 700; font-size: 16px; }
+#choiceBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#choiceBtns button { height: 54px; border-radius: 12px; background: #4c3527; font-weight: 700; font-size: 15px; }
+#choiceNote { margin-top: 8px; width: 100%; height: 40px; border-radius: 11px; background: rgba(255,255,255,.08); font-size: 13.5px; font-weight: 700; color: var(--on); }
+
+#title { position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; padding: calc(9vh + var(--safe-t)) 22px calc(26px + var(--safe-b)); text-align: center; }
+#logo { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-style: italic; font-size: clamp(44px, 13.5vw, 62px); line-height: 1.02; font-weight: 700; color: #fbe6bd; letter-spacing: -.01em; text-shadow: 0 3px 22px rgba(0,0,0,.6); }
+#logo span { display: block; }
+#byline { margin-top: 9px; color: #d9c5a7; font-size: 13.5px; }
+#titleBtns { margin-top: auto; width: 100%; display: grid; gap: 9px; max-width: 340px; }
+#titleBtns button { height: 56px; border-radius: 15px; font-weight: 800; font-size: 17px; background: rgba(53,36,26,.92); border: 1px solid var(--line); }
+#titleBtns .mainBtn { background: var(--on); color: var(--onInk); border: 0; }
+#titleBtns small { display: block; font-weight: 600; font-size: 11.5px; opacity: .8; }
+#titleFoot { margin-top: 12px; display: flex; gap: 12px; color: var(--muted); font-size: 12.5px; }
+#titleFoot a { color: inherit; }
+
+#setup { position: absolute; inset: 0; z-index: 11; background: #24170f; display: flex; flex-direction: column; padding: calc(14px + var(--safe-t)) 16px calc(14px + var(--safe-b)); }
+#setupCount { font-size: 13px; font-weight: 700; color: var(--on); }
+#setupTitle { margin: 3px 0 2px; font-size: 24px; font-weight: 800; }
+#setupSub { color: var(--muted); font-size: 14px; line-height: 1.45; margin: 0 0 13px; min-height: 20px; }
+#setupBody { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.pick2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pick { display: block; width: 100%; padding: 10px; border-radius: 15px; background: #35241a; border: 2px solid transparent; text-align: center; }
+.pick.on { border-color: var(--on); background: #47301f; }
+.pick canvas { display: block; width: 100%; border-radius: 10px; }
+.pick b { display: block; margin-top: 7px; font-size: 16px; }
+.pick small { display: block; margin-top: 2px; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.pickWide { display: grid; grid-template-columns: 124px 1fr; gap: 11px; text-align: left; align-items: center; margin-bottom: 10px; }
+.nameRow { display: block; width: 100%; text-align: left; padding: 11px 13px; border-radius: 13px; background: #35241a; border: 2px solid transparent; margin-bottom: 7px; }
+.nameRow.on { border-color: var(--on); background: #47301f; }
+.nameRow b { font-size: 17px; }
+.nameRow span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+#customName { width: 100%; height: 48px; padding: 0 13px; border-radius: 12px; border: 2px solid transparent; background: #1a100a; color: var(--text); font-size: 16px; }
+#customName:focus { outline: 0; border-color: var(--on); }
+#customName.on { border-color: var(--on); }
+.setupFoot { display: flex; gap: 8px; padding-top: 12px; }
+.setupFoot button { height: 56px; border-radius: 14px; font-weight: 800; font-size: 16.5px; }
+.setupFoot .subBtn { flex: 0 0 88px; }
+.setupFoot .mainBtn { flex: 1; }
+.setupFoot .mainBtn:disabled { background: #6a5442; color: #c6b6a2; opacity: 1; }
+#shopBar { position: absolute; left: 12px; right: 12px; bottom: calc(12px + var(--safe-b)); z-index: 7; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
+#shopBar button { height: 52px; border-radius: 13px; background: rgba(40,26,17,.94); font-weight: 800; font-size: 15px; border: 1px solid var(--line); }
+#shopBar button.on { background: var(--on); color: var(--onInk); }
+#shopLabel { position: absolute; left: 50%; bottom: calc(15% + var(--safe-b)); transform: translateX(-50%); white-space: nowrap; z-index: 6; padding: 8px 15px; border-radius: 14px; background: rgba(28,17,11,.82); font-size: 14px; font-weight: 700; max-width: calc(100% - 28px); text-align: center; pointer-events: none; }
+#tickets { position: absolute; left: 0; right: 0; bottom: 0; height: calc(214px + var(--safe-b)); padding: 7px 10px calc(8px + var(--safe-b)); background: #2a1b12; border-top: 2px solid #5a3f2b; z-index: 5; display: flex; flex-direction: column; gap: 5px; }
+#tickHead { font-size: 12.5px; font-weight: 700; color: var(--on); }
+#tickList { flex: 1; min-height: 0; display: grid; gap: 4px; grid-auto-rows: 44px; align-content: start; overflow: hidden; }
+.ticket { display: flex; align-items: center; gap: 6px; padding: 0 5px 0 9px; border-radius: 10px; background: #452f20; min-width: 0; }
+.ticket.reg { background: #2f4f47; }
+.tInfo { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; }
+.tInfo b { font-size: 14px; white-space: nowrap; }
+.tInfo span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tInfo i { display: block; width: 100%; height: 5px; margin-top: 3px; border-radius: 3px; background: rgba(0,0,0,.4); overflow: hidden; }
+.tInfo u { display: block; height: 100%; width: 100%; background: #8fe39a; text-decoration: none; }
+.tInfo u.mid { background: #f0bf68; } .tInfo u.low { background: #f0927a; } .tInfo u.run { background: #8ec9ef; }
+.tBtns { display: flex; gap: 4px; flex: none; }
+.tBtns button { height: 36px; padding: 0 9px; border-radius: 9px; background: var(--on); color: var(--onInk); font-size: 13px; font-weight: 800; white-space: nowrap; }
+.tBtns button + button { background: #e7d8bf; }
+.tEmpty { color: var(--muted); font-size: 13.5px; padding: 12px 4px; text-align: center; }
+#settle { position: absolute; inset: 0; z-index: 9; background: #24170f; overflow-y: auto; padding: calc(16px + var(--safe-t)) 16px calc(18px + var(--safe-b)); touch-action: pan-y; }
+#settle h2 { margin: 0 0 10px; font-size: 23px; }
+#settle h3 { margin: 15px 0 7px; font-size: 15px; color: var(--on); }
+.sRows { display: grid; gap: 2px; font-size: 14.5px; }
+.sRows div { display: flex; justify-content: space-between; padding: 6px 2px; border-bottom: 1px solid var(--line); }
+.sRows span { color: var(--muted); }
+.sMoney { margin-top: 11px; padding: 11px 13px; border-radius: 13px; background: #47301f; font-size: 14px; }
+.sMoney b { font-size: 20px; margin-left: 6px; color: var(--on); }
+.sMoney small { display: block; margin-top: 3px; color: var(--muted); }
+.sEquip { display: grid; gap: 6px; }
+.sEquip button { text-align: left; padding: 9px 12px; border-radius: 12px; background: #35241a; display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; }
+.sEquip small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.sEquip span { color: var(--on); font-weight: 700; font-size: 13.5px; }
+.sNext { width: 100%; height: 56px; margin-top: 15px; border-radius: 14px; font-weight: 800; font-size: 17px; }
+.sLead { margin: 8px 0 12px; line-height: 1.5; font-size: 15px; }
+#confirmBox { position: absolute; left: 14px; right: 14px; top: 50%; transform: translateY(-50%); z-index: 20; padding: 16px; border-radius: 16px; background: #3a2719; border: 1px solid var(--line); }
+#confirmBox p { margin: 0; font-size: 15.5px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="safeProbe"></div>
+  <canvas id="view"></canvas>
+
+  <div id="hud" class="hide">
+    <div id="hudDay"></div>
+    <button class="hudBtn gap" id="btnShop" aria-label="가게 보기">🏠 가게</button>
+    <button class="hudBtn" id="btnNote" aria-label="커피 노트">📖 노트</button>
+    <button class="hudBtn" id="btnSound" aria-label="소리">🔊</button>
+    <button class="hudBtn" id="btnMenu" aria-label="메뉴">≡</button>
+  </div>
+  <button class="hudBtn hide" id="skip">건너뛰기 ▶▶</button>
+  <div id="shopBar" class="hide"><button id="shopOut">가게 앞</button><button id="shopIn">가게 안</button><button id="shopClose">돌아가기</button></div>
+  <div id="shopLabel" class="hide"></div>
+
+  <div id="stepbar" class="hide"><div id="stepTitle"></div><div id="steps"></div></div>
+  <div id="patience" class="hide"><b></b></div>
+  <div id="hint" class="hide"></div>
+  <div id="actions" class="hide">
+    <button id="secondary" class="hide"></button>
+    <button id="primary"></button>
+  </div>
+
+  <div id="dialog" class="hide">
+    <canvas id="avatar" width="124" height="124"></canvas>
+    <div id="who"></div>
+    <div id="line"></div>
+    <div id="more">▼</div>
+  </div>
+
+  <div id="choice" class="hide"><p id="choiceQ"></p><div id="choiceBtns"></div><button id="choiceNote">📖 커피 노트 보기</button></div>
+
+  <div id="result" class="hide">
+    <h3 id="resTitle"></h3>
+    <div id="resStars"></div>
+    <div id="resDetail"></div>
+    <div class="scale"><div class="bar"></div><div class="aim hide"></div><div class="dot"></div><div class="l">시큼</div><div class="m">좋음</div><div class="r">씀</div></div>
+    <p id="resMsg"></p>
+    <div class="resBtns"><button class="subBtn" id="resAgain">다시 만들기</button><button class="mainBtn" id="resGo"></button></div>
+  </div>
+
+  <div id="tickets" class="hide"><div id="tickHead"></div><div id="tickList"></div></div>
+  <div id="settle" class="hide"></div>
+  <div id="daycard" class="hide"><div><h1 id="dayNum"></h1><p id="dayWhen"></p><h2 id="dayTitle"></h2></div></div>
+  <div id="toast"></div>
+
+  <div id="sheet" class="hide"><div id="sheetIn"><div id="sheetHead"><h2>커피 노트</h2><button id="sheetClose">✕</button></div><div id="sheetBody"></div></div></div>
+
+  <div id="title" class="hide">
+    <div id="logo"><span>My Little</span><span>Cafe</span></div>
+    <div id="byline">by Danny Soft</div>
+    <div id="titleBtns"></div>
+    <div id="titleFoot"><button id="titleSound"></button><a href="../../">게임 센터로</a></div>
+  </div>
+
+  <div id="setup" class="hide">
+    <div id="setupCount"></div>
+    <h1 id="setupTitle"></h1>
+    <p id="setupSub"></p>
+    <div id="setupBody"></div>
+    <div class="setupFoot"><button class="subBtn" id="setupBack">이전</button><button class="mainBtn" id="setupNext">다음</button></div>
+  </div>
+  <div id="confirmBox" class="hide"><p id="confirmMsg"></p><div class="resBtns"><button class="subBtn" id="confirmNo">아니요</button><button class="mainBtn" id="confirmYes">네</button></div></div>
+</div>
+
+<script type="module">
+import * as G from './logic.js';
+import { CAFE_NAMES, CAFE_NAME_MAX, PLACES, WEEKDAYS, MENUS, STEP_NAME, REGULARS, RUSH, HOME_PASS_STARS, PEOPLE, SEASON_NAME } from './data.js';
+import { SCRIPT, NOTES, REACT, EXAM_TEXT, DAY_LABEL } from './story.js';
+import { drawBar, drawPerson, CUTS, drawTitleBg, shopFront, personOf, lin } from './art.js';
+import { runBrew, setInsets } from './stations.js';
+import { createFloor, spawn, stepFloor, sendOut, prefill, reserveSeat, FLOORS } from './floor.js';
+import { drawInside, drawOutside, randomLook } from './art-shop.js';
+import { createSound } from './sound.js';
+import { createMusic, createFileMusic } from './music.js';
+import * as B from './business.js';
+import { createBusiness } from './main-mode.js';
+import { WEATHER_MUSIC } from './data.js';
+
+const $ = (id) => document.getElementById(id);
+const q = new URLSearchParams(location.search), DBG = q.has('dbg');
+const SAVE_KEY = 'mlc.save.v1', CLEAR_KEY = 'mlc.cleared', SOUND_KEY = 'mlc.sound', BIZ_KEY = 'mlc.biz.v1';
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* 저장소를 못 쓰면 이번 판만 유지 */ } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* 위와 같음 */ } },
+};
+function loadSave() { try { return G.normalizeSave(JSON.parse(store.get(SAVE_KEY))); } catch { return null; } }
+
+const sfx = createSound(), music = createFileMusic(createMusic());
+let soundOn = store.get(SOUND_KEY) !== 'off';
+sfx.setOn(soundOn);
+const refreshSoundBtns = () => { $('btnSound').textContent = soundOn ? '🔊' : '🔇'; $('titleSound').textContent = soundOn ? '🔊 소리 켜짐' : '🔇 소리 꺼짐'; };
+function toggleSound() { soundOn = !soundOn; store.set(SOUND_KEY, soundOn ? 'on' : 'off'); sfx.setOn(soundOn); music.setOn(soundOn); refreshSoundBtns(); }
+refreshSoundBtns();
+function weatherNow() { return S?.biz ? S.biz.weather : S ? G.dailyOf(S.day).weather : 'cloud'; }
+const artWeather = () => (weatherNow() === 'shower' ? 'rain' : weatherNow());
+function startMusic() { if (!sfx.ensure()) return; music.play(sfx.ctx, WEATHER_MUSIC[weatherNow()] || 'cloudy'); music.setOn(soundOn); }
+
+// ── 캔버스와 그리기 ──
+const cv = $('view'), g = cv.getContext('2d');
+let W = 0, H = 0, T = 0, paused = false, lastNow = performance.now(), fade = 1;
+let view = () => {};
+function resize() {
+  const r = $('stage').getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const st = getComputedStyle($('safeProbe'));
+  setInsets(parseFloat(st.paddingTop) || 0, parseFloat(st.paddingBottom) || 0);
+}
+window.addEventListener('resize', resize); resize();
+const ticks = new Set();
+function drawFrame(dt) {
+  if (!paused) { T += dt; for (const f of ticks) f(dt); }
+  view(g, W, H, T, paused ? 0 : dt);
+  if (fade > 0) { g.fillStyle = `rgba(14,8,5,${Math.min(1, fade)})`; g.fillRect(0, 0, W, H); fade = Math.max(0, fade - dt * 2.4); }
+}
+function frame(now) {
+  requestAnimationFrame(frame); // 그리다 오류가 나도 다음 프레임은 돈다
+  const dt = Math.min(0.05, (now - lastNow) / 1000); lastNow = now;
+  drawFrame(dt);
+}
+requestAnimationFrame(frame);
+
+let pointer = null;
+const localXY = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+cv.addEventListener('pointerdown', (e) => { sfx.ensure(); try { cv.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트는 캡처가 없을 수 있다 */ } if (pointer) pointer.down?.(...localXY(e), W, H); else if (tapHandler) tapHandler(); });
+cv.addEventListener('pointermove', (e) => { if (pointer) pointer.move?.(...localXY(e), W, H); });
+const ptrUp = (e) => { if (pointer) pointer.up?.(...localXY(e), W, H); };
+cv.addEventListener('pointerup', ptrUp); cv.addEventListener('pointercancel', ptrUp);
+let tapHandler = null;
+
+// ── 제조 화면 UI ──
+const primary = $('primary'), secondary = $('secondary');
+let primOpts = null;
+const ui = {
+  hint(t) { $('hint').textContent = t; $('hint').classList.toggle('hide', !t); },
+  primary(label, opts) { primOpts = opts; primary.textContent = label; primary.classList.toggle('danger', !!opts.danger); primary.classList.remove('hide', 'held'); $('actions').classList.remove('hide'); },
+  secondary(label, fn) { secondary.textContent = label; secondary.classList.remove('hide'); secondary.onclick = () => { secondary.classList.add('hide'); sfx.play('click'); fn(); }; $('actions').classList.remove('hide'); },
+  clearActions() { primOpts = null; primary.classList.add('hide'); primary.classList.remove('held'); secondary.classList.add('hide'); secondary.onclick = null; },
+  fire() { primOpts?.tap?.(); },
+  setSteps(steps, doList, i, title) {
+    $('stepTitle').textContent = title;
+    $('steps').innerHTML = steps.map((s, k) => `<span class="${k === i ? 'now' : !doList.includes(s) ? 'owner' : k < i ? 'done' : ''}">${k < i && doList.includes(s) ? '✓' : ''}${STEP_NAME[s]}</span>`).join('');
+  },
+};
+primary.addEventListener('pointerdown', (e) => {
+  sfx.ensure(); e.preventDefault();
+  if (!primOpts) return;
+  try { primary.setPointerCapture(e.pointerId); } catch { /* 위와 같음 */ }
+  if (primOpts.hold) { primary.classList.add('held'); primOpts.down?.(); }
+});
+const primRelease = () => {
+  if (!primOpts) return;
+  if (primOpts.hold) { if (primary.classList.contains('held')) { primary.classList.remove('held'); primOpts.up?.(); } } else { sfx.play('click'); primOpts.tap?.(); }
+};
+primary.addEventListener('pointerup', primRelease);
+primary.addEventListener('pointercancel', () => { if (primOpts?.hold && primary.classList.contains('held')) { primary.classList.remove('held'); primOpts.up?.(); } });
+
+// ── 게임 진행 ──
+let S = null, front = null, frontMood = 'calm', skipReq = false, lastCup = null;
+const AUTO = q.has('auto'); // 점검용: 대사와 제조를 자동으로 넘긴다
+const brewCtx = { ui, sfx, get S() { return S; }, auto: AUTO, fast: AUTO, setView: (f) => { view = f; }, setPointer: (p) => { pointer = p; } };
+const save = () => { if (S) store.set(SAVE_KEY, JSON.stringify(S)); };
+
+function barView() {
+  view = (gx, w, h, t) => {
+    const p = front === 'owner' || !front ? personOf('owner', S.choices) : personOf(front, S.choices);
+    drawBar(gx, w, h, { place: S.choices.place, weather: artWeather(), t, cafe: S.choices.cafe, front: p, frontMood, frontOpts: { apron: front === 'owner' || !front }, counterY: h * 0.56 });
+  };
+  pointer = null;
+}
+function setHud() {
+  const isDay = S.day >= 1 && S.day <= 5;
+  const label = S.day === 0 ? '프롤로그' : isDay ? `${DAY_LABEL[S.day]}` : '엔딩';
+  $('hudDay').innerHTML = `${label}${isDay ? `<small>${WEEKDAYS[S.choices.place][S.day - 1]} · ${G.dailyOf(S.day).line}</small>` : ''}`;
+  $('hud').classList.remove('hide');
+}
+function drawAvatar(who) {
+  const a = $('avatar'), c = a.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 124, 124);
+  c.fillStyle = lin(c, 0, 0, 0, 124, [[0, '#7c5d45'], [1, '#54392a']]); c.fillRect(0, 0, 124, 124);
+  const p = personOf(who, S.choices);
+  drawPerson(c, p, 62, 150, 34, { mood: who === 'hero' ? 'calm' : 'smile', apron: who === 'owner' || (who === 'hero' && S.day >= 1), suit: who === 'hero' && S.day === 0, t: 0 });
+}
+// ── 가게 외관·점내 장면 ──
+let floor = null, ownerSeat = null;
+const LOOKERS = ['kim', 'choi', 'han', 'oh', 'park', 'mina', 'jaeho'];
+function floorFor() {
+  if (!floor || floor.place !== S.choices.place) { floor = createFloor(S.choices.place); ownerSeat = null; prefill(floor, S.choices.place === 'home' ? 6 : 2, Math.random, () => randomLook(floor.place)); }
+  return floor;
+}
+function staffOf() {
+  // 5일차에는 사장님이 손님 자리에 앉아 구경하고, 엔딩부터는 주인공 혼자예요
+  const hero = { person: personOf('hero', S.choices) }, owner = { person: personOf('owner', S.choices) };
+  return S.day >= 1 && S.day <= 4 ? [hero, owner] : [hero];
+}
+function insideView() {
+  const F = floorFor();
+  if (S.day === 5 && !ownerSeat) ownerSeat = reserveSeat(F, F.taken.findIndex((v) => v === null));
+  view = (gx, w, h, t, dt) => {
+    stepFloor(F, dt, Math.random, () => randomLook(F.place));
+    drawInside(gx, w, h, { place: S.choices.place, cafe: S.choices.cafe, F, t, weather: artWeather(), staff: staffOf(), ownerSit: S.day === 5 && ownerSeat ? { seat: ownerSeat, person: personOf('owner', S.choices) } : null });
+  };
+  pointer = null;
+}
+function outsideView() {
+  const looks = LOOKERS.map(() => randomLook(S.choices.place));
+  view = (gx, w, h, t) => drawOutside(gx, w, h, { place: S.choices.place, cafe: S.choices.cafe, t, weather: artWeather(), looks });
+  pointer = null;
+}
+// 잠깐 보여 주는 장면. 탭하면 넘어간다
+function shopScene(fn, sec, label = '', until = null) {
+  if (AUTO) return Promise.resolve();
+  fn(); fade = 0.7; hideDialog();
+  const lab = $('shopLabel'); lab.textContent = label; lab.classList.toggle('hide', !label);
+  return new Promise((done) => {
+    let left = sec, over = false;
+    const close = () => { if (over) return; over = true; ticks.delete(tick); tapHandler = null; lab.classList.add('hide'); done(); };
+    const tick = (dt) => { left -= dt; if (left <= 0 || (until && until())) close(); };
+    ticks.add(tick); tapHandler = close;
+  });
+}
+const lookOf = (id) => personOf(id, S.choices);
+async function customerEnters(id) {
+  const F = floorFor();
+  const c = spawn(F, 'takeout', { look: lookOf(id), named: true, hold: true });
+  activeCustomer = c;
+  await shopScene(insideView, 5, `🔔 문이 열려요 · ${PEOPLE[id].name}`, () => c.state === 'order');
+}
+let activeCustomer = null;
+async function customerLeaves() {
+  const F = floorFor(), c = activeCustomer;
+  if (!c) return;
+  activeCustomer = null; c.hold = false; c.cup = true;
+  if (F.people.includes(c)) {
+    const stays = S.choices.place === 'home' && F.taken.includes(null);
+    if (stays) { c.kind = 'dine'; c.wait = 0; } else { c.kind = 'takeout'; sendOut(F, c); }
+    await shopScene(insideView, 2.2, stays ? '자리에 앉아 천천히 마셔요' : '커피를 들고 나가요');
+  }
+}
+function openShop(mode = 'in') {
+  if (!S || !$('stepbar').classList.contains('hide')) return;
+  const saved = { view, pointer, tap: tapHandler, dlg: !$('dialog').classList.contains('hide') };
+  tapHandler = null; hideDialog(); $('hud').classList.add('hide');
+  const show = (m) => { (m === 'in' ? insideView : outsideView)(); $('shopIn').classList.toggle('on', m === 'in'); $('shopOut').classList.toggle('on', m === 'out'); fade = 0.4; sfx.play('page'); };
+  $('shopBar').classList.remove('hide'); show(mode);
+  $('shopIn').onclick = () => show('in'); $('shopOut').onclick = () => show('out');
+  $('shopClose').onclick = () => { $('shopBar').classList.add('hide'); $('hud').classList.remove('hide'); view = saved.view; pointer = saved.pointer; tapHandler = saved.tap; if (saved.dlg) $('dialog').classList.remove('hide'); sfx.play('click'); };
+}
+
+function nameOf(who) { if (who === 'narr' || who === 'sys') return ''; if (who === 'hero') return '나'; if (who === 'owner') return '사장님'; return PEOPLE[who]?.name ?? ''; }
+function showLine(who, text) {
+  const box = $('dialog'), isPlain = who === 'narr' || who === 'sys';
+  box.className = isPlain ? `noavatar ${who}` : '';
+  if (!isPlain) drawAvatar(who);
+  $('who').textContent = who === 'sys' ? '안내' : nameOf(who);
+  const line = $('line'), chars = [...text];
+  line.textContent = ''; $('more').classList.add('hide');
+  return new Promise((done) => {
+    let i = 0, finished = false, tm = null;
+    const complete = () => { clearInterval(tm); line.textContent = text; finished = true; $('more').classList.remove('hide'); };
+    const advance = () => {
+      if (!finished) { complete(); return; }
+      box.onclick = null; tapHandler = null; sfx.play('page'); done();
+    };
+    tm = setInterval(() => { i += 1; line.textContent = chars.slice(0, i).join(''); if (i % 3 === 0) sfx.play('type'); if (i >= chars.length) complete(); }, 26);
+    box.onclick = advance; tapHandler = advance;
+    if (AUTO) setTimeout(() => { complete(); advance(); }, 5);
+    pendingAdvance = () => { complete(); finished = true; advance(); };
+  });
+}
+let pendingAdvance = null;
+const hideDialog = () => $('dialog').classList.add('hide');
+function pickLine(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+function dayCard() {
+  const d = S.day;
+  $('dayNum').textContent = DAY_LABEL[d];
+  $('dayWhen').textContent = `${WEEKDAYS[S.choices.place][d - 1]} · ${G.dailyOf(d).line}`;
+  $('dayTitle').textContent = G.currentBeat(S).title;
+  $('daycard').classList.remove('hide');
+  sfx.play('bell');
+  return new Promise((done) => {
+    const close = () => { $('daycard').classList.add('hide'); $('daycard').onclick = null; clearTimeout(tm); done(); };
+    const tm = setTimeout(close, AUTO ? 5 : 2200);
+    $('daycard').onclick = close;
+  });
+}
+function toast(text) {
+  const t = $('toast'); t.textContent = text; t.classList.add('on');
+  return new Promise((r) => setTimeout(() => { t.classList.remove('on'); r(); }, AUTO ? 5 : 1500));
+}
+
+// 잔 결과 카드
+const BAND_TEXT = { good: '맛이 딱 좋아요!', sour: '살짝 시큼해요.', verySour: '많이 시큼해요.', bitter: '살짝 써요.', veryBitter: '많이 써요.' };
+function showResult(r, { goLabel = '다음으로', canAgain = true, extra = '', stars = null } = {}) {
+  const st = stars ?? G.starsOf(r.score, r.band);
+  $('hint').classList.add('hide');
+  $('resTitle').textContent = MENUS[r.menu].name;
+  $('resStars').innerHTML = Array.from({ length: 3 }, (_, i) => (i < st ? '★' : '<i>★</i>')).join('');
+  $('resDetail').textContent = r.detail;
+  const X = (v) => `${(Math.max(-1, Math.min(1, v)) + 1) * 50}%`;
+  const dot = document.querySelector('.scale .dot'); dot.style.left = '50%';
+  requestAnimationFrame(() => requestAnimationFrame(() => { dot.style.left = X(r.taste); }));
+  const aim = document.querySelector('.scale .aim');
+  aim.classList.toggle('hide', !r.target); aim.style.left = X(r.target);
+  let msg = r.target && r.band !== 'good' ? '' : BAND_TEXT[r.band];
+  if (r.band !== 'good') msg += r.target ? (r.band.toLowerCase().includes('sour') ? '좋아하는 맛보다 시큼해요. 더 곱게 갈아 봐요.' : '좋아하는 맛보다 써요. 더 굵게 갈아 봐요.') : ` ${G.grindAdvice(r.band)}`;
+  if (r.milk) { const ms = G.scoreMilk(r.milk); if (ms.burnt) msg += ' 우유가 너무 뜨거워졌어요.'; else if (r.milk.temp < 55) msg += ' 우유가 조금 미지근해요.'; else if (ms.foamScore < 0.6) msg += r.milk.foam > 0.5 ? ' 거품이 너무 많아요.' : ' 거품이 조금 부족해요.'; }
+  if (extra) msg += ` ${extra}`;
+  $('resMsg').textContent = msg;
+  $('resGo').textContent = goLabel;
+  $('resAgain').classList.toggle('hide', !canAgain);
+  $('result').classList.remove('hide');
+  sfx.play(st >= 2 ? 'star' : st === 1 ? 'cup' : 'bad');
+  return new Promise((done) => {
+    const fin = (again) => { $('result').classList.add('hide'); $('resGo').onclick = null; $('resAgain').onclick = null; sfx.play('click'); done(again); };
+    $('resGo').onclick = () => fin(false);
+    $('resAgain').onclick = () => fin(true);
+    if (AUTO) setTimeout(() => fin(false), 5);
+  });
+}
+function enterBrew(menu) {
+  hideDialog();
+  $('stepbar').classList.remove('hide');
+}
+function leaveBrew() {
+  $('stepbar').classList.add('hide'); $('hint').classList.add('hide'); $('actions').classList.add('hide'); $('patience').classList.add('hide');
+  ui.clearActions(); pointer = null; sfx.stopLoops();
+  startMusic();
+  barView();
+}
+async function brewBeat(b) {
+  let tries = 0, advice = null, hintGrind = !!b.grindHint;
+  for (;;) {
+    enterBrew(b.menu);
+    fade = 0.7;
+    const r = await runBrew(brewCtx, { ...b, grindHint: hintGrind }, { advice });
+    tries += 1;
+    const isDemo = b.do.length === 1 && b.autoStop;
+    const untilGood = b.until === 'good' && r.band !== 'good' && !AUTO;
+    if (untilGood && tries >= (b.maxTries || 5) - 1) hintGrind = true; // 너무 오래 헤매면 오너가 칸을 표시해 준다
+    const again = await showResult(r, { goLabel: untilGood ? '다시 맞춰 볼게요' : '이 잔으로 할게요', canAgain: !isDemo && !untilGood, extra: untilGood && hintGrind ? '사장님이 칸을 표시해 줬어요.' : '' });
+    if (untilGood) { advice = G.grindAdvice(r.band); continue; }
+    if (again) { advice = r.band === 'good' ? null : G.grindAdvice(r.band); continue; }
+    G.recordCup(S, r); lastCup = r;
+    break;
+  }
+  leaveBrew();
+}
+function moodOf(band) { return band === 'good' ? 'smile' : band === 'veryBitter' || band === 'verySour' ? 'surprised' : 'calm'; }
+async function reactBeat(b) {
+  const band = lastCup?.band ?? G.tasteBand(S.cups.at(-1)?.taste ?? 0);
+  const table = b.who === 'owner' ? REACT.owner : REACT[S.choices.place];
+  frontMood = moodOf(band);
+  await showLine(b.who, pickLine(table[band]));
+  frontMood = 'calm';
+}
+
+function chooseMenu(question) {
+  return new Promise((done) => {
+    $('choiceQ').textContent = question;
+    $('choiceBtns').innerHTML = '';
+    for (const id of Object.keys(MENUS)) {
+      const btn = document.createElement('button');
+      btn.textContent = MENUS[id].name;
+      btn.onclick = () => { $('choice').classList.add('hide'); sfx.play('click'); done(id); };
+      $('choiceBtns').append(btn);
+    }
+    $('choice').classList.remove('hide');
+    if (AUTO) setTimeout(() => { const id = REGULARS[front]?.menu ?? 'americano'; $('choice').classList.add('hide'); done(id); }, 5);
+  });
+}
+
+async function rushExam() {
+  for (;;) {
+    let stars = 0, lates = 0;
+    for (const o of RUSH.orders) {
+      front = o.who; frontMood = 'calm'; barView(); $('dialog').classList.remove('hide');
+      await showLine(o.who, `${MENUS[o.menu].name} 한 잔이요!`);
+      let left = RUSH.patience;
+      const bar = $('patience').firstElementChild;
+      $('patience').classList.remove('hide');
+      const tick = (dt) => { left -= dt; const k = Math.max(0, left / RUSH.patience); bar.style.width = `${k * 100}%`; bar.className = k < 0.25 ? 'low' : k < 0.55 ? 'mid' : ''; };
+      ticks.add(tick);
+      enterBrew(o.menu);
+      const steps = MENUS[o.menu].steps.filter((s) => s !== 'grind');
+      const r = await runBrew(brewCtx, { menu: o.menu, do: steps, title: `${PEOPLE[o.who].name} · ${MENUS[o.menu].name}` }, { useDial: true });
+      ticks.delete(tick);
+      const late = left < 0, st = G.starsOf(r.score, r.band);
+      stars += st; if (late) lates += 1; G.recordCup(S, r); lastCup = r;
+      await showResult(r, { goLabel: '다음 손님', canAgain: false, stars: st, extra: late ? `손님을 너무 오래 기다리게 했어요(${lates}명째).` : '' });
+      leaveBrew();
+      front = o.who; frontMood = late ? 'tired' : moodOf(r.band); $('dialog').classList.remove('hide');
+      await showLine(o.who, late ? REACT.late[0] : pickLine(REACT.office[r.band]));
+    }
+    frontMood = 'calm'; front = null; barView(); $('dialog').classList.remove('hide');
+    const passed = G.rushPassed(stars, lates) || AUTO;
+    await showLine('sys', `별 ${stars}개, 오래 기다린 손님 ${lates}명이에요(합격선: 별 ${RUSH.passStars}개 이상, ${RUSH.maxLate}명 이하).`);
+    await showLine('owner', passed ? EXAM_TEXT.rushPass : EXAM_TEXT.rushFail);
+    S.examTries += 1;
+    if (passed) return;
+  }
+}
+async function regularsExam() {
+  for (;;) {
+    let stars = 0;
+    for (const id of Object.keys(REGULARS)) {
+      const R = REGULARS[id];
+      front = id; frontMood = 'smile'; barView(); $('dialog').classList.remove('hide');
+      await showLine(id, EXAM_TEXT.regularOrder[id]);
+      hideDialog(); frontMood = 'calm';
+      const pick = await chooseMenu(`${PEOPLE[id].name}의 "늘 먹던 것"은 뭘까요?`);
+      const right = pick === R.menu;
+      enterBrew(pick);
+      const r = await runBrew(brewCtx, { menu: pick, do: MENUS[pick].steps, title: `${PEOPLE[id].name} · ${MENUS[pick].name}` }, { target: right ? R.taste : 0 });
+      const st = right ? G.starsOf(r.score, r.band) : Math.min(1, G.starsOf(r.score, r.band));
+      stars += st; G.recordCup(S, r); lastCup = r; S.cups.at(-1).stars = st;
+      await showResult(r, { goLabel: '내주기', canAgain: false, stars: st, extra: right ? (R.taste ? '▼ 표시가 이 손님이 좋아하는 맛이에요.' : '') : '늘 먹던 메뉴가 아니었어요.' });
+      leaveBrew();
+      front = id; frontMood = right ? moodOf(r.band) : 'surprised'; $('dialog').classList.remove('hide');
+      await showLine(id, right ? pickLine(REACT.home[r.band]) : REACT.wrongMenu[0]);
+    }
+    frontMood = 'calm'; front = null; barView(); $('dialog').classList.remove('hide');
+    const passed = stars >= HOME_PASS_STARS || AUTO;
+    await showLine('sys', `별 ${stars}개를 모았어요(합격선 ${HOME_PASS_STARS}개).`);
+    await showLine('owner', passed ? EXAM_TEXT.homePass : EXAM_TEXT.homeFail);
+    S.examTries += 1;
+    if (passed) return;
+  }
+}
+
+let lastCut = null;
+async function runBeat(b, index) {
+  switch (b.t) {
+    case 'day':
+      hideDialog(); front = null; barView(); fade = 1; await dayCard(); setHud();
+      await shopScene(outsideView, S.day === 1 ? 3.2 : 2, `「${S.choices.cafe}」 ${G.dailyOf(S.day).line}`);
+      await shopScene(insideView, 3.2, S.choices.place === 'office' ? '오늘도 손님들이 들고 나요' : '오늘도 동네 손님들이 찾아와요');
+      barView(); fade = 0.6;
+      $('dialog').classList.remove('hide'); $('line').textContent = ''; $('who').textContent = '';
+      break;
+    case 'cut': {
+      if (b.art !== lastCut) { fade = 1; lastCut = b.art; sfx.play('page'); }
+      const ctxExtra = { get choices() { return S.choices; }, who: b.who, index };
+      view = (gx, w, h, t) => CUTS[b.art](gx, w, h, { choices: S.choices, t, who: ctxExtra.who, index });
+      pointer = null;
+      $('dialog').classList.remove('hide');
+      await showLine(b.who, G.beatText(S, b));
+      break;
+    }
+    case 'say':
+      if (lastCut) { lastCut = null; barView(); fade = 0.8; }
+      $('dialog').classList.remove('hide');
+      await showLine(b.who, G.beatText(S, b));
+      break;
+    case 'meet':
+      if (b.who) { sfx.play('bell'); await customerEnters(b.who); } else await customerLeaves();
+      front = b.who; frontMood = 'calm';
+      lastCut = null; barView(); fade = 0.6;
+      break;
+    case 'note': G.addNote(S, b.id); hideDialog(); await toast(`📖 커피 노트에 적었어요: ${NOTES[b.id].title}`); break;
+    case 'brew': lastCut = null; await brewBeat(b); break;
+    case 'react': $('dialog').classList.remove('hide'); await reactBeat(b); break;
+    case 'exam':
+      hideDialog();
+      { const F = floorFor(), n = b.kind === 'rush' ? RUSH.orders.length : Object.keys(REGULARS).length;
+        for (let i = 0; i < n; i++) spawn(F, 'takeout', { look: randomLook(F.place) });
+        await shopScene(insideView, 3, b.kind === 'rush' ? '줄이 길어졌어요!' : '단골들이 하나둘 들어와요'); }
+      if (b.kind === 'rush') await rushExam(); else await regularsExam();
+      break;
+    case 'end': store.set(CLEAR_KEY, '1'); store.del(SAVE_KEY); S.done = true; store.set(BIZ_KEY, JSON.stringify({ choices: S.choices, notes: S.notes, dial: S.dial, biz: null })); location.href = location.pathname + (DBG ? `?${q.toString().replace(/&?auto(=[^&]*)?/, '')}` : ''); await new Promise(() => {}); break;
+    default: throw new Error(`없는 줄 ${b.t}`);
+  }
+}
+// 앞서 어떤 손님이 와 있었는지 저장에서 되살린다
+function restoreFront() {
+  front = null;
+  const list = G.scriptOf(S);
+  for (let i = 0; i < S.beat; i++) if (list[i].t === 'meet') front = list[i].who;
+}
+async function play() {
+  $('title').classList.add('hide'); $('setup').classList.add('hide');
+  restoreFront(); barView(); setHud();
+  startMusic();
+  for (;;) {
+    const b = G.currentBeat(S);
+    if (!b) break;
+    const list = G.scriptOf(S), idx = S.beat;
+    $('skip').classList.toggle('hide', S.day !== 0);
+    if (S.day >= 1 && G.dailyOf(S.day).weather === 'rain') sfx.loop('rain', 0.5); else sfx.loop('rain', 0);
+    await runBeat(b, idx);
+    if (skipReq) { skipReq = false; S.day = 1; S.beat = 0; lastCut = null; $('skip').classList.add('hide'); save(); setHud(); continue; }
+    G.nextBeat(S); setHud(); save();
+    window.MLC_lastBeat = { day: S.day, beat: S.beat, type: list[idx]?.t };
+  }
+}
+
+// ── 본게임 ──
+function loadBiz() {
+  try {
+    const raw = JSON.parse(store.get(BIZ_KEY));
+    if (!raw || !G.validChoices(raw.choices)) return null;
+    return { choices: raw.choices, notes: Array.isArray(raw.notes) ? raw.notes.filter((n) => NOTES[n]) : [], dial: raw.dial, biz: raw.biz ? B.normalizeBiz(raw.biz) : null };
+  } catch { return null; }
+}
+let business = null;
+const bizEnv = {
+  $, sfx, ticks, ui, brewCtx,
+  get S() { return S; },
+  setView: (f) => { view = f; }, setPointer: (p) => { pointer = p; }, setFade: (v) => { fade = v; },
+  setFront: (id) => { front = id; frontMood = 'calm'; }, barView: () => barView(),
+  personOf: (id) => personOf(id, S.choices), artWeather,
+  startMusic, showLine, showResult,
+  showDialog: () => $('dialog').classList.remove('hide'), hideDialog,
+  showStepbar: () => { hideDialog(); $('stepbar').classList.remove('hide'); fade = 0.5; },
+  leaveBrewQuiet: () => { $('stepbar').classList.add('hide'); $('hint').classList.add('hide'); $('actions').classList.add('hide'); ui.clearActions(); pointer = null; sfx.stopLoops(); },
+  flash: (text) => { const t = $('toast'); t.textContent = text; t.classList.add('on'); clearTimeout(bizEnv.flashT); bizEnv.flashT = setTimeout(() => t.classList.remove('on'), 1300); },
+  save: () => { store.set(BIZ_KEY, JSON.stringify({ choices: S.choices, notes: S.notes, dial: S.dial, biz: S.biz })); },
+  toTitle: () => location.reload(),
+  dayCard: (num, when, title) => new Promise((done) => {
+    $('dayNum').textContent = num; $('dayWhen').textContent = when; $('dayTitle').textContent = title;
+    $('daycard').classList.remove('hide'); sfx.play('bell');
+    const close = () => { $('daycard').classList.add('hide'); $('daycard').onclick = null; clearTimeout(tm); done(); };
+    const tm = setTimeout(close, AUTO ? 5 : 1800);
+    $('daycard').onclick = close;
+  }),
+  pick: (question, options) => new Promise((done) => {
+    $('choiceQ').textContent = question; $('choiceBtns').innerHTML = ''; $('choiceNote').classList.add('hide');
+    for (const [label, value] of options) {
+      const b = document.createElement('button'); b.textContent = label;
+      b.onclick = () => { $('choice').classList.add('hide'); $('choiceNote').classList.remove('hide'); sfx.play('click'); done(value); };
+      $('choiceBtns').append(b);
+    }
+    $('choice').classList.remove('hide');
+  }),
+};
+async function startBusiness(save0) {
+  S = G.newGame(save0.choices);
+  S.notes = save0.notes || [];
+  if (save0.dial) S.dial = save0.dial;
+  S.biz = save0.biz || B.newBiz();
+  $('title').classList.add('hide'); $('setup').classList.add('hide');
+  business = createBusiness(bizEnv);
+  bizEnv.save();
+  await business.run();
+}
+
+// ── 노트 ──
+function openNotes() {
+  const body = $('sheetBody');
+  body.innerHTML = S && S.notes.length ? S.notes.map((id) => `<div class="note"><b>${NOTES[id].title}</b><span>${NOTES[id].text}</span></div>`).join('') : '<div class="empty">아직 적은 게 없어요. 배우면 저절로 적혀요.</div>';
+  $('sheet').classList.remove('hide'); paused = true; sfx.play('page');
+}
+$('btnShop').onclick = () => openShop('in');
+$('btnNote').onclick = openNotes; $('choiceNote').onclick = openNotes;
+$('sheetClose').onclick = () => { $('sheet').classList.add('hide'); paused = false; };
+$('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) { $('sheet').classList.add('hide'); paused = false; } });
+$('btnSound').onclick = toggleSound; $('titleSound').onclick = toggleSound;
+$('skip').onclick = () => { skipReq = true; pendingAdvance?.(); };
+function confirmBox(msg) {
+  return new Promise((done) => {
+    $('confirmMsg').textContent = msg; $('confirmBox').classList.remove('hide');
+    const fin = (v) => { $('confirmBox').classList.add('hide'); done(v); };
+    $('confirmYes').onclick = () => fin(true); $('confirmNo').onclick = () => fin(false);
+  });
+}
+$('btnMenu').onclick = async () => {
+  paused = true;
+  const go = await confirmBox('타이틀로 나갈까요? 지금 만들던 잔은 사라지지만 진행은 저장돼요.');
+  paused = false;
+  if (go) { save(); location.reload(); }
+};
+
+// ── 타이틀 ──
+function showTitle() {
+  view = (gx, w, h, t) => drawTitleBg(gx, w, h, t);
+  pointer = null; tapHandler = null;
+  const box = $('titleBtns'), saved = loadSave(), cleared = store.get(CLEAR_KEY) === '1';
+  box.innerHTML = '';
+  const add = (html, cls, fn, off) => { const b = document.createElement('button'); b.innerHTML = html; if (cls) b.className = cls; b.disabled = !!off; b.onclick = () => { sfx.ensure(); sfx.play('click'); fn?.(); }; box.append(b); return b; };
+  if (saved) add(`이어 하기<small>${DAY_LABEL[saved.day]} · ${saved.choices.cafe}</small>`, 'mainBtn', () => { S = saved; play(); });
+  add(saved || cleared ? '새 게임' : '시작하기', saved || cleared ? '' : 'mainBtn', async () => {
+    if ((saved || loadBiz()) && !(await confirmBox('이어 하던 기록이 지워져요. 새로 시작할까요?'))) return;
+    openSetup();
+  });
+  const bizSave = loadBiz();
+  const bizInfo = !bizSave ? '스토리 모드를 끝내면 열려요' : bizSave.biz?.finished ? '봄을 마쳤어요. 여름은 지금 만들고 있어요' : bizSave.biz ? `${SEASON_NAME[bizSave.biz.season]} ${bizSave.biz.day}일차 · ${bizSave.choices.cafe}` : `봄 1일차부터 · ${bizSave.choices.cafe}`;
+  add(`내 가게 운영<small>${bizInfo}</small>`, bizSave && !saved ? 'mainBtn' : '', () => startBusiness(bizSave), !bizSave || bizSave.biz?.finished);
+  $('title').classList.remove('hide');
+}
+
+// ── 새 게임: 선택 4가지 ──
+const CH = { hero: null, owner: null, place: null, cafe: null, custom: '' };
+const SETUP = [
+  { key: 'hero', title: '주인공', sub: '대기업 과장, 30대 중반. 언젠가 내 카페를 여는 게 꿈이었어요.' },
+  { key: 'owner', title: '카페 사장님', sub: '60대 중반, 커피 경력 30년. "나도 자네 나이에 커피를 시작했다네."' },
+  { key: 'place', title: '물려받을 카페', sub: '둘 다 프랜차이즈가 아닌 개인 카페예요. 본게임의 재미가 달라져요.' },
+  { key: 'cafe', title: '카페 이름', sub: '하나 고르거나 직접 지어요.' },
+];
+let setupStep = 0;
+function portrait(id, opts) {
+  const c = document.createElement('canvas'); c.width = 320; c.height = 340;
+  const x = c.getContext('2d');
+  x.fillStyle = lin(x, 0, 0, 0, 340, [[0, '#7c5d45'], [1, '#54392a']]); x.fillRect(0, 0, 320, 340);
+  drawPerson(x, PEOPLE[id], 160, 345, 72, opts);
+  return c;
+}
+function shopThumb(place) {
+  const c = document.createElement('canvas'), w = 124, h = 150; c.width = w * 2; c.height = h * 2;
+  const x = c.getContext('2d'); x.scale(2, 2);
+  shopFront(x, w, h, { place, cafe: '', t: 1 });
+  return c;
+}
+function renderSetup() {
+  const s = SETUP[setupStep], body = $('setupBody');
+  $('setupCount').textContent = `${setupStep + 1} / ${SETUP.length}`;
+  $('setupTitle').textContent = s.title; $('setupSub').textContent = s.sub;
+  body.innerHTML = ''; body.scrollTop = 0;
+  const canNext = () => { $('setupNext').disabled = s.key === 'cafe' ? !(G.cleanCafeName(CH.cafe ?? '').length) : !CH[s.key]; };
+  $('setupBack').textContent = setupStep === 0 ? '타이틀' : '이전';
+  $('setupNext').textContent = setupStep === SETUP.length - 1 ? '이 카페로 시작' : '다음';
+  const select = (v) => { CH[s.key] = v; sfx.play('click'); renderSetup(); };
+  if (s.key === 'hero' || s.key === 'owner') {
+    const wrap = document.createElement('div'); wrap.className = 'pick2';
+    const base = s.key === 'hero' ? 'hero' : 'owner', opts = s.key === 'hero' ? { mood: 'calm', suit: true, badge: true } : { mood: 'smile', apron: true };
+    for (const [v, label] of [['M', '남자'], ['F', '여자']]) {
+      const b = document.createElement('button'); b.className = `pick${CH[s.key] === v ? ' on' : ''}`;
+      b.append(portrait(`${base}${v}`, opts));
+      const t = document.createElement('b'); t.textContent = label; b.append(t);
+      const sm = document.createElement('small'); sm.textContent = s.key === 'hero' ? '30대 중반' : '60대 중반 · 경력 30년'; b.append(sm);
+      b.onclick = () => select(v);
+      wrap.append(b);
+    }
+    body.append(wrap);
+  } else if (s.key === 'place') {
+    for (const v of ['office', 'home']) {
+      const b = document.createElement('button'); b.className = `pick pickWide${CH.place === v ? ' on' : ''}`;
+      b.append(shopThumb(v));
+      const d = document.createElement('div'); d.innerHTML = `<b>${PLACES[v].name}</b><small>${PLACES[v].sub}</small><small style="color:var(--on);margin-top:5px">${PLACES[v].fun}</small>`;
+      b.append(d);
+      b.onclick = () => select(v);
+      body.append(b);
+    }
+  } else {
+    for (const n of CAFE_NAMES) {
+      const b = document.createElement('button'); b.className = `nameRow${CH.cafe === n.name && !CH.custom ? ' on' : ''}`;
+      b.innerHTML = `<b>${n.name}</b><span>${n.mean}</span>`;
+      b.onclick = () => { CH.custom = ''; select(n.name); };
+      body.append(b);
+    }
+    const inp = document.createElement('input');
+    inp.id = 'customName'; inp.placeholder = `직접 짓기 (${CAFE_NAME_MAX}자까지)`; inp.maxLength = CAFE_NAME_MAX * 2; inp.value = CH.custom;
+    if (CH.custom) inp.className = 'on';
+    inp.oninput = () => {
+      const clean = [...inp.value].slice(0, CAFE_NAME_MAX).join('');
+      if (clean !== inp.value) inp.value = clean;
+      CH.custom = clean; CH.cafe = clean || null;
+      body.querySelectorAll('.nameRow').forEach((r) => r.classList.remove('on'));
+      inp.classList.toggle('on', !!clean);
+      canNext();
+    };
+    body.append(inp);
+  }
+  canNext();
+}
+function openSetup() { setupStep = 0; Object.assign(CH, { hero: null, owner: null, place: null, cafe: null, custom: '' }); $('title').classList.add('hide'); $('setup').classList.remove('hide'); renderSetup(); }
+$('setupBack').onclick = () => { sfx.play('click'); if (setupStep === 0) { $('setup').classList.add('hide'); showTitle(); } else { setupStep -= 1; renderSetup(); } };
+$('setupNext').onclick = () => {
+  sfx.ensure(); sfx.play('click');
+  if (setupStep < SETUP.length - 1) { setupStep += 1; renderSetup(); return; }
+  const choices = { hero: CH.hero, owner: CH.owner, place: CH.place, cafe: CH.cafe };
+  if (!G.validChoices(choices)) return;
+  store.del(SAVE_KEY); store.del(BIZ_KEY);
+  if (store.get(CLEAR_KEY) === '1') { // 스토리를 끝낸 적이 있으면 건너뛸 수 있다
+    confirmBox('스토리를 건너뛰고 바로 가게를 열까요? 아니요를 누르면 스토리부터 해요.').then((skip) => {
+      if (skip) startBusiness({ choices, notes: Object.keys(NOTES).filter((n) => !n.startsWith('reg')), dial: { espresso: 6, drip: 5 }, biz: null });
+      else { S = G.newGame(choices); save(); play(); }
+    });
+    return;
+  }
+  S = G.newGame(choices); save(); play();
+};
+
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+if ('serviceWorker' in navigator && !DBG && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// 점검용: ?dbg=1 또는 ?auto=1&place=home
+if (DBG) window.MLC = { get S() { return S; }, setS(v) { S = v; }, start(choices, day = 0, beat = 0) { S = G.newGame(choices); S.day = day; S.beat = beat; save(); return play(); }, view: () => view, brewCtx, startBiz: startBusiness, get business() { return business; }, B, tickOnly(sec) { for (let i = 0; i < sec * 30; i++) for (const f of ticks) f(1 / 30); }, run(sec) { for (let i = 0; i < sec * 30; i++) drawFrame(1 / 30); }, ptr(type, x, y) { pointer?.[type]?.(x, y, W, H); }, get size() { return [W, H]; } };
+if (AUTO) {
+  S = G.newGame({ hero: q.get('hero') || 'F', owner: q.get('owner') || 'M', place: q.get('place') || 'home', cafe: q.get('cafe') || '윤슬' });
+  window.MLC_done = false;
+  play();
+} else showTitle();
+</script>
+</body>
+</html>
