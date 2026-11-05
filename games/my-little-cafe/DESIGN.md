@@ -174,6 +174,13 @@
 
 커피를 산 손님이 일정 확률로 함께 사요. 확률은 변수의 곱이에요: 카페 위치, 평판, 그 잔의 별, 단골과의 친밀도, 시간대·날씨(디저트), 로스팅 품질·주말(원두). **가게를 잘 운영할수록 많이 팔리는 구조예요.**
 
+### 5.9 랜덤 이벤트 (2026-11-05 대니님 아이디어, 나중에 구현)
+
+본게임에 랜덤 이벤트를 넣는 걸 나중에 검토해요. 대화 모드로 나오면 시간이 멈춰서 기존 구조에 잘 맞아요.
+
+- **진상 손님:** 심리적으로 힘들어하면서 "괜히 회사 그만뒀나" 하고 눈물을 찔끔 흘려요.
+- **심쿵 손님:** 잘생긴 손님이나 예쁜 손님이 들어와 설레요.
+
 ## 6. 선행조사 기록
 
 - **채택:** 저장소의 기존 방식(바닐라 JS, `logic.js` 분리 테스트, 캔버스 그림, Web Audio 합성, 네트워크 우선 서비스 워커). 레시피는 [Clive Coffee 에스프레소](https://clivecoffee.com/blogs/learn/the-perfect-espresso-recipe), [Clive Coffee 우유 스팀](https://clivecoffee.com/blogs/learn/how-to-steam-milk-for-lattes-and-cappuccinos-at-home-clive-coffee), [Seattle Coffee Gear 드립](https://www.seattlecoffeegear.com/blogs/learning-center/how-to-dial-in-pour-over).
