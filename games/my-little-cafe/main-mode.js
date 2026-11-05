@@ -6,6 +6,7 @@ import { drawInside, randomLook } from './art-shop.js';
 import { runBrew, runRoast } from './stations.js';
 import { MENUS, DAY_SEC, PATIENCE, AUTO_SEC, EQUIP, PEOPLE, BIZ_REGULARS, WEATHER_NAME, COLDBREW_COST, RENT_PER_SEASON, SEASON_NAME, DAYS_PER_SEASON, SIDE, ROAST } from './data.js';
 import { REG_TALK, OWNER_VISIT, REACT } from './story.js';
+import { EVENTS, FAIR } from './events.js';
 
 const PANEL = 214; // 아래 주문판 높이
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -162,7 +163,7 @@ export function createBusiness(env) {
       for (const p of d.pending.filter((x) => x.p.state === 'queue' || x.p.state === 'order')) { addTicket(p.p, p.menu, p.kind, p.regular); d.pending.splice(d.pending.indexOf(p), 1); }
       while (d.arrivals.length && d.arrivals[0] <= d.clock) {
         d.arrivals.shift();
-        const hour = B.hourOf(d.clock), menu = B.pickMenu(d.place, hour, biz().weather, biz().stock.coldbrew - d.tickets.filter((x) => x.menu === 'coldbrew').length, Math.random);
+        const hour = B.hourOf(d.clock), menu = B.pickMenu(d.place, hour, biz().weather, biz().stock.coldbrew - d.tickets.filter((x) => x.menu === 'coldbrew').length, Math.random, biz().unlocked);
         const takeout = menu === 'beans' || Math.random() < d.F.L.takeoutShare, kind = takeout ? 'takeout' : 'dine';
         d.pending.push({ p: spawn(d.F, kind, { look: randomLook(d.place), hold: true }), menu, kind });
       }
@@ -190,6 +191,76 @@ export function createBusiness(env) {
     if (d.hudT > 0.25) { d.hudT = 0; setHudDay(Math.min(d.clock, DAY_SEC)); renderTickets(); }
   }
 
+  // ── 이벤트 ──
+  // 대본을 차례로 보여 준다. 찾아온 사람(visitor)이 앞에 서 있고, 표정만 바뀐다
+  async function playScript(script, visitor, show) {
+    for (const s of script) {
+      if (s.who) {
+        if (s.who === visitor) { env.setFront(visitor, s.mood || 'calm'); show(); }
+        env.showDialog();
+        await env.showLine(s.who, s.text);
+      } else if (s.brew) {
+        env.showStepbar();
+        const r = await runBrew(brewCtx, { menu: s.brew.menu, do: s.brew.do, title: s.brew.title }, {});
+        env.leaveBrewQuiet();
+        env.setFront(visitor); show();
+        await playScript(r.band === 'good' ? s.good : s.other, visitor, show);
+      } else if (s.ask) {
+        env.hideDialog();
+        const i = await env.pick(s.ask, s.options.map(([label], k) => [label, k]));
+        await playScript(s.options[i][1], visitor, show);
+      } else if (s.note) {
+        G.addNote(env.S, s.note);
+        await env.noteToast(s.note);
+      } else if (s.unlock) biz().unlocked[s.unlock] = true;
+    }
+  }
+  async function runEvent(phase) {
+    const b = biz(), e = B.eventDue(b, EVENTS, phase);
+    if (!e) return;
+    const place = env.S.choices.place, visitor = typeof e.visitor === 'string' ? e.visitor : e.visitor[place];
+    const script = Array.isArray(e.script) ? e.script : e.script[place];
+    setHudDay();
+    env.setFront(visitor); env.barView();
+    await playScript(script, visitor, env.barView);
+    if (e.kind === 'fair-news') {
+      env.hideDialog();
+      const go = await env.pick('내일 하루 가게를 쉬고 박람회에 다녀올까요? 그날 매출은 없어요.', [['문 닫고 다녀올게요', true], ['이번엔 넘어갈게요', false]]);
+      if (go) { b.fairTomorrow = true; B.markEvent(b, e.id); } else B.snoozeEvent(b, e.id, 3);
+    } else B.markEvent(b, e.id);
+    env.hideDialog(); env.setFront(null); env.barView();
+    env.save();
+  }
+  // 박람회 날: 가게를 쉰다. 영업과 평판 변화가 없다
+  async function fairDay() {
+    const b = biz();
+    b.fairTomorrow = false;
+    syncStoryDay(); setHudDay();
+    await env.dayCard(`${SEASON_NAME[b.season]} ${b.day}일차`, '오늘은 가게를 쉬어요', FAIR.name);
+    env.setFront(null); env.sceneView('bg-fair');
+    const show = () => env.sceneView('bg-fair');
+    await playScript(FAIR.open, null, show);
+    const left = FAIR.booths.slice();
+    for (;;) {
+      env.hideDialog();
+      const id = await env.pick(FAIR.question, [...left.map((x) => [x.label, x.id]), [FAIR.consultLabel, 'consult']]);
+      if (id === 'consult') break;
+      await playScript(left.find((x) => x.id === id).script, null, show);
+      left.splice(left.findIndex((x) => x.id === id), 1);
+    }
+    env.setFront('staff'); show();
+    await playScript(FAIR.consult, 'staff', show);
+    env.hideDialog();
+    const need = await env.pick(FAIR.consultAsk, FAIR.needs.map((x) => [x.label, x]));
+    b.equipHint = need.equip;
+    env.showDialog();
+    await env.showLine('staff', need.reply);
+    await playScript(FAIR.close, 'staff', show);
+    env.hideDialog(); env.setFront(null);
+    B.markEvent(b, 'fair');
+    env.save();
+  }
+
   // ── 하루 ──
   async function morning() {
     const b = biz();
@@ -200,6 +271,7 @@ export function createBusiness(env) {
     const visit = OWNER_VISIT.find((v) => v.day === b.day);
     if (visit) { env.showDialog(); await env.showLine('owner', visit.text); }
     env.setFront(null); env.barView(); env.hideDialog();
+    await runEvent('morning');
     // 아침 칸 맞추기: 시간이 멈춘 상태. 오늘 자동 잔의 맛을 정한다
     let accepted = false, advice = null, err = 0;
     while (!accepted) {
@@ -211,13 +283,15 @@ export function createBusiness(env) {
       accepted = !again;
     }
     env.leaveBrewQuiet();
-    if (env.S.choices.place === 'office') {
+    if (env.S.choices.place === 'office' && B.isUnlocked(b, 'coldbrew')) {
       const n = await env.pick(`오늘 콜드브루를 몇 병 준비할까요? 병당 ${won(COLDBREW_COST)}이고, 남으면 저녁에 버려요.`, [['안 만들어요', 0], ['2병', 2], ['4병', 4], ['6병', 6]]);
       B.prepColdbrew(b, n);
     }
+    if (B.isUnlocked(b, 'dessert')) {
     const d = await env.pick(`오늘 디저트를 몇 개 들일까요? 외부에서 개당 ${won(SIDE.dessert.unitCost)}에 받아 ${won(SIDE.dessert.price)}에 팔아요. 남으면 저녁에 버려요.`, [['안 들여요', 0], ['4개', 4], ['8개', 8], ['12개', 12]]);
     B.buyDessert(b, d);
-    if (b.stock.beans < ROAST.lowStock && b.money >= ROAST.batchCost) {
+    }
+    if (B.isUnlocked(b, 'beans') && b.stock.beans < ROAST.lowStock && b.money >= ROAST.batchCost) {
       const roast = await env.pick(`원두가 ${b.stock.beans}봉지 남았어요. 오늘 로스팅할까요? 생두값 ${won(ROAST.batchCost)}으로 ${ROAST.bags}봉지가 나와요.`, [['로스팅할게요', true], ['오늘은 안 해요', false]]);
       if (roast) {
         env.showStepbar();
@@ -263,15 +337,16 @@ export function createBusiness(env) {
       const box = $('settle');
       const draw = () => {
         const rows = [['오늘 매출', won(rec.sales)], ['팁', won(rec.tips)], ['재료비', `- ${won(rec.cost)}`], ['오늘 번 돈', won(rec.net)], ['손님', `${rec.served}명`], ['기다리다 간 손님', `${rec.lost}명`], ['별 평균', rec.avg.toFixed(1)], ['평판', `${b.rep.toFixed(1)} (${rec.repDelta >= 0 ? '+' : ''}${rec.repDelta})`]];
-        rows.splice(1, 0, ['커피 외 판매', `디저트 ${rec.dessert}개 · 원두 ${rec.beans}봉지 · ${won(rec.sideSales)}`]);
+        if (B.isUnlocked(b, 'dessert') || B.isUnlocked(b, 'beans')) rows.splice(1, 0, ['커피 외 판매', `디저트 ${rec.dessert}개 · 원두 ${rec.beans}봉지 · ${won(rec.sideSales)}`]);
+        rows.push(['지금까지 모은 별', `${b.starsTotal}개`]);
         if (rec.wasted.coldbrew || rec.wasted.dessert) rows.push(['저녁에 버린 것', `콜드브루 ${rec.wasted.coldbrew}병 · 디저트 ${rec.wasted.dessert}개`]);
-        rows.push(['남은 원두', `${b.stock.beans}봉지`]);
+        if (B.isUnlocked(b, 'beans')) rows.push(['남은 원두', `${b.stock.beans}봉지`]);
         const left = DAYS_PER_SEASON - b.day;
         box.innerHTML = `<h2>${SEASON_NAME[b.season]} ${b.day}일차 마감</h2>
           <div class="sRows">${rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
           <div class="sMoney">가진 돈 <b>${won(b.money)}</b><small>${left ? `월세 ${won(RENT_PER_SEASON[env.S.choices.place])}까지 ${left}일 남았어요` : '오늘이 계절 결산이에요'}</small></div>
-          <h3>장비 들이기</h3>
-          <div class="sEquip">${Object.entries(EQUIP).map(([id, e]) => `<button data-buy="${id}"${b.equip[id] || b.money < e.price ? ' disabled' : ''}><b>${e.name}</b><span>${b.equip[id] ? '샀어요' : won(e.price)}</span><small>${e.text}</small></button>`).join('')}</div>
+          ${B.isUnlocked(b, 'equip') ? `<h3>장비 들이기</h3>
+          <div class="sEquip">${Object.entries(EQUIP).map(([id, e]) => `<button data-buy="${id}"${b.equip[id] || b.money < e.price ? ' disabled' : ''}><b>${e.name}${b.equipHint === id ? ' · 상담 추천' : ''}</b><span>${b.equip[id] ? '샀어요' : won(e.price)}</span><small>${e.text}</small></button>`).join('')}</div>` : ''}
           <button class="mainBtn sNext" id="settleNext">${left ? '다음 날' : '봄 결산 보기'}</button>`;
         box.querySelectorAll('[data-buy]').forEach((el) => { el.onclick = () => { if (B.buyEquip(b, el.dataset.buy)) { sfx.play('star'); env.save(); draw(); } }; });
         $('settleNext').onclick = () => { sfx.play('click'); box.classList.add('hide'); done(); };
@@ -298,12 +373,16 @@ export function createBusiness(env) {
       for (;;) {
         const b = biz();
         if (b.finished) { env.toTitle(); return; }
-        const err = await morning();
-        env.save();
-        await openShop(err);
-        const rec = closeUp();
-        env.save();
-        await settleScreen(rec);
+        if (b.fairTomorrow) await fairDay();
+        else {
+          const err = await morning();
+          env.save();
+          await openShop(err);
+          const rec = closeUp();
+          env.save();
+          await settleScreen(rec);
+          await runEvent('close');
+        }
         if (B.isSeasonEnd(b)) {
           const s = B.settleSeason(b, env.S.choices.place);
           b.finished = true; env.save();

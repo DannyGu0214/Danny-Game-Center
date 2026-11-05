@@ -73,6 +73,11 @@ export const PEOPLE = {
   heroF: { name: '나', skin: '#f3cfae', hair: '#33261f', style: 'bob', body: '#f2eee6', age: 35 },
   ownerM: { name: '사장님', skin: '#e3b48e', hair: '#c9c6c0', style: 'oldM', body: '#6d5a48', glasses: true, age: 65, mustache: true },
   ownerF: { name: '사장님', skin: '#ecc19c', hair: '#d6d2cb', style: 'oldF', body: '#7c5a55', glasses: true, age: 65 },
+  mom: { name: '엄마', age: 62 },
+  friend: { name: '수현', age: 35 },
+  baker: { name: '윤 사장님', age: 48 },
+  staff: { name: '서 매니저', age: 40 },
+  booth: { name: '부스 직원', noArt: true },
   junior: { name: '지수', skin: '#f1cdae', hair: '#1f1a1b', style: 'mid', body: '#34405a', age: 29, tired: true },
   // 오피스 손님
   kim: { name: '김 대리', skin: '#efc6a2', hair: '#221d1c', style: 'short', body: '#3f4b63', tie: '#8c3b3b', age: 31 },

@@ -40,11 +40,11 @@ export function customerCount(place, day, weather, rep) {
   const base = isWeekend(day) ? BASE_COUNT[place].end : BASE_COUNT[place].week;
   return Math.round(base * (WEATHER_FACTOR[weather] ?? 1) * (0.9 + rep * 0.04));
 }
-export function pickMenu(place, hour, weather, stock, rand = Math.random) {
+export function pickMenu(place, hour, weather, stock, rand = Math.random, unlocked = null) {
   const rainy = weather === 'rain' || weather === 'shower' || weather === 'snow';
   const table = place === 'office'
     ? { americano: 40, iced: rainy ? 8 : 20, latte: 26, espresso: 5, coldbrew: stock > 0 ? (rainy ? 6 : 12) : 0, drip: hour >= 14 && hour < 17 ? 8 : 0 }
-    : { americano: 30, latte: 34, drip: 12, origin: 6, espresso: 8, iced: rainy ? 2 : 8 };
+    : { americano: 30, latte: 34, drip: 12, origin: !unlocked || unlocked.origin ? 6 : 0, espresso: 8, iced: rainy ? 2 : 8 };
   let r = rand() * Object.values(table).reduce((a, b) => a + b, 0);
   for (const [k, v] of Object.entries(table)) { r -= v; if (r < 0) return k; }
   return 'americano';
@@ -84,7 +84,7 @@ export const isInstant = (menu) => menu === 'coldbrew';
 
 export function newBiz(rand = Math.random) {
   const season = 'spring';
-  return { season, day: 1, money: START_MONEY, rep: 2.5, equip: {}, friend: {}, visits: {}, stock: { coldbrew: 0, dessert: 0, beans: 0, beansQ: 0.7 }, weather: rollWeather(season, rand), history: [], finished: false };
+  return { season, day: 1, money: START_MONEY, rep: 2.5, equip: {}, friend: {}, visits: {}, stock: { coldbrew: 0, dessert: 0, beans: 0, beansQ: 0.7 }, weather: rollWeather(season, rand), history: [], finished: false, starsTotal: 0, unlocked: {}, seen: {}, snooze: {}, eventDay: 0, fairTomorrow: false, equipHint: null };
 }
 export function newDayStats() { return { served: 0, lost: 0, stars: 0, sales: 0, cost: 0, tips: 0, regulars: 0, dessert: 0, beans: 0, sideSales: 0, prep: 0 }; }
 // 내준 잔 하나를 장부에 적는다
@@ -129,6 +129,7 @@ export function closeDay(biz, stats) {
   const repDelta = stats.served ? clamp((avg - 1.5) * 0.16 - stats.lost * 0.025, -0.3, 0.3) : -0.1;
   const net = stats.sales + stats.tips - stats.cost;
   biz.money += net;
+  biz.starsTotal += stats.stars; // 해금 조건에 쓴다. 가게별로 센다
   biz.rep = clamp(biz.rep + repDelta, 0, 5);
   const record = { season: biz.season, day: biz.day, weather: biz.weather, ...stats, avg: +avg.toFixed(2), net, rep: +biz.rep.toFixed(2) };
   biz.history.push(record);
@@ -181,6 +182,25 @@ export function roastBatch(biz, temp) {
 }
 // 콜드브루와 디저트는 그날 저녁 버린다. 원두는 남겨 둔다
 export function endOfDayStock(biz) { const left = { coldbrew: biz.stock.coldbrew, dessert: biz.stock.dessert }; biz.stock.coldbrew = 0; biz.stock.dessert = 0; return left; }
+// ── 이벤트와 해금(DESIGN 5.9절) ──
+export const UNLOCKS = ['equip', 'dessert', 'beans', 'coldbrew', 'origin'];
+export const isUnlocked = (biz, id) => !!biz.unlocked[id];
+// 지금 나올 이벤트 하나. 하루에 하나까지이고, 목록 앞쪽이 먼저다
+export function eventDue(biz, events, phase) {
+  if (biz.eventDay === biz.day) return null;
+  return events.find((e) => {
+    if (e.phase !== phase || biz.seen[e.id]) return false;
+    if (e.minDay && biz.day < e.minDay) return false;
+    if (e.maxDay && biz.day > e.maxDay) return false;
+    if (e.minStars && biz.starsTotal < e.minStars) return false;
+    if (e.minRep && biz.rep < e.minRep) return false;
+    if (biz.snooze[e.id] && biz.day < biz.snooze[e.id]) return false;
+    if (e.after && !(biz.seen[e.after] && biz.day >= biz.seen[e.after] + (e.gap || 0))) return false;
+    return true;
+  }) || null;
+}
+export function markEvent(biz, id) { biz.seen[id] = biz.day; biz.eventDay = biz.day; }
+export function snoozeEvent(biz, id, days) { biz.snooze[id] = biz.day + days; biz.eventDay = biz.day; }
 export const friendLevel = (biz, id) => biz.friend[id] || 0;
 export function regularDone(biz, id, cup) {
   biz.visits[id] = (biz.visits[id] || 0) + 1;
@@ -198,6 +218,17 @@ export function normalizeBiz(raw) {
   if (raw.stock) for (const k of Object.keys(b.stock)) if (Number.isFinite(raw.stock[k])) b.stock[k] = raw.stock[k];
   b.history = Array.isArray(raw.history) ? raw.history.slice(-100) : [];
   b.finished = !!raw.finished;
+  if (raw.unlocked && typeof raw.unlocked === 'object') {
+    for (const k of ['unlocked', 'seen', 'snooze']) if (raw[k] && typeof raw[k] === 'object') b[k] = { ...raw[k] };
+    b.starsTotal = Number(raw.starsTotal) || 0;
+    b.eventDay = Number(raw.eventDay) || 0;
+    b.fairTomorrow = !!raw.fairTomorrow;
+    b.equipHint = EQUIP[raw.equipHint] ? raw.equipHint : null;
+  } else { // 해금이 생기기 전 저장: 이미 쓰던 것은 열어 두고, 그 장면은 건너뛴다
+    b.unlocked = Object.fromEntries(UNLOCKS.map((k) => [k, true]));
+    b.seen = { 'fair-news': 1, fair: 1, baker: 1 };
+    b.starsTotal = b.history.reduce((a, d) => a + (d.stars || 0), 0);
+  }
   return b;
 }
 

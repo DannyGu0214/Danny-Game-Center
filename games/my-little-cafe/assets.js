@@ -33,9 +33,11 @@ export function portraitOf(id, choices, mood = 'calm', look = '') {
     const o = `owner${choices.owner}`;
     return `${o}-${mood === 'surprised' ? 'surprised' : mood === 'scold' ? 'scold' : mood === 'sad' || mood === 'tired' ? 'sad' : 'smile'}`;
   }
+  if ((id === 'mom' || id === 'friend') && mood === 'sad') return `${id}-sad`;
   if (id === 'junior') return `junior-${mood === 'smile' || mood === 'closed' ? 'smile' : 'tired'}`;
   return `${id}-${mood === 'surprised' ? 'surprised' : 'smile'}`;
 }
+export const EVENT_ASSETS = ['bg-fair', 'mom-smile', 'mom-sad', 'friend-smile', 'friend-sad', 'baker-smile', 'baker-surprised', 'staff-smile', 'staff-surprised', 'junior-smile', 'junior-tired'];
 export function storyAssets(choices) {
   const { hero: h, owner: o, place } = choices;
   const names = ['st-bench', 'sp-grinder', 'sp-machine', 'sp-portafilter', 'sp-tamper', 'sp-kettle', 'sp-dripper', 'sp-roaster', 'sp-key', 'sp-cup', 'sp-pitcher', 'sp-latte-base', 'sp-latte-heart', 'sp-nozzle', 'sp-dripper-side', `room-${place}`];

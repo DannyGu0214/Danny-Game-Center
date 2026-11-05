@@ -100,6 +100,13 @@ export function drawBar(g, W, H, { place, weather, t, cafe, front, frontMood = '
   barScene(g, W, H, { place, weather, t, cafe, people: name ? [{ name, x: 0.5 }] : [] });
 }
 
+// 가게 밖 장면(박람회 등): 그림 한 장 위에 인물을 세운다
+export function drawScene(g, W, H, { bg, t, front, frontMood = 'calm', choices }) {
+  const im = img(bg);
+  if (im) cover(g, im, W, H); else { g.fillStyle = '#2a1b12'; g.fillRect(0, 0, W, H); }
+  if (front) drawBust(g, portraitOf(front, choices, frontMood), W / 2, H * 0.8, H * 0.47, t);
+}
+
 // ── 가게 앞 ────────────────────────────────
 const SIGN = { home: { x0: 0.14, x1: 0.91, y: 0.303 }, office: { x0: 0.14, x1: 0.78, y: 0.445 } };
 export function drawFront(g, W, H, { place, cafe, t, night = false, weather = 'sun' }) {

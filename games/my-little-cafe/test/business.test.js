@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as B from '../business.js';
 import { WEATHER_ODDS, DAY_SEC, RENT_PER_SEASON, MENUS, COST, DAYS_PER_SEASON, BIZ_REGULARS, EQUIP, PEOPLE } from '../data.js';
-import { REG_TALK, OWNER_VISIT } from '../story.js';
+import { REG_TALK, OWNER_VISIT, NOTES } from '../story.js';
+import { EVENTS, FAIR, textsOf } from '../events.js';
 
 const seeded = (s = 1) => () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 
@@ -211,4 +212,55 @@ test('가게 저장: 위치별로 따로이고, 이전 저장을 옮기고, 다�
   const m2 = B.migrateOldBiz({ ...base, biz: null }, known);
   assert.equal(m2.slot, null);
   assert.equal(B.migrateOldBiz(null, known), null);
+});
+
+test('이벤트: 조건이 맞을 때 하루 하나만 나오고, 본 건 다시 안 나와요', () => {
+  const b = B.newBiz(seeded(1));
+  assert.equal(B.eventDue(b, EVENTS, 'close'), null);
+  b.starsTotal = 100;
+  assert.equal(B.eventDue(b, EVENTS, 'close').id, 'fair-news');
+  B.snoozeEvent(b, 'fair-news', 3);
+  assert.equal(B.eventDue(b, EVENTS, 'close'), null); // 오늘은 이미 하나 나왔어요
+  b.day = 3; assert.equal(B.eventDue(b, EVENTS, 'close'), null); // 사흘 뒤에 다시 물어요
+  b.day = 4; assert.equal(B.eventDue(b, EVENTS, 'close').id, 'fair-news');
+  B.markEvent(b, 'fair-news');
+  b.day = 5; assert.equal(B.eventDue(b, EVENTS, 'morning').id, 'friend');
+  B.markEvent(b, 'friend'); assert.equal(B.eventDue(b, EVENTS, 'close'), null);
+  b.day = 20; b.starsTotal = 900; b.seen['fair-news'] = 0; delete b.seen['fair-news'];
+  assert.notEqual(B.eventDue(b, EVENTS, 'close')?.id, 'fair-news'); // 마지막 날엔 다음 날이 없어 박람회 소식이 안 나와요
+});
+test('이벤트: 디저트는 박람회 뒤, 별이 모여야 열려요', () => {
+  const b = B.newBiz(seeded(1)), baker = EVENTS.filter((e) => e.id === 'baker');
+  b.starsTotal = 999; b.day = 10;
+  assert.equal(B.eventDue(b, baker, 'close'), null);
+  b.seen.fair = 9; assert.equal(B.eventDue(b, baker, 'close'), null); // 이틀 뒤부터
+  b.day = 11; assert.equal(B.eventDue(b, baker, 'close').id, 'baker');
+  b.starsTotal = 249; assert.equal(B.eventDue(b, baker, 'close'), null);
+});
+test('해금: 새 가게는 잠겨 있고, 예전 저장은 열려 있어요', () => {
+  const b = B.newBiz(seeded(1)), st = B.newDayStats();
+  for (const k of B.UNLOCKS) assert.equal(B.isUnlocked(b, k), false);
+  st.served = 2; st.stars = 5; B.closeDay(b, st); assert.equal(b.starsTotal, 5);
+  const same = B.normalizeBiz(JSON.parse(JSON.stringify({ ...b, unlocked: { equip: true }, seen: { fair: 3 }, starsTotal: 7, fairTomorrow: true, equipHint: 'machine' })));
+  assert.deepEqual([same.unlocked, same.seen, same.starsTotal, same.fairTomorrow, same.equipHint], [{ equip: true }, { fair: 3 }, 7, true, 'machine']);
+  const old = B.normalizeBiz({ season: 'spring', day: 7, money: 1, rep: 3, weather: 'sun', history: [{ stars: 30 }, { stars: 12 }] });
+  for (const k of B.UNLOCKS) assert.equal(B.isUnlocked(old, k), true);
+  assert.equal(old.starsTotal, 42);
+  assert.equal(old.seen.baker, 1); // 옮긴 저장은 해금 장면을 건너뛰어요
+});
+test('해금: 잠기면 싱글오리진 주문이 안 들어와요', () => {
+  const rand = seeded(5);
+  for (let i = 0; i < 2000; i++) assert.notEqual(B.pickMenu('home', 11, 'sun', 0, rand, {}), 'origin');
+  const seen = new Set(); for (let i = 0; i < 2000; i++) seen.add(B.pickMenu('home', 11, 'sun', 0, rand, { origin: true }));
+  assert.ok(seen.has('origin'));
+});
+test('이벤트 대본: 말투, 등장인물, 노트, 장비가 맞아요', () => {
+  const all = [...EVENTS.flatMap((e) => (Array.isArray(e.script) ? e.script : Object.values(e.script).flat())), ...FAIR.open, ...FAIR.booths.flatMap((x) => x.script), ...FAIR.consult, ...FAIR.close];
+  const texts = [...textsOf(all), FAIR.question, FAIR.consultAsk, ...FAIR.needs.flatMap((n) => [n.label, n.reply])];
+  assert.ok(texts.length > 40);
+  for (const t of texts) assert.doesNotMatch(t, /(습니다|합니다|입니다|십시오|답니다)/, t);
+  const walk = (list) => { for (const s of list) { if (s.who && !['narr', 'sys', 'hero'].includes(s.who)) assert.ok(PEOPLE[s.who], s.who); if (s.note) assert.ok(NOTES[s.note], s.note); if (s.brew) { walk(s.good); walk(s.other); } if (s.options) s.options.forEach(([, l]) => walk(l)); } };
+  walk(all);
+  for (const n of FAIR.needs) assert.ok(EQUIP[n.equip], n.equip);
+  assert.ok(all.some((s) => s.unlock === 'equip') && all.some((s) => s.unlock === 'dessert'));
 });

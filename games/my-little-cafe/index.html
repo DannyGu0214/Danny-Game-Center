@@ -259,8 +259,8 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 import * as G from './logic.js';
 import { CAFE_NAMES, CAFE_NAME_MAX, PLACES, WEEKDAYS, MENUS, STEP_NAME, REGULARS, RUSH, HOME_PASS_STARS, PEOPLE, SEASON_NAME, BIZ_REGULARS } from './data.js';
 import { SCRIPT, NOTES, REACT, EXAM_TEXT, DAY_LABEL } from './story.js';
-import { drawBar, CUTS, drawTitleBg, personOf, lin } from './art.js';
-import { img, preload, portraitOf, storyAssets } from './assets.js';
+import { drawBar, drawScene, CUTS, drawTitleBg, personOf, lin } from './art.js';
+import { img, preload, portraitOf, storyAssets, EVENT_ASSETS } from './assets.js';
 import { runBrew, setInsets } from './stations.js';
 import { createFloor, spawn, stepFloor, sendOut, prefill, reserveSeat, FLOORS } from './floor.js';
 import { drawInside, drawOutside, randomLook } from './art-shop.js';
@@ -445,9 +445,9 @@ function openShop(mode = 'in') {
 
 function nameOf(who) { if (who === 'narr' || who === 'sys') return ''; if (who === 'hero') return '나'; if (who === 'owner') return '사장님'; return PEOPLE[who]?.name ?? ''; }
 function showLine(who, text) {
-  const box = $('dialog'), isPlain = who === 'narr' || who === 'sys';
-  box.className = isPlain ? `noavatar ${who}` : '';
-  if (!isPlain) drawAvatar(who);
+  const box = $('dialog'), isPlain = who === 'narr' || who === 'sys', noArt = !!PEOPLE[who]?.noArt;
+  box.className = isPlain ? `noavatar ${who}` : noArt ? 'noavatar' : '';
+  if (!isPlain && !noArt) drawAvatar(who);
   $('who').textContent = who === 'sys' ? '안내' : nameOf(who);
   const line = $('line'), chars = [...text];
   line.textContent = ''; $('more').classList.add('hide');
@@ -714,7 +714,9 @@ const bizEnv = {
   $, sfx, ticks, ui, brewCtx,
   get S() { return S; },
   setView: (f) => { view = f; }, setPointer: (p) => { pointer = p; }, setFade: (v) => { fade = v; },
-  setFront: (id) => { front = id; frontMood = 'calm'; }, barView: () => barView(),
+  setFront: (id, mood = 'calm') => { front = id; frontMood = mood; }, barView: () => barView(),
+  sceneView: (bg) => { view = (gx, w, h, t) => drawScene(gx, w, h, { bg, t, front, frontMood, choices: S.choices }); pointer = null; fade = 0.6; },
+  noteToast: (id) => { hideDialog(); return toast(`📖 커피 노트에 적었어요: ${NOTES[id].title}`); },
   personOf: (id) => personOf(id, S.choices), artWeather,
   startMusic, showLine, showResult,
   showDialog: () => $('dialog').classList.remove('hide'), hideDialog,
@@ -745,7 +747,7 @@ async function startBusiness(save0) {
   S.notes = save0.notes || [];
   if (save0.dial) S.dial = save0.dial;
   S.biz = save0.biz || B.newBiz();
-  await preload([...storyAssets(S.choices), ...Object.keys(BIZ_REGULARS[S.choices.place]).flatMap((id) => [`${id}-smile`, `${id}-surprised`])]);
+  await preload([...storyAssets(S.choices), ...EVENT_ASSETS, ...Object.keys(BIZ_REGULARS[S.choices.place]).flatMap((id) => [`${id}-smile`, `${id}-surprised`])]);
   $('title').classList.add('hide'); $('setup').classList.add('hide');
   business = createBusiness(bizEnv);
   bizEnv.save();
