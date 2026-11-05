@@ -38,7 +38,7 @@ export function portraitOf(id, choices, mood = 'calm', look = '') {
 }
 export function storyAssets(choices) {
   const { hero: h, owner: o, place } = choices;
-  const names = ['st-bench', 'sp-grinder', 'sp-machine', 'sp-portafilter', 'sp-tamper', 'sp-kettle', 'sp-dripper', 'sp-roaster', 'sp-key', 'sp-cup', 'sp-pitcher', 'sp-latte-base', 'sp-latte-heart', `room-${place}`];
+  const names = ['st-bench', 'sp-grinder', 'sp-machine', 'sp-portafilter', 'sp-tamper', 'sp-kettle', 'sp-dripper', 'sp-roaster', 'sp-key', 'sp-cup', 'sp-pitcher', 'sp-latte-base', 'sp-latte-heart', 'sp-nozzle', 'sp-dripper-side', `room-${place}`];
   for (const w of ['sun', 'cloud', 'rain']) names.push(`bar-${place}-${w}`);
   for (const f of ['day', 'night']) names.push(`front-${place}-${f}`);
   names.push('cut-night', 'cut-sketch', 'cut-notice');
