@@ -272,7 +272,7 @@ import { WEATHER_MUSIC } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search), DBG = q.has('dbg');
-const SAVE_KEY = 'mlc.save.v1', CLEAR_KEY = 'mlc.cleared', SOUND_KEY = 'mlc.sound';
+const SAVE_KEY = 'mlc.save.v1', CLEAR_KEY = 'mlc.cleared', SOUND_KEY = 'mlc.sound', TAMP_KEY = 'mlc.tamp';
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* 저장소를 못 쓰면 이번 판만 유지 */ } },
@@ -345,15 +345,16 @@ primary.addEventListener('pointerdown', (e) => {
 });
 const primRelease = () => {
   if (!primOpts) return;
-  if (primOpts.hold) { if (primary.classList.contains('held')) { primary.classList.remove('held'); primOpts.up?.(); } } else { sfx.play('click'); primOpts.tap?.(); }
+  if (primOpts.hold) { if (primary.classList.contains('held')) { primary.classList.remove('held'); primOpts.up?.(); } } else if (!primOpts.click) { sfx.play('click'); primOpts.tap?.(); }
 };
 primary.addEventListener('pointerup', primRelease);
+primary.addEventListener('click', () => { if (primOpts?.click) { sfx.play('click'); primOpts.tap?.(); } }); // 센서 허용처럼 진짜 클릭이 필요한 버튼
 primary.addEventListener('pointercancel', () => { if (primOpts?.hold && primary.classList.contains('held')) { primary.classList.remove('held'); primOpts.up?.(); } });
 
 // ── 게임 진행 ──
 let S = null, front = null, frontMood = 'calm', skipReq = false, lastCup = null;
 const AUTO = q.has('auto'); // 점검용: 대사와 제조를 자동으로 넘긴다
-const brewCtx = { ui, sfx, get S() { return S; }, auto: AUTO, fast: AUTO, setView: (f) => { view = f; }, setPointer: (p) => { pointer = p; } };
+const brewCtx = { ui, sfx, get S() { return S; }, auto: AUTO, fast: AUTO, setView: (f) => { view = f; }, setPointer: (p) => { pointer = p; }, tampMode: () => store.get(TAMP_KEY), setTampMode: (m) => store.set(TAMP_KEY, m) };
 const save = () => { if (S) store.set(SAVE_KEY, JSON.stringify(S)); };
 
 function barView() {

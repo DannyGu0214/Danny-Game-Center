@@ -42,6 +42,13 @@ export function scoreShot({ doseG, even, realT, yieldG }, target = 0) {
 export const realFromGame = (sec) => sec * REAL_PER_GAME;
 
 // ── 다지기 ─────────────────────────────────
+// 폰의 좌우 기울기(도). 오른쪽이 내려가면 +. 폰의 가로축이 수평에서 벗어난 각도라 폰을 세워 들어도 값이 튀지 않는다
+export function levelAngle(beta, gamma) {
+  const r = Math.PI / 180;
+  return Math.asin(clamp(Math.cos(beta * r) * Math.sin(gamma * r), -1, 1)) / r;
+}
+// 처음 누른 순간의 각도를 기준으로, 20도 기울이면 수평계 끝에 닿는다
+export const tiltFromAngle = (angle, base, range = 20) => clamp((angle - base) / range, -1, 1);
 // 기울기 표본의 평균으로 균일도(0~1)
 export function tampEvenness(tilts) {
   if (!tilts.length) return 0.5;

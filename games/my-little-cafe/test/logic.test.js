@@ -78,6 +78,11 @@ test('보통 손놀림이면 별 3개가 드물어요: 무작위 오차로 2000�
 test('다지기: 수평이면 균일도가 높고 비뚤면 낮아요', () => {
   assert.ok(G.tampEvenness([0, 0.02, -0.03]) > 0.9);
   assert.ok(G.tampEvenness([0.6, 0.7, -0.6]) === 0);
+  assert.ok(Math.abs(G.levelAngle(0, 10) - 10) < 1e-9); // 폰을 눕히면 좌우 기울기 그대로예요
+  assert.ok(G.levelAngle(0, -10) < 0);
+  assert.ok(Math.abs(G.levelAngle(89, 89) - G.levelAngle(91, -89)) < 1e-6); // 폰을 세워도 값이 튀지 않아요
+  assert.equal(G.tiltFromAngle(15, 5), 0.5);
+  assert.equal(G.tiltFromAngle(90, 0), 1);
   assert.equal(G.tampEvenness([0.1, -0.08, 0.05]), 1); // 수평 칸 안쪽에서 조금 흔들리는 건 괜찮아요
   assert.ok(G.channelFlowBoost(0.2) > G.channelFlowBoost(0.9));
 });

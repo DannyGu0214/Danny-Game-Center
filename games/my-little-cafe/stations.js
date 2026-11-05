@@ -3,6 +3,7 @@ import * as G from './logic.js';
 import { ESPRESSO, DRIP, MILK, AMERICANO, MENUS, STEP_NAME, GRIND, REAL_PER_GAME, TASTE_GOOD, TASTE_OK } from './data.js';
 import { rr, circle, lin, rad, font, TAU } from './art.js';
 import { img } from './assets.js';
+import { tiltAvailable, tiltNeedsAsk, tiltListen, tiltStop, tiltAsk, tiltWait, tiltAngle } from './tilt.js';
 
 let TOP = 128; // 위쪽 단계 표시와 안내 자리
 let COUNTER = 176; // 카운터 윗면이 화면 아래에서 떨어진 거리(게이지 2줄 + 버튼 자리)
@@ -245,18 +246,63 @@ async function stepDose(ctx, st, beat) {
 }
 
 // ── 3. 다지기 ──
+const TILT_HINT = '화면을 꾹 누른 채 폰을 좌우로 기울여 수평을 맞춰요. 힘이 초록 칸에 들면 손을 떼요.';
+// 폰 기울이기와 손가락 중 무엇으로 할지 정한다. 안 되는 기기는 손가락으로 돌아간다
+async function tampInput(ctx) {
+  const { ui } = ctx;
+  if (!tiltAvailable()) return 'finger';
+  const saved = ctx.tampMode();
+  if (saved === 'finger') return 'finger';
+  if (saved === 'tilt') {
+    tiltListen();
+    if (await tiltWait(500)) return 'tilt';
+    if (!tiltNeedsAsk()) { tiltStop(); return 'finger'; }
+  }
+  ui.hint(saved ? '폰 기울이기를 다시 켜 주세요. 손가락으로 해도 돼요.' : '이번엔 폰을 직접 기울여서 수평을 맞춰 볼까요? 손가락으로 해도 돼요.');
+  const pick = await new Promise((res) => {
+    ui.primary('폰 기울이기', { click: true, tap: () => res(tiltAsk()) }); // 허용 창 때문에 눌린 그 자리에서 부른다
+    ui.secondary('손가락으로', () => res('finger'));
+  });
+  ui.clearActions();
+  if (pick === 'finger') { ctx.setTampMode('finger'); tiltStop(); return 'finger'; }
+  if (pick && await tiltWait(1500)) { ctx.setTampMode('tilt'); return 'tilt'; }
+  ctx.setTampMode('finger'); tiltStop();
+  return 'failed';
+}
+
 async function stepTamp(ctx, st, beat) {
   const { ui, sfx } = ctx;
   let down = false, press = 0, startX = 0, fingerX = 0, tilt = 0, phase = Math.random() * 6, samples = [], kicked = 0;
+  let mode = null, base = 0, hand = 0, chipArmed = false, chipBusy = false;
   const easy = ctx.S.day <= 1 ? 0.3 : 0.5;
-  ui.hint(beat.tips?.tamp || '꾹 누른 채 좌우로 움직여 수평을 맞춰요. 힘이 초록 칸에 들면 손을 떼요.');
+  const fingerHint = beat.tips?.tamp || '꾹 누른 채 좌우로 움직여 수평을 맞춰요. 힘이 초록 칸에 들면 손을 떼요.';
+  const setMode = (m) => {
+    mode = m === 'tilt' ? 'tilt' : 'finger';
+    ui.hint(m === 'tilt' ? TILT_HINT : m === 'failed' ? `폰 기울이기를 못 켜서 손가락으로 해요. ${fingerHint}` : fingerHint);
+  };
+  // 누르기 전에는 조작 방식을 바꿀 수 있다
+  const chipBox = (W, cy0) => ({ w: 176, h: 30, x: W / 2 - 88, y: cy0 + 64 });
+  const onChip = (x, y, W, H) => { if (!tiltAvailable() || mode == null || press > 0) return false; const c = chipBox(W, H - COUNTER); return x >= c.x - 6 && x <= c.x + c.w + 6 && y >= c.y - 6 && y <= c.y + c.h + 6; };
+  const switchMode = async () => {
+    if (chipBusy) return;
+    if (mode === 'tilt') { ctx.setTampMode('finger'); tiltStop(); setMode('finger'); return; }
+    chipBusy = true;
+    const ok = await tiltAsk() && await tiltWait(1500);
+    chipBusy = false;
+    if (ok) { ctx.setTampMode('tilt'); setMode('tilt'); } else { tiltStop(); setMode('failed'); }
+  };
+  ui.hint(fingerHint);
   return new Promise((done) => {
     ctx.setView((g, W, H, t, dt) => {
       const cy0 = bench(g, W, H), cx = W / 2, w = Math.min(W * 0.25, 92), baseY = cy0 - w * 1.38, topArea = TOP + 18;
       if (down) {
         press = Math.min(1.1, press + dt * 0.28); // 초록 칸까지 약 2초, 지나치기까지 약 3초: 수평을 잡을 시간을 준다
         phase += dt * 1.25;
-        tilt = Math.sin(phase) * easy + Math.sin(phase * 2.3) * easy * 0.45 + (fingerX - startX) / W * 3;
+        const wobble = Math.sin(phase) * easy + Math.sin(phase * 2.3) * easy * 0.45;
+        if (mode === 'tilt') { // 손 떨림이 더해지니 흔들림을 조금 줄인다. 가만히 들고만 있어선 만점이 안 나온다
+          hand += (G.tiltFromAngle(tiltAngle() ?? base, base) - hand) * Math.min(1, dt * 14);
+          tilt = wobble * 0.85 + hand;
+        } else tilt = wobble + (fingerX - startX) / W * 3;
         tilt = Math.max(-1, Math.min(1, tilt));
         samples.push(tilt);
       } else if (press > 0 && !kicked) tilt *= 0.9;
@@ -276,27 +322,41 @@ async function stepTamp(ctx, st, beat) {
       g.fillStyle = rad(g, bx - 3, ly + lh / 2 - 3, 1, 14, [[0, '#ffffff'], [1, '#d9eee0']]); circle(g, bx, ly + lh / 2, 12); g.fill();
       g.fillStyle = '#efe3cf'; g.font = font(12, 700); g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText(green ? '수평이에요!' : tilt < 0 ? '← 왼쪽으로 기울었어요' : '오른쪽으로 기울었어요 →', cx, ly + lh + 18);
       gauge(g, 24, cy0 + 40, W - 48, { val: press, max: 1.1, lo: 0.55, hi: 0.85, label: '누르는 힘', text: press < 0.55 ? (press ? '더요' : '') : press <= 0.85 ? '좋아요!' : '너무 세요' });
-      // 아래 조작 안내: 화면 어디를 눌러도 되지만, 여기를 보며 좌우로 움직이게 한다
+      if (mode == null) return; // 조작 방식을 고르는 동안은 아래 칸에 버튼이 있다
+      if (tiltAvailable() && press === 0) { // 조작 방식 바꾸기
+        const c = chipBox(W, cy0);
+        g.fillStyle = 'rgba(28,17,11,.78)'; rr(g, c.x, c.y, c.w, c.h, 15); g.fill();
+        g.strokeStyle = 'rgba(241,218,178,.45)'; g.lineWidth = 1; rr(g, c.x, c.y, c.w, c.h, 15); g.stroke();
+        g.fillStyle = '#efe3cf'; g.font = font(12, 700); g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(mode === 'tilt' ? '손가락으로 바꾸기' : '폰 기울이기로 바꾸기', cx, c.y + c.h / 2 + 1);
+      }
+      // 아래 조작 안내: 화면 어디를 눌러도 되지만, 여기를 보며 움직이게 한다
       const padH = 62, padY = H - padH - 12 - (COUNTER - 176), padX = 12, padW = W - 24; // 아래 막대가 있는 폰이면 그만큼 올린다
       g.fillStyle = 'rgba(28,17,11,.88)'; rr(g, padX, padY, padW, padH, 16); g.fill();
       g.strokeStyle = down ? '#f0bf68' : 'rgba(241,218,178,.35)'; g.lineWidth = 2; rr(g, padX, padY, padW, padH, 16); g.stroke();
       g.fillStyle = 'rgba(241,218,178,.7)'; g.font = font(18, 800); g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillText('◀', padX + 24, padY + padH / 2); g.fillText('▶', padX + padW - 24, padY + padH / 2);
-      const off = down ? Math.max(-padW / 2 + 70, Math.min(padW / 2 - 70, fingerX - startX)) : 0;
-      if (!down) { g.fillStyle = '#efe3cf'; g.font = font(14, 700); g.fillText(press === 0 ? '꾹 누른 채 좌우로' : '다시 꾹 눌러요', cx, padY + padH / 2 + (press === 0 ? Math.sin(t * 4) * 1.5 : 0)); } else {
+      const reach = padW / 2 - 70, off = !down ? 0 : mode === 'tilt' ? tilt * reach : Math.max(-reach, Math.min(reach, fingerX - startX));
+      if (!down) { g.fillStyle = '#efe3cf'; g.font = font(14, 700); g.fillText(press > 0 ? '다시 꾹 눌러요' : mode === 'tilt' ? '꾹 누른 채 폰을 기울여요' : '꾹 누른 채 좌우로', cx, padY + padH / 2 + (press === 0 ? Math.sin(t * 4) * 1.5 : 0)); } else {
         g.fillStyle = '#f0bf68'; rr(g, cx + off - 34, padY + 9, 68, padH - 18, 12); g.fill();
-        g.fillStyle = '#2a1b10'; g.font = font(13, 800); g.fillText('좌우로', cx + off, padY + padH / 2);
+        g.fillStyle = '#2a1b10'; g.font = font(13, 800); g.fillText(mode === 'tilt' ? '기울이기' : '좌우로', cx + off, padY + padH / 2);
       }
     });
     const finish = () => {
       const even = G.tampEvenness(samples) - (press > 0.95 ? 0.08 : 0);
       sfx.play('thud');
+      tiltStop();
       done(Math.max(0, even));
     };
     ctx.setPointer({
-      down: (x) => { down = true; startX = x; fingerX = x; sfx.play('clunk'); },
+      down: (x, y, W, H) => {
+        if (mode == null) return;
+        if (onChip(x, y, W, H)) { chipArmed = true; return; }
+        down = true; startX = x; fingerX = x; base = tiltAngle() ?? 0; hand = 0; sfx.play('clunk');
+      },
       move: (x) => { if (down) fingerX = x; },
       up: () => {
+        if (chipArmed) { chipArmed = false; switchMode(); return; } // 손을 뗀 순간이어야 허용 창이 뜬다
         if (!down) return;
         down = false;
         if (press < 0.4) { ui.hint('조금 더 오래 꾹 눌러요. 초록 칸까지요.'); press = 0; samples = []; tilt = 0; return; }
@@ -304,7 +364,8 @@ async function stepTamp(ctx, st, beat) {
       },
     });
     ui.clearActions();
-    if (ctx.auto) { samples = [0]; press = 0.7; down = false; finish(); }
+    if (ctx.auto) { samples = [0]; press = 0.7; down = false; finish(); return; }
+    tampInput(ctx).then((m) => { ui.clearActions(); setMode(m); });
   });
 }
 
