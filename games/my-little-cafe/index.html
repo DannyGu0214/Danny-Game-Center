@@ -125,7 +125,8 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .pick2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .pick { display: block; width: 100%; padding: 10px; border-radius: 15px; background: #35241a; border: 2px solid transparent; text-align: center; }
 .pick.on { border-color: var(--on); background: #47301f; }
-.pick canvas { display: block; width: 100%; border-radius: 10px; }
+.pick img { display: block; width: 100%; border-radius: 10px; background: linear-gradient(#7c5d45, #54392a); }
+.pickWide img { height: 150px; object-fit: cover; object-position: center top; }
 .pick b { display: block; margin-top: 7px; font-size: 16px; }
 .pick small { display: block; margin-top: 2px; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
 .pickWide { display: grid; grid-template-columns: 124px 1fr; gap: 11px; text-align: left; align-items: center; margin-bottom: 10px; }
@@ -247,9 +248,10 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 
 <script type="module">
 import * as G from './logic.js';
-import { CAFE_NAMES, CAFE_NAME_MAX, PLACES, WEEKDAYS, MENUS, STEP_NAME, REGULARS, RUSH, HOME_PASS_STARS, PEOPLE, SEASON_NAME } from './data.js';
+import { CAFE_NAMES, CAFE_NAME_MAX, PLACES, WEEKDAYS, MENUS, STEP_NAME, REGULARS, RUSH, HOME_PASS_STARS, PEOPLE, SEASON_NAME, BIZ_REGULARS } from './data.js';
 import { SCRIPT, NOTES, REACT, EXAM_TEXT, DAY_LABEL } from './story.js';
-import { drawBar, drawPerson, CUTS, drawTitleBg, shopFront, personOf, lin } from './art.js';
+import { drawBar, CUTS, drawTitleBg, personOf, lin } from './art.js';
+import { img, preload, portraitOf, storyAssets } from './assets.js';
 import { runBrew, setInsets } from './stations.js';
 import { createFloor, spawn, stepFloor, sendOut, prefill, reserveSeat, FLOORS } from './floor.js';
 import { drawInside, drawOutside, randomLook } from './art-shop.js';
@@ -347,8 +349,7 @@ const save = () => { if (S) store.set(SAVE_KEY, JSON.stringify(S)); };
 
 function barView() {
   view = (gx, w, h, t) => {
-    const p = front === 'owner' || !front ? personOf('owner', S.choices) : personOf(front, S.choices);
-    drawBar(gx, w, h, { place: S.choices.place, weather: artWeather(), t, cafe: S.choices.cafe, front: p, frontMood, frontOpts: { apron: front === 'owner' || !front }, counterY: h * 0.56 });
+    drawBar(gx, w, h, { place: S.choices.place, weather: artWeather(), t, cafe: S.choices.cafe, front: front || 'owner', frontMood, choices: S.choices });
   };
   pointer = null;
 }
@@ -362,8 +363,9 @@ function drawAvatar(who) {
   const a = $('avatar'), c = a.getContext('2d');
   c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 124, 124);
   c.fillStyle = lin(c, 0, 0, 0, 124, [[0, '#7c5d45'], [1, '#54392a']]); c.fillRect(0, 0, 124, 124);
-  const p = personOf(who, S.choices);
-  drawPerson(c, p, 62, 150, 34, { mood: who === 'hero' ? 'calm' : 'smile', apron: who === 'owner' || (who === 'hero' && S.day >= 1), suit: who === 'hero' && S.day === 0, t: 0 });
+  const look = who === 'hero' && S.day === 0 ? (S.choices.place === 'office' ? 'suit' : 'casual') : '';
+  const im = img(portraitOf(who, S.choices, who === 'owner' ? 'smile' : 'calm', look));
+  if (im) { const size = im.width * 0.72; c.drawImage(im, (im.width - size) / 2, im.height * 0.03, size, size, 0, 0, 124, 124); } // 얼굴 쪽만 잘라 쓴다
 }
 // ── 가게 외관·점내 장면 ──
 let floor = null, ownerSeat = null;
@@ -382,7 +384,7 @@ function insideView() {
   if (S.day === 5 && !ownerSeat) ownerSeat = reserveSeat(F, F.taken.findIndex((v) => v === null));
   view = (gx, w, h, t, dt) => {
     stepFloor(F, dt, Math.random, () => randomLook(F.place));
-    drawInside(gx, w, h, { place: S.choices.place, cafe: S.choices.cafe, F, t, weather: artWeather(), staff: staffOf(), ownerSit: S.day === 5 && ownerSeat ? { seat: ownerSeat, person: personOf('owner', S.choices) } : null });
+    drawInside(gx, w, h, { place: S.choices.place, cafe: S.choices.cafe, F, t, staff: staffOf(), ownerSit: S.day === 5 && ownerSeat ? { seat: ownerSeat, person: personOf('owner', S.choices) } : null });
   };
   pointer = null;
 }
@@ -664,6 +666,7 @@ function restoreFront() {
 }
 async function play() {
   $('title').classList.add('hide'); $('setup').classList.add('hide');
+  await preload(storyAssets(S.choices));
   restoreFront(); barView(); setHud();
   startMusic();
   for (;;) {
@@ -723,6 +726,7 @@ async function startBusiness(save0) {
   S.notes = save0.notes || [];
   if (save0.dial) S.dial = save0.dial;
   S.biz = save0.biz || B.newBiz();
+  await preload([...storyAssets(S.choices), ...Object.keys(BIZ_REGULARS[S.choices.place]).flatMap((id) => [`${id}-smile`, `${id}-surprised`])]);
   $('title').classList.add('hide'); $('setup').classList.add('hide');
   business = createBusiness(bizEnv);
   bizEnv.save();
@@ -757,6 +761,7 @@ $('btnMenu').onclick = async () => {
 
 // ── 타이틀 ──
 function showTitle() {
+  preload(['front-home-night']);
   view = (gx, w, h, t) => drawTitleBg(gx, w, h, t);
   pointer = null; tapHandler = null;
   const box = $('titleBtns'), saved = loadSave(), cleared = store.get(CLEAR_KEY) === '1';
@@ -782,18 +787,9 @@ const SETUP = [
   { key: 'cafe', title: '카페 이름', sub: '하나 고르거나 직접 지어요.' },
 ];
 let setupStep = 0;
-function portrait(id, opts) {
-  const c = document.createElement('canvas'); c.width = 320; c.height = 340;
-  const x = c.getContext('2d');
-  x.fillStyle = lin(x, 0, 0, 0, 340, [[0, '#7c5d45'], [1, '#54392a']]); x.fillRect(0, 0, 320, 340);
-  drawPerson(x, PEOPLE[id], 160, 345, 72, opts);
-  return c;
-}
-function shopThumb(place) {
-  const c = document.createElement('canvas'), w = 124, h = 150; c.width = w * 2; c.height = h * 2;
-  const x = c.getContext('2d'); x.scale(2, 2);
-  shopFront(x, w, h, { place, cafe: '', t: 1 });
-  return c;
+function picture(name) {
+  const im = document.createElement('img'); im.src = `assets/${name}.webp`; im.alt = '';
+  return im;
 }
 function renderSetup() {
   const s = SETUP[setupStep], body = $('setupBody');
@@ -806,10 +802,9 @@ function renderSetup() {
   const select = (v) => { CH[s.key] = v; sfx.play('click'); renderSetup(); };
   if (s.key === 'hero' || s.key === 'owner') {
     const wrap = document.createElement('div'); wrap.className = 'pick2';
-    const base = s.key === 'hero' ? 'hero' : 'owner', opts = s.key === 'hero' ? { mood: 'calm', suit: true, badge: true } : { mood: 'smile', apron: true };
     for (const [v, label] of [['M', '남자'], ['F', '여자']]) {
       const b = document.createElement('button'); b.className = `pick${CH[s.key] === v ? ' on' : ''}`;
-      b.append(portrait(`${base}${v}`, opts));
+      b.append(picture(s.key === 'hero' ? `hero${v}-suit` : `owner${v}-smile`));
       const t = document.createElement('b'); t.textContent = label; b.append(t);
       const sm = document.createElement('small'); sm.textContent = s.key === 'hero' ? '30대 중반' : '60대 중반 · 경력 30년'; b.append(sm);
       b.onclick = () => select(v);
@@ -819,7 +814,7 @@ function renderSetup() {
   } else if (s.key === 'place') {
     for (const v of ['office', 'home']) {
       const b = document.createElement('button'); b.className = `pick pickWide${CH.place === v ? ' on' : ''}`;
-      b.append(shopThumb(v));
+      b.append(picture(`front-${v}-day`));
       const d = document.createElement('div'); d.innerHTML = `<b>${PLACES[v].name}</b><small>${PLACES[v].sub}</small><small style="color:var(--on);margin-top:5px">${PLACES[v].fun}</small>`;
       b.append(d);
       b.onclick = () => select(v);

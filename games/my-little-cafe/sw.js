@@ -1,6 +1,6 @@
 // 오프라인 실행용 서비스 워커(Sailing Master와 같은 방식). 게임 파일은 네트워크 우선 + 브라우저 캐시 건너뛰기, 안 되면 캐시로.
 const CACHE = 'my-little-cafe-v1';
-const CORE = ['./', 'index.html', 'logic.js', 'data.js', 'story.js', 'floor.js', 'business.js', 'main-mode.js', 'art.js', 'art-shop.js', 'stations.js', 'music.js', 'sound.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+const CORE = ['./', 'index.html', 'logic.js', 'data.js', 'story.js', 'floor.js', 'business.js', 'main-mode.js', 'assets.js', 'art.js', 'art-shop.js', 'stations.js', 'music.js', 'sound.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const NET_TIMEOUT_MS = 4000; // 신호가 약하면 기다리지 않고 캐시로
 
 self.addEventListener('install', (e) => {

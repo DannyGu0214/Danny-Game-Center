@@ -115,7 +115,7 @@ export function createBusiness(env) {
     const d = day; // 마감 뒤 다음 프레임이 와도 오늘 상태로 그린다
     env.setView((g, W, H, t) => {
       const F = d.F;
-      drawInside(g, W, H - PANEL, { place: d.place, cafe: env.S.choices.cafe, F, t, weather: env.artWeather(), staff: [{ person: env.personOf('hero') }] });
+      drawInside(g, W, H - PANEL, { place: d.place, cafe: env.S.choices.cafe, F, t, staff: [{ person: env.personOf('hero') }] });
     });
     env.setPointer(null);
   }
