@@ -86,7 +86,7 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .mainBtn { background: var(--on); color: var(--onInk); }
 .subBtn { background: rgba(255,255,255,.1); }
 
-#toast { position: absolute; left: 50%; top: calc(54px + var(--safe-t)); transform: translateX(-50%); z-index: 9; padding: 8px 14px; border-radius: 14px; background: rgba(63,102,87,.97); font-size: 13.5px; font-weight: 700; white-space: nowrap; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#toast { position: absolute; left: 50%; top: calc(150px + var(--safe-t)); max-width: calc(100% - 20px); transform: translateX(-50%); z-index: 9; padding: 8px 14px; border-radius: 14px; background: rgba(63,102,87,.97); font-size: 13.5px; font-weight: 700; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; }
 #toast.on { opacity: 1; }
 
 #sheet { position: absolute; inset: 0; z-index: 12; background: rgba(12,7,4,.72); display: flex; align-items: flex-end; }

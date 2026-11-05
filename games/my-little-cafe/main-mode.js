@@ -69,14 +69,17 @@ export function createBusiness(env) {
   });
   function act(t, what) {
     if (t.state !== 'wait') return; // 이미 만들거나 대화 중인 주문은 다시 시작하지 않는다
-    if (what === 'auto') { t.state = 'auto'; t.total = AUTO_SEC[t.menu] ?? 9; t.left = t.total; sfx.play('clunk'); day.sig = ''; } else if (what === 'instant') finishCup(t, { menu: t.menu, stars: 2, band: 'good', taste: 0, auto: true }); else if (what === 'hand') makeByHand(t); else if (what === 'talk') talkTo(t);
+    if (what === 'auto') {
+      if (machineBusy() >= machineCap()) return; // 화면이 갱신되기 전에 연달아 눌러도 머신 수를 넘지 않는다
+      t.state = 'auto'; t.total = AUTO_SEC[t.menu] ?? 9; t.left = t.total; sfx.play('clunk'); day.sig = null; renderTickets();
+    } else if (what === 'instant') finishCup(t, { menu: t.menu, stars: 2, band: 'good', taste: 0, auto: true }); else if (what === 'hand') makeByHand(t); else if (what === 'talk') talkTo(t);
   }
 
   function finishCup(t, cup) {
     const st = cup.stars ?? G.starsOf(cup.score, cup.band), waited = t.maxPatience - t.patience;
     const { price, tip } = B.sellCup(biz(), day.stats, { menu: cup.menu, stars: st, waited, place: day.place });
     if (cup.menu === 'coldbrew') biz().stock.coldbrew = Math.max(0, biz().stock.coldbrew - 1);
-    day.tickets = day.tickets.filter((x) => x !== t); day.sig = '';
+    day.tickets = day.tickets.filter((x) => x !== t); day.sig = null;
     if (day.F.people.includes(t.p)) serve(day.F, t.p, Math.random);
     sfx.play(st >= 2 ? 'cup' : 'bad');
     const sold = B.sellSide(biz(), day.stats, { place: day.place, rep: biz().rep, stars: st, hour: B.hourOf(day.clock), weekend: B.isWeekend(biz().day), weather: biz().weather, friend: t.regular ? B.friendLevel(biz(), t.regular) : 0 });
@@ -87,7 +90,7 @@ export function createBusiness(env) {
 
   // 일반 손님 직접 만들기: 시간은 계속 흐른다. 이 손님은 만드는 동안 기다려 준다
   async function makeByHand(t) {
-    t.state = 'hand'; day.busy = true; day.sig = '';
+    t.state = 'hand'; day.busy = true; day.sig = null;
     $('tickets').classList.add('hide');
     let steps = MENUS[t.menu].steps.filter((s) => s !== 'grind' || t.menu === 'drip' || t.menu === 'origin');
     if (biz().equip.grinder) steps = steps.filter((s) => s !== 'dose');
@@ -106,7 +109,7 @@ export function createBusiness(env) {
     day.busy = false;
     mainView();
     $('tickets').classList.remove('hide');
-    day.sig = ''; renderTickets();
+    day.sig = null; renderTickets();
   }
   function mainView() {
     const d = day; // 마감 뒤 다음 프레임이 와도 오늘 상태로 그린다
@@ -148,7 +151,7 @@ export function createBusiness(env) {
   function addTicket(p, menu, kind, regular = null) {
     const P = regular ? 1e6 : PATIENCE[day.place];
     day.tickets.push({ id: day.nextId++, p, menu, kind, regular, state: 'wait', patience: P, maxPatience: P, left: 0, total: 1 });
-    day.sig = '';
+    day.sig = null;
     sfx.play('bell');
   }
   function tick(dt) {
@@ -175,7 +178,7 @@ export function createBusiness(env) {
         } else if (t.state === 'wait' && !t.regular) {
           t.patience -= dt;
           if (t.patience <= 0) {
-            d.tickets = d.tickets.filter((x) => x !== t); d.sig = '';
+            d.tickets = d.tickets.filter((x) => x !== t); d.sig = null;
             d.stats.lost += 1; d.F.lost += 1;
             if (d.F.people.includes(t.p)) { t.p.hold = false; sendOut(d.F, t.p); }
             sfx.play('bad'); env.flash('손님이 기다리다 그냥 갔어요');
@@ -234,7 +237,7 @@ export function createBusiness(env) {
     const F = createFloor(place); F.auto = false;
     prefill(F, place === 'home' ? 3 : 1, Math.random, () => randomLook(place));
     day = {
-      place, F, err, clock: 0, clockOn: true, busy: false, tickets: [], pending: [], nextId: 1, sig: '', stats: B.newDayStats(),
+      place, F, err, clock: 0, clockOn: true, busy: false, tickets: [], pending: [], nextId: 1, sig: null, stats: B.newDayStats(),
       arrivals: B.planDay(place, b.day, b.weather, b.rep), regs: B.regularsOfDay(place, b.day).sort((a, x) => a.at - x.at), resolve: null,
     };
     mainView();
