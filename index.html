@@ -30,6 +30,7 @@
   .os ol b, .os p b { color: var(--text); }
   .os .alt { margin-top: 8px; font-size: 13px; }
   .hint { font-size: 12px; }
+  .notice { padding: 12px 14px; border: 1px solid var(--amber); border-radius: 14px; background: rgba(242, 169, 59, .08); color: var(--text); font-size: 14px; line-height: 1.6; } /* 첫 실행 안내 */
   @media (max-width: 350px) { a.game { grid-template-columns: 56px 1fr; gap: 12px; } a.game img { width: 56px; height: 56px; border-radius: 13px; } a.game .one { font-size: 12.5px; } } /* 아주 좁은 휴대폰에서도 한 줄 소개가 한 줄에 */
 </style>
 </head>
@@ -37,6 +38,7 @@
 <main>
   <h1>Danny Game Center</h1>
   <p>by Danny Soft</p>
+  <p class="notice">ℹ️ 처음 게임을 실행하면 자동으로 다운로드가 진행돼서 시간이 조금 걸려요.</p>
   <a class="game" href="games/zombie-outpost/">
     <img src="games/zombie-outpost/icons/icon-192.png" alt="">
     <span><b>Zombie Outpost</b><span class="one">마지막 불빛을 지키는 좀비 서바이벌</span></span>
