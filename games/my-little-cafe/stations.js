@@ -775,7 +775,7 @@ async function stepBloom(ctx, st, beat) {
     ctx.setView((g, W, H, t, dt) => {
       const cy0 = bench(g, W, H), { cx, cy, R } = dripLayout(W, H);
       if (phase === 'pour') {
-        if (finger && d.poured < 110) { G.dripStep(d, { x: (finger.x - cx) / R, y: (finger.y - cy) / R }, dt); idle = 0; sfx.loop('pour', 0.7); } else { sfx.loop('pour', 0); if (d.poured > 8) idle += dt; G.dripStep(d, null, dt); }
+        if (finger && d.poured < 110) { G.dripStep(d, { x: (finger.x - cx) / R, y: (finger.y - cy) / R }, dt); idle = 0; sfx.loop('trickle', 0.7); } else { sfx.loop('trickle', 0); if (d.poured > 8) idle += dt; G.dripStep(d, null, dt); }
         // 초록 칸 전에 손을 잠깐 떼도 바로 끝나지 않게 더 기다려 준다
         if (d.poured > 8 && idle > (d.poured >= DRIP.bloomWater - DRIP.bloomOk ? 0.7 : 2.5)) { phase = 'wait'; sfx.stopLoops(); ui.hint('기다려요. 가루가 빵처럼 부풀어 올라요.'); }
       } else if (phase === 'wait') {
@@ -815,9 +815,9 @@ async function stepPour(ctx, st, beat) {
       if (!finished) {
         if (finger) {
           G.dripStep(d, { x: (finger.x - cx) / R, y: (finger.y - cy) / R }, dt);
-          sfx.loop('pour', 1);
+          sfx.loop('trickle', 1);
           if (Math.random() < dt * 28) fx.add({ x: finger.x, y: finger.y, vx: (Math.random() - 0.5) * 34, vy: (Math.random() - 0.5) * 34, life: 0.3, fade: 0.2, r: 2 + Math.random() * 2, c: 'rgba(235,204,160,.8)' });
-        } else { sfx.loop('pour', 0); G.dripStep(d, null, dt); }
+        } else { sfx.loop('trickle', 0); G.dripStep(d, null, dt); }
         if (d.poured >= 200) ui.secondary('그만 붓기', stopPour);
         if (d.poured >= 370) stopPour();
       } else if (!drained) {

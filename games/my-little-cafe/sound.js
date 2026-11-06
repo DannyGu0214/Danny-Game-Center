@@ -18,6 +18,8 @@ const LOOPS = {
   steam: { type: 'highpass', f: 2600, q: 0.8, peak: 0.28, rate: 1.2 },
   whirl: { type: 'lowpass', f: 480, q: 1.2, peak: 0.3, rate: 0.7 },
   rain: { type: 'bandpass', f: 2200, q: 0.5, peak: 0.1, rate: 1 },
+  // 핸드드립 주전자 물줄기: 낮게 깔린 물소리에 작은 방울 소리를 얹는다. 원래 거의 안 나는 소리라 작게 둔다
+  trickle: { type: 'lowpass', f: 900, q: 0.4, peak: 0.06, rate: 0.6, bubbles: true },
 };
 export function createSound() {
   let ac = null, master = null, noise = null, on = true;
@@ -45,18 +47,38 @@ export function createSound() {
       osc = ac.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = def.buzz;
       og = ac.createGain(); og.gain.value = 0.11; osc.connect(og); og.connect(g); osc.start();
     }
-    loops[name] = { g, flt, def };
+    loops[name] = { g, flt, def, level: 0 };
+    if (def.bubbles) startBubbles(loops[name]);
     return loops[name];
+  }
+  // 물방울: 짧은 사인파가 위로 휘며 사라진다. 물이 흐르는 동안 불규칙하게 톡톡 터진다
+  function bubble(out, when) {
+    const f = 380 + Math.random() * Math.random() * 1500, dur = 0.025 + Math.random() * 0.055;
+    const t = ac.currentTime + when, o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * (1.4 + Math.random() * 0.8), t + dur);
+    const peak = 0.12 + Math.random() * 0.2;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function startBubbles(l) {
+    setInterval(() => {
+      if (l.level < 0.02 || ac.state !== 'running') return;
+      // 물소리 높낮이가 조금씩 일렁이게 한다
+      l.flt.frequency.setTargetAtTime(650 + Math.random() * 600, ac.currentTime, 0.08);
+      const n = Math.random() < 0.55 * l.level ? 1 + (Math.random() < 0.3 ? 1 : 0) : 0;
+      for (let i = 0; i < n; i++) bubble(l.g, Math.random() * 0.03);
+    }, 30);
   }
   // level 0~1. 부드럽게 커지고 줄어든다
   function loop(name, level) {
     if (!ensure()) return;
     const l = loopOf(name);
+    l.level = level;
     l.g.gain.setTargetAtTime(l.def.peak * level, ac.currentTime, 0.04);
   }
   function stopLoops(except = []) {
     if (!ac) return;
-    for (const [n, l] of Object.entries(loops)) if (!except.includes(n)) l.g.gain.setTargetAtTime(0, ac.currentTime, 0.05);
+    for (const [n, l] of Object.entries(loops)) if (!except.includes(n)) { l.level = 0; l.g.gain.setTargetAtTime(0, ac.currentTime, 0.05); }
   }
   function tone(f, dur, type = 'sine', peak = 0.2, when = 0, slide = 0) {
     if (!ensure()) return;
