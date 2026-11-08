@@ -53,10 +53,10 @@ export const WEATHER = {
 };
 
 // 선체(배 평면 격자는 cols × rows, 칸 한 변 cell m. x0: 0행 앞쪽 끝의 배 좌표). id는 등급과 별을 함께 나타낸다: sloop = 슬루프 ★1, sloop2 = ★2
-// hp: 내구도(피해는 절대값으로 들어온다), yard: 필요한 조선소 등급
-const raft = { id: 'raft', kind: 'raft', star: 1, grade: 1, name: '뗏목', len: 4.6, beam: 3.1, deck: 0.34, cols: 3, rows: 4, cell: 1, x0: 2, drag: 0.55, row: 3.8, turn: 0.8, stability: 1.4, buoy: 26, draft: 0.2, crew: 0, foodBase: 4, holdBase: 14, helmX: -1.45, hp: 40, yard: 1, price: {} };
-const rowboat = { id: 'rowboat', kind: 'rowboat', star: 1, grade: 2, name: '나룻배', len: 6.4, beam: 2.1, deck: 0.5, cols: 2, rows: 6, cell: 0.8, x0: 2.4, drag: 0.9, row: 4.6, turn: 0.82, stability: 0.8, buoy: 30, draft: 0.3, crew: 1, foodBase: 5, holdBase: 18, helmX: -2.65, hp: 70, yard: 1, price: { wood: 40, coin: 15 } };
-const sloop = { id: 'sloop', kind: 'sloop', star: 1, grade: 3, name: '슬루프', len: 9, beam: 3, deck: 1, cols: 3, rows: 7, cell: 0.72, x0: 3.1, drag: 1, row: 4, turn: 0.62, stability: 1, buoy: 70, draft: 0.68, crew: 2, foodBase: 6, holdBase: 24, helmX: -3.1, cockpit: [-3.95, -2.2], hp: 120, yard: 3, blueprint: 'sloop', price: { wood: 160, cloth: 60, coin: 110 } };
+// hp: 내구도(피해는 절대값으로 들어온다), yard: 필요한 조선소 등급, speed: 항해 속도 배율(노·돛 모두. 뗏목 2배, 이후 배는 이전 값의 1.5배)
+const raft = { id: 'raft', kind: 'raft', star: 1, grade: 1, name: '뗏목', len: 4.6, beam: 3.1, deck: 0.34, cols: 3, rows: 4, cell: 1, x0: 2, drag: 0.55, row: 3.8, turn: 0.8, stability: 1.4, buoy: 26, draft: 0.2, crew: 0, foodBase: 4, holdBase: 14, helmX: -1.45, hp: 40, yard: 1, speed: 2, price: {} };
+const rowboat = { id: 'rowboat', kind: 'rowboat', star: 1, grade: 2, name: '나룻배', len: 6.4, beam: 2.1, deck: 0.5, cols: 2, rows: 6, cell: 0.8, x0: 2.4, drag: 0.9, row: 4.6, turn: 0.82, stability: 0.8, buoy: 30, draft: 0.3, crew: 1, foodBase: 5, holdBase: 18, helmX: -2.65, hp: 70, yard: 1, speed: 1.5, price: { wood: 40, coin: 15 } };
+const sloop = { id: 'sloop', kind: 'sloop', star: 1, grade: 3, name: '슬루프', len: 9, beam: 3, deck: 1, cols: 3, rows: 7, cell: 0.72, x0: 3.1, drag: 1, row: 4, turn: 0.62, stability: 1, buoy: 70, draft: 0.68, crew: 2, foodBase: 6, holdBase: 24, helmX: -3.1, cockpit: [-3.95, -2.2], hp: 120, yard: 3, speed: 1.5, blueprint: 'sloop', price: { wood: 160, cloth: 60, coin: 110 } };
 // ★2 선체 연장: 길이·칸·부력이 늘고 회전은 조금 느려진다. rowOff: 놓인 모듈을 뒤로 미는 행 수
 const star2 = (b, over) => ({ ...b, id: `${b.kind}2`, star: 2, turn: b.turn * 0.93, blueprint: undefined, ...over });
 // ★3 보강: 내구·복원력이 늘고 등급 고유 개조가 붙는다
