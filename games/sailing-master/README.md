@@ -27,12 +27,14 @@
 | `art.js` | 물·땅·나무·항구·표류물·항적·날씨 그림 |
 | `art-ship.js` | 층 쌓기 배 그림(선체·모듈)·돛·사람·노 |
 | `creatures.js` | 생물 19종 움직임과 그림 |
-| `music.js`, `sound.js` | 음악 3곡, 파도·바람 소리와 효과음 합성 |
+| `music.js`, `sound.js` | 배경음악 mp3 재생(못 읽으면 합성곡 3곡), 파도·바람 소리와 효과음 합성 |
 | `test/logic.test.js` | 규칙 테스트 |
 | `tools/sim.js` | 밸런스 봇: `node tools/sim.js [시드] [최대 분] [v]` |
 | `tools/ship-preview.html` | 방향 8개 × 상태 5개 배 점검표(`?zoom=10`, `&hull=rowboat`) |
 | `tools/sound-check.html` | 소리 크기 오프라인 측정 |
 | `tools/icon.html` | 앱 아이콘 그리기 |
+| `assets/` | 선장 초상화·이야기 그림·배경음악 mp3(출처는 `assets/CREDITS.md`) |
+| `docs/asset-manifest.yaml`, `docs/art-style.md` | 에셋 목록과 화풍 기준(agent-bridge 의뢰용) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | 독립 실행(PWA) |
 
 ## 실행
