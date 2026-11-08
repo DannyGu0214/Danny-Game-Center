@@ -1,9 +1,14 @@
-// 배경음악: 파일 없이 Web Audio로 합성한다(게시 페이지는 외부 음원이 막히고, 라이선스·용량 걱정도 없다).
+// 배경음악: 기본은 Suno로 만든 mp3 7곡(assets/bgm, 아래 FILES — 합성곡 7곡과 1:1 대응)을 틀고,
+// 파일을 못 불러오면(오프라인·차단 등) 아래 Web Audio 합성곡으로 이어서 틀어 소리가 끊기지 않게 한다.
+// 합성곡 설명:
 // 포스트 아포칼립스 분위기의 단순한 멜로디 7곡(단조 3곡 + 조금 희망적인 장조 4곡). 무작위로 한 곡을 골라 5분 동안 틀고,
 // 다음 곡은 직전 곡을 빼고 무작위로 골라 4초 동안 겹쳐 넘어간다.
 // 음표는 0.6초 앞까지 미리 예약한다(Web Audio 표준 예약 방식: setInterval로 깨어나 ctx.currentTime 기준으로 예약).
 
-export const SEGMENT_S = 300; // 한 곡을 트는 시간(5분)
+export const SEGMENT_S = 300; // 한 곡을 트는 시간(5분). mp3는 약 4분 58초라 파일 끝에서 넘어간다
+// TRACKS와 같은 순서(1:1): 잿빛 들판 · 녹슨 라디오 · 마지막 불빛 · 새벽 정찰 · 첫 수확 · 등불 아래 · 모닥불 노래
+export const FILES = ['01-gray-field', '02-rusty-radio', '03-last-light', '04-dawn-patrol', '05-first-harvest', '06-under-the-lantern', '07-campfire-song'].map((n) => `${n}.mp3`);
+const FILE_BASE = new URL('./assets/bgm/', import.meta.url);
 const FADE_S = 4;
 const LOOKAHEAD_S = 0.6;
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
@@ -222,8 +227,9 @@ export const TRACKS = [
 ];
 
 // rand: 곡 고르기·사람 손맛(셈여림·박자 흔들림) 난수. segment: 한 곡 길이(초).
-export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.random } = {}) {
+export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.random, files = true } = {}) {
   let ac = null, bus = null, verb = null, noiseBuf = null, timer = null;
+  let filesOk = files && typeof Audio !== 'undefined', fcur = null; // mp3 재생 상태(fcur: 지금 트는 파일 곡)
   let on = true, paused = false, cur = null, history = [], user = 1; // user: 메뉴의 음악 음량(0~1)
 
   // 리버브: 잡음에 지수 감쇠를 입힌 2.6초 임펄스(넓은 폐허 느낌)
@@ -236,7 +242,7 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
     return c;
   }
   function pick() {
-    const choices = TRACKS.map((_, k) => k).filter((k) => k !== cur?.k);
+    const choices = TRACKS.map((_, k) => k).filter((k) => k !== (cur?.k ?? fcur?.k));
     return choices[Math.floor(rand() * choices.length)];
   }
   // 한 곡 시작: 곡마다 자기 볼륨 노드(겹쳐 넘어가기용)를 가진다
@@ -280,9 +286,47 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
       scheduleBar(cur);
     }
   }
+  // ---------- mp3 재생 ----------
+  // 파일마다 <audio>를 MediaElementSource로 같은 AudioContext 버스에 연결한다(스트리밍이라 메모리를 거의 안 쓰고, iOS에서도 음량이 먹는다).
+  const shouldPlay = () => on && !paused;
+  function fileBegin(k) {
+    const el = new Audio(new URL(FILES[k], FILE_BASE).href), g = ac.createGain(), t = ac.currentTime;
+    el.preload = 'auto';
+    const src = ac.createMediaElementSource(el);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(TRACKS[k].fileGain ?? 1, t + FADE_S);
+    src.connect(g); g.connect(bus);
+    const f = { k, T: TRACKS[k], el, src, g, retryAt: 0 };
+    el.addEventListener('error', () => fileFail(f));
+    fcur = f;
+    history.push(f.T.name);
+    if (shouldPlay()) el.play().catch(() => {}); // 재생을 막으면(자동재생 정책) 아래 fileTick이 다시 시도한다
+  }
+  function fileDrop(f) { try { f.el.pause(); f.src.disconnect(); f.g.disconnect(); } catch { /* 이미 정리됨 */ } }
+  // 파일을 못 불러오면(오프라인·차단) 합성곡으로 넘어간다
+  function fileFail(f) {
+    if (f !== fcur) return;
+    filesOk = false; fileDrop(f); fcur = null;
+  }
+  function fileTick() {
+    if (!fcur) fileBegin(pick());
+    const f = fcur, el = f.el, now = performance.now();
+    if (el.paused && !el.ended && now >= f.retryAt) { f.retryAt = now + 1000; el.play().catch(() => {}); }
+    const len = Number.isFinite(el.duration) && el.duration > 0 ? Math.min(el.duration, segment) : segment;
+    if (el.ended || el.currentTime >= len - FADE_S) { // 끝나기 4초 전에 다음 곡을 겹쳐 넘긴다
+      const t = ac.currentTime;
+      f.g.gain.setValueAtTime(Math.max(0.0001, f.g.gain.value), t); f.g.gain.exponentialRampToValueAtTime(0.0001, t + FADE_S);
+      setTimeout(() => fileDrop(f), (FADE_S + 1) * 1000);
+      fileBegin(pick());
+    }
+  }
+  function syncFile() {
+    if (!fcur) return;
+    if (shouldPlay()) fcur.el.play().catch(() => {}); else fcur.el.pause();
+  }
+
   function tick() {
     if (!ac || !on || paused || ac.state !== 'running') return;
-    scheduleUntil(ac.currentTime + LOOKAHEAD_S);
+    if (filesOk) fileTick(); else scheduleUntil(ac.currentTime + LOOKAHEAD_S);
   }
   function setLevel() {
     if (!bus) return;
@@ -302,12 +346,13 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
       timer = setInterval(tick, 50);
       tick();
     },
-    setOn(v) { on = !!v; setLevel(); },
+    setOn(v) { on = !!v; setLevel(); syncFile(); },
     setVolume(v) { user = Math.max(0, Math.min(1, v)); setLevel(); },
     // 화면이 숨으면 멈추고, 돌아오면 이어서
-    pause() { paused = true; setLevel(); },
-    resume() { paused = false; setLevel(); },
-    get current() { return cur?.T.name ?? null; },
+    pause() { paused = true; setLevel(); syncFile(); },
+    resume() { paused = false; setLevel(); syncFile(); },
+    get current() { return (fcur ?? cur)?.T.name ?? null; },
+    get source() { return filesOk ? 'mp3' : 'synth'; },
     get history() { return history.slice(); },
     get bus() { return bus; },
     // 미리듣기·검증용: 오프라인 컨텍스트에 한 곡을 seconds만큼 통째로 예약한다
