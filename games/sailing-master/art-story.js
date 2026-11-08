@@ -1,4 +1,5 @@
-// 선장 출항 이야기의 그림. 외부 파일 없이 캔버스로 그린다(논리 크기 360×250).
+// 선장 출항 이야기의 그림(논리 크기 360×250). assets/story/에 받은 일러스트를 쓰고, 아직 못 읽었거나 없으면 캔버스로 직접 그린다.
+// 3쪽 여정은 일러스트(배경만) 위에 길·빨간 점선·이동하는 인물을 겹쳐 움직인다.
 // drawStoryScene(g, captain, sceneId, t): t는 3쪽 여정 진행도(0~1), 다른 쪽은 쓰지 않는다
 export const STORY_W = 360, STORY_H = 250;
 const TAU = Math.PI * 2;
@@ -268,8 +269,8 @@ const SCENES = {
 
 // ── 3쪽: 살던 곳에서 작은 호수까지 가는 길(t로 그려져 나간다) ──
 const ROUTE = [[52, 212], [120, 244], [176, 150], [264, 134]];
-const routeAt = (t) => {
-  const u = 1 - t, [a, b, c, d] = ROUTE;
+const routeAt = (t, R = ROUTE) => {
+  const u = 1 - t, [a, b, c, d] = R;
   return [u * u * u * a[0] + 3 * u * u * t * b[0] + 3 * u * t * t * c[0] + t * t * t * d[0], u * u * u * a[1] + 3 * u * u * t * b[1] + 3 * u * t * t * c[1] + t * t * t * d[1]];
 };
 function hometown(g, kind) {
@@ -320,8 +321,41 @@ function journey(g, C, t, kind) {
 
 const JOURNEY = { journeyHorse: 'port', journeyCoach: 'customs', journeyCart: 'market', journeyDonkey: 'workshop' };
 export const isJourney = (scene) => scene in JOURNEY;
+// 일러스트
+const IMG = {};
+export function storyImage(scene, onload) {
+  let im = IMG[scene];
+  if (!im) { im = IMG[scene] = new Image(); im.decoding = 'async'; im.src = `assets/story/${scene}.webp`; }
+  if (onload && !(im.complete && im.naturalWidth)) im.addEventListener('load', onload, { once: true });
+  return im;
+}
+const ready = (im) => im && im.complete && im.naturalWidth > 0;
+// 여정 일러스트마다 살던 곳 앞(시작)과 갈대 나루 부두(끝)의 자리, 그 사이 길의 굽이(베지어 조절점 둘)
+const ROUTES = {
+  journeyHorse: [[115, 215], [170, 242], [228, 204], [255, 168]],
+  journeyCoach: [[115, 218], [170, 242], [220, 198], [258, 182]],
+  journeyCart: [[140, 192], [172, 218], [200, 182], [226, 170]],
+  journeyDonkey: [[170, 196], [214, 218], [250, 180], [282, 168]],
+};
+function journeyArt(g, C, t, kind, im, R) {
+  g.drawImage(im, 0, 0, STORY_W, STORY_H);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const path = (end) => { g.beginPath(); g.moveTo(R[0][0], R[0][1]); for (let i = 1; i <= 40; i++) { const q = routeAt(i / 40 * end, R); g.lineTo(q[0], q[1]); } g.stroke(); };
+  g.strokeStyle = 'rgba(120,96,60,.35)'; g.lineWidth = 8; path(1);
+  g.strokeStyle = 'rgba(226,206,160,.85)'; g.lineWidth = 5.5; path(1);
+  g.strokeStyle = '#c8452f'; g.lineWidth = 2.4; g.setLineDash([6, 5]); if (t > 0.002) path(t); g.setLineDash([]);
+  const tag = (text, x, y) => { g.font = '700 11px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3.2; g.strokeStyle = 'rgba(20,40,50,.75)'; g.strokeText(text, x, y); g.fillStyle = '#fff8e6'; g.fillText(text, x, y); };
+  const [ex, ey] = R[3];
+  tag('갈대 나루', Math.min(STORY_W - 30, ex + 8), ey - 24);
+  tag(({ port: '살던 항구', customs: '세관 창고', market: '헐린 시장', workshop: '닫은 공방' })[kind], R[0][0] - 4, Math.min(R[0][1] + 15, 222));
+  const [x, y] = routeAt(t, R), [x2, y2] = routeAt(Math.min(1, t + 0.01), R), [x1, y1] = routeAt(Math.max(0, t - 0.01), R);
+  if (t < 0.985) vehicle(g, kind, C, x, y, Math.atan2(y2 - y1, x2 - x1));
+  else person(g, C, ex - 4, ey + 3, 0.5, { hat: true, arm: [10, -30] });
+}
 export function drawStoryScene(g, C, scene, t = 1) {
   g.save(); g.beginPath(); g.rect(0, 0, STORY_W, STORY_H); g.clip();
-  if (scene in JOURNEY) journey(g, C, t, JOURNEY[scene]); else SCENES[scene](g, C);
+  const im = storyImage(scene);
+  if (ready(im)) { if (scene in JOURNEY) journeyArt(g, C, t, JOURNEY[scene], im, ROUTES[scene]); else g.drawImage(im, 0, 0, STORY_W, STORY_H); }
+  else if (scene in JOURNEY) journey(g, C, t, JOURNEY[scene]); else SCENES[scene](g, C);
   g.restore();
 }

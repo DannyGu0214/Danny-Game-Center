@@ -484,7 +484,7 @@ import * as G from './logic.js';
 import * as A from './art.js';
 import * as SA from './art-ship.js';
 import * as SH from './ship.js';
-import { drawStoryScene, isJourney, STORY_W, STORY_H } from './art-story.js';
+import { drawStoryScene, isJourney, storyImage, STORY_W, STORY_H } from './art-story.js';
 import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound } from './sound.js';
 import { createMusic } from './music.js';
@@ -592,7 +592,7 @@ $('capGo').addEventListener('click', () => {
 });
 // 출항 이야기: 선장을 고른 뒤 한 번, 3쪽. 마지막 쪽은 호수까지 가는 길이 그려진다
 const story = { cap: null, page: 0, raf: 0, t0: 0 };
-function openStory(cap) { story.cap = cap; story.page = 0; $('story').classList.add('on'); showStoryPage(); }
+function openStory(cap) { story.cap = cap; story.page = 0; for (const P of STORIES[cap.id].pages) storyImage(P.scene); $('story').classList.add('on'); showStoryPage(); }
 function closeStory() { cancelAnimationFrame(story.raf); $('story').classList.remove('on'); enterGame(); }
 function drawStoryPage(t) {
   const cv = $('storyArt'), g = cv.getContext('2d'), k = cv.width / STORY_W;
@@ -615,6 +615,10 @@ function showStoryPage() {
   $('storyDots').innerHTML = St.pages.map((_, i) => `<i class="${i === story.page ? 'on' : ''}"></i>`).join('');
   $('storyNext').textContent = last ? '갈대 나루에 내리기 →' : '다음 →';
   $('storySkip').style.display = last ? 'none' : '';
+  // 일러스트가 늦게 도착하면 그때 다시 그린다(여정은 움직이는 동안 어차피 다시 그린다)
+  const page = story.page;
+  storyImage(P.scene, () => { if (story.page === page && $('story').classList.contains('on') && (!isJourney(P.scene) || performance.now() - story.t0 > 4500)) drawStoryPage(1); });
+  story.t0 = 0;
   if (isJourney(P.scene) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     story.t0 = performance.now();
     const frame = (now) => { const t = Math.min(1, (now - story.t0) / 4500); drawStoryPage(t < 1 ? t * t * (3 - 2 * t) : 1); if (t < 1) story.raf = requestAnimationFrame(frame); };
