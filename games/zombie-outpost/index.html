@@ -196,6 +196,45 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .hint b { color: var(--text); font-weight: 600; }
 @keyframes hintIn { from { opacity: 0; transform: translateY(4px); } }
 
+/* 초심자 가이드 말풍선: 오래 발전이 없을 때 시급한 과제 2개를 알린다(누르면 해당 탭으로) */
+#guide {
+  position: absolute; z-index: 4; left: var(--gutter-l); right: calc(var(--gutter-r) + 60px);
+  bottom: calc(128px + env(safe-area-inset-bottom, 0px)); pointer-events: none;
+}
+#ctxBtn:not([hidden]) ~ #guide { bottom: calc(194px + env(safe-area-inset-bottom, 0px)); }
+#sheet:not([hidden]) ~ #guide, #guide:empty { display: none; }
+.guide-card {
+  position: relative; pointer-events: auto; background: rgba(24, 28, 36, 0.97); border: 1px solid var(--amber); border-radius: 12px;
+  padding: 8px 10px 9px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55); animation: guideIn .22s ease-out;
+}
+.guide-card::after { /* 말풍선 꼬리: 아래 탭 줄을 가리킨다 */
+  content: ""; position: absolute; left: 26px; bottom: -7px; width: 12px; height: 12px; background: rgba(24, 28, 36, 0.97);
+  border-right: 1px solid var(--amber); border-bottom: 1px solid var(--amber); transform: rotate(45deg);
+}
+.guide-card.out { opacity: 0; transition: opacity .35s; }
+.guide-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.guide-head b { font-family: var(--f-display); font-weight: 400; font-size: 14px; color: var(--amber); }
+.guide-head small { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; }
+.guide-head .x { width: 26px; height: 26px; border-radius: 7px; font-size: 12px; }
+.guide-row {
+  display: grid; gap: 2px; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--panel-2);
+  border-radius: 9px; padding: 6px 9px; margin-top: 5px;
+}
+.guide-row strong { font-size: 13px; font-weight: 600; }
+.guide-row span { font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+.guide-row em { font-style: normal; font-size: 11px; color: var(--teal); }
+.guide-row em.lack { color: var(--red); }
+.guide-row em.late { color: var(--amber); }
+.guide-note { margin: 7px 0 0; padding: 6px 9px; border-radius: 9px; background: #2a2216; border: 1px solid #5a4520; font-size: 11.5px; line-height: 1.45; color: var(--text); }
+.guide-note b { color: var(--amber); font-weight: 600; }
+.guide-note.kakao { background: #3a1a16; border-color: var(--red); }
+.guide-note.kakao b { color: #ff8f7c; }
+.guide-card.raid { border-color: var(--red); }
+.guide-card.raid::after { border-color: var(--red); }
+.guide-card.raid .guide-head b { color: #ff8f7c; }
+.guide-card.raid .guide-note { background: #3a1a16; border-color: var(--red); font-size: 13px; }
+@keyframes guideIn { from { opacity: 0; transform: translateY(8px); } }
+
 #toasts {
   position: absolute; z-index: 6; top: 120px; left: 50%; transform: translateX(-50%);
   width: min(340px, calc(100% - 32px)); display: grid; gap: 6px; pointer-events: none;
@@ -398,6 +437,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .gains b { display: block; font-family: var(--f-num); font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) {
+  .guide-card { animation: none; }
   .raid-pill.on, .toast, .reward-card, .reward-line, #hpBar.danger { animation: none; }
 }
 </style>
@@ -437,6 +477,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
   <button id="ctxBtn" hidden></button>
   <div id="hints" aria-live="polite"></div>
+  <div id="guide" aria-live="polite"></div>
   <div id="toasts" aria-live="polite"></div>
   <div id="reward" aria-live="polite"></div>
 
@@ -987,6 +1028,8 @@ function handleEvents(list) {
         floatText(S.player.x, S.player.y - 30, '무기 파손!', '#ff8a6e', true); markTab('arms');
         break;
       case 'fire': fx.fires.push({ x: e.x, y: e.y, t: 0 }); sfx.play('fire'); mark(e.x, e.y, 70, '20,16,12', 0.55, 14, true); break;
+      case 'guide': showGuide(e); break;
+      case 'raid-warn': showAlert({ title: '긴급 무전', sub: `습격까지 약 ${e.in}초`, text: '본부에서 긴급 무전이 왔어요. 좀비들이 달려오고 있어요. 빨리 본부로 오세요.', raid: true, ttl: 12000 }); break;
       case 'item-auto': toast('위급해서 구급상자를 자동으로 썼어요', 'warn'); sfx.play('use', { id: 'medkit' }); break;
       case 'job-done':
         toast(`${e.name} 완료${e.kind === 'craft' ? ' · 장착했어요' : ''}${e.posted ? ` · ${e.posted.name}(${G.ROLES[e.posted.role].name}) 방벽 배치` : ''}`, 'good');
@@ -1877,6 +1920,79 @@ function toast(text, kind = '') {
   setTimeout(() => el.remove(), 2600);
 }
 
+// ---------- 초심자 가이드 말풍선 ----------
+// 오래 발전이 없으면 logic이 'guide' 이벤트로 시급한 과제 2개를 보낸다. 시트가 열려 있으면 닫힐 때까지 미룬다.
+let guidePending = null, guideTimer = 0;
+function closeGuide() {
+  clearTimeout(guideTimer);
+  const card = $('#guide').firstElementChild;
+  if (!card) return;
+  card.classList.add('out');
+  guideTimer = setTimeout(() => $('#guide').replaceChildren(), 360);
+}
+// 알림 말풍선(내용 한 덩어리): 카카오톡 저장 주의, 습격 무전 경고. raid면 빨간 테두리
+function showAlert({ title, sub, bold, text, raid = false, ttl = 25000 }) {
+  const card = document.createElement('div');
+  card.className = `guide-card${raid ? ' raid' : ''}`;
+  const head = document.createElement('div'), h = document.createElement('b'), sm = document.createElement('small'), x = document.createElement('button');
+  head.className = 'guide-head'; h.textContent = title; sm.textContent = sub || '';
+  x.className = 'x'; x.textContent = '✕'; x.setAttribute('aria-label', '닫기'); x.addEventListener('click', closeGuide);
+  head.append(h, sm, x);
+  const note = document.createElement('p'), nb = document.createElement('b');
+  note.className = `guide-note${raid ? ' kakao' : ''}`;
+  nb.textContent = bold ? `${bold} ` : ''; note.append(nb, text);
+  card.append(head, note);
+  $('#guide').replaceChildren(card);
+  clearTimeout(guideTimer);
+  guideTimer = setTimeout(closeGuide, ttl);
+}
+// 카카오톡 인앱 브라우저로 열면 시작하자마자 한 번 알린다(저장이 지워질 수 있다)
+let kakaoShown = false;
+function kakaoNotice() {
+  if (kakaoShown || !/KAKAOTALK/i.test(navigator.userAgent)) return;
+  kakaoShown = true;
+  showAlert({ title: '저장 주의', sub: '카카오톡에서 열었어요', bold: '세이브가 날아갈 수 있어요!', text: '카카오톡 안에서 플레이하면 저장이 지워질 수 있어요. 꼭 크롬 같은 브라우저에서 플레이하세요.', ttl: 40000 });
+}
+function showGuide(e) {
+  if (tab) { guidePending = e; return; } // 관리 시트가 열려 있음
+  guidePending = null;
+  const box = $('#guide'), card = document.createElement('div');
+  card.className = 'guide-card';
+  const head = document.createElement('div');
+  head.className = 'guide-head';
+  const title = document.createElement('b'), sub = document.createElement('small'), x = document.createElement('button');
+  title.textContent = '발전 가이드';
+  sub.textContent = !e.due ? '지금 하면 좋은 일이에요' : e.due > e.done ? `표준 테크 ${e.done}/${e.due} · ${e.due - e.done}단계 늦음` : `표준 테크 ${e.done}/${e.due} · 순조로워요`;
+  x.className = 'x'; x.textContent = '✕'; x.setAttribute('aria-label', '가이드 닫기');
+  x.addEventListener('click', closeGuide);
+  head.append(title, sub, x);
+  card.append(head);
+  for (const a of e.items) {
+    const row = document.createElement('button');
+    row.className = 'guide-row';
+    const name = document.createElement('strong'), why = document.createElement('span'), cost = document.createElement('em');
+    name.textContent = a.title;
+    why.textContent = a.note ? `${a.why} · ${a.note}` : a.why;
+    const lack = Object.entries(a.lack);
+    if (lack.length) { cost.className = 'lack'; cost.textContent = `모자라요: ${lack.map(([r, v]) => `${G.RES_NAMES[r]} ${G.fmt(v)}`).join(' · ')} — 파밍하세요`; }
+    else if (Object.keys(a.cost).length) { cost.textContent = `지금 가능 · ${costText(a.cost)}`; }
+    row.append(name, why);
+    if (Object.keys(a.cost).length) row.append(cost);
+    if (a.late > 0) { const late = document.createElement('em'); late.className = 'late'; late.textContent = `표준보다 ${a.late}분 늦어요 (목표 ${a.by}분)`; row.append(late); }
+    row.addEventListener('click', () => { closeGuide(); openTab(a.tab); });
+    card.append(row);
+  }
+  // 카카오톡 인앱 브라우저는 저장소가 지워질 수 있다: 항상 알리고, 지금 카카오톡 안이면 더 눈에 띄게 한다
+  const kakao = /KAKAOTALK/i.test(navigator.userAgent), note = document.createElement('p'), nb = document.createElement('b');
+  note.className = `guide-note${kakao ? ' kakao' : ''}`;
+  nb.textContent = kakao ? '지금 카카오톡에서 하고 있어요! ' : '저장 주의 · ';
+  note.append(nb, '카카오톡에서 플레이하면 세이브가 날아갈 수 있어요. 꼭 크롬 같은 브라우저에서 플레이하세요.');
+  card.append(note);
+  box.replaceChildren(card);
+  clearTimeout(guideTimer);
+  guideTimer = setTimeout(closeGuide, kakao ? 40000 : 25000);
+}
+
 // ---------- 관리 시트 ----------
 let tab = null;
 const TAB_TITLES = { base: '기지', arms: '무기', crew: '동료', outposts: '전진기지', missions: '미션' };
@@ -1886,6 +2002,7 @@ $('#sheetClose').addEventListener('click', () => openTab(null));
 
 function openTab(id) {
   tab = id;
+  if (id) closeGuide(); else if (guidePending && !S.over) { const g = guidePending; guidePending = null; setTimeout(() => showGuide(g), 600); }
   document.querySelectorAll('.tab').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.tab === id));
     if (b.dataset.tab === id) b.querySelector('.dot')?.remove();
@@ -2296,6 +2413,7 @@ $('#heroStart').addEventListener('click', () => {
   $('#heroName').blur();
   save(); pushCloud();
   toast(`${r.msg}. 쓰러지면 끝이니 체력을 잘 보세요`, 'good');
+  setTimeout(kakaoNotice, 500);
 });
 
 let newArmed = false, newTimer = 0;
@@ -2546,6 +2664,7 @@ function hideTitle() {
   titleRun?.stop(); titleRun = null;
   $('#titleScreen').hidden = true;
   titleOn = false; last = performance.now(); acc = 0;
+  if (!titleFresh) setTimeout(kakaoNotice, 500); // 새 판은 생존자를 고른 뒤에
 }
 function titlePrimary() {
   hideTitle();
