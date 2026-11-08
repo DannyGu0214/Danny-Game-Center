@@ -125,6 +125,8 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .capCard { display: flex; align-items: center; gap: 12px; padding: 11px 13px; margin-bottom: 14px; border-radius: 14px; background: linear-gradient(120deg, #21506a, #173a4c); border: 1px solid rgba(226,196,130,.4); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
 .face { flex: none; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 40% 30%, #3f7f96, #143444); box-shadow: 0 0 0 1.5px rgba(226,196,130,.75); }
 .face { position: relative; }
+.face img { position: absolute; width: 210%; height: auto; left: -70%; top: -88%; display: block; }
+.deckKey { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: -6px 2px 12px; font-size: 11.5px; color: var(--muted); }
 .face canvas { display: block; width: 100%; height: 100%; }
 .capCard .lab { font-size: 11px; font-weight: 700; letter-spacing: .05em; color: #e2c482; }
 .capCard .nm { font-size: 18px; font-weight: 800; line-height: 1.25; }
@@ -136,6 +138,18 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .seat.on { background: #e2c482; border-color: #e2c482; }
 .rosterNote { margin: -2px 2px 9px; font-size: 12px; line-height: 1.45; color: var(--muted); }
 .crewEmpty { margin-bottom: 14px; padding: 13px; border: 1px dashed rgba(190,226,232,.3); border-radius: 13px; font-size: 13px; line-height: 1.5; color: var(--muted); text-align: center; }
+.plans { display: flex; gap: 6px; margin: 0 0 8px; } .plans button { flex: 1; padding: 8px 4px; border-radius: 10px; background: rgba(255,255,255,.08); font-size: 13.5px; font-weight: 600; }
+.plans button.on { background: var(--on); color: #203038; font-weight: 800; } .plans button.save { flex: none; padding: 8px 10px; }
+.rules { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; } .rules button { padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); font-size: 12.5px; color: var(--muted); }
+.rules button.on { color: var(--text); border-color: var(--ok); background: rgba(143,220,154,.14); }
+.deck { position: relative; margin: 0 0 12px; border-radius: 14px; background: #1d5f78; overflow: hidden; }
+.deck canvas { display: block; width: 100%; }
+.deck .seat { position: absolute; transform: translate(-50%, -50%); min-width: 28px; height: 28px; padding: 0 5px; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 11.5px; font-weight: 700; color: #fff; background: rgba(10,30,40,.72); border: 2px solid rgba(255,255,255,.55); white-space: nowrap; }
+.deck .seat.empty { border-style: dashed; color: #ffd27a; } .deck .seat.rest { background: rgba(60,50,30,.7); } .deck .seat.pick { border-color: var(--on); box-shadow: 0 0 0 3px rgba(242,193,78,.35); }
+.deck .hint { position: absolute; left: 8px; bottom: 6px; font-size: 11.5px; color: rgba(255,255,255,.8); }
+.crewCard.sel { border-color: var(--on); box-shadow: 0 0 0 2px rgba(242,193,78,.3); }
+.crewMeta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; font-size: 12px; } .crewMeta span { padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted); } .crewMeta .lv { color: #f2c14e; background: rgba(242,193,78,.12); } .crewMeta .seatTag { color: var(--text); }
+.crewBars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 7px; font-size: 11.5px; color: var(--muted); } .crewBars i { display: block; height: 5px; margin-top: 3px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; } .crewBars b { display: block; height: 100%; border-radius: 3px; }
 .crewCard { margin-bottom: 9px; padding: 11px 12px; border-radius: 14px; background: var(--card); border: 1px solid rgba(190,226,232,.12); }
 .crewTop { display: flex; align-items: center; gap: 10px; }
 .crewTop .who { flex: 1; min-width: 0; }
@@ -506,7 +520,7 @@ import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound } from './sound.js';
 import { createMusic } from './music.js';
 import { worldOf } from './world.js';
-import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP } from './data.js';
+import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP, SEATS, TRAITS } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view'), ctx = view.getContext('2d', { alpha: false });
@@ -795,7 +809,10 @@ function drainEvents() {
       case 'arrive': snd.play('arrive'); syncButtons(); break;
       case 'atGate': openGate(worldOf(S.region).gates.find((g) => g.id === ev.id)); break;
       case 'docked': snd.play('dock'); openPort(ev); break;
-      case 'crewLeft': toast(`${ev.name}이(가) 보수를 못 받았다고 내려 버렸어!`); break;
+      case 'crewLeft': toast(ev.why === 'morale' ? `${ev.name}이(가) 이 배는 못 견디겠다며 내려 버렸어!` : `${ev.name}이(가) 보수를 못 받았다고 내려 버렸어!`); break;
+      case 'crewLevel': toast(`⭐ ${ev.name} 숙련 ${ev.lv}! 보수도 조금 올랐어`); break;
+      case 'carpNoWood': toast('🔨 목수: 화물칸에 잡목이 없어서 못 고친다고!'); break;
+      case 'plan': toast(ev.name === 'storm' ? '🌀 폭풍 편성으로!' : '⛵ 항해 편성으로 돌아왔다'); break;
       case 'wages': toast(`선원들 보수로 금화 ${G.coinCount(ev.pay)}`); break;
       case 'built': snd.play('build'); break;
       case 'inlandHint': showHint('🔭 저 숲 안쪽은 맨눈으론 안 보여! 망원경이 있어야 해!', 4.5); break;
@@ -1168,7 +1185,7 @@ function renderPaint(body) {
 }
 
 // ── 선원 ──
-const HAIRS = ['#2a1c12', '#3a2a1c', '#5a3a22', '#1f1a18', '#6d4a2a'], ROLE_COAT = { deckhand: '#2f6f8f', lookout: '#3f7a5a', helmsman: '#8a5a3a' };
+const HAIRS = ['#2a1c12', '#3a2a1c', '#5a3a22', '#1f1a18', '#6d4a2a'], ROLE_COAT = { deckhand: '#2f6f8f', lookout: '#3f7a5a', helmsman: '#8a5a3a', rower: '#7a4a3a', fisher: '#4a6f7a', carpenter: '#7a6a3a' };
 // 얼굴 그림: 선장은 모자, 선원은 성별·역할에 맞춘 옷과 머리
 function faceEl(C, size, hat) {
   const box = el('div', 'face'); box.style.cssText = `width:${size}px;height:${size}px`;
@@ -1179,21 +1196,30 @@ function faceEl(C, size, hat) {
 }
 const crewLook = (c) => ({ coat: ROLE_COAT[c.role], hair: HAIRS[(c.id || 0) % HAIRS.length], style: c.gender === '여' ? 'long' : 'short' });
 const coinIcon = '<svg><use href="#i-coin"/></svg>';
-function crewCard(c, cost, act, label, cls) {
-  const R = ROLES[c.role], card = el('div', 'crewCard');
+function crewCard(c, cost, act, label, cls, aboard) {
+  const R = ROLES[c.role], card = el('div', `crewCard${aboard && crewSel === c.id ? ' sel' : ''}`);
   const top = el('div', 'crewTop');
   top.append(faceEl(crewLook(c), 44, false));
   const who = el('div', 'who');
   const nm = el('div', 'nm'); nm.textContent = c.name;
   nm.insertAdjacentHTML('beforeend', `<span class="gender${c.gender === '여' ? ' f' : ''}">${c.gender}</span>`);
   who.append(nm, el('div', 'ds', R.brief));
+  // 숙련·특성·자리
+  const T = TRAITS[c.trait], seatT = aboard ? G.seatType(S, c) : null;
+  who.append(el('div', 'crewMeta', `<span class="lv">숙련 ${'★'.repeat(c.lv || 1)}</span>${T ? `<span title="${T.desc}">${T.name}</span>` : ''}${aboard ? `<span class="seatTag">${seatT ? `${seatT === 'rest' ? '💤' : '📍'} ${SEATS[seatT]}` : '자리 없음'}${seatT && seatT !== 'rest' && ROLES[c.role].seat !== seatT ? ' (안 맞음 50%)' : ''}</span>` : ''}`));
   if (G.wantsRum(c)) who.append(el('div', 'rum', '“내 보수는 럼주로 부탁해!”'));
-  top.append(who, el('div', 'roleTag', `<svg><use href="#i-${c.role}"/></svg>${R.name}`));
+  top.append(who, el('div', 'roleTag', `${['deckhand', 'lookout', 'helmsman'].includes(c.role) ? `<svg><use href="#i-${c.role}"/></svg>` : `<i class="emo">${R.icon}</i>`}${R.name}`));
   // 값은 기준 100에서 ±25: 막대 가운데 금이 기준값
   const stat = (name, v, color) => `<div class="st" style="--c:${color}"><div class="l">${name}<b>${v}</b></div><div class="b"><i style="width:${(v - 75) * 2}%"></i></div></div>`;
   const foot = el('div', 'crewFoot', `<div class="pay">${cost != null ? `<span>고용 ${coinIcon}<b>${cost}</b></span>` : ''}<span>${G.wantsRum(c) ? '하루 럼주 값' : '하루'} ${coinIcon}<b>금화 ${G.coinCount(c.wage)}</b></span></div>`);
   if (label) { const b = el('button', `crewBtn ${cls}`, label); b.addEventListener('click', act); foot.append(b); }
-  card.append(top, el('div', 'crewStats', stat('항해술', c.skill, '#7fd6a0') + stat('유머', c.humor, '#f2c14e') + stat('주량', c.drink, '#8fb8e8')), foot);
+  card.append(top, el('div', 'crewStats', stat('항해술', c.skill, '#7fd6a0') + stat('유머', c.humor, '#f2c14e') + stat('주량', c.drink, '#8fb8e8')));
+  if (aboard) {
+    const f = c.fatigue || 0, m = c.morale ?? 0.7;
+    card.append(el('div', 'crewBars', `<div>피로 ${Math.round(f * 100)}%<i><b style="width:${f * 100}%;background:${f > 0.7 ? '#f08a6e' : '#e2c482'}"></b></i></div><div>사기 ${Math.round(m * 100)}%<i><b style="width:${m * 100}%;background:${m < 0.3 ? '#f08a6e' : '#8fdc9a'}"></b></i></div>`));
+    card.addEventListener('click', (e) => { if (e.target.closest('button')) return; crewSel = crewSel === c.id ? null : c.id; renderSheet(); });
+  }
+  card.append(foot);
   return card;
 }
 function renderCrew(body) {
@@ -1207,19 +1233,82 @@ function renderCrew(body) {
   body.append(el('div', 'rosterHead', `승선 선원<span class="cnt">${seats}<span style="margin-left:3px">${S.crew.length} / ${st.crewCap}</span></span>`));
   const notes = [!st.hull.crew ? `${st.hull.name}엔 선원을 못 태워! 나룻배부터 태울 수 있어.` : st.crewCap < st.hull.crew ? `해먹·선실을 놓으면 ${st.hull.crew}명까지 태운다!` : '', S.owed > 0.5 ? `못 준 보수가 금화 ${G.coinCount(Math.ceil(S.owed))}! 다음 입항 때 꼭 챙겨 줘.` : ''].filter(Boolean);
   if (notes.length) body.append(el('p', 'rosterNote', notes.join(' ')));
-  for (const c of S.crew) body.append(crewCard(c, null, () => { G.dismiss(S, c.id); renderSheet(); }, docked ? '내보내기' : '', 'ghost'));
+  if (S.crew.length) body.append(...crewPlanUI());
+  for (const c of S.crew) body.append(crewCard(c, null, () => { G.dismiss(S, c.id); crewSel = null; renderSheet(); }, docked ? '내보내기' : '', 'ghost', true));
   if (!S.crew.length) body.append(el('div', 'crewEmpty', '아직 혼자군! 선장이 키와 돛 사이를 뛰어다니는 동안 배는 곧게만 간다고.'));
   if (!docked) return;
   const list = G.candidatesAt(S);
   body.append(el('div', 'rosterHead', `이 항구의 구직자<span class="cnt">${list.length}명 · 며칠 뒤면 딴 녀석들이 와</span>`));
   for (const c of list) {
-    const why = !st.hull.crew || S.crew.length >= st.crewCap ? '자리 없음' : G.hasRole(S, c.role) ? '역할 있음' : S.res.coin < c.hireCost ? '금화 부족' : '';
+    const why = !st.hull.crew || S.crew.length >= st.crewCap ? '자리 없음' : S.res.coin < c.hireCost ? '금화 부족' : '';
     body.append(crewCard(c, c.hireCost, () => {
       const res = G.hire(S, c.id);
       if (!res.ok) { showHint(res.why, 2.5); return; }
       snd.play('place'); toast(`${res.name}이(가) 올라탔다!`); drainEvents(); renderSheet();
     }, why || '고용', why ? 'off' : ''));
   }
+}
+
+// 선원 자리 배치(S3): 편성 · 위임 규칙 · 갑판 평면도. 선원 카드를 누른 뒤 자리를 누르면 앉는다
+let crewSel = null;
+const SEAT_ICON = { helm: '☸️', oar: '🚣', sail: '⛵', look: '🔭', fish: '🎣', carpenter: '🔨', rest: '🛏', weather: '🌡' };
+function crewPlanUI() {
+  for (const c of S.crew) G.seatType(S, c); // 아직 자리가 없으면 알아서 앉힌다
+  const out = [], plan = S.plan || 'sail';
+  const plans = el('div', 'plans');
+  for (const [id, name] of Object.entries(G.PLANS)) {
+    const b = el('button', id === plan ? 'on' : '', `${name}${S.plans?.[id] ? '' : ' ＋'}`);
+    b.addEventListener('click', () => { if (G.applyPlan(S, id)) toast(`${name} 편성으로!`); else { G.savePlan(S, id); toast(`지금 배치를 ${name} 편성으로 저장했다!`); } renderSheet(); });
+    plans.append(b);
+  }
+  const sv = el('button', 'save', '💾'); sv.title = '지금 배치를 이 편성에 저장';
+  sv.addEventListener('click', () => { G.savePlan(S, plan); toast(`${G.PLANS[plan]} 편성 저장!`); renderSheet(); });
+  plans.append(sv); out.push(plans);
+  const rules = el('div', 'rules'), R = G.rulesOf(S);
+  for (const [k, label] of [['reef', '돌풍엔 갑판원이 돛 줄이기'], ['repair', '선체 50% 밑이면 목수가 수리'], ['storm', '돌풍엔 폭풍 편성으로']]) {
+    const b = el('button', R[k] ? 'on' : '', `${R[k] ? '✓' : '○'} ${label}`);
+    b.addEventListener('click', () => { G.setRule(S, k, !R[k]); renderSheet(); });
+    rules.append(b);
+  }
+  out.push(rules);
+  // 갑판 평면도: 뱃머리가 오른쪽. 자리는 동그라미, 사람이 있으면 이름
+  const H = HULLS[S.ship.hull], box = el('div', 'deck'), cv = el('canvas');
+  const cw = Math.min(window.innerWidth, 560) - 28, ch = Math.max(150, Math.min(220, cw * (H.beam + 2.4) / (H.len + 1))), px = Math.min((cw - 24) / H.len, (ch - 40) / (H.beam + 0.4)), dpr = Math.min(2.5, devicePixelRatio || 1);
+  cv.width = cw * dpr; cv.height = ch * dpr; cv.style.height = `${ch}px`;
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const sx = (x) => cw / 2 + x * px, sy = (y) => ch / 2 + y * px;
+  g.fillStyle = PAINTS.hull[S.ship.paint.hull] || '#f6f1e6'; g.beginPath();
+  for (let i = 0; i <= 40; i++) { const t = -1 + i / 20; g.lineTo(sx(t * H.len / 2), sy(-SH.planW(H.id, t))); }
+  for (let i = 40; i >= 0; i--) { const t = -1 + i / 20; g.lineTo(sx(t * H.len / 2), sy(SH.planW(H.id, t))); }
+  g.closePath(); g.fill();
+  g.fillStyle = '#c79c63'; g.beginPath();
+  for (let i = 0; i <= 40; i++) { const t = -1 + i / 20; g.lineTo(sx(t * H.len / 2 * 0.96), sy(-SH.planW(H.id, t) * 0.86)); }
+  for (let i = 40; i >= 0; i--) { const t = -1 + i / 20; g.lineTo(sx(t * H.len / 2 * 0.96), sy(SH.planW(H.id, t) * 0.86)); }
+  g.closePath(); g.fill();
+  for (const m of S.ship.mods) {
+    const M = MODULES[m.id], [x, y] = SH.modulePos(H.id, m), [w, h] = SH.sizeOf(m), hx = h * H.cell * px / 2, hy = w * H.cell * px / 2;
+    g.fillStyle = M.color; g.globalAlpha = 0.75; g.beginPath(); g.roundRect(sx(x) - hx + 1, sy(y) - hy + 1, hx * 2 - 2, hy * 2 - 2, 4); g.fill(); g.globalAlpha = 1;
+    g.font = `${Math.min(16, hx * 1.1)}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(M.icon, sx(x), sy(y));
+  }
+  box.append(cv);
+  const sel = S.crew.find((c) => c.id === crewSel);
+  for (const q of G.seatsOf(S)) {
+    const who = S.crew.find((c) => c.seat === q.key), b = el('button', `seat${who ? '' : ' empty'}${q.type === 'rest' ? ' rest' : ''}${sel && sel.seat === q.key ? ' pick' : ''}`);
+    // 자리 아이콘 + 앉은 사람 이름 첫 두 글자(조타는 비면 선장)
+    b.textContent = `${SEAT_ICON[q.type] || '•'}${who ? who.name.slice(0, 2) : q.type === 'helm' ? '선장' : q.type === 'rest' ? '' : '?'}`;
+    b.title = `${SEATS[q.type]}${who ? ` · ${who.name}` : ''}`;
+    b.style.left = `${sx(q.x)}px`; b.style.top = `${sy(q.y)}px`;
+    b.addEventListener('click', () => {
+      if (!sel) { showHint('선원 카드를 먼저 누르고 자리를 눌러!', 2); return; }
+      G.setSeat(S, sel.id, q.key); crewSel = null; snd.play('tap'); renderSheet();
+    });
+    box.append(b);
+  }
+  box.append(el('div', 'hint', sel ? `${sel.name}: 앉힐 자리를 눌러!` : '선원 카드를 누르고 → 자리를 눌러 앉히기'));
+  out.push(box);
+  const used = [...new Set(G.seatsOf(S).map((q) => q.type))];
+  out.push(el('div', 'deckKey', used.map((t) => `<span>${SEAT_ICON[t]} ${SEATS[t]}</span>`).join('') + '<span>? 빈 자리</span>'));
+  return out;
 }
 
 // ── 해도 ──
@@ -1513,7 +1602,7 @@ function shipState(x, y, h, t, heelV, zoom, still = false) {
   const bob = still ? 0 : Math.sin(t * 1.25) * 0.09 * swell + Math.sin(t * 0.73 + 1) * 0.05 * swell;
   const pitch = still ? 0 : Math.sin(t * 1.1 + 0.6) * 0.022 * swell + Math.min(0.03, b.spd * 0.004);
   const heel = heelV + (still ? 0 : Math.sin(t * 0.93) * 0.015 * swell);
-  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: S.crew, capLook: CAPTAINS[S.captain?.id] || null };
+  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: G.crewOnDeck(S), rower: !!G.workerAt(S, 'oar'), capLook: CAPTAINS[S.captain?.id] || null };
 }
 function render() {
   const b = S.boat, t = S.t;
