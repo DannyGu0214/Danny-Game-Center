@@ -375,12 +375,13 @@ export function createBusiness(env) {
   function seasonScreen(s) {
     return new Promise((done) => {
       const box = $('settle');
-      box.innerHTML = `<h2>봄 결산</h2>
-        <p class="sLead">${s.money >= 0 ? '봄을 무사히 넘겼어요.' : '월세를 내고 나니 빚이 생겼어요. 그래도 가게는 계속돼요.'}</p>
+      const b = biz(), name = SEASON_NAME[b.season], next = B.canContinue(b) ? SEASON_NAME[B.nextSeasonOf(b.season)] : null;
+      box.innerHTML = `<h2>${name} 결산</h2>
+        <p class="sLead">${s.money >= 0 ? `${name}을 무사히 넘겼어요.` : '월세를 내고 나니 빚이 생겼어요. 그래도 가게는 계속돼요.'}</p>
         <div class="sRows"><div><span>영업한 날</span><b>${s.days}일</b></div><div><span>번 돈(재료비 뺌)</span><b>${won(s.income)}</b></div><div><span>월세</span><b>- ${won(s.rent)}</b></div><div><span>손님</span><b>${s.served}명</b></div><div><span>기다리다 간 손님</span><b>${s.lost}명</b></div><div><span>별 평균</span><b>${s.avgStars}</b></div><div><span>평판</span><b>${s.rep}</b></div></div>
         <div class="sMoney">가진 돈 <b>${won(s.money)}</b></div>
-        <p class="sLead">여름부터는 지금 만들고 있어요. 다음 계절이 열리면 여기서 이어져요.</p>
-        <button class="mainBtn sNext" id="settleNext">타이틀로</button>`;
+        <p class="sLead">${next ? `이제 ${next}이에요. 가진 돈과 단골, 해금한 것은 그대로 가져가요.` : `${SEASON_NAME[B.nextSeasonOf(b.season)]}은 지금 만들고 있어요. 업데이트되면 이 가게 그대로 이어서 할 수 있어요.`}</p>
+        <button class="mainBtn sNext" id="settleNext">${next ? `${next} 시작하기` : '타이틀로'}</button>`;
       box.classList.remove('hide');
       $('settleNext').onclick = () => { box.classList.add('hide'); done(); };
     });
@@ -390,7 +391,10 @@ export function createBusiness(env) {
     async run() {
       for (;;) {
         const b = biz();
-        if (b.finished) { env.toTitle(); return; }
+        if (b.finished) { // 지난 계절을 마친 저장: 이 버전에 다음 계절이 있으면 이어서 한다
+          if (!B.canContinue(b)) { env.toTitle(); return; }
+          B.startNextSeason(b); env.save();
+        }
         if (b.fairTomorrow) await fairDay();
         else {
           const err = await morning();
@@ -405,8 +409,9 @@ export function createBusiness(env) {
           const s = B.settleSeason(b, env.S.choices.place);
           b.finished = true; env.save();
           await seasonScreen(s);
-          env.toTitle();
-          return;
+          if (!B.canContinue(b)) { env.toTitle(); return; }
+          B.startNextSeason(b); env.save();
+          continue;
         }
         B.nextDay(b); env.save();
       }
