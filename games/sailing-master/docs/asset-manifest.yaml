@@ -37,7 +37,7 @@ assets:
     source: generate
     path: games/sailing-master/assets/portraits/crafter.webp
     spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
-    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a sturdy, kind-faced man in his fifties, an Age of Sail sea captain who was a master shipwright and carpenter in a European port town. Bald head with graying hair only on the sides, a full graying beard, weathered skin, strong forearms, a carpenter's pencil behind his ear. Ochre-brown (#6b5a3a) work-worn captain's coat over a leather apron. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a sturdy, kind-faced man in his fifties, an Age of Sail sea captain who was a master clockmaker in a European port town for thirty years. Bald head with graying hair only on the sides, a full graying beard, warm wise eyes, a brass jeweler's loupe hanging on a cord around his neck, a small leather tool bag strap on his shoulder. Ochre-brown (#6b5a3a) work-worn captain's coat over a leather apron. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
     url: ""
     status: pending
     license: ""
@@ -72,3 +72,123 @@ assets:
     status: pending
     license: ""
     note: "곡 이름: 노 저어라, 친구(강)"
+  - id: story-ride
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/ride.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 1/3 'The Last Letter': the young sailor captain (twenties, short dark brown hair, tanned, light stubble, deep sea-blue #25506f coat) as a young postal courier galloping on a chestnut horse through a narrow cobblestone alley of a hillside port town, a leather mail bag flying, laundry lines and stucco houses with terracotta roofs, glimpse of the harbor and ships far below, bright morning light. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 sailor"
+  - id: story-poleNotice
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/poleNotice.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 2/3: rainy night in the port town. the young sailor captain (twenties, short dark brown hair, tanned, light stubble, deep sea-blue #25506f coat) in a wet riding cloak with an empty mail bag stops under an iron street lamp post and looks at a single paper notice pinned to the post. Rain streaks, glowing lamp light reflecting on wet cobblestones, dark harbor silhouettes behind. Quiet, decisive moment. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 sailor"
+  - id: story-journeyHorse
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/journeyHorse.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 3/3 travel map scene, slightly elevated bird's-eye view of countryside: the port town with terracotta roofs and a harbor in the lower-left corner, rolling green meadows and small pine trees in the middle, distant blue-gray mountains on the horizon, and a small reed-fringed lake on the right side (center of the lake around 82% across, 46% down) with a tiny wooden jetty and a log raft at its left shore. Soft sunny afternoon, sun in the upper right. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons. Do NOT paint any road, path or route line between the town and the lake: the game draws the road, the animated red dotted route and the traveling figure on top. Keep the meadow between them open and simple."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 sailor · 여정 배경(길·경로·인물은 게임이 위에 그림)"
+  - id: story-lostFound
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/lostFound.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 1/3 'The Unclaimed Chest': the young lucky captain (twenties, long wavy brown hair, teal-green #2f6b5a coat over cream blouse) as a keeper of the customs lost-and-found warehouse, smiling as she hands a lost walking cane back to a grateful old sailor. Tall wooden shelves full of tagged bags, hats, umbrellas, lanterns and chests, dusty sunbeams through a high window. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 lucky"
+  - id: story-oldBox
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/oldBox.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 2/3: in the same warehouse, the young lucky captain (twenties, long wavy brown hair, teal-green #2f6b5a coat over cream blouse) kneels and opens an old dusty sea chest that nobody claimed for a year. Inside she finds a rolled antique sea chart and a folded paper notice, a soft golden glow coming from the chest onto her surprised face. Dim warm lantern light. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 lucky"
+  - id: story-journeyCoach
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/journeyCoach.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 3/3 travel map scene, slightly elevated bird's-eye view of countryside: a stone customs warehouse by the harbor of the port town in the lower-left corner, rolling green meadows and small pine trees in the middle, distant blue-gray mountains on the horizon, and a small reed-fringed lake on the right side (center of the lake around 82% across, 46% down) with a tiny wooden jetty and a log raft at its left shore. Soft sunny afternoon, sun in the upper right. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons. Do NOT paint any road, path or route line between the town and the lake: the game draws the road, the animated red dotted route and the traveling figure on top. Keep the meadow between them open and simple."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 lucky · 여정 배경(길·경로·인물은 게임이 위에 그림)"
+  - id: story-market
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/market.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 1/3 'The Last Market Day': the trader captain (woman in her fifties, graying permed hair pinned up, gold hoop earrings, plum-mauve #7a4a5e coat) behind the counter of her lively spice stall in a bustling port market, sacks and baskets of colorful spices (saffron, paprika, cinnamon, pepper), brass scales, hanging dried herbs, customers in period clothing, crates stamped with shipping marks (no letters). Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 trader"
+  - id: story-lastDay
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/lastDay.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 2/3: the last market day. An empty, half-demolished market alley with boarded stalls and rubble, workers' scaffolding near the harbor. the trader captain (woman in her fifties, graying permed hair pinned up, gold hoop earrings, plum-mauve #7a4a5e coat) stands with her adult daughter, looking at a paper notice pasted on a bare wall. Late afternoon golden light, bittersweet but hopeful. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 trader"
+  - id: story-journeyCart
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/journeyCart.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 3/3 travel map scene, slightly elevated bird's-eye view of countryside: a demolished market square with a few empty stalls in the port town in the lower-left corner, rolling green meadows and small pine trees in the middle, distant blue-gray mountains on the horizon, and a small reed-fringed lake on the right side (center of the lake around 82% across, 46% down) with a tiny wooden jetty and a log raft at its left shore. Soft sunny afternoon, sun in the upper right. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons. Do NOT paint any road, path or route line between the town and the lake: the game draws the road, the animated red dotted route and the traveling figure on top. Keep the meadow between them open and simple."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 trader · 여정 배경(길·경로·인물은 게임이 위에 그림)"
+  - id: story-clockShop
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/clockShop.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 1/3 \"The Grandchild's Question\": the crafter captain (man in his fifties, bald with gray sides, full gray beard, brass loupe on a cord, ochre-brown #6b5a3a coat over leather apron) as a clockmaker at his workbench in a cozy workshop full of brass gears, pendulum clocks and a large tower-clock mechanism, examining a tiny gear through his loupe, warm lamplight, tools neatly hung on the wall. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 crafter"
+  - id: story-basinBoat
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/basinBoat.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 2/3: in a homey kitchen-yard, the crafter captain (man in his fifties, bald with gray sides, full gray beard, brass loupe on a cord, ochre-brown #6b5a3a coat over leather apron) kneels beside a wooden wash basin where a small hand-carved toy sailboat floats; his young grandchild (about 6 years old) points at the boat and looks up at him asking a question. Afternoon light, gentle and warm. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 crafter"
+  - id: story-journeyDonkey
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/journeyDonkey.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 3/3 travel map scene, slightly elevated bird's-eye view of countryside: a small clockmaker's workshop with a clock sign shape (no letters) in the port town in the lower-left corner, rolling green meadows and small pine trees in the middle, distant blue-gray mountains on the horizon, and a small reed-fringed lake on the right side (center of the lake around 82% across, 46% down) with a tiny wooden jetty and a log raft at its left shore. Soft sunny afternoon, sun in the upper right. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons. Do NOT paint any road, path or route line between the town and the lake: the game draws the road, the animated red dotted route and the traveling figure on top. Keep the meadow between them open and simple."
+    url: ""
+    status: pending
+    license: ""
+    note: "선장 crafter · 여정 배경(길·경로·인물은 게임이 위에 그림)"
