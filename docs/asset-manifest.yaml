@@ -30,9 +30,9 @@ assets:
     spec: "마지막 불빛 · E minor, 58 BPM, chords Em - C - G - D · 연주곡, 드럼 없음 · 공포·좀비 서바이벌 분위기 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
     prompt: "instrumental dark ambient survival horror, solo detuned felt piano, E minor, 58 BPM, very slow and sparse. steady eighth-note arpeggios (chords Em - C - G - D) with long decaying low notes, a slow fragile melody with unsettling minor-second dissonance entering in later phrases, one low sustained bass drone per bar, faint distant metallic scrape and cold empty-room reverb. last flickering light in a dead city, zombie apocalypse, dread, unsettling stillness, cinematic horror game score, no vocals, no drums, no climax"
     url: ""
-    status: "pending"
-    license: ""
-    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId f58e8748-a84d-4fe0-a9a2-eca33fc20691·59ebee50-7eb3-4cab-8fd0-253495527a3b 재사용 금지, 같은 path에 덮어쓰기"
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId f58e8748-a84d-4fe0-a9a2-eca33fc20691·59ebee50-7eb3-4cab-8fd0-253495527a3b 재사용 금지, 같은 path에 덮어쓰기 · sunoapi.org V6 연주곡 300초, 요청당 12크레딧(두 테이크) · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 2026-11-09 공포 프롬프트·새 negativeTags로 재생성, 대니님 지시로 두 테이크 모두 배달(이 항목과 -b 항목) · trackId 3f618021-f1f4-4607-ab7b-71e805084d2b · 추정 E minor · 54 BPM"
 
   - id: bgm-04-dawn-patrol
     kind: music
@@ -43,7 +43,7 @@ assets:
     url: ""
     status: "pending"
     license: ""
-    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId cf58778a-b7ef-43d2-9cde-c92088d3cd99·2f66a998-af38-4140-84db-92e4b843975c 재사용 금지, 같은 path에 덮어쓰기"
+    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId cf58778a-b7ef-43d2-9cde-c92088d3cd99·2f66a998-af38-4140-84db-92e4b843975c 재사용 금지, 같은 path에 덮어쓰기 · 2026-11-09 대니님 지시로 이번 회차에는 생성하지 않음(기존 밝은 분위기 파일이 path에 그대로 남아 있음)"
 
   - id: bgm-05-first-harvest
     kind: music
@@ -54,7 +54,7 @@ assets:
     url: ""
     status: "pending"
     license: ""
-    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId 4e827466-2ae3-4e65-87d9-92952834a3a4·d21d831c-cdea-45c4-823b-7f53375075c1 재사용 금지, 같은 path에 덮어쓰기"
+    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId 4e827466-2ae3-4e65-87d9-92952834a3a4·d21d831c-cdea-45c4-823b-7f53375075c1 재사용 금지, 같은 path에 덮어쓰기 · 2026-11-09 대니님 지시로 이번 회차에는 생성하지 않음(기존 밝은 분위기 파일이 path에 그대로 남아 있음)"
 
   - id: bgm-06-under-the-lantern
     kind: music
@@ -63,9 +63,9 @@ assets:
     spec: "등불 아래 · F minor, 66 BPM, chords Fm - Cm - Db - Eb · 연주곡, 드럼 없음 · 공포·좀비 서바이벌 분위기 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
     prompt: "instrumental creepy horror, F minor, 66 BPM, unsettling and fragile. dark low pad, sparse piano broken chords on quarter notes, soft low bass, a detuned warped music box lullaby melody entering in later phrases (haunting, slightly out of tune, slowing at phrase ends). chords Fm - Cm - Db - Eb, one chord per bar. one dim lantern in a barricaded shelter at night while the undead shuffle outside, dread, cinematic horror game score, cold reverb, no vocals, no drums, no climax"
     url: ""
-    status: "pending"
-    license: ""
-    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId 69a400fa-ff77-4774-9e70-f7ed029661ef·db5c5250-1df5-43af-9dc7-8914b4cb8e2e 재사용 금지, 같은 path에 덮어쓰기"
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId 69a400fa-ff77-4774-9e70-f7ed029661ef·db5c5250-1df5-43af-9dc7-8914b4cb8e2e 재사용 금지, 같은 path에 덮어쓰기 · sunoapi.org V6 연주곡 300초, 요청당 12크레딧(두 테이크) · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 2026-11-09 공포 프롬프트·새 negativeTags로 재생성, 대니님 지시로 두 테이크 모두 배달(이 항목과 -b 항목) · trackId 2ce6c8d4-43b5-4d89-9042-561697dc12b7 · 추정 C minor(목표 F minor, 단조 유지) · 65 BPM"
 
   - id: bgm-07-campfire-song
     kind: music
@@ -76,5 +76,48 @@ assets:
     url: ""
     status: "pending"
     license: ""
-    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId edef5951-e827-4fbb-93a7-f820a299850d·97b0c22c-4bb9-49ef-8135-12a65192e53a 재사용 금지, 같은 path에 덮어쓰기"
+    note: "v1(밝은 분위기라 좀비 공포와 불일치, 대니님 청취 피드백)은 폐기 · 이전 trackId edef5951-e827-4fbb-93a7-f820a299850d·97b0c22c-4bb9-49ef-8135-12a65192e53a 재사용 금지, 같은 path에 덮어쓰기 · 2026-11-09 대니님 지시로 이번 회차에는 생성하지 않음(기존 밝은 분위기 파일이 path에 그대로 남아 있음)"
 
+  - id: bgm-01b-gray-field
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/01-gray-field-b.mp3
+    spec: "잿빛 들판 · D minor, 68 BPM, chords Dm - Bb - F - C · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental, drumless post-apocalyptic ambient, D minor, 68 BPM, slow and bleak. low detuned analog sawtooth synth pad muffled by a low-pass filter, sparse plucked acoustic guitar melody, soft deep sine bass, faint wind noise in the background. chords Dm - Bb - F - C, 4 bars per phrase. starts with only the pad, then bass enters, then the guitar melody. desolate, empty grey fields, long reverb, no vocals, no drums, calm and steady, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧(두 테이크) · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · bgm-01-gray-field의 두 번째 테이크(대니님 지시로 함께 배달) · trackId fa6c5d53-5359-4474-be8b-163fa940aa01 · 추정 D minor · 68 BPM · 2026-11-08 생성분"
+
+  - id: bgm-02b-rusty-radio
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/02-rusty-radio-b.mp3
+    spec: "녹슨 라디오 · A minor, 84 BPM, chords Am - G - F - E · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental, drumless lo-fi post-apocalyptic, A minor, 84 BPM, melancholic. small flat square-wave lead like an old broken radio (band-pass filtered, narrow and nasal), pulsing quarter-note sine and triangle bass alternating octaves, sparkling music box notes in later phrases, subtle radio static crackle. chords Am - G - F - E, one chord per bar. lonely signal in the ruins, light reverb, no vocals, no drums, calm, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧(두 테이크) · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · bgm-02-rusty-radio의 두 번째 테이크(대니님 지시로 함께 배달) · trackId 183b7061-410d-4e5b-ac54-7c5889860eb6 · 추정 C major(A minor의 나란한조, 잡음 때문에 불확실) · 86 BPM · 2026-11-08 생성분"
+
+  - id: bgm-03b-last-light
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/03-last-light-b.mp3
+    spec: "마지막 불빛 · E minor, 58 BPM, chords Em - C - G - D · 연주곡, 드럼 없음 · 공포·좀비 서바이벌 분위기 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental dark ambient survival horror, solo detuned felt piano, E minor, 58 BPM, very slow and sparse. steady eighth-note arpeggios (chords Em - C - G - D) with long decaying low notes, a slow fragile melody with unsettling minor-second dissonance entering in later phrases, one low sustained bass drone per bar, faint distant metallic scrape and cold empty-room reverb. last flickering light in a dead city, zombie apocalypse, dread, unsettling stillness, cinematic horror game score, no vocals, no drums, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧(두 테이크) · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · bgm-03-last-light의 두 번째 테이크(대니님 지시로 함께 배달) · trackId b2d6967a-f823-4db1-992e-00e0b4c7d1b7 · 추정 B major(2순위 B minor) · 50 BPM — 장조 추정이나 대니님 지시(2곡×2테이크 확보)로 재생성하지 않음"
+
+  - id: bgm-06b-under-the-lantern
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/06-under-the-lantern-b.mp3
+    spec: "등불 아래 · F minor, 66 BPM, chords Fm - Cm - Db - Eb · 연주곡, 드럼 없음 · 공포·좀비 서바이벌 분위기 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental creepy horror, F minor, 66 BPM, unsettling and fragile. dark low pad, sparse piano broken chords on quarter notes, soft low bass, a detuned warped music box lullaby melody entering in later phrases (haunting, slightly out of tune, slowing at phrase ends). chords Fm - Cm - Db - Eb, one chord per bar. one dim lantern in a barricaded shelter at night while the undead shuffle outside, dread, cinematic horror game score, cold reverb, no vocals, no drums, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧(두 테이크) · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · bgm-06-under-the-lantern의 두 번째 테이크(대니님 지시로 함께 배달) · trackId 45eede82-7874-43c9-938f-a2ae669cba49 · 추정 C minor(목표 F minor) · 65 BPM"
