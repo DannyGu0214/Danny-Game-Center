@@ -1,4 +1,4 @@
-// 배경음악: 파일 없이 Web Audio로 합성한다(Animal World music.js와 같은 예약 방식).
+// 배경음악: assets/music/의 mp3를 먼저 틀고(2026-11-08), 파일을 못 읽으면 Web Audio 합성곡으로 대신한다(Animal World music.js와 같은 예약 방식).
 // 항해의 기본 곡은 선술집 풍(2026-11-02 대니님 요청): 아코디언·피들·뜯는 현·발 구르기·탬버린. 수역마다 한 곡, 바뀌면 4초 동안 겹쳐 넘어간다.
 
 const FADE_S = 4, LOOKAHEAD_S = 0.6;
@@ -120,8 +120,43 @@ export const TRACKS = {
 };
 const INTRO_BARS = 2;
 
-export function createMusic({ volume = 0.65, rand = Math.random } = {}) { // 파도 소리(RMS 약 0.06)에 묻히지 않을 크기
+// 수역별 mp3. 바다·대양 곡(sea)은 그 수역이 생기면 쓴다
+export const FILES = { pond: 'pond', lake: 'lake', river: 'river', sea: 'sea', ocean: 'sea' };
+// mp3는 평균 -17.5dB(RMS 약 0.13)라 합성곡(RMS 약 0.035)과 크기를 맞추려고 줄인다
+const FILE_GAIN = 0.42;
+export function createMusic({ volume = 0.65, rand = Math.random, base = 'assets/music/' } = {}) { // 파도 소리(RMS 약 0.06)에 묻히지 않을 크기
   let ac = null, bus = null, verb = null, timer = null, on = true, paused = false, cur = null, wanted = 'pond';
+  // 파일 곡: 곡마다 audio 하나를 만들어 두고 이음새 없이 반복한다. 실패한 곡은 failed에 넣고 합성곡으로 간다
+  const files = {}, failed = new Set();
+  let fileCur = null;
+  const fileOf = (id) => (FILES[id] && !failed.has(FILES[id]) ? FILES[id] : null);
+  function fileTrack(name) {
+    if (files[name]) return files[name];
+    const el = new Audio(); el.src = `${base}${name}.mp3`; el.loop = true; el.preload = 'auto'; el.crossOrigin = 'anonymous';
+    const g = ac.createGain(); g.gain.value = 0.0001; g.connect(bus);
+    const src = ac.createMediaElementSource(el); src.connect(g);
+    const f = files[name] = { name, el, g };
+    el.addEventListener('error', () => { failed.add(name); if (fileCur === f) fileCur = null; });
+    return f;
+  }
+  function fade(g, to, s) { const t = ac.currentTime; g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.exponentialRampToValueAtTime(Math.max(0.0001, to), t + s); }
+  function playFile(f) { const p = f.el.play(); if (p && p.catch) p.catch(() => { /* 자동 재생이 막히면 다음 탭에서 다시 */ }); }
+  function stopSynth() {
+    if (!cur) return;
+    const old = cur, t = ac.currentTime; old.g.gain.cancelScheduledValues(t); old.g.gain.setValueAtTime(Math.max(0.0001, old.g.gain.value), t); old.g.gain.exponentialRampToValueAtTime(0.0001, t + FADE_S);
+    setTimeout(() => old.g.disconnect(), (FADE_S + 1) * 1000); cur = null;
+  }
+  function tickFile() {
+    const name = fileOf(wanted);
+    if (!name) { if (fileCur) { const old = fileCur; fade(old.g, 0.0001, FADE_S); setTimeout(() => { if (fileCur !== old) old.el.pause(); }, FADE_S * 1000 + 200); fileCur = null; } return false; }
+    if (!fileCur || fileCur.name !== name) {
+      const old = fileCur, f = fileTrack(name);
+      if (old) { fade(old.g, 0.0001, FADE_S); setTimeout(() => { if (fileCur !== old) old.el.pause(); }, FADE_S * 1000 + 200); }
+      stopSynth();
+      fileCur = f; playFile(f); fade(f.g, FILE_GAIN, FADE_S);
+    } else if (fileCur.el.paused) playFile(fileCur);
+    return true;
+  }
   function makeReverb() {
     const len = Math.floor(ac.sampleRate * 0.9), buf = ac.createBuffer(2, len, ac.sampleRate);
     for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3; }
@@ -172,17 +207,20 @@ export function createMusic({ volume = 0.65, rand = Math.random } = {}) { // 파
   }
   function tick() {
     if (!ac || !on || paused || ac.state !== 'running') return;
-    const until = ac.currentTime + LOOKAHEAD_S;
-    if (!cur) begin(wanted, ac.currentTime + 0.1);
+    if (tickFile()) return;
+    const until = ac.currentTime + LOOKAHEAD_S, sid = TRACKS[wanted] ? wanted : 'river'; // 합성곡이 없는 수역은 강 곡으로
+    if (!cur) begin(sid, ac.currentTime + 0.1);
     if (cur.nextBar < ac.currentTime) cur.nextBar = ac.currentTime + 0.05; // 멈췄다 돌아오면 밀린 음표를 치지 않는다
-    if (cur.id !== wanted) {
+    if (cur.id !== sid) {
       const old = cur, t = cur.nextBar;
       old.g.gain.setValueAtTime(1, t); old.g.gain.exponentialRampToValueAtTime(0.0001, t + FADE_S);
       setTimeout(() => old.g.disconnect(), (t - ac.currentTime + FADE_S + 2) * 1000);
-      begin(wanted, t);
+      begin(sid, t);
     }
     while (cur.nextBar < until) scheduleBar(cur);
   }
+  // 꺼지거나 멈추면 소리가 줄어든 뒤 파일 재생도 멈춘다(배터리)
+  function holdFiles() { const f = fileCur; if (f) setTimeout(() => { if (!on || paused) f.el.pause(); }, 700); }
   function level() {
     if (!bus) return;
     const t = ac.currentTime, v = on && !paused ? Math.max(0.0001, volume) : 0.0001;
@@ -194,13 +232,15 @@ export function createMusic({ volume = 0.65, rand = Math.random } = {}) { // 파
       ac = ctx; bus = ac.createGain(); bus.gain.value = 0.0001; bus.connect(ac.destination);
       verb = makeReverb(); level();
       timer = setInterval(tick, 50); tick();
+      if (on && !paused) tickFile(); // 탭한 그 순간에 재생을 시작해야 iOS가 막지 않는다
     },
-    setRegion(id) { if (TRACKS[id]) wanted = id; },
-    setOn(v) { on = !!v; level(); },
+    setRegion(id) { if (TRACKS[id] || FILES[id]) wanted = id; },
+    setOn(v) { on = !!v; level(); if (!on) holdFiles(); else if (ac && !paused) tickFile(); },
     get on() { return on; },
-    pause() { paused = true; level(); },
-    resume() { paused = false; level(); },
-    get current() { return cur?.T.name ?? null; },
+    pause() { paused = true; level(); holdFiles(); },
+    resume() { paused = false; level(); if (ac && on) tickFile(); },
+    get current() { return fileCur ? `${fileCur.name}.mp3` : cur?.T.name ?? null; },
+    get failed() { return [...failed]; },
     // 점검용: 오프라인 컨텍스트에 한 곡을 seconds만큼 예약한다
     renderInto(ctx, id, seconds) {
       ac = ctx; bus = ac.createGain(); bus.gain.value = volume; bus.connect(ac.destination);
