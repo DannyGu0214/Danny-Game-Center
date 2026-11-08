@@ -6,7 +6,7 @@ assets:
     kind: image
     source: generate
     path: games/sailing-master/assets/portraits/sailor.webp
-    spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경(2026-11-08 대니님 확정: 한 화면에 한 명씩 크게 보여 주는 선택 화면용)"
     prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a confident young man in his twenties, an Age of Sail sea captain from a Southern European port town. Short dark brown hair, sun-tanned skin, bright determined eyes, light stubble, a former fast mail rider turned sailor. Deep sea-blue (#25506f) long captain's coat with brass buttons over a linen shirt, tricorn hat optional. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
     url: ""
     status: done
@@ -16,7 +16,7 @@ assets:
     kind: image
     source: generate
     path: games/sailing-master/assets/portraits/lucky.webp
-    spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경(2026-11-08 대니님 확정: 한 화면에 한 명씩 크게 보여 주는 선택 화면용)"
     prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a cheerful young woman in her twenties, an Age of Sail sea captain from a Spanish or Latin American port town. Long wavy brown hair, warm curious eyes, a playful knowing smile, a former customs lost-and-found keeper known for her luck. Teal-green (#2f6b5a) fitted captain's coat over a cream blouse, an old rolled sea chart tucked under her arm. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
     url: ""
     status: done
@@ -26,7 +26,7 @@ assets:
     kind: image
     source: generate
     path: games/sailing-master/assets/portraits/trader.webp
-    spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경(2026-11-08 대니님 확정: 한 화면에 한 명씩 크게 보여 주는 선택 화면용)"
     prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a shrewd, dignified woman in her fifties, an Age of Sail sea captain who ran a spice shop in a Portuguese or Spanish port market for thirty years. Graying permed wavy hair pinned up, sharp appraising eyes, a confident half smile, gold hoop earrings. Plum-mauve (#7a4a5e) captain's coat with embroidered cuffs over a dark dress, a small coin purse at her belt. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
     url: ""
     status: done
@@ -36,7 +36,7 @@ assets:
     kind: image
     source: generate
     path: games/sailing-master/assets/portraits/crafter.webp
-    spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경(2026-11-08 대니님 확정: 한 화면에 한 명씩 크게 보여 주는 선택 화면용)"
     prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a sturdy, kind-faced man in his fifties, an Age of Sail sea captain who was a master clockmaker in a European port town for thirty years. Bald head with graying hair only on the sides, a full graying beard, warm wise eyes, a brass jeweler's loupe hanging on a cord around his neck, a small leather tool bag strap on his shoulder. Ochre-brown (#6b5a3a) work-worn captain's coat over a leather apron. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
     url: ""
     status: done
