@@ -150,7 +150,7 @@ export function nextDay(biz, rand = Math.random) {
 }
 export function buyEquip(biz, id) {
   const e = EQUIP[id];
-  if (!e || biz.equip[id] || biz.money < e.price) return false;
+  if (!e || biz.equip[id] || !equipOpen(biz, id) || biz.money < e.price) return false;
   biz.money -= e.price; biz.equip[id] = true;
   return true;
 }
@@ -183,8 +183,10 @@ export function roastBatch(biz, temp) {
 // 콜드브루와 디저트는 그날 저녁 버린다. 원두는 남겨 둔다
 export function endOfDayStock(biz) { const left = { coldbrew: biz.stock.coldbrew, dessert: biz.stock.dessert }; biz.stock.coldbrew = 0; biz.stock.dessert = 0; return left; }
 // ── 이벤트와 해금(DESIGN 5.9절) ──
-export const UNLOCKS = ['equip', 'dessert', 'beans', 'coldbrew', 'origin'];
+export const UNLOCKS = ['equip', 'dessert', 'beans', 'coldbrew', 'origin', 'machine'];
 export const isUnlocked = (biz, id) => !!biz.unlocked[id];
+// 장비 목록에 보이고 살 수 있는지: 따로 해금이 필요한 장비(2구 머신)가 있다. 이미 산 장비는 그대로 둔다
+export const equipOpen = (biz, id) => !EQUIP[id].unlock || isUnlocked(biz, EQUIP[id].unlock);
 // 지금 나올 이벤트 하나. 하루에 하나까지이고, 목록 앞쪽이 먼저다
 export function eventDue(biz, events, phase) {
   if (biz.eventDay === biz.day) return null;

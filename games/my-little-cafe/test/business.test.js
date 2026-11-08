@@ -148,6 +148,9 @@ test('로스팅: 초록 칸이면 품질 100%, 태우면 떨어지고, 원두는
 test('장비와 콜드브루: 돈이 모자라면 못 사고, 남은 병은 버려요', () => {
   const biz = B.newBiz(seeded(1));
   assert.equal(B.buyEquip(biz, 'machine'), false);
+  biz.money = 1e7; assert.equal(B.buyEquip(biz, 'machine'), false); // 2구 머신은 겨울에 열려요
+  biz.unlocked.machine = true; assert.equal(B.buyEquip(biz, 'machine'), true);
+  biz.money = 500000; biz.equip = {};
   assert.equal(B.buyEquip(biz, 'grinder'), true);
   assert.equal(B.buyEquip(biz, 'grinder'), false);
   assert.equal(biz.money, 200000);

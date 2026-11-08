@@ -148,7 +148,7 @@ export const AUTO_SEC = { espresso: 7, americano: 8, iced: 9 }; // 머신이 알
 // 장비(DESIGN 5.7절). 자동화가 성장 보상이다
 export const EQUIP = {
   grinder: { name: '자동 도징 그라인더', price: 300000, text: '직접 만들 때 가루 담기가 자동이에요.' },
-  machine: { name: '2구 머신', price: 600000, text: '자동 메뉴를 2잔까지 동시에 만들어요.' },
+  machine: { name: '2구 머신', price: 600000, text: '자동 메뉴를 2잔까지 동시에 만들어요.', unlock: 'machine' }, // 겨울 연말 카페 쇼에서 열려요(DESIGN 5.9절)
   pitcher: { name: '자동 스팀 피처', price: 250000, text: '라떼도 자동으로 만들어요. 직접 치면 별과 팁이 더 붙어요.' },
 };
 // 단골: 두 카페 모두 있다. 대화 모드에서 시간이 멈추고, 전부 직접 만든다
