@@ -1,0 +1,74 @@
+version: 1
+style: games/sailing-master/docs/art-style.md
+# 경로는 모두 저장소 루트 기준. 개발 중 placeholder = 지금의 캔버스 초상화(art-ship.js drawCaptainPortrait)와 Web Audio 합성곡(music.js)
+assets:
+  - id: portrait-sailor
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/portraits/sailor.webp
+    spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a confident young man in his twenties, an Age of Sail sea captain from a Southern European port town. Short dark brown hair, sun-tanned skin, bright determined eyes, light stubble, a former fast mail rider turned sailor. Deep sea-blue (#25506f) long captain's coat with brass buttons over a linen shirt, tricorn hat optional. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: portrait-lucky
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/portraits/lucky.webp
+    spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a cheerful young woman in her twenties, an Age of Sail sea captain from a Spanish or Latin American port town. Long wavy brown hair, warm curious eyes, a playful knowing smile, a former customs lost-and-found keeper known for her luck. Teal-green (#2f6b5a) fitted captain's coat over a cream blouse, an old rolled sea chart tucked under her arm. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: portrait-trader
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/portraits/trader.webp
+    spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a shrewd, dignified woman in her fifties, an Age of Sail sea captain who ran a spice shop in a Portuguese or Spanish port market for thirty years. Graying permed wavy hair pinned up, sharp appraising eyes, a confident half smile, gold hoop earrings. Plum-mauve (#7a4a5e) captain's coat with embroidered cuffs over a dark dress, a small coin purse at her belt. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: portrait-crafter
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/portraits/crafter.webp
+    spec: "1024x1024 WebP(품질 85, 400KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a sturdy, kind-faced man in his fifties, an Age of Sail sea captain who was a master shipwright and carpenter in a European port town. Bald head with graying hair only on the sides, a full graying beard, weathered skin, strong forearms, a carpenter's pencil behind his ear. Ochre-brown (#6b5a3a) work-worn captain's coat over a leather apron. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: bgm-pond
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/pond.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 앞뒤 무음 0.1초 이하, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental tavern folk jig in 6/8, about 112 BPM (dotted quarter), D Dorian. Fiddle carries the melody, accordion answers on the repeat, plucked mandolin chords, upright bass, stomping on a wooden tavern floor, tambourine, an occasional clink of mugs at phrase ends. Warm, lively, slightly rough sailors' tavern by a reed-lined lake dock at dusk. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 갈대 나루 선술집(작은 호수)"
+  - id: bgm-lake
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/lake.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 앞뒤 무음 0.1초 이하, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental tavern polka in 4/4, about 132 BPM, G major. Accordion leads the melody, tin whistle takes it on the repeat, plucked mandolin offbeat chords, upright bass oom-pah, foot stomps on wooden floor, tambourine, cheerful clink of mugs. Bright, rowdy 'one more round!' drinking-hall energy on a wide lake harbor. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 한 잔 더!(큰 호수)"
+  - id: bgm-river
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/river.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 앞뒤 무음 0.1초 이하, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental sea-shanty style rowing tune in 4/4, about 118 BPM, A harmonic minor. Fiddle leads, accordion doubles on the repeat, plucked mandolin chords, driving upright bass, steady foot stomps like oar strokes, tambourine. Determined, adventurous, a crew rowing together down a winding river, minor-key but warm, not gloomy. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 노 저어라, 친구(강)"
