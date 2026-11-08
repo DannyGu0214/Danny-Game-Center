@@ -166,6 +166,7 @@ export const FAIR = {
   ],
   consultAsk: '어떤 때가 제일 바쁜가요?',
   needs: [
+    { equip: 'machine', label: '샷 뽑는 동안 손님이 밀려요', reply: '그럼 2구 머신이 맞겠어요. 자동 메뉴를 두 잔까지 동시에 만들 수 있어요.' },
     { equip: 'pitcher', label: '라떼 스팀이 오래 걸려요', reply: '그럼 자동 스팀 피처를 보세요. 라떼도 자동으로 만들 수 있어요. 직접 치면 맛은 더 좋지만요.' },
     { equip: 'grinder', label: '가루 담는 게 손이 많이 가요', reply: '그럼 자동 도징 그라인더가 좋아요. 직접 만들 때 가루 담기를 맡길 수 있어요.' },
   ],

@@ -346,7 +346,7 @@ export function createBusiness(env) {
           <div class="sRows">${rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
           <div class="sMoney">가진 돈 <b>${won(b.money)}</b><small>${left ? `월세 ${won(RENT_PER_SEASON[env.S.choices.place])}까지 ${left}일 남았어요` : '오늘이 계절 결산이에요'}</small></div>
           ${B.isUnlocked(b, 'equip') ? `<h3>장비 들이기</h3>
-          <div class="sEquip">${Object.entries(EQUIP).filter(([id]) => b.equip[id] || B.equipOpen(b, id)).map(([id, e]) => `<button data-buy="${id}"${b.equip[id] || b.money < e.price ? ' disabled' : ''}><b>${e.name}${b.equipHint === id ? ' · 상담 추천' : ''}</b><span>${b.equip[id] ? '샀어요' : won(e.price)}</span><small>${e.text}</small></button>`).join('')}</div>` : ''}
+          <div class="sEquip">${Object.entries(EQUIP).map(([id, e]) => `<button data-buy="${id}"${b.equip[id] || b.money < e.price ? ' disabled' : ''}><b>${e.name}${b.equipHint === id ? ' · 상담 추천' : ''}</b><span>${b.equip[id] ? '샀어요' : won(e.price)}</span><small>${e.text}</small></button>`).join('')}</div>` : ''}
           <button class="mainBtn sNext" id="settleNext">${left ? '다음 날' : '봄 결산 보기'}</button>`;
         box.querySelectorAll('[data-buy]').forEach((el) => { el.onclick = () => { if (B.buyEquip(b, el.dataset.buy)) { sfx.play('star'); env.save(); draw(); } }; });
         $('settleNext').onclick = () => { sfx.play('click'); box.classList.add('hide'); done(); };
