@@ -7,10 +7,12 @@
 //  { ask, options: [[고르는 말, [대본]], ...] }  대답을 고른다. 대사만 달라진다
 //  { note: id }  커피 노트에 적는다
 //  { unlock: id }  해금한다
+// 이벤트의 season이 없으면 봄 것이다. minSeasonStars는 그 계절에 모은 별이다
 const say = (who, text, mood) => ({ who, text, mood });
 const N = 'narr', H = 'hero', Y = 'sys';
 
 export const FAIR_ID = 'fair';
+export const FESTIVAL_ID = 'festival';
 
 export const EVENTS = [
   {
@@ -118,11 +120,112 @@ export const EVENTS = [
       say(N, '그 말, 내가 예전에 이 가게에 올 때 하던 생각이야.'),
     ],
   },
+  // ── 여름(DESIGN 5.13절) ──
+  {
+    id: 'festival-news', season: 'summer', phase: 'close', minSeasonStars: 120, maxDay: 19, kind: 'fair-news', fair: FESTIVAL_ID,
+    visitor: { office: 'kim', home: 'jaeho' },
+    script: {
+      office: [
+        say('kim', '사장님, 이번 주말에 강변에서 원두 페스티벌 한대요. 혹시 아세요?'),
+        say(H, '원두 페스티벌이요? 처음 들어요.'),
+        say('kim', '작은 로스터리들이 천막 치고 커피를 내려 줘요. 작년에 갔다가 원두만 세 봉지 사 왔어요.'),
+        say('kim', '사장님은 가면 저보다 훨씬 재밌을 거예요. 아, 저는 일해야 해서 못 가요.'),
+      ],
+      home: [
+        say('jaeho', '사장님, 내일 강변 공원에서 원두 페스티벌 열린대요. 친구가 거기서 알바해요.'),
+        say(H, '원두 페스티벌? 그런 것도 있어요?'),
+        say('jaeho', '천막마다 원두를 볶아서 냄새가 장난 아니래요. 콜드브루도 공짜로 준대요.'),
+        say('jaeho', '사장님 가게 원두 얘기도 하고 오세요. 저는 진하게 쌉쌀한 거로요.'),
+      ],
+    },
+  },
+  {
+    id: 'roaster', season: 'summer', phase: 'close', after: FESTIVAL_ID, gap: 2, minSeasonStars: 300, visitor: 'roaster',
+    script: [
+      say('roaster', '계세요? 페스티벌에서 뵌 강이에요. 지나가는 길에 들르겠다고 했잖아요.', 'smile'),
+      say(H, '진짜 오셨네요. 앉으세요.'),
+      {
+        brew: { menu: 'drip', do: ['bloom', 'pour'], title: '강 대표님께 내리는 한 잔' },
+        good: [say('roaster', '물줄기가 차분하네요. 이 손이면 볶는 것도 금방 하시겠어요.', 'surprised')],
+        other: [say('roaster', '뜸이 조금 급했어요. 괜찮아요, 저는 처음에 원두를 한 솥 다 태웠어요.')],
+      },
+      say('roaster', '작은 로스터 하나가 남아요. 빌려 드릴 테니 직접 볶아 보세요.'),
+      say(H, '제가요? 아직 내리는 것도 겨우 하는데요.'),
+      say('roaster', '210도에서 220도 사이, 그것만 기억하세요. 탁 하고 튀는 소리가 나면 거의 다 온 거예요.'),
+      { unlock: 'beans' },
+      say(Y, '이제 아침에 원두를 볶아 봉지로 팔 수 있어요.'),
+      say('roaster', '볶는 날은 냄새 때문에 손님이 먼저 알아요. 그게 제일 좋은 광고예요.', 'smile'),
+    ],
+  },
+  {
+    id: 'friend-summer', season: 'summer', phase: 'morning', minDay: 4, visitor: 'friend',
+    script: [
+      say('friend', '화분 살아 있나 보러 왔어.'),
+      say(H, '살아 있어. 물도 꼬박꼬박 줘.'),
+      say('friend', '진짜네. 잎이 더 늘었다?'),
+      {
+        brew: { menu: 'americano', do: ['extract', 'water'], title: '수현이에게 내리는 얼음 가득 한 잔' },
+        good: [say('friend', '이 더위엔 이게 살 길이다. 맛있어.')],
+        other: [say('friend', '얼음이 다 했네. 그래도 시원하다.')],
+      },
+      say('friend', '나 다음 달에 회사 옮겨. 너 보고 좀 용기 났어.'),
+      say(H, '진짜? 잘됐다.'),
+      say('friend', '잘된 건지는 모르겠어. 그래도 잠 못 자는 이유는 바뀌겠지.', 'sad'),
+      say(N, '수현이가 가고 화분에 물을 한 번 더 줬어. 오늘은 왠지 그러고 싶었어.'),
+    ],
+  },
+  {
+    id: 'influencer', season: 'summer', phase: 'close', minDay: 6, minRep: 3.2, kind: 'buzz', visitor: 'influencer',
+    script: [
+      say('influencer', '안녕하세요! 혹시 아직 주문돼요? 동네 카페 다니면서 영상 찍는 하린이에요.', 'smile'),
+      say(H, '영상이요? 저희 가게를요?'),
+      say('influencer', '평이 좋더라고요. 작은데 커피가 맛있는 집이라고요. 한 잔만 찍어도 될까요?'),
+      {
+        brew: { menu: 'latte', do: ['steam'], title: '하린 씨에게 내리는 한 잔' },
+        good: [say('influencer', '와, 거품 봐요. 이거 화면에 진짜 예쁘게 나와요.', 'surprised')],
+        other: [say('influencer', '괜찮아요. 이런 게 오히려 사람 사는 냄새 나서 좋아요.')],
+      },
+      {
+        ask: '찍는 동안 뭐라고 할까요?',
+        options: [
+          ['맛있게만 찍어 주세요', [say(H, '맛있게만 찍어 주세요.'), say('influencer', '맛은 제가 보장할게요. 방금 마셔 봤으니까요.', 'smile')]],
+          ['너무 유명해지면 곤란한데요', [say(H, '너무 유명해지면 곤란한데요. 혼자 하거든요.'), say('influencer', '하하, 그건 사장님 손이 감당하셔야죠.', 'smile')]],
+        ],
+      },
+      say('influencer', '오늘 밤에 올릴게요. 내일은 좀 바쁘실 거예요.'),
+      say(Y, '내일은 손님이 평소보다 많이 올 것 같아요.'),
+    ],
+  },
+  {
+    id: 'dad', season: 'summer', phase: 'close', minDay: 9, visitor: 'dad',
+    script: [
+      say(N, '마감하려는데 문이 열렸어. 아빠야. 혼자서.'),
+      say(H, '아빠? 엄마는?'),
+      say('dad', '지나가던 길이다.'),
+      say(H, '…앉아. 뭐 마실래?'),
+      say('dad', '아무거나.'),
+      {
+        brew: { menu: 'americano', do: ['extract', 'water'], title: '아빠에게 내리는 한 잔' },
+        good: [say(N, '아빠는 아무 말 없이 마셨어. 천천히, 끝까지.')],
+        other: [say(N, '아빠는 아무 말 없이 마셨어. 미간을 잠깐 찌푸렸지만, 끝까지.')],
+      },
+      say('dad', '…간판이 작더라.'),
+      {
+        ask: '뭐라고 할까요?',
+        options: [
+          ['작아도 내 거야', [say(H, '작아도 내 거야.'), say('dad', '그래.')]],
+          ['아빠 회사보다는 작지', [say(H, '아빠 회사 건물보다는 작지.'), say('dad', '…그렇지.')]],
+        ],
+      },
+      say(N, '아빠는 잔을 씻어 엎어 놓고 갔어. 앉았던 자리에 가게 이름이 적힌 냅킨이 반듯하게 접혀 있었어.'),
+      say(N, '엄마가 그랬지. 말은 안 해도 가게 이름은 찾아본다고.'),
+    ],
+  },
 ];
 
 // 커피·티 박람회: 가게를 하루 쉬고 참가한다
 export const FAIR = {
-  name: '커피·티 박람회',
+  id: FAIR_ID, name: '커피·티 박람회', bg: 'bg-fair', host: 'staff',
   open: [
     say(N, '문에 "오늘 하루 쉬어요" 종이를 붙이고 나왔어. 사장 되고 처음 쉬는 날이네.'),
     say(N, '전시장에 들어서자마자 커피 향이 확 밀려와. 원두, 기계, 찻잎… 통로 끝이 안 보여.'),
@@ -177,6 +280,68 @@ export const FAIR = {
     say(N, '돌아오는 길, 가방이 팸플릿으로 묵직해. 내일도 아메리카노부터 뽑겠지만, 기분이 이상하게 좋아.'),
   ],
 };
+
+// 여름 원두 페스티벌: 가게를 하루 쉬고 참가한다. 로스터를 만나고, 오피스는 콜드브루가 열린다
+export const FESTIVAL = {
+  id: FESTIVAL_ID, name: '원두 페스티벌', bg: 'bg-festival', host: 'roaster',
+  open: [
+    say(N, '문에 "오늘 하루 쉬어요" 종이를 붙였어. 이번엔 두 번째라 손이 덜 떨려.'),
+    say(N, '강변 공원에 천막이 줄지어 서 있어. 천막마다 볶는 냄새가 다 달라.'),
+    say(N, '덥긴 한데, 이상하게 발이 자꾸 앞으로 가.'),
+  ],
+  question: '어느 천막부터 가 볼까요?',
+  booths: [
+    {
+      id: 'coldbrew', label: '콜드브루 천막',
+      script: [
+        say('booth', '여름엔 이거죠. 찬물에 열네 시간 우린 콜드브루예요.'),
+        say(H, '뜨거운 물 없이도 커피가 되네요.'),
+        say('booth', '천천히 우려서 쓴맛이 덜해요. 전날 만들어 두면 아침에 바로 내줄 수 있고요.'),
+        { note: 'festColdbrew' },
+      ],
+    },
+    {
+      id: 'cupping', label: '커핑 천막',
+      script: [
+        say('booth', '커핑 해 보셨어요? 숟가락으로 떠서 후루룩 소리 내며 마셔요.'),
+        say(H, '소리를 내도 돼요?'),
+        say('booth', '내야 해요. 공기랑 같이 마셔야 향이 입 안에 퍼지거든요.'),
+        { note: 'festCupping' },
+      ],
+    },
+    {
+      id: 'roastery', label: '작은 로스터리 천막',
+      script: [
+        say('roaster', '어서 오세요. 오늘 아침에 볶은 거예요. 봉지째 냄새 맡아 보세요.'),
+        say(H, '이걸 다 직접 볶으세요?'),
+        say('roaster', '작은 기계 하나로요. 손님이 원두를 사 가서 집에서 내려 마시면, 그게 제일 기뻐요.', 'smile'),
+        { note: 'festRoast' },
+      ],
+    },
+  ],
+  consultLabel: '로스터와 이야기 나누기',
+  consult: [
+    say('roaster', '아까 그 사장님이시죠? 가게는 어디세요?'),
+    say(H, '작은 카페요. 아직 혼자 해요.'),
+    say('roaster', '혼자면 여름이 제일 힘들어요. 다들 얼음 든 것만 찾거든요.'),
+  ],
+  close: {
+    office: [
+      say('roaster', '회사 앞이면 콜드브루를 꼭 해 보세요. 출근길에 기다릴 틈이 없는 손님한테 딱이에요.'),
+      { unlock: 'coldbrew' },
+      say(Y, '이제 아침에 콜드브루를 준비할 수 있어요.'),
+      say('roaster', '명함 드릴게요. 근처 지나가면 한번 들를게요.', 'smile'),
+      say(N, '돌아오는 길, 땀에 젖은 손에 명함 한 장이 남았어.'),
+    ],
+    home: [
+      say('roaster', '동네 가게면 원두를 파는 것도 좋아요. 단골이 집에서도 사장님 커피를 마시게 되니까요.'),
+      say(H, '볶는 건 해 본 적이 없어요.'),
+      say('roaster', '생각보다 어렵지 않아요. 명함 드릴게요. 근처 지나가면 한번 들를게요.', 'smile'),
+      say(N, '돌아오는 길, 땀에 젖은 손에 명함 한 장이 남았어.'),
+    ],
+  },
+};
+export const FAIRS = { [FAIR_ID]: FAIR, [FESTIVAL_ID]: FESTIVAL };
 
 // 대본의 모든 글을 모은다(말투 검사에 쓴다)
 export function textsOf(script) {

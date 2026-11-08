@@ -78,6 +78,10 @@ export const PEOPLE = {
   baker: { name: '윤 사장님', age: 48 },
   staff: { name: '서 매니저', age: 40 },
   booth: { name: '부스 직원', noArt: true },
+  // 여름(그림은 agent-bridge로 만든다. 그림이 없으면 대화창이 얼굴 없이 나온다)
+  roaster: { name: '강 대표', age: 44 },
+  dad: { name: '아빠', age: 66 },
+  influencer: { name: '하린', age: 26 },
   junior: { name: '지수', skin: '#f1cdae', hair: '#1f1a1b', style: 'mid', body: '#34405a', age: 29, tired: true },
   // 오피스 손님
   kim: { name: '김 대리', skin: '#efc6a2', hair: '#221d1c', style: 'short', body: '#3f4b63', tie: '#8c3b3b', age: 31 },

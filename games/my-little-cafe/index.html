@@ -452,7 +452,8 @@ function openShop(mode = 'in') {
 
 function nameOf(who) { if (who === 'narr' || who === 'sys') return ''; if (who === 'hero') return '나'; if (who === 'owner') return '사장님'; return PEOPLE[who]?.name ?? ''; }
 function showLine(who, text) {
-  const box = $('dialog'), isPlain = who === 'narr' || who === 'sys', noArt = !!PEOPLE[who]?.noArt;
+  // 그림이 아직 없는 인물(새 계절 인물 등)은 얼굴 없이 이름만 보여 준다
+  const box = $('dialog'), isPlain = who === 'narr' || who === 'sys', noArt = !!PEOPLE[who]?.noArt || (!!PEOPLE[who] && who !== 'hero' && who !== 'owner' && !img(portraitOf(who, S.choices, 'calm')));
   box.className = isPlain ? `noavatar ${who}` : noArt ? 'noavatar' : '';
   if (!isPlain && !noArt) drawAvatar(who);
   $('who').textContent = who === 'sys' ? '안내' : nameOf(who);

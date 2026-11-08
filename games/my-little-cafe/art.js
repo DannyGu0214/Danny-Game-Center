@@ -66,12 +66,12 @@ export function drawBust(g, name, cx, by, h, t = 0) {
 
 // ── 바 화면 ────────────────────────────────
 const COUNTER_Y = 0.786; // 배경 그림에서 앞 카운터 윗면 높이(비율)
-const barWeather = (w) => (w === 'cloud' || w === 'rain' ? w : 'sun');
+const barWeather = (w) => (w === 'cloud' || w === 'rain' ? w : w === 'shower' ? 'rain' : 'sun'); // 소나기는 비 배경(DESIGN 5.10절)
 function drawBarBack(g, W, H, place, weather, t) {
   const im = img(`bar-${place}-${barWeather(weather)}`);
   if (!im) { g.fillStyle = '#2a1b12'; g.fillRect(0, 0, W, H); return null; }
   const c = cover(g, im, W, H);
-  if (weather === 'rain') rainOverlay(g, c.x(0), c.y(0.11), c.x(0.74) - c.x(0), c.y(0.5), t, 22, 0.22);
+  if (weather === 'rain' || weather === 'shower') rainOverlay(g, c.x(0), c.y(0.11), c.x(0.74) - c.x(0), c.y(0.5), t, 22, 0.22);
   c.im = im; c.counter = c.y(COUNTER_Y);
   return c;
 }
@@ -102,7 +102,7 @@ export function drawBar(g, W, H, { place, weather, t, cafe, front, frontMood = '
 
 // 가게 밖 장면(박람회 등): 그림 한 장 위에 인물을 세운다
 export function drawScene(g, W, H, { bg, t, front, frontMood = 'calm', choices }) {
-  const im = img(bg);
+  const im = img(bg) || img('bg-fair'); // 새 배경 그림이 아직 없으면 박람회장으로 대신한다
   if (im) cover(g, im, W, H); else { g.fillStyle = '#2a1b12'; g.fillRect(0, 0, W, H); }
   if (front) drawBust(g, portraitOf(front, choices, frontMood), W / 2, H * 0.8, H * 0.47, t);
 }
@@ -118,7 +118,7 @@ export function drawFront(g, W, H, { place, cafe, t, night = false, weather = 's
     g.fillStyle = '#f7dfae'; g.font = font(Math.min(32, sw * 0.13), 800); g.textAlign = 'center'; g.textBaseline = 'middle';
     g.shadowColor = 'rgba(0,0,0,.55)'; g.shadowBlur = 5; g.fillText(cafe, cx, c.y(s.y), sw * 0.9); g.shadowBlur = 0;
   }
-  if (weather === 'rain') rainOverlay(g, 0, 0, W, H, t, 44, 0.3);
+  if (weather === 'rain' || weather === 'shower') rainOverlay(g, 0, 0, W, H, t, 44, 0.3);
   return c;
 }
 

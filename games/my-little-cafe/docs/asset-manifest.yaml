@@ -1,0 +1,65 @@
+version: 1
+style: games/my-little-cafe/docs/art-style.md
+# 경로는 모두 저장소 루트 기준. 그림이 없을 때 게임은 대화창을 얼굴 없이 보여 주고, 페스티벌 배경은 박람회장(bg-fair)으로 대신해요.
+# 여름(DESIGN 5.13절) 그림이에요. 기존 그림은 2026-11-05 google/gemini-3-pro-image로 만들었어요(목록 밖).
+assets:
+  - id: bg-festival
+    kind: image
+    source: generate
+    path: games/my-little-cafe/assets/bg-festival.webp
+    spec: "780x1398 세로 WebP, 불투명, 150KB 이하. 가운데 아래(세로 55~95%)는 비교적 비워 둠"
+    prompt: "Vertical background illustration in a realistic Japanese animated film style, clean line art, soft cel shading. An outdoor summer coffee bean festival in a riverside park in Korea at late morning: rows of white canvas tents along a paved path, wooden tables with burlap coffee sacks, small drum coffee roasters, glass jars of beans, iced coffee in clear cups, string lights between tents, green trees, bright blue summer sky with big white cumulus clouds, warm sunlight and soft shadows. Only a few small distant people. Keep the lower middle area of the image simple and open (a wide paved path). No text, no signs with letters, no logos, no watermark, no border."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: roaster-smile
+    kind: image
+    source: generate
+    path: games/my-little-cafe/assets/roaster-smile.webp
+    spec: "640x857 WebP, 배경 투명, 정면 흉상. 표정: 편안한 미소"
+    prompt: "Bust portrait in a realistic Japanese animated film style, clean line art, soft cel shading, front-facing, chest up, transparent background. A Korean man in his mid forties who runs a small coffee roastery: short neat black hair with a little gray at the temples, light stubble, sun-tanned skin, friendly calm eyes, rolled-up sleeves of a light denim work shirt under a brown canvas apron with a small towel tucked in the strap. Gentle relaxed smile. Soft natural light. No text, no logo, no watermark, no border."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: roaster-surprised
+    kind: image
+    source: generate
+    path: games/my-little-cafe/assets/roaster-surprised.webp
+    spec: "640x857 WebP, 배경 투명. roaster-smile과 같은 사람·옷·각도, 표정만 놀람"
+    prompt: "Same character, outfit, angle and framing as roaster-smile (use it as the reference image). Expression: pleasantly surprised and impressed, eyebrows raised, eyes a little wider, small open-mouthed smile. Transparent background. No text, no logo, no watermark, no border."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: dad-smile
+    kind: image
+    source: generate
+    path: games/my-little-cafe/assets/dad-smile.webp
+    spec: "640x857 WebP, 배경 투명, 정면 흉상. 이름은 smile이지만 표정은 무뚝뚝한 무표정(기본 표정 파일)"
+    prompt: "Bust portrait in a realistic Japanese animated film style, clean line art, soft cel shading, front-facing, chest up, transparent background. A reserved Korean father in his mid sixties: short gray hair neatly combed, thin-rimmed glasses, slightly weathered face, a plain beige short-sleeved collared summer shirt. Stoic, quiet, almost expressionless face with a very faint softness in the eyes, mouth closed. Soft natural light. Should look like the father of a 35-year-old cafe owner and the husband of assets/mom-smile.webp (similar age and simple everyday clothing). No text, no logo, no watermark, no border."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: influencer-smile
+    kind: image
+    source: generate
+    path: games/my-little-cafe/assets/influencer-smile.webp
+    spec: "640x857 WebP, 배경 투명, 정면 흉상. 표정: 밝은 미소"
+    prompt: "Bust portrait in a realistic Japanese animated film style, clean line art, soft cel shading, front-facing, chest up, transparent background. A cheerful Korean woman in her mid twenties who makes short videos about neighborhood cafes: shoulder-length light brown hair with a small clip, bright friendly eyes, a white summer T-shirt under a light green open shirt, a small camera on a neck strap. Bright open smile. Soft natural light. No text, no logo, no brand marks on the camera, no watermark, no border."
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+  - id: influencer-surprised
+    kind: image
+    source: generate
+    path: games/my-little-cafe/assets/influencer-surprised.webp
+    spec: "640x857 WebP, 배경 투명. influencer-smile과 같은 사람·옷·각도, 표정만 놀람"
+    prompt: "Same character, outfit, angle and framing as influencer-smile (use it as the reference image). Expression: delighted surprise, eyes wide, mouth open in an excited 'wow', one hand slightly raised near the cheek. Transparent background. No text, no logo, no watermark, no border."
+    url: ""
+    status: pending
+    license: ""
+    note: ""

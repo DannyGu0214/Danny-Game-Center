@@ -6,7 +6,7 @@ import { drawInside, randomLook } from './art-shop.js';
 import { runBrew, runRoast } from './stations.js';
 import { MENUS, DAY_SEC, PATIENCE, AUTO_SEC, EQUIP, PEOPLE, BIZ_REGULARS, WEATHER_NAME, COLDBREW_COST, RENT_PER_SEASON, SEASON_NAME, DAYS_PER_SEASON, SIDE, ROAST } from './data.js';
 import { REG_TALK, OWNER_VISIT, REACT } from './story.js';
-import { EVENTS, FAIR } from './events.js';
+import { EVENTS, FAIRS, FAIR_ID } from './events.js';
 import { TRIVIA, TRIVIA_KIND } from './trivia.js';
 
 const PANEL = 214; // 아래 주문판 높이
@@ -178,7 +178,7 @@ export function createBusiness(env) {
       for (const p of d.pending.filter((x) => x.p.state === 'queue' || x.p.state === 'order')) { addTicket(p.p, p.menu, p.kind, p.regular); d.pending.splice(d.pending.indexOf(p), 1); }
       while (d.arrivals.length && d.arrivals[0] <= d.clock) {
         d.arrivals.shift();
-        const hour = B.hourOf(d.clock), menu = B.pickMenu(d.place, hour, biz().weather, biz().stock.coldbrew - d.tickets.filter((x) => x.menu === 'coldbrew').length, Math.random, biz().unlocked);
+        const hour = B.hourOf(d.clock), menu = B.pickMenu(d.place, hour, biz().weather, biz().stock.coldbrew - d.tickets.filter((x) => x.menu === 'coldbrew').length, Math.random, biz().unlocked, biz().season);
         const takeout = menu === 'beans' || Math.random() < d.F.L.takeoutShare, kind = takeout ? 'takeout' : 'dine';
         d.pending.push({ p: spawn(d.F, kind, { look: randomLook(d.place), hold: true }), menu, kind });
       }
@@ -241,40 +241,48 @@ export function createBusiness(env) {
     env.setFront(visitor); env.barView();
     await playScript(script, visitor, env.barView);
     if (e.kind === 'fair-news') {
+      const fair = FAIRS[e.fair || FAIR_ID];
       env.hideDialog();
-      const go = await env.pick('내일 하루 가게를 쉬고 박람회에 다녀올까요? 그날 매출은 없어요.', [['문 닫고 다녀올게요', true], ['이번엔 넘어갈게요', false]]);
-      if (go) { b.fairTomorrow = true; B.markEvent(b, e.id); } else B.snoozeEvent(b, e.id, 3);
-    } else B.markEvent(b, e.id);
+      const go = await env.pick(`내일 하루 가게를 쉬고 ${fair.name}에 다녀올까요? 그날 매출은 없어요.`, [['문 닫고 다녀올게요', true], ['이번엔 넘어갈게요', false]]);
+      if (go) { b.fairTomorrow = true; b.fairId = fair.id; B.markEvent(b, e.id); } else B.snoozeEvent(b, e.id, 3);
+    } else {
+      if (e.kind === 'buzz') b.buzzDay = b.day + 1; // 다음 날 손님이 는다
+      B.markEvent(b, e.id);
+    }
     env.hideDialog(); env.setFront(null); env.barView();
     env.save();
   }
-  // 박람회 날: 가게를 쉰다. 영업과 평판 변화가 없다
+  // 박람회·페스티벌 날: 가게를 쉰다. 영업과 평판 변화가 없다(봄 박람회, 여름 원두 페스티벌)
   async function fairDay() {
-    const b = biz();
+    const b = biz(), fair = FAIRS[b.fairId] || FAIRS[FAIR_ID], place = env.S.choices.place;
     b.fairTomorrow = false;
     syncStoryDay(); setHudDay();
-    await env.dayCard(`${SEASON_NAME[b.season]} ${b.day}일차`, '오늘은 가게를 쉬어요', FAIR.name);
-    env.setFront(null); env.sceneView('bg-fair');
-    const show = () => env.sceneView('bg-fair');
-    await playScript(FAIR.open, null, show);
-    const left = FAIR.booths.slice();
+    await env.dayCard(`${SEASON_NAME[b.season]} ${b.day}일차`, '오늘은 가게를 쉬어요', fair.name);
+    const show = () => env.sceneView(fair.bg);
+    env.setFront(null); show();
+    await playScript(fair.open, null, show);
+    const left = fair.booths.slice();
     for (;;) {
       env.hideDialog();
-      const id = await env.pick(FAIR.question, [...left.map((x) => [x.label, x.id]), [FAIR.consultLabel, 'consult']]);
+      const id = await env.pick(fair.question, [...left.map((x) => [x.label, x.id]), [fair.consultLabel, 'consult']]);
       if (id === 'consult') break;
-      await playScript(left.find((x) => x.id === id).script, null, show);
-      left.splice(left.findIndex((x) => x.id === id), 1);
+      const booth = left.find((x) => x.id === id);
+      await playScript(booth.script, booth.script.some((s) => s.who === fair.host) ? fair.host : null, show);
+      env.setFront(null); show();
+      left.splice(left.indexOf(booth), 1);
     }
-    env.setFront('staff'); show();
-    await playScript(FAIR.consult, 'staff', show);
-    env.hideDialog();
-    const need = await env.pick(FAIR.consultAsk, FAIR.needs.map((x) => [x.label, x]));
-    b.equipHint = need.equip;
-    env.showDialog();
-    await env.showLine('staff', need.reply);
-    await playScript(FAIR.close, 'staff', show);
+    env.setFront(fair.host); show();
+    await playScript(fair.consult, fair.host, show);
+    if (fair.needs) { // 장비 상담: 고른 장비에 '상담 추천'이 붙는다
+      env.hideDialog();
+      const need = await env.pick(fair.consultAsk, fair.needs.map((x) => [x.label, x]));
+      b.equipHint = need.equip;
+      env.showDialog();
+      await env.showLine(fair.host, need.reply);
+    }
+    await playScript(Array.isArray(fair.close) ? fair.close : fair.close[place], fair.host, show);
     env.hideDialog(); env.setFront(null);
-    B.markEvent(b, 'fair');
+    B.markEvent(b, fair.id);
     env.save();
   }
 
@@ -285,7 +293,7 @@ export function createBusiness(env) {
     env.startMusic();
     await env.dayCard(`${SEASON_NAME[b.season]} ${b.day}일차`, `${B.weekdayOf(b.day)}요일 · ${WEATHER_NAME[b.weather]}`, B.isWeekend(b.day) ? '주말이에요' : '평일이에요');
     env.setFront('owner'); env.barView();
-    const visit = OWNER_VISIT.find((v) => v.day === b.day);
+    const visit = OWNER_VISIT.find((v) => v.day === b.day && (v.season || 'spring') === b.season);
     if (visit) { env.showDialog(); await env.showLine('owner', visit.text); }
     env.setFront(null); env.barView(); env.hideDialog();
     await runEvent('morning');
@@ -328,7 +336,7 @@ export function createBusiness(env) {
     prefill(F, place === 'home' ? 3 : 1, Math.random, () => randomLook(place));
     day = {
       place, F, err, clock: 0, clockOn: true, busy: false, tickets: [], pending: [], nextId: 1, sig: null, stats: B.newDayStats(),
-      arrivals: B.planDay(place, b.day, b.weather, b.rep), regs: B.regularsOfDay(place, b.day).sort((a, x) => a.at - x.at), resolve: null, trivia: B.planTrivia(b, TRIVIA.map((x) => x.id)),
+      arrivals: B.planDay(place, b.day, b.weather, b.rep, Math.random, b.buzzDay === b.day ? B.BUZZ_BOOST : 1), regs: B.regularsOfDay(place, b.day).sort((a, x) => a.at - x.at), resolve: null, trivia: B.planTrivia(b, TRIVIA.map((x) => x.id)),
     };
     mainView();
     $('tickets').classList.remove('hide');

@@ -4,7 +4,7 @@ import { ESPRESSO, DAYS_PER_SEASON, DAY_SEC, OPEN_HOUR, HOURS, WEEK, WEATHER_ODD
 
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 // 이 버전에 들어 있는 계절. 새 계절을 만들면 여기에 더한다. 그 전 계절을 마친 저장은 다음에 열 때 새 계절로 이어진다(DESIGN 5.12절)
-export const SEASONS_READY = ['spring'];
+export const SEASONS_READY = ['spring', 'summer'];
 export const nextSeasonOf = (season) => SEASONS[(SEASONS.indexOf(season) + 1) % SEASONS.length];
 export const canContinue = (biz, ready = SEASONS_READY) => !!biz.finished && biz.season !== 'winter' && ready.includes(nextSeasonOf(biz.season));
 // 다음 계절 1일차로 넘어간다. 돈·평판·해금·단골·별은 그대로 가져간다. 월세는 결산 때 이미 냈다
@@ -12,7 +12,7 @@ export function startNextSeason(biz, rand = Math.random) {
   biz.season = nextSeasonOf(biz.season);
   biz.day = 1; biz.finished = false;
   biz.weather = rollWeather(biz.season, rand);
-  biz.eventDay = 0; biz.fairTomorrow = false; biz.snooze = {};
+  biz.eventDay = 0; biz.fairTomorrow = false; biz.fairId = null; biz.snooze = {}; biz.buzzDay = 0;
   return biz;
 }
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -48,22 +48,25 @@ function hourWeight(place, weekend, hour) {
 // 일반 손님 수: 일주일 평균이 하루 20명쯤 되게 맞췄다
 const BASE_COUNT = { office: { week: 22, end: 12 }, home: { week: 16, end: 27 } };
 const WEATHER_FACTOR = { sun: 1.06, cloud: 1, rain: 0.86, shower: 0.82, snow: 0.82 };
-export function customerCount(place, day, weather, rep) {
+// boost: 소문 난 날(인플루언서 다음 날) 손님이 는다
+export const BUZZ_BOOST = 1.35;
+export function customerCount(place, day, weather, rep, boost = 1) {
   const base = isWeekend(day) ? BASE_COUNT[place].end : BASE_COUNT[place].week;
-  return Math.round(base * (WEATHER_FACTOR[weather] ?? 1) * (0.9 + rep * 0.04));
+  return Math.round(base * (WEATHER_FACTOR[weather] ?? 1) * (0.9 + rep * 0.04) * boost);
 }
-export function pickMenu(place, hour, weather, stock, rand = Math.random, unlocked = null) {
-  const rainy = weather === 'rain' || weather === 'shower' || weather === 'snow';
+// 여름에는 얼음 든 메뉴가 늘어난다
+export function pickMenu(place, hour, weather, stock, rand = Math.random, unlocked = null, season = 'spring') {
+  const rainy = weather === 'rain' || weather === 'shower' || weather === 'snow', hot = season === 'summer' && !rainy;
   const table = place === 'office'
-    ? { americano: 40, iced: rainy ? 8 : 20, latte: 26, espresso: 5, coldbrew: stock > 0 ? (rainy ? 6 : 12) : 0, drip: hour >= 14 && hour < 17 ? 8 : 0 }
-    : { americano: 30, latte: 34, drip: 12, origin: !unlocked || unlocked.origin ? 6 : 0, espresso: 8, iced: rainy ? 2 : 8 };
+    ? { americano: hot ? 30 : 40, iced: rainy ? 8 : hot ? 34 : 20, latte: 26, espresso: 5, coldbrew: stock > 0 ? (rainy ? 6 : hot ? 18 : 12) : 0, drip: hour >= 14 && hour < 17 ? 8 : 0 }
+    : { americano: hot ? 22 : 30, latte: 34, drip: 12, origin: !unlocked || unlocked.origin ? 6 : 0, espresso: 8, iced: rainy ? 2 : hot ? 18 : 8 };
   let r = rand() * Object.values(table).reduce((a, b) => a + b, 0);
   for (const [k, v] of Object.entries(table)) { r -= v; if (r < 0) return k; }
   return 'americano';
 }
 // 하루 일정: 손님이 언제 오는지 미리 뽑아 둔다
-export function planDay(place, day, weather, rep, rand = Math.random) {
-  const n = customerCount(place, day, weather, rep), weekend = isWeekend(day), hours = [];
+export function planDay(place, day, weather, rep, rand = Math.random, boost = 1) {
+  const n = customerCount(place, day, weather, rep, boost), weekend = isWeekend(day), hours = [];
   for (let h = 0; h < HOURS * 2; h++) hours.push(hourWeight(place, weekend, OPEN_HOUR + h / 2));
   const total = hours.reduce((a, b) => a + b, 0), times = [];
   for (let i = 0; i < n; i++) {
@@ -96,7 +99,7 @@ export const isInstant = (menu) => menu === 'coldbrew';
 
 export function newBiz(rand = Math.random) {
   const season = 'spring';
-  return { season, day: 1, money: START_MONEY, rep: 2.5, equip: {}, friend: {}, visits: {}, stock: { coldbrew: 0, dessert: 0, beans: 0, beansQ: 0.7 }, weather: rollWeather(season, rand), history: [], finished: false, starsTotal: 0, unlocked: {}, seen: {}, snooze: {}, eventDay: 0, fairTomorrow: false, equipHint: null, trivia: [], year: 1 };
+  return { season, day: 1, money: START_MONEY, rep: 2.5, equip: {}, friend: {}, visits: {}, stock: { coldbrew: 0, dessert: 0, beans: 0, beansQ: 0.7 }, weather: rollWeather(season, rand), history: [], finished: false, starsTotal: 0, unlocked: {}, seen: {}, snooze: {}, eventDay: 0, fairTomorrow: false, fairId: null, equipHint: null, trivia: [], year: 1, buzzDay: 0 };
 }
 export function newDayStats() { return { served: 0, lost: 0, stars: 0, sales: 0, cost: 0, tips: 0, regulars: 0, dessert: 0, beans: 0, sideSales: 0, prep: 0 }; }
 // 내준 잔 하나를 장부에 적는다
@@ -143,14 +146,14 @@ export function closeDay(biz, stats) {
   biz.money += net;
   biz.starsTotal += stats.stars; // 해금 조건에 쓴다. 가게별로 센다
   biz.rep = clamp(biz.rep + repDelta, 0, 5);
-  const record = { season: biz.season, day: biz.day, weather: biz.weather, ...stats, avg: +avg.toFixed(2), net, rep: +biz.rep.toFixed(2) };
+  const record = { season: biz.season, year: biz.year, day: biz.day, weather: biz.weather, ...stats, avg: +avg.toFixed(2), net, rep: +biz.rep.toFixed(2) };
   biz.history.push(record);
   return { ...record, repDelta: +repDelta.toFixed(2) };
 }
 export const isSeasonEnd = (biz) => biz.day >= DAYS_PER_SEASON;
 // 계절이 끝나면 월세를 낸다
 export function settleSeason(biz, place) {
-  const rent = RENT_PER_SEASON[place], days = biz.history.filter((d) => d.season === biz.season);
+  const rent = RENT_PER_SEASON[place], days = biz.history.filter((d) => d.season === biz.season && (d.year || 1) === biz.year);
   const sum = (k) => days.reduce((a, d) => a + d[k], 0);
   const income = sum('sales') + sum('tips') - sum('cost');
   biz.money -= rent;
@@ -206,6 +209,7 @@ export function eventDue(biz, events, phase) {
     if (e.minDay && biz.day < e.minDay) return false;
     if (e.maxDay && biz.day > e.maxDay) return false;
     if (e.minStars && biz.starsTotal < e.minStars) return false;
+    if (e.minSeasonStars && starsThisSeason(biz) < e.minSeasonStars) return false;
     if (e.minRep && biz.rep < e.minRep) return false;
     if (biz.snooze[e.id] && biz.day < biz.snooze[e.id]) return false;
     if (e.after && !(biz.seen[e.after] && biz.day >= biz.seen[e.after] + (e.gap || 0))) return false;
@@ -221,6 +225,8 @@ export function planTrivia(biz, ids, rand = Math.random) {
   return { id: pool[Math.floor(rand() * pool.length)], at: DAY_SEC * (0.15 + rand() * 0.65), shown: false };
 }
 export function markTrivia(biz, id) { if (!biz.trivia.includes(id)) biz.trivia.push(id); }
+// 이번 계절에 모은 별(여름부터 이벤트 조건에 쓴다)
+export const starsThisSeason = (biz) => biz.history.filter((d) => d.season === biz.season && (d.year || 1) === biz.year).reduce((a, d) => a + (d.stars || 0), 0);
 export function markEvent(biz, id) { biz.seen[id] = biz.day; biz.eventDay = biz.day; }
 export function snoozeEvent(biz, id, days) { biz.snooze[id] = biz.day + days; biz.eventDay = biz.day; }
 export const friendLevel = (biz, id) => biz.friend[id] || 0;
@@ -247,6 +253,8 @@ export function normalizeBiz(raw) {
     b.starsTotal = Number(raw.starsTotal) || 0;
     b.eventDay = Number(raw.eventDay) || 0;
     b.fairTomorrow = !!raw.fairTomorrow;
+    b.fairId = typeof raw.fairId === 'string' ? raw.fairId : null;
+    b.buzzDay = Number(raw.buzzDay) || 0;
     b.equipHint = EQUIP[raw.equipHint] ? raw.equipHint : null;
   } else { // 해금이 생기기 전 저장: 이미 쓰던 것은 열어 두고, 그 장면은 건너뛴다
     b.unlocked = Object.fromEntries(UNLOCKS.map((k) => [k, true]));

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as B from '../business.js';
 import { WEATHER_ODDS, DAY_SEC, RENT_PER_SEASON, MENUS, COST, DAYS_PER_SEASON, BIZ_REGULARS, EQUIP, PEOPLE } from '../data.js';
 import { REG_TALK, OWNER_VISIT, NOTES } from '../story.js';
-import { EVENTS, FAIR, textsOf } from '../events.js';
+import { EVENTS, FAIR, FESTIVAL, FAIRS, textsOf } from '../events.js';
 
 const seeded = (s = 1) => () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 
@@ -294,8 +294,9 @@ test('업데이트 뒤 이어 하기: 계절을 마친 저장은 다음 계절�
   biz.day = 20; biz.money = 777000; biz.rep = 3.4; biz.unlocked = { equip: true, dessert: true }; biz.equip = { grinder: true };
   biz.starsTotal = 820; biz.friend = { kim: 3 }; biz.seen = { 'fair-news': 3, fair: 4, baker: 8 }; biz.trivia = ['bach'];
   B.settleSeason(biz, 'office'); biz.finished = true;
-  // 지금 버전(봄만 있음): 기다려요
-  assert.equal(B.canContinue(biz), false);
+  // 봄만 있는 버전: 기다려요. 지금 버전은 여름이 있어서 이어져요
+  assert.equal(B.canContinue(biz, ['spring']), false);
+  assert.equal(B.canContinue(biz), true);
   // 저장을 다시 읽어도 그대로예요
   const saved = B.normalizeBiz(JSON.parse(JSON.stringify(biz)));
   assert.equal(saved.finished, true); assert.equal(saved.season, 'spring');
@@ -311,4 +312,45 @@ test('업데이트 뒤 이어 하기: 계절을 마친 저장은 다음 계절�
   // 겨울 다음(2년 차)은 아직 이어지지 않아요
   saved.season = 'winter'; saved.finished = true;
   assert.equal(B.canContinue(saved, ['spring', 'summer', 'autumn', 'winter']), false);
+});
+
+test('여름: 페스티벌·로스터·인플루언서가 조건대로 나오고, 콜드브루와 원두가 열려요', () => {
+  // 대본: 말투, 등장인물, 노트
+  const F = FESTIVAL, all = [...F.open, ...F.booths.flatMap((x) => x.script), ...F.consult, ...F.close.office, ...F.close.home];
+  for (const t of [...textsOf(all), F.question]) assert.doesNotMatch(t, /(습니다|합니다|입니다|십시오|답니다)/, t);
+  const walk = (list) => { for (const s of list) { if (s.who && !['narr', 'sys', 'hero'].includes(s.who)) assert.ok(PEOPLE[s.who], s.who); if (s.note) assert.ok(NOTES[s.note], s.note); if (s.brew) { walk(s.good); walk(s.other); } if (s.options) s.options.forEach(([, l]) => walk(l)); } };
+  walk(all);
+  assert.ok(F.close.office.some((s) => s.unlock === 'coldbrew'));
+  assert.ok(!F.close.home.some((s) => s.unlock));
+  const summer = EVENTS.filter((e) => e.season === 'summer');
+  assert.ok(summer.length >= 4);
+  for (const e of summer) if (e.fair) assert.ok(FAIRS[e.fair], e.fair);
+  assert.ok(EVENTS.find((e) => e.id === 'roaster').script.some((s) => s.unlock === 'beans'));
+  for (const v of OWNER_VISIT.filter((x) => x.season === 'summer')) assert.doesNotMatch(v.text, /(습니다|합니다|입니다|십시오)/, v.text);
+
+  // 조건: 봄을 마친 가게가 여름으로 넘어왔다
+  const b = B.newBiz(seeded(4));
+  b.history = [{ season: 'spring', year: 1, stars: 800 }]; b.seen = { 'fair-news': 3, fair: 4, baker: 8, friend: 5, mom: 11, junior: 14 }; b.unlocked = { equip: true, dessert: true };
+  b.finished = true; B.startNextSeason(b, seeded(1));
+  assert.equal(B.starsThisSeason(b), 0); // 봄 별은 여름 조건에 안 들어가요
+  b.day = 2; assert.equal(B.eventDue(b, EVENTS, 'close'), null);
+  b.history.push({ season: 'summer', year: 1, stars: 130 });
+  assert.equal(B.eventDue(b, EVENTS, 'close').id, 'festival-news');
+  B.markEvent(b, 'festival-news'); b.day = 3; B.markEvent(b, 'festival');
+  b.day = 4; b.history.push({ season: 'summer', year: 1, stars: 200 });
+  assert.notEqual(B.eventDue(b, EVENTS, 'close')?.id, 'roaster'); // 페스티벌 뒤 이틀은 기다려요
+  b.day = 5; assert.equal(B.eventDue(b, EVENTS, 'close').id, 'roaster');
+  // 인플루언서는 평판이 있어야 와요
+  b.seen.roaster = 5; b.day = 7; b.rep = 3.0;
+  assert.notEqual(B.eventDue(b, EVENTS, 'close')?.id, 'influencer');
+  b.rep = 3.5; assert.equal(B.eventDue(b, EVENTS, 'close').id, 'influencer');
+  // 소문 난 날은 손님이 늘어요
+  assert.ok(B.customerCount('office', 8, 'sun', 3.5, B.BUZZ_BOOST) > B.customerCount('office', 8, 'sun', 3.5));
+  // 여름 맑은 날엔 아이스가 늘어요
+  const count = (season) => { const r = seeded(7); let n = 0; for (let i = 0; i < 4000; i++) if (B.pickMenu('home', 11, 'sun', 0, r, {}, season) === 'iced') n++; return n; };
+  assert.ok(count('summer') > count('spring') * 1.5);
+  // 저장: 페스티벌 예약과 소문 난 날이 남아요
+  b.fairTomorrow = true; b.fairId = 'festival'; b.buzzDay = 8;
+  const back = B.normalizeBiz(JSON.parse(JSON.stringify(b)));
+  assert.deepEqual([back.fairId, back.buzzDay, back.season], ['festival', 8, 'summer']);
 });
