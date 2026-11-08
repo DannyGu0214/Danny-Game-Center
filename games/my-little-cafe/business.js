@@ -84,7 +84,7 @@ export const isInstant = (menu) => menu === 'coldbrew';
 
 export function newBiz(rand = Math.random) {
   const season = 'spring';
-  return { season, day: 1, money: START_MONEY, rep: 2.5, equip: {}, friend: {}, visits: {}, stock: { coldbrew: 0, dessert: 0, beans: 0, beansQ: 0.7 }, weather: rollWeather(season, rand), history: [], finished: false, starsTotal: 0, unlocked: {}, seen: {}, snooze: {}, eventDay: 0, fairTomorrow: false, equipHint: null };
+  return { season, day: 1, money: START_MONEY, rep: 2.5, equip: {}, friend: {}, visits: {}, stock: { coldbrew: 0, dessert: 0, beans: 0, beansQ: 0.7 }, weather: rollWeather(season, rand), history: [], finished: false, starsTotal: 0, unlocked: {}, seen: {}, snooze: {}, eventDay: 0, fairTomorrow: false, equipHint: null, trivia: [] };
 }
 export function newDayStats() { return { served: 0, lost: 0, stars: 0, sales: 0, cost: 0, tips: 0, regulars: 0, dessert: 0, beans: 0, sideSales: 0, prep: 0 }; }
 // 내준 잔 하나를 장부에 적는다
@@ -199,6 +199,15 @@ export function eventDue(biz, events, phase) {
     return true;
   }) || null;
 }
+// 영업 중 커피 이야기(trivia.js): 하루 하나까지이고 없는 날도 있다. 본 이야기는 다 볼 때까지 다시 나오지 않는다
+export const TRIVIA_CHANCE = 0.7;
+export function planTrivia(biz, ids, rand = Math.random) {
+  if (!ids.length || rand() >= TRIVIA_CHANCE) return null;
+  let pool = ids.filter((id) => !biz.trivia.includes(id));
+  if (!pool.length) { biz.trivia = []; pool = ids.slice(); } // 한 바퀴 다 봤으면 처음부터
+  return { id: pool[Math.floor(rand() * pool.length)], at: DAY_SEC * (0.15 + rand() * 0.65), shown: false };
+}
+export function markTrivia(biz, id) { if (!biz.trivia.includes(id)) biz.trivia.push(id); }
 export function markEvent(biz, id) { biz.seen[id] = biz.day; biz.eventDay = biz.day; }
 export function snoozeEvent(biz, id, days) { biz.snooze[id] = biz.day + days; biz.eventDay = biz.day; }
 export const friendLevel = (biz, id) => biz.friend[id] || 0;
@@ -218,6 +227,7 @@ export function normalizeBiz(raw) {
   if (raw.stock) for (const k of Object.keys(b.stock)) if (Number.isFinite(raw.stock[k])) b.stock[k] = raw.stock[k];
   b.history = Array.isArray(raw.history) ? raw.history.slice(-100) : [];
   b.finished = !!raw.finished;
+  b.trivia = Array.isArray(raw.trivia) ? raw.trivia.filter((x) => typeof x === 'string') : [];
   if (raw.unlocked && typeof raw.unlocked === 'object') {
     for (const k of ['unlocked', 'seen', 'snooze']) if (raw[k] && typeof raw[k] === 'object') b[k] = { ...raw[k] };
     b.starsTotal = Number(raw.starsTotal) || 0;
