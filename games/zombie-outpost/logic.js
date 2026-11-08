@@ -716,6 +716,7 @@ function avoidObstacles(s, x, y, vx, vy, er) {
 }
 
 export const RAID_FIRST_S = 240;
+export const RAID_WARN_S = 30; // 습격 시작 이만큼 전에 경고 말풍선
 
 // ---------- 초심자 가이드(발전 조언) ----------
 // 건축·강화·제작·훈련·전진기지 공사를 GUIDE_IDLE_S(3분) 동안 하나도 시작하지 않으면, 아래 '표준 테크'와 비교해
@@ -728,7 +729,7 @@ export const TECH_STANDARD = [
   { k: 'craft', key: 'pipe', by: 3, why: '맨주먹보다 훨씬 세요. 첫 무기로 딱이에요' },
   { k: 'bld', key: 'sawmill', lv: 1, by: 3, why: '목재가 저절로 쌓여요' },
   { k: 'bld', key: 'scrapyard', lv: 1, by: 4, why: '고철이 저절로 쌓여요. 무기와 건물의 주재료예요' },
-  { k: 'bld', key: 'barricade', lv: 1, by: 4, why: '첫 습격(4분)을 막는 방벽이 튼튼해져요' },
+  { k: 'bld', key: 'barricade', lv: 1, by: 4, why: '습격(본부 2레벨·동료가 생기면 시작)을 막는 방벽이 튼튼해져요' },
   { k: 'bld', key: 'watchtower', lv: 1, by: 5, why: '방어 동료를 한 명 더 세우고 방어 피해가 올라요' },
   { k: 'craft', key: 'pistol', by: 6, why: '먼 좀비를 총으로 잡아요. 총기 스위치를 켜 주세요' },
   { k: 'bld', key: 'repair', lv: 1, by: 6, why: '근접 무기는 닳아요. 본부에서 고칠 수 있어요' },
@@ -1358,7 +1359,9 @@ function updateRaid(s, dt, ev) {
   if (!s.raid) {
     s.wall = Math.min(max, s.wall + max * 0.03 * dt);
     if (!raidsEnabled(s)) return;
+    const before = s.raidT;
     s.raidT -= dt;
+    if (before >= RAID_WARN_S && s.raidT < RAID_WARN_S && s.raidT > 0) ev.push({ t: 'raid-warn', in: Math.ceil(s.raidT) }); // 습격 30초 전 무전 경고(한 번)
     if (s.raidT <= 0) startRaid(s, ev);
     return;
   }

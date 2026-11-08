@@ -394,7 +394,7 @@ test('동료 능력치: 방어 화력 = 전투력 × 공격 × 공속(× 감시�
 });
 
 test('동료: 배치 리셋은 모두 생산으로 돌리고 자리를 비운다', () => {
-  const s = fresh(15);
+  const s = fresh(15); s.hq = 2; // 습격은 본부 2레벨이거나 동료가 있을 때부터
   s.hq = 5; s.bld.dorm = 1;
   s.survivors.push(G.makeSurvivor(s), G.makeSurvivor(s), G.makeSurvivor(s));
   const [a, b] = s.survivors;
@@ -618,7 +618,7 @@ test('저장 → 불러오기 왕복, 깨진 저장은 거부', () => {
 });
 
 test('오프라인 보상: 생산은 30분어치까지만, 작업 타이머는 8시간까지 흐르고, 가방은 창고로 들어간다', () => {
-  const s = fresh(15);
+  const s = fresh(15); s.hq = 2; // 습격은 본부 2레벨이거나 동료가 있을 때부터
   s.bld.scrapyard = 2;
   s.bag.scrap = 10;
   // 20분 쉬면 20분어치 그대로
@@ -2034,4 +2034,13 @@ test('가이드 시계는 저장하지 않고, 불러오면 0에서 다시 센�
   assert.ok(s.idleT > 50);
   const r = G.deserialize(typeof G.serialize(s) === 'string' ? G.serialize(s) : JSON.stringify(G.serialize(s)));
   assert.equal(r.idleT, 0);
+});
+
+test('습격 30초 전에 경고를 한 번 보낸다', () => {
+  const s = fresh(15); s.hq = 2; // 습격은 본부 2레벨이거나 동료가 있을 때부터
+  s.raidT = G.RAID_WARN_S + 2;
+  const warns = [];
+  for (let t = 0; t < 40; t += DT) for (const e of G.step(s, DT)) if (e.t === 'raid-warn') warns.push(e);
+  assert.equal(warns.length, 1);
+  assert.ok(warns[0].in <= G.RAID_WARN_S && warns[0].in >= G.RAID_WARN_S - 1);
 });

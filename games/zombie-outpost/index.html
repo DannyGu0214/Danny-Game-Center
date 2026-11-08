@@ -229,6 +229,10 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .guide-note b { color: var(--amber); font-weight: 600; }
 .guide-note.kakao { background: #3a1a16; border-color: var(--red); }
 .guide-note.kakao b { color: #ff8f7c; }
+.guide-card.raid { border-color: var(--red); }
+.guide-card.raid::after { border-color: var(--red); }
+.guide-card.raid .guide-head b { color: #ff8f7c; }
+.guide-card.raid .guide-note { background: #3a1a16; border-color: var(--red); font-size: 13px; }
 @keyframes guideIn { from { opacity: 0; transform: translateY(8px); } }
 
 #toasts {
@@ -1025,6 +1029,7 @@ function handleEvents(list) {
         break;
       case 'fire': fx.fires.push({ x: e.x, y: e.y, t: 0 }); sfx.play('fire'); mark(e.x, e.y, 70, '20,16,12', 0.55, 14, true); break;
       case 'guide': showGuide(e); break;
+      case 'raid-warn': showAlert({ title: '긴급 무전', sub: `습격까지 약 ${e.in}초`, text: '본부에서 긴급 무전이 왔어요. 좀비들이 달려오고 있어요. 빨리 본부로 오세요.', raid: true, ttl: 12000 }); break;
       case 'item-auto': toast('위급해서 구급상자를 자동으로 썼어요', 'warn'); sfx.play('use', { id: 'medkit' }); break;
       case 'job-done':
         toast(`${e.name} 완료${e.kind === 'craft' ? ' · 장착했어요' : ''}${e.posted ? ` · ${e.posted.name}(${G.ROLES[e.posted.role].name}) 방벽 배치` : ''}`, 'good');
@@ -1925,6 +1930,29 @@ function closeGuide() {
   card.classList.add('out');
   guideTimer = setTimeout(() => $('#guide').replaceChildren(), 360);
 }
+// 알림 말풍선(내용 한 덩어리): 카카오톡 저장 주의, 습격 무전 경고. raid면 빨간 테두리
+function showAlert({ title, sub, bold, text, raid = false, ttl = 25000 }) {
+  const card = document.createElement('div');
+  card.className = `guide-card${raid ? ' raid' : ''}`;
+  const head = document.createElement('div'), h = document.createElement('b'), sm = document.createElement('small'), x = document.createElement('button');
+  head.className = 'guide-head'; h.textContent = title; sm.textContent = sub || '';
+  x.className = 'x'; x.textContent = '✕'; x.setAttribute('aria-label', '닫기'); x.addEventListener('click', closeGuide);
+  head.append(h, sm, x);
+  const note = document.createElement('p'), nb = document.createElement('b');
+  note.className = `guide-note${raid ? ' kakao' : ''}`;
+  nb.textContent = bold ? `${bold} ` : ''; note.append(nb, text);
+  card.append(head, note);
+  $('#guide').replaceChildren(card);
+  clearTimeout(guideTimer);
+  guideTimer = setTimeout(closeGuide, ttl);
+}
+// 카카오톡 인앱 브라우저로 열면 시작하자마자 한 번 알린다(저장이 지워질 수 있다)
+let kakaoShown = false;
+function kakaoNotice() {
+  if (kakaoShown || !/KAKAOTALK/i.test(navigator.userAgent)) return;
+  kakaoShown = true;
+  showAlert({ title: '저장 주의', sub: '카카오톡에서 열었어요', bold: '세이브가 날아갈 수 있어요!', text: '카카오톡 안에서 플레이하면 저장이 지워질 수 있어요. 꼭 크롬 같은 브라우저에서 플레이하세요.', ttl: 40000 });
+}
 function showGuide(e) {
   if (tab) { guidePending = e; return; } // 관리 시트가 열려 있음
   guidePending = null;
@@ -2385,6 +2413,7 @@ $('#heroStart').addEventListener('click', () => {
   $('#heroName').blur();
   save(); pushCloud();
   toast(`${r.msg}. 쓰러지면 끝이니 체력을 잘 보세요`, 'good');
+  setTimeout(kakaoNotice, 500);
 });
 
 let newArmed = false, newTimer = 0;
@@ -2635,6 +2664,7 @@ function hideTitle() {
   titleRun?.stop(); titleRun = null;
   $('#titleScreen').hidden = true;
   titleOn = false; last = performance.now(); acc = 0;
+  if (!titleFresh) setTimeout(kakaoNotice, 500); // 새 판은 생존자를 고른 뒤에
 }
 function titlePrimary() {
   hideTitle();
