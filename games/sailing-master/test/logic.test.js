@@ -5,7 +5,9 @@ import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
 import { advanceFlow, waveAngle, FLOW_LAYERS } from '../art.js';
 import { createCreatures, hitRadius } from '../creatures.js';
-import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS, ROLES, CAPTAINS, STORIES } from '../data.js';
+import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS, ROLES, CAPTAINS, STORIES, MAT_IDS, ITEMS, SUPPLY, HERB, WORKSHOP } from '../data.js';
+// 모든 재료와 금화를 n개씩(S2 아이템부터 배 값에 여러 재료가 들어가요)
+const rich = (n) => Object.fromEntries([...MAT_IDS, 'coin'].map((k) => [k, n]));
 import { isJourney } from '../art-story.js';
 import { TRACKS, TRACK_IDS } from '../music.js';
 
@@ -215,7 +217,7 @@ test('입항: 항구로 항로를 잡으면 묶이고, 화물이 창고로 옮�
   run(S, 60);
   assert.equal(S.docked, p.id);
   assert.equal(S.res.wood, wood + 7);
-  assert.equal(S.hold.wood, 0);
+  assert.equal((S.hold.wood || 0), 0);
   assert.equal(S.vigor, 1);
 });
 
@@ -231,7 +233,7 @@ test('건지기: 지나가면 화물칸에 담기고, 칸이 차면 더 못 담�
   G.flotsamOf(S).push({ x: 1, y: 1, k: 'cloth', n: 5, ph: 0 });
   S.boat.x = 0; S.boat.y = 0;
   run(S, 1);
-  assert.equal(S.hold.cloth, 0);
+  assert.equal((S.hold.cloth || 0), 0);
   assert.ok(drain(S).some((e) => e.type === 'holdFull'));
 });
 
@@ -402,8 +404,8 @@ test('기항지: 작은 호수 3곳, 큰 호수 5곳이 고루 있고 어디든 
   assert.equal(REGIONS.pond.shape.ax, 96); assert.equal(REGIONS.lake.shape.ax, 170);
   // 같은 맵 안에서는 어느 나루든 값이 같고 수리·보급·고용·건조가 된다
   const results = worldOf('lake').ports.map((p) => {
-    const S = G.newGame(1); S.region = 'lake'; S.visited.lake = 1; S.res = { wood: 500, cloth: 500, coin: 500 }; S.food = 0; S.hull = 0.5;
-    G.dock(S, p.id); S.res = { wood: 500, cloth: 500, coin: 500 }; S.hull = 0.5; S.food = 1;
+    const S = G.newGame(1); S.region = 'lake'; S.visited.lake = 1; S.res = rich(500); S.food = 0; S.hull = 0.5;
+    G.dock(S, p.id); S.res = rich(500); S.hull = 0.5; S.food = 1;
     const sold = G.sell(S, 'wood', 20), food = G.buyFood(S, 2), fixed = G.repair(S), built = G.buildHull(S, 'rowboat').ok, placed = G.placeModule(S, 'hammock', 0, 3).ok, res = { ...S.res }, hired = G.hire(S, G.candidatesAt(S)[0].id).ok;
     return JSON.stringify({ sold, food, fixed, built, placed, hired, res });
   });
@@ -464,7 +466,7 @@ test('망원경: 내륙 발견지와 뭍짐승은 망원경이 있어야 찾고,
   T.ship.mods.push({ id: 'telescope', col: 0, row: 3, rot: 0 });
   G.flotsamOf(T).push({ x: 8, y: 0, k: 'wood', n: 5, ph: 0 });
   run(T, 1);
-  assert.equal(T.hold.wood, 0);
+  assert.equal((T.hold.wood || 0), 0);
 });
 
 test('뭍짐승은 망원경이 있을 때만 나타난다', () => {
@@ -516,7 +518,7 @@ test('다음 배 재료가 모이면 한 번만 알려 준다', () => {
   G.undock(S);
   run(S, 1);
   assert.ok(!drain(S).some((e) => e.type === 'canBuild'), '아직 모자람');
-  S.res.wood = 30; S.hold.wood = 10; S.res.coin = 15;
+  S.res.wood = 30; S.hold.wood = 10; S.res.coin = 15; S.res.hemp = 6;
   run(S, 1);
   assert.equal(drain(S).filter((e) => e.type === 'canBuild').length, 1);
   run(S, 1);
@@ -632,7 +634,7 @@ test('파국: 침몰하면 구조되어 마지막 항구로 간다. 화물·모�
   const S = sloopAt('lake', 1, [{ id: 'food', col: 0, row: 3, rot: 0 }]);
   S.lastPort = { region: 'lake', id: 'pine' };
   S.crew = [{ role: 'lookout', name: 'x', wage: 2 }];
-  S.hold.wood = 9; S.res.coin = 100; S.blueprints.mast_m = 1;
+  S.hold.wood = 9; S.res.coin = 100; S.res.wood = 200; S.blueprints.mast_m = 1; // 잡목이 있으면 항구가 대신 때워 주지 않아요
   S.boat.x = 0; S.boat.y = 0; S.hull = 0.001; S.boat.heel = 0; S.boat.sailLevel = 2;
   S.hull = -1;
   G.step(S, G.FIXED_DT);
@@ -641,7 +643,7 @@ test('파국: 침몰하면 구조되어 마지막 항구로 간다. 화물·모�
   assert.deepEqual(r.broke, ['food']);
   assert.equal(r.left, 'x');
   assert.equal(S.docked, 'pine');
-  assert.equal(S.hold.wood, 0);
+  assert.equal((S.hold.wood || 0), 0);
   assert.equal(S.ship.hull, 'sloop');
   assert.ok(S.ship.mods.some((m) => m.id === 'mast_m'));
   assert.ok(S.blueprints.mast_m);
@@ -699,7 +701,7 @@ test('사다리: 1~3등급 별 9칸의 칸 수·내구도가 기획 표와 같�
 
 test('별 올리기: 선원과 모듈이 그대로 가고, 값을 내고, 안 맞는 모듈만 절반 돌려받는다', () => {
   for (const [from, to] of [['raft', 'raft2'], ['raft2', 'raft3'], ['rowboat', 'rowboat2'], ['rowboat2', 'rowboat3'], ['sloop', 'sloop2'], ['sloop2', 'sloop3']]) {
-    const S = G.newGame(1); S.region = 'river'; S.docked = 'head'; S.res = { wood: 900, cloth: 900, coin: 900 }; S.hull = 0.5;
+    const S = G.newGame(1); S.region = 'river'; S.docked = 'head'; S.res = rich(900); S.hull = 0.5;
     S.ship.hull = from; S.ship.mods = [];
     // 칸을 모듈로 다 채워도 ★1에 놓인 것이 어긋나지 않아야 해요
     for (const [c, r] of SH.validCells(from)) S.ship.mods.push({ id: 'food', col: c, row: r, rot: 0 });
@@ -726,7 +728,7 @@ test('별 올리기: 선원과 모듈이 그대로 가고, 값을 내고, 안 �
 
 test('등급 올리기: 뗏목은 바로, 2등급부터 ★2가 먼저고, 슬루프는 강에서 설계도로 짓는다', () => {
   const S = G.newGame(1);
-  S.res = { wood: 900, cloth: 900, coin: 900 };
+  S.res = rich(900);
   assert.equal(G.buildHull(S, 'sloop').ok, false, '두 칸은 못 건너요');
   assert.equal(G.buildHull(S, 'raft3').ok, false, '별도 한 칸씩');
   assert.ok(G.buildHull(S, 'rowboat').ok, '뗏목은 별 없이 나룻배로');
@@ -809,14 +811,14 @@ test('고유 개조: 노걸이는 노를 빠르게, 센터보드는 맞바람에
 });
 
 test('뗏목에는 돛대를 못 세운다', () => {
-  const S = G.newGame(1); S.visited.lake = 1; S.res = { wood: 99, cloth: 99, coin: 99 };
+  const S = G.newGame(1); S.visited.lake = 1; S.res = rich(99);
   assert.match(G.placeModule(S, 'mast_s', 1, 2).why, /돛대/);
   assert.ok(G.buildHull(S, 'rowboat').ok);
   assert.ok(G.placeModule(S, 'mast_s', 0, 2).ok);
 });
 
 test('가장 높은 배 기록: 고치면 따라오고, 구조로 모듈을 잃어도 남는다', () => {
-  const S = G.newGame(1); S.res = { wood: 900, cloth: 900, coin: 900 };
+  const S = G.newGame(1); S.res = rich(900);
   assert.equal(S.best.hull, 'raft');
   G.buildHull(S, 'raft2'); assert.equal(S.best.hull, 'raft2');
   G.placeModule(S, 'food', 0, 0); assert.ok(S.best.mods.some((m) => m.id === 'food'));
@@ -829,11 +831,11 @@ test('가장 높은 배 기록: 고치면 따라오고, 구조로 모듈을 잃�
   assert.equal(S.best.mods.length, n);
 });
 
-test('저장 v1 → v2: 예전 배는 ★1, 슬루프로 있던 판도 그대로, 찾아 둔 물레방아는 설계도를 준다', () => {
+test('저장 v1 → v3: 예전 배는 ★1, 슬루프로 있던 판도 그대로, 찾아 둔 물레방아는 설계도를 준다', () => {
   const old = JSON.parse(G.serialize(sloopAt('lake')));
   old.v = 1; delete old.best; old.found = { mill2: 1 };
   const T = G.deserialize(JSON.stringify(old));
-  assert.equal(T.v, 2);
+  assert.equal(T.v, 3);
   assert.equal(T.ship.hull, 'sloop');
   assert.equal(HULLS[T.ship.hull].star, 1);
   assert.equal(T.best.hull, 'sloop');
@@ -942,4 +944,94 @@ test('같은 시드는 같은 결과', () => {
   const a = G.newGame(5), b = G.newGame(5);
   for (const S of [a, b]) { G.undock(S); G.setDest(S, 20, 60); run(S, 40); }
   assert.deepEqual([a.boat.x, a.boat.y, a.boat.h], [b.boat.x, b.boat.y, b.boat.h]);
+});
+
+// ── S2 아이템 ──
+test('S2 교역: 금화 상자가 없고, 반짝이는 곳에서 교역품을 건져 항구에서 판다(찾는 공간이면 1.5배)', () => {
+  for (const r of REGION_ORDER) assert.ok(!REGIONS[r].flot.table.some((e) => e[0] === 'coin'), `${r} 금화 상자 없음`);
+  const S = G.newGame(3); G.undock(S); S.boat.x = 0; S.boat.y = 0;
+  G.flotsamOf(S).length = 0; G.flotsamOf(S).push({ x: 1, y: 1, k: 'shiny', n: 2, ph: 0 });
+  run(S, 1);
+  const ev = drain(S).find((e) => e.type === 'pick');
+  assert.ok(ev && ev.shiny && ITEMS[ev.k].kind === 'trade', JSON.stringify(ev));
+  assert.equal(S.hold[ev.k], 2);
+  // 호수는 도자기를 찾고, 강은 커피·향신료를 찾는다
+  const T = G.newGame(1); T.res.porcelain = 2; T.res.coffee = 2;
+  assert.equal(G.priceOf(T, 'porcelain'), Math.round(ITEMS.porcelain.price * 1.5));
+  assert.equal(G.priceOf(T, 'coffee'), ITEMS.coffee.price);
+  const c0 = T.res.coin; G.sell(T, 'porcelain', 2);
+  assert.equal(T.res.coin - c0, 2 * Math.round(ITEMS.porcelain.price * 1.5));
+  T.region = 'river'; assert.equal(G.priceOf(T, 'coffee'), Math.round(ITEMS.coffee.price * 1.5));
+});
+test('S2 재료: 공방은 낮은 등급 3개 + 금화로 높은 등급 1개, 기본 재료는 금화로 산다', () => {
+  const S = G.newGame(1); S.res = { wood: 10, coin: 40 };
+  assert.equal(G.craft(S, 'wood', 5), 3, '잡목 9개로 참나무 3개');
+  assert.equal(S.res.oak, 3); assert.equal(S.res.wood, 1); assert.equal(S.res.coin, 40 - 3 * WORKSHOP.fee);
+  assert.equal(G.craft(S, 'nail'), 0, '쇠못은 올릴 등급이 없음');
+  assert.equal(G.buyMat(S, 'hemp', 2), 2); assert.equal(S.res.hemp, 2);
+  assert.equal(G.buyMat(S, 'oak', 1), 0, '참나무는 못 사요');
+  // 슬루프는 강의 고급 재료로 짓는다
+  assert.ok(HULLS.sloop.price.oak && HULLS.sloop.price.canvas && HULLS.sloop.price.nail);
+});
+test('S2 보급품: 빵은 5일이면 상하고 건어는 안 상한다, 어망은 신선한 물고기, 약초는 기력이 바닥나기 전에 먹는다', () => {
+  const S = G.newGame(1);
+  assert.equal(G.pantryOf(S).bread.n, S.food);
+  S.food = 0; S.pantry = []; S.res.coin = 50;
+  assert.equal(G.buyFood(S, 2, 'bread'), 2); assert.equal(G.buyFood(S, 1, 'dfish'), 1);
+  assert.equal(S.res.coin, 50 - 2 * SUPPLY.bread.price - SUPPLY.dfish.price);
+  G.undock(S); S.boat.x = 0; S.boat.y = 0;
+  // 하루에 1개씩 먹으니 이틀이 지나면 빵부터 다 먹는다. 빵만 사 두고 엿새를 넘기면 상해서 버린다
+  const U = G.newGame(1); U.food = 0; U.pantry = []; U.res.coin = 50; G.buyFood(U, 4, 'bread'); G.undock(U);
+  U.crew = []; let spoiled = null;
+  for (let i = 0; i < CAL.day * 30 * 6 && !spoiled; i++) { G.step(U, G.FIXED_DT); U.vigor = 1; U.boat.x = 0; U.boat.y = 0; U.food = Math.max(U.food, 0); for (const e of U.events) if (e.type === 'spoiled') spoiled = e; U.events.length = 0; if (U.food < 0.5) break; }
+  assert.ok(U.food < 4, '먹으면 준다');
+  S.herb = 2; S.vigor = 0.3; run(S, 0.2);
+  assert.ok(drain(S).some((e) => e.type === 'herb')); assert.equal(S.herb, 1); assert.ok(S.vigor > 0.6);
+});
+test('S2 보급품: 상한 빵은 버린다', () => {
+  const S = G.newGame(1); S.food = 3; S.pantry = [{ k: 'bread', n: 2, exp: 0 }, { k: 'dfish', n: 1, exp: null }];
+  G.undock(S); S.foodDay = -1; S.boat.x = 0; S.boat.y = 0;
+  run(S, 0.1);
+  const ev = drain(S).find((e) => e.type === 'spoiled');
+  assert.ok(ev && ev.gone.bread >= 1.9, JSON.stringify(ev));
+  assert.ok(S.food < 1.01 && S.food > 0.9);
+});
+test('S2 모듈: 8갈래·Mk·자리가 있고, 슬루프부터 같은 칸에서 Mk를 올린다. 뒤 공간 모듈은 잠겨 있다', () => {
+  for (const [id, M] of Object.entries(MODULES)) { assert.ok(M.fam && M.mk, id); }
+  assert.ok(!G.isUnlocked(G.newGame(1), 'wheel'), '타륜은 표에만');
+  const S = G.newGame(1); S.region = 'river'; S.docked = 'head'; S.visited.lake = 1; S.res = rich(200);
+  S.ship.hull = 'sloop'; S.ship.mods = [{ id: 'hold', col: 0, row: 2, rot: 0 }];
+  const cap0 = G.stats(S).holdCap;
+  assert.ok(G.upgradeModule(S, 0, 2).ok);
+  assert.equal(S.ship.mods[0].id, 'hold2'); assert.ok(G.stats(S).holdCap > cap0);
+  const T = G.newGame(1); T.res = rich(50); T.ship.mods.push({ id: 'food', col: 0, row: 0, rot: 0 });
+  assert.equal(G.upgradeModule(T, 0, 0).ok, false, '뗏목에서는 못 올림');
+});
+test('S2 수집품: 발견지마다 유물이 있고, 병 속 편지는 못 찾은 발견지를 알려 준다', () => {
+  for (const r of REGION_ORDER) for (const f of REGIONS[r].finds) assert.ok(f.relic, f.id);
+  const S = G.newGame(1); G.undock(S); const f = G.findsOf(S)[0];
+  S.boat.x = f.x; S.boat.y = f.y; run(S, 0.5);
+  assert.ok(S.relics[f.id]);
+  G.flotsamOf(S).length = 0; G.flotsamOf(S).push({ x: S.boat.x, y: S.boat.y, k: 'bottle', n: 1, ph: 0 });
+  run(S, 0.5);
+  const ev = drain(S).find((e) => e.type === 'letter');
+  assert.ok(ev && S.letters[ev.id] && !S.found[ev.id]);
+});
+test('저장 v2 → v3: 화물칸 금화는 창고로, 식량은 빵으로, 찾은 발견지의 유물을 받는다', () => {
+  const S = G.newGame(1); const o = JSON.parse(G.serialize(S));
+  o.v = 2; o.hold = { wood: 3, cloth: 0, coin: 7 }; o.res = { wood: 1, cloth: 2, coin: 5 }; o.food = 4; delete o.pantry; delete o.relics; delete o.letters; delete o.herb;
+  o.found = { logpile: 1 }; o.flot = { pond: [{ x: 0, y: 0, k: 'coin', n: 3, ph: 0 }] };
+  const T = G.deserialize(JSON.stringify(o));
+  assert.equal(T.v, 3); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
+  assert.equal(T.pantry[0].k, 'bread'); assert.equal(T.pantry[0].n, 4);
+  assert.ok(T.relics.logpile); assert.equal(T.flot.pond[0].k, 'shiny');
+});
+
+test('교착 방지: 금화가 없으면 잡목으로 고치고, 둘 다 없으면 항구가 절반까지 때워 준다', () => {
+  const S = G.newGame(1); S.hull = 0.3; S.res = { coin: 0, wood: 100 };
+  const c = G.repairCost(S);
+  assert.equal(G.repair(S), false); assert.ok(G.repairWithWood(S)); assert.equal(S.hull, 1); assert.equal(S.res.wood, 100 - c);
+  const T = G.newGame(1); G.undock(T); T.hull = 0.2; T.res = { coin: 0, wood: 0 };
+  const ev = G.dock(T, 'reed') && drain(T).find((e) => e.type === 'docked');
+  assert.equal(T.hull, 0.5); assert.ok(ev.patched);
 });
