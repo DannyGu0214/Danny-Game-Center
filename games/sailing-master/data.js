@@ -119,12 +119,12 @@ export const MODULES = {
 };
 // 선원 역할(S3, 2026-11-08). seat: 앉는 자리 종류(모듈의 seat). grade: 이 등급 배부터 후보로 와요. future: 뒤 공간 역할(표에만)
 export const ROLES = {
-  rower: { name: '노잡이', icon: '🚣', seat: 'oar', desc: '노는 내가 젓지! 선장은 키만 잡으라고', brief: '노는 내가 젓지! 선장은 키만 잡아', hire: 12, wage: 2, region: 'pond', grade: 2, z: 1 },
-  deckhand: { name: '갑판원', icon: '🪢', seat: 'sail', desc: '돛은 내게 맡겨! 선장이 돛대까지 안 뛰어도 되고, 돌풍이면 알아서 줄이지', brief: '돛은 내게 맡겨! 돌풍이면 알아서 줄이지', hire: 15, wage: 2, region: 'pond', grade: 2, z: 1 },
-  lookout: { name: '견시', icon: '🔭', seat: 'look', desc: '망원경 자리에서 건질 건 더 멀리서 줍고, 해도도 더 넓게 밝히지', brief: '망원경만 있으면 멀리서도 줍지!', hire: 15, wage: 2, region: 'pond', grade: 2, z: 1 },
-  helmsman: { name: '조타수', icon: '☸️', seat: 'helm', desc: '선장이 키를 떠나도 항로는 지키지. 돛·노를 오가도 배가 안 헤맨다고', brief: '선장이 자리를 떠도 항로는 지키지!', hire: 25, wage: 3, region: 'river', grade: 3, z: 1 },
-  fisher: { name: '어부', icon: '🎣', seat: 'fish', desc: '어망 자리에서 물고기를 두 배로 낚지', brief: '어망만 주면 저녁은 걱정 마!', hire: 15, wage: 2, region: 'river', grade: 3, z: 1 },
-  carpenter: { name: '목수', icon: '🔨', seat: 'carpenter', desc: '수리대 자리에서 화물칸 잡목으로 항해 중에 배를 고치지', brief: '잡목만 실어 주면 바다 위에서 고친다!', hire: 25, wage: 3, region: 'river', grade: 3, z: 1 },
+  rower: { name: '노잡이', icon: '🚣', seat: 'oar', desc: '노는 내가 젓지! 선장은 키만 잡으라고', brief: '노는 내가 젓지! 선장은 키만 잡아', hire: 12, wage: 1, region: 'pond', grade: 2, z: 1 },
+  deckhand: { name: '갑판원', icon: '🪢', seat: 'sail', desc: '돛은 내게 맡겨! 선장이 돛대까지 안 뛰어도 되고, 돌풍이면 알아서 줄이지', brief: '돛은 내게 맡겨! 돌풍이면 알아서 줄이지', hire: 15, wage: 1, region: 'pond', grade: 2, z: 1 },
+  lookout: { name: '견시', icon: '🔭', seat: 'look', desc: '망원경 자리에서 건질 건 더 멀리서 줍고, 해도도 더 넓게 밝히지', brief: '망원경만 있으면 멀리서도 줍지!', hire: 15, wage: 1, region: 'pond', grade: 2, z: 1 },
+  helmsman: { name: '조타수', icon: '☸️', seat: 'helm', desc: '선장이 키를 떠나도 항로는 지키지. 돛·노를 오가도 배가 안 헤맨다고', brief: '선장이 자리를 떠도 항로는 지키지!', hire: 20, wage: 2, region: 'river', grade: 3, z: 1 },
+  fisher: { name: '어부', icon: '🎣', seat: 'fish', desc: '어망 자리에서 물고기를 두 배로 낚지', brief: '어망만 주면 저녁은 걱정 마!', hire: 15, wage: 1, region: 'river', grade: 3, z: 1 },
+  carpenter: { name: '목수', icon: '🔨', seat: 'carpenter', desc: '수리대 자리에서 화물칸 잡목으로 항해 중에 배를 고치지', brief: '잡목만 실어 주면 바다 위에서 고친다!', hire: 20, wage: 2, region: 'river', grade: 3, z: 1 },
   cook: { name: '요리사', icon: '🍲', seat: 'cook', desc: '식량 효율과 사기', hire: 20, wage: 3, region: 'river', grade: 4, future: true },
   engineer: { name: '기관사', icon: '⚙️', seat: 'engine', desc: '기관·배터리 효율', hire: 30, wage: 4, region: 'river', grade: 4, future: true },
   bosun: { name: '갑판장', icon: '📯', seat: 'sail', desc: '갑판원 효과 증가, 돌풍 대응이 빨라져', hire: 30, wage: 4, region: 'river', grade: 4, future: true },

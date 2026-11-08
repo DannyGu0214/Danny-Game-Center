@@ -746,7 +746,7 @@ function spawnFlot(S) {
   }
 }
 function collectFlot(S) {
-  const st = stats(S), b = S.boat, list = flotsamOf(S), R = 6 + 6 * lookK(S);
+  const st = stats(S), b = S.boat, list = flotsamOf(S), R = 6 + 10 * lookK(S);
   for (let i = list.length - 1; i >= 0; i--) {
     const f = list[i];
     if (Math.hypot(f.x - b.x, f.y - b.y) > R) continue;
@@ -960,7 +960,7 @@ export function step(S, dt) {
     const rower = work(S, 'oar');
     if (!rower) b.stamina = Math.max(0, b.stamina - BOAT.staminaDrain * (wx.heat && !st.awning ? 1.5 : 1) * dt);
     else b.stamina = Math.min(1, b.stamina + BOAT.staminaRest * dt);
-    rowT = st.rowSpeed * (rower ? 0.8 + 0.25 * rower : b.stamina > 0 ? 1 : BOAT.tired) * (0.82 + 0.36 * Math.max(0, Math.sin(b.rowPhase)));
+    rowT = st.rowSpeed * (rower ? 0.85 + 0.3 * rower : b.stamina > 0 ? 1 : BOAT.tired) * (0.82 + 0.36 * Math.max(0, Math.sin(b.rowPhase)));
   } else b.stamina = Math.min(1, b.stamina + BOAT.staminaRest * dt);
 
   // 여울: 배가 수심보다 깊으면 걸린다
