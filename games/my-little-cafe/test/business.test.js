@@ -264,3 +264,27 @@ test('이벤트 대본: 말투, 등장인물, 노트, 장비가 맞아요', () =
   for (const n of FAIR.needs) assert.ok(EQUIP[n.equip], n.equip);
   assert.ok(all.some((s) => s.unlock === 'equip') && all.some((s) => s.unlock === 'dessert'));
 });
+
+test('커피 이야기: 하루 하나까지, 없는 날도 있고, 다 볼 때까지 겹치지 않아요', async () => {
+  const { TRIVIA, TRIVIA_KIND } = await import('../trivia.js');
+  const ids = TRIVIA.map((x) => x.id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const x of TRIVIA) {
+    assert.ok(TRIVIA_KIND[x.kind], x.id);
+    assert.doesNotMatch(x.text, /(습니다|합니다|입니다|십시오|답니다)/, x.text);
+    assert.ok(x.text.length <= 90, x.id); // 말풍선 두세 줄
+  }
+  assert.deepEqual(new Set(TRIVIA.map((x) => x.kind)), new Set(Object.keys(TRIVIA_KIND)));
+  const biz = B.newBiz(seeded(3)), rand = seeded(9);
+  let none = 0;
+  for (let day = 0; day < 200; day++) {
+    const p = B.planTrivia(biz, ids, rand);
+    if (!p) { none++; continue; }
+    assert.ok(p.at >= DAY_SEC * 0.15 && p.at <= DAY_SEC * 0.8);
+    if (biz.trivia.length < ids.length) assert.ok(!biz.trivia.includes(p.id));
+    B.markTrivia(biz, p.id);
+  }
+  assert.ok(none > 20 && none < 120, `없는 날 ${none}`);
+  const back = B.normalizeBiz(JSON.parse(JSON.stringify({ ...biz, unlocked: {} })));
+  assert.deepEqual(back.trivia, biz.trivia);
+});

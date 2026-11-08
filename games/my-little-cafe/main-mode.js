@@ -7,6 +7,7 @@ import { runBrew, runRoast } from './stations.js';
 import { MENUS, DAY_SEC, PATIENCE, AUTO_SEC, EQUIP, PEOPLE, BIZ_REGULARS, WEATHER_NAME, COLDBREW_COST, RENT_PER_SEASON, SEASON_NAME, DAYS_PER_SEASON, SIDE, ROAST } from './data.js';
 import { REG_TALK, OWNER_VISIT, REACT } from './story.js';
 import { EVENTS, FAIR } from './events.js';
+import { TRIVIA, TRIVIA_KIND } from './trivia.js';
 
 const PANEL = 214; // 아래 주문판 높이
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -89,8 +90,21 @@ export function createBusiness(env) {
     renderTickets();
   }
 
+  // 커피 이야기 말풍선: 영업 화면 위에 잠깐 떠 있다가 사라진다. 눌러도 닫힌다. 영업은 멈추지 않는다
+  function showTrivia(id) {
+    const x = TRIVIA.find((v) => v.id === id), box = $('trivia');
+    if (!x) return;
+    box.innerHTML = `<b>☕ ${TRIVIA_KIND[x.kind]}</b><p></p><small>눌러서 닫기</small>`;
+    box.querySelector('p').textContent = x.text;
+    box.classList.remove('hide');
+    clearTimeout(showTrivia.t); showTrivia.t = setTimeout(hideTrivia, 14000);
+  }
+  function hideTrivia() { clearTimeout(showTrivia.t); $('trivia').classList.add('hide'); }
+  $('trivia').addEventListener('click', hideTrivia);
+
   // 일반 손님 직접 만들기: 시간은 계속 흐른다. 이 손님은 만드는 동안 기다려 준다
   async function makeByHand(t) {
+    hideTrivia();
     t.state = 'hand'; day.busy = true; day.sig = null;
     $('tickets').classList.add('hide');
     let steps = MENUS[t.menu].steps.filter((s) => s !== 'grind' || t.menu === 'drip' || t.menu === 'origin');
@@ -125,6 +139,7 @@ export function createBusiness(env) {
   async function talkTo(t) {
     const id = t.regular, R = BIZ_REGULARS[day.place][id];
     t.state = 'talk';
+    hideTrivia();
     day.clockOn = false; day.busy = true;
     $('tickets').classList.add('hide');
     env.setFront(id); env.barView();
@@ -185,6 +200,8 @@ export function createBusiness(env) {
           }
         }
       }
+      const tv = d.trivia; // 하루 하나까지. 손이 빌 때만 띄우고, 마감 직전이면 그날은 건너뛴다
+      if (tv && !tv.shown && !d.busy && d.clock >= tv.at && d.clock < DAY_SEC - 15) { tv.shown = true; B.markTrivia(biz(), tv.id); showTrivia(tv.id); }
       if (d.clock >= DAY_SEC && !d.busy) { d.resolve(); return; }
     }
     d.hudT = (d.hudT || 0) + dt;
@@ -311,7 +328,7 @@ export function createBusiness(env) {
     prefill(F, place === 'home' ? 3 : 1, Math.random, () => randomLook(place));
     day = {
       place, F, err, clock: 0, clockOn: true, busy: false, tickets: [], pending: [], nextId: 1, sig: null, stats: B.newDayStats(),
-      arrivals: B.planDay(place, b.day, b.weather, b.rep), regs: B.regularsOfDay(place, b.day).sort((a, x) => a.at - x.at), resolve: null,
+      arrivals: B.planDay(place, b.day, b.weather, b.rep), regs: B.regularsOfDay(place, b.day).sort((a, x) => a.at - x.at), resolve: null, trivia: B.planTrivia(b, TRIVIA.map((x) => x.id)),
     };
     mainView();
     $('tickets').classList.remove('hide');
@@ -327,6 +344,7 @@ export function createBusiness(env) {
     ticks.delete(tick);
     day = null;
     $('tickets').classList.add('hide');
+    hideTrivia();
     const lost = d.tickets.filter((t) => !t.regular).length; // 문 닫을 때 남은 손님은 놓친 걸로 치지 않지만 알려 준다
     const wasted = B.endOfDayStock(b);
     return { ...B.closeDay(b, d.stats), leftAtClose: lost, wasted };
