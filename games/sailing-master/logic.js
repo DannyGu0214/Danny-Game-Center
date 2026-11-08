@@ -1,4 +1,4 @@
-import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS } from './data.js';
+import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB } from './data.js';
 import { worldOf } from './world.js';
 import * as SH from './ship.js';
 // 게임 규칙 전부. 화면이 없고, 시드와 고정 시간 단계만으로 결과가 같다.
@@ -59,15 +59,15 @@ export function windAt(S) {
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 2, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 3, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: { heat: false, drought: false, gustOn: false, gustSoon: false },
     boat: { x: 0, y: 0, h: -PI / 2, spd: 0, turn: 0, rudder: 0, sailLevel: 0, sailNow: 0, lastSail: 2, row: false, rowPhase: 0, stamina: 1, boom: 0.2, luff: false, heel: 0, twa: 0, grounded: false, shoal: false },
     cap: { x: HULLS.raft.helmX, at: 'helm', to: null, then: null },
     route: null, docked: 'reed', disaster: null, events: [],
-    res: { wood: 15, cloth: 0, coin: 10 }, hold: { wood: 0, cloth: 0, coin: 0 },
-    food: HULLS.raft.foodBase, hull: 1, vigor: 1,
+    res: { wood: 15, cloth: 0, coin: 10 }, hold: {},
+    food: HULLS.raft.foodBase, pantry: [{ k: 'bread', n: HULLS.raft.foodBase, exp: SUPPLY.bread.keep }], herb: 0, hull: 1, vigor: 1, relics: {}, letters: {},
     ship: { hull: 'raft', mods: [{ id: 'oar', col: 1, row: 1, rot: 0 }], name: '새벽호', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] },
     crew: [], hiredEver: {}, owed: 0, wageDay: 0,
     flot: {}, fog: {}, found: {}, blueprints: {}, seen: {}, photos: {}, ach: {},
@@ -113,8 +113,13 @@ export function moduleCost(S, id) {
   if (hasTrait(S, 'crafter')) for (const k of Object.keys(cost)) cost[k] = Math.max(0, cost[k] - 1);
   return cost;
 }
-export const holdUsed = (S) => S.hold.wood + S.hold.cloth + S.hold.coin;
-export const isUnlocked = (S, id) => { const n = MODULES[id].need; return (!n.region || S.visited[n.region]) && (!n.blueprint || S.blueprints[n.blueprint]); };
+// 화물칸 부피: 금화는 자리를 차지하지 않아요
+export const holdUsed = (S) => Object.entries(S.hold).reduce((a, [k, v]) => a + v * (ITEMS[k]?.vol ?? 1), 0);
+const add = (o, k, n) => { o[k] = (o[k] || 0) + n; };
+// 짐 옮기기: 화물칸 → 항구 창고
+function unload(S) { const got = {}; for (const [k, v] of Object.entries(S.hold)) { if (!v) continue; add(S.res, k, v); got[k] = v; } S.hold = {}; return got; }
+export const isTrade = (k) => ITEMS[k]?.kind === 'trade';
+export const isUnlocked = (S, id) => { const M = MODULES[id], n = M.need; return !M.future && !M.upOnly && (!n.region || S.visited[n.region]) && (!n.blueprint || S.blueprints[n.blueprint]) && (!n.grade || HULLS[S.ship.hull].grade >= n.grade); };
 export const hasRole = (S, role) => S.crew.some((c) => c.role === role);
 function emit(S, type, data) { S.events.push({ type, ...data }); }
 
@@ -191,8 +196,7 @@ export function nearPort(S, r = NAV.dock + 8) { return W(S).ports.find((p) => Ma
 export function nearGate(S, r = NAV.dock + 8) { return W(S).gates.find((g) => Math.hypot(g.x - S.boat.x, g.y - S.boat.y) < r) || null; }
 export function dock(S, portId) {
   placeAtPort(S, portId);
-  const got = { ...S.hold };
-  for (const k of Object.keys(S.hold)) { S.res[k] += S.hold[k]; S.hold[k] = 0; }
+  const got = unload(S);
   S.boat.sailLevel = 0; S.boat.row = false;
   S.vigor = 1; S.boat.stamina = 1;
   S.cap.to = null; S.cap.then = null; S.cap.at = 'helm'; S.cap.x = HULLS[S.ship.hull].helmX;
@@ -200,10 +204,16 @@ export function dock(S, portId) {
   // 굶는 사람은 돌려보내지 않는다: 코인이 없으면 마을에서 하루치를 나눠 줘요
   const persons = 1 + S.crew.length;
   let gift = 0;
-  if (S.food < persons && S.res.coin < persons * FOOD_PRICE) { gift = persons - S.food; S.food = persons; }
+  if (S.food < persons && S.res.coin < persons * FOOD_PRICE) { gift = persons - S.food; stock(S, 'bread', gift); }
+  // 금화도 잡목도 없어 못 고치는 배는 항구 사람들이 절반까지 대충 때워 준다(침몰 → 구조 → 침몰 악순환 방지)
+  const patched = patchIfBroke(S);
   checkAch(S);
-  emit(S, 'docked', { got, port: portId, gift });
+  emit(S, 'docked', { got, port: portId, gift, patched });
   return got;
+}
+function patchIfBroke(S) {
+  if (S.hull < 0.5 && S.res.coin < repairCost(S) && (S.res.wood || 0) < repairWoodCost(S)) { S.hull = 0.5; return true; }
+  return false;
 }
 function payWages(S) {
   const due = Math.ceil(S.owed);
@@ -229,6 +239,8 @@ export function departureCheck(S, days = 2) {
   if (S.crew.length < 0) blockers.push('');
   const persons = 1 + S.crew.length;
   if (S.food < persons * days) warns.push(`식량이 ${Math.floor(S.food / persons)}일치뿐이야!`);
+  const bread = pantryOf(S).bread;
+  if (bread && bread.n >= 1 && bread.left != null && bread.left <= 1) warns.push(`빵 ${Math.round(bread.n)}개가 ${bread.left <= 0 ? '오늘' : '내일'} 상한다!`);
   if (S.hull < 0.5) warns.push('선체가 많이 상했어!');
   if (st.load > 0.9) warns.push('짐이 많아서 느려 터졌어');
   const fc = forecast(S);
@@ -239,34 +251,115 @@ export function departureCheck(S, days = 2) {
 }
 
 // ── 항구에서 할 일 ──
-const canPay = (S, cost) => Object.entries(cost).every(([k, v]) => S.res[k] >= v);
-const pay = (S, cost, sign = 1) => { for (const [k, v] of Object.entries(cost)) S.res[k] -= v * sign; };
-export const FOOD_PRICE = 1;
-export function buyFood(S, n = 1) {
-  const st = stats(S), room = Math.max(0, st.foodCap - S.food), k = Math.min(n, Math.floor(room), S.res.coin / FOOD_PRICE | 0);
-  if (!S.docked || k <= 0) return false;
-  S.food += k; S.res.coin -= k * FOOD_PRICE;
-  return k;
+const canPay = (S, cost) => Object.entries(cost).every(([k, v]) => (S.res[k] || 0) >= v);
+const pay = (S, cost, sign = 1) => { for (const [k, v] of Object.entries(cost)) S.res[k] = (S.res[k] || 0) - v * sign; };
+// ── 식량 창고: 무엇을 얼마나, 언제 상하는지(batch). S.food는 그 합이에요 ──
+const today = (S) => Math.floor(S.clock / CAL.day);
+// 다른 곳에서 S.food만 바꿨으면(구조·옛 저장·점검) 맞춰 준다: 모자라면 안 상하는 건어로, 넘치면 빨리 상할 것부터 덜어 낸다
+function syncPantry(S) {
+  if (!S.pantry) S.pantry = [];
+  let sum = S.pantry.reduce((a, q) => a + q.n, 0);
+  if (sum < S.food - 1e-6) { stock(S, 'dfish', S.food - sum, true); sum = S.food; }
+  S.pantry.sort((p, q) => (p.exp ?? 1e9) - (q.exp ?? 1e9));
+  while (sum > S.food + 1e-6 && S.pantry.length) { const q = S.pantry[0], d = Math.min(q.n, sum - S.food); q.n -= d; sum -= d; if (q.n <= 1e-6) S.pantry.shift(); }
 }
-// 재료를 코인으로 판다(목재 2개에 1코인, 천 1개에 1코인). 코인이 없어 막히는 일을 막는다
-export const SELL_RATE = { wood: 0.5, cloth: 1 };
+function stock(S, k, n, raw = false) {
+  if (n <= 0) return;
+  const keep = SUPPLY[k].keep, exp = keep ? today(S) + keep : null;
+  const same = S.pantry.find((q) => q.k === k && q.exp === exp);
+  if (same) same.n += n; else S.pantry.push({ k, n, exp });
+  S.pantry.sort((p, q) => (p.exp ?? 1e9) - (q.exp ?? 1e9));
+  if (!raw) S.food += n;
+}
+// 먹기: 빨리 상할 것부터
+function eat(S, n) {
+  syncPantry(S);
+  S.food = Math.max(0, S.food - n);
+  while (n > 1e-9 && S.pantry.length) { const q = S.pantry[0], d = Math.min(q.n, n); q.n -= d; n -= d; if (q.n <= 1e-6) S.pantry.shift(); }
+}
+// 날이 바뀌면 상한 것을 버린다
+function spoil(S) {
+  syncPantry(S);
+  const d = today(S), gone = {};
+  S.pantry = S.pantry.filter((q) => { if (q.exp == null || q.exp > d) return true; gone[q.k] = (gone[q.k] || 0) + q.n; S.food = Math.max(0, S.food - q.n); return false; });
+  if (Object.keys(gone).length) emit(S, 'spoiled', { gone });
+}
+// 창고 보기: 종류별 양과 가장 빨리 상하는 날(며칠 남았나)
+export function pantryOf(S) {
+  syncPantry(S);
+  const out = {}, d = today(S);
+  for (const q of S.pantry) { const o = out[q.k] ||= { n: 0, left: null }; o.n += q.n; if (q.exp != null) o.left = o.left == null ? q.exp - d : Math.min(o.left, q.exp - d); }
+  return out;
+}
+export const FOOD_PRICE = SUPPLY.bread.price;
+export function buyFood(S, n = 1, k = 'bread') {
+  const P = SUPPLY[k]?.price;
+  if (!P) return false;
+  const st = stats(S), room = Math.max(0, st.foodCap - S.food), q = Math.min(n, Math.floor(room + 1e-9), Math.floor(S.res.coin / P));
+  if (!S.docked || q <= 0) return false;
+  syncPantry(S); stock(S, k, q); S.res.coin -= q * P;
+  return q;
+}
+export function buyHerb(S, n = 1) {
+  const q = Math.min(n, HERB.cap - (S.herb || 0), Math.floor(S.res.coin / HERB.price));
+  if (!S.docked || q <= 0) return false;
+  S.herb = (S.herb || 0) + q; S.res.coin -= q * HERB.price;
+  return q;
+}
+// ── 팔기 ──
+// 재료는 정한 값, 교역품은 그 공간이 찾는 품목이면 1.5배. 같은 공간의 기항지는 값이 같아요
+export const SELL_RATE = Object.fromEntries(Object.entries(ITEMS).filter(([, I]) => I.kind === 'mat').map(([k, I]) => [k, I.sell]));
+export const wanted = (S, k) => (REGIONS[S.region].demand || []).includes(k);
+export function priceOf(S, k) {
+  const I = ITEMS[k];
+  if (!I) return 0;
+  if (I.kind === 'trade') return Math.round(I.price * (wanted(S, k) ? TRADE.demandK : 1));
+  return I.sell || 0;
+}
 export function sell(S, k, n) {
-  if (!S.docked || !SELL_RATE[k]) return 0;
-  n = Math.min(n, S.res[k]);
-  if (k === 'wood') n -= n % 2;
+  const rate = priceOf(S, k);
+  if (!S.docked || !rate) return 0;
+  n = Math.min(n, S.res[k] || 0);
+  if (rate < 1) n -= n % Math.round(1 / rate); // 잡목은 2개에 1닢이라 짝수로
   if (n <= 0) return 0;
   // 거래술 +10%는 끝수를 모아 두었다 1코인이 되면 준다(적게 팔아도 손해가 없게)
-  S.sellCarry = (S.sellCarry || 0) + n * SELL_RATE[k] * (hasTrait(S, 'trader') ? 1.1 : 1);
+  S.sellCarry = (S.sellCarry || 0) + n * rate * (hasTrait(S, 'trader') ? 1.1 : 1);
   const coin = Math.floor(S.sellCarry + 1e-9);
   S.sellCarry -= coin;
   S.res[k] -= n; S.res.coin += coin;
+  if (isTrade(k)) S.stats.traded = (S.stats.traded || 0) + coin;
   return coin;
+}
+// ── 공방: 같은 계열 낮은 등급 3개 + 금화 → 높은 등급 1개. 기본 재료는 금화로도 사요(막힘 방지) ──
+export function craft(S, from, times = 1) {
+  const to = WORKSHOP.pairs[from];
+  if (!S.docked || !to) return 0;
+  const n = Math.min(times, Math.floor((S.res[from] || 0) / WORKSHOP.ratio), Math.floor(S.res.coin / WORKSHOP.fee));
+  if (n <= 0) return 0;
+  S.res[from] -= n * WORKSHOP.ratio; S.res.coin -= n * WORKSHOP.fee; add(S.res, to, n);
+  return n;
+}
+export function buyMat(S, k, n = 1) {
+  const P = ITEMS[k]?.buy;
+  if (!S.docked || !P) return 0;
+  const q = Math.min(n, Math.floor(S.res.coin / P));
+  if (q <= 0) return 0;
+  S.res.coin -= q * P; add(S.res, k, q);
+  return q;
 }
 export const repairCost = (S) => Math.ceil((1 - S.hull) * HULLS[S.ship.hull].hp); // 잃은 내구도 1에 금화 한 닢
 export function repair(S) {
   const c = repairCost(S);
   if (!S.docked || c <= 0 || S.res.coin < c) return false;
   S.res.coin -= c; S.hull = 1;
+  return true;
+}
+// 금화가 없어도 잡목으로 손수 고친다(교착 방지). 잃은 내구도 1에 잡목 1개
+export const repairWoodCost = (S) => repairCost(S);
+export function repairWithWood(S) {
+  const c = repairWoodCost(S);
+  if (!S.docked || c <= 0 || (S.res.wood || 0) < c) return false;
+  S.res.wood -= c; S.hull = 1;
   return true;
 }
 export function waitDay(S) {
@@ -332,16 +425,34 @@ export function placeModule(S, id, col, row, rot = 0) {
   S.ship.mods.push(m); S.rev++; noteBest(S);
   return { ok: true };
 }
+// 모듈 올리기(Mk): 같은 칸에서 재료만 내면 다음 Mk가 돼요. 슬루프부터
+export function upgradeStatus(S, m) {
+  const to = m && MODULES[m.id].up, U = to && MODULES[to];
+  if (!U) return null;
+  const okGrade = !U.need.grade || HULLS[S.ship.hull].grade >= U.need.grade, cost = moduleCost(S, to);
+  return { to, U, cost, okGrade, ok: !!S.docked && okGrade && canPay(S, cost) };
+}
+export function upgradeModule(S, col, row) {
+  const m = SH.moduleAt(S.ship, col, row), u = upgradeStatus(S, m);
+  if (!u) return { ok: false, why: '더 올릴 수 없는 물건이야!' };
+  if (!S.docked) return { ok: false, why: '배는 항구에 대고 고치는 거야, 친구!' };
+  if (!u.okGrade) return { ok: false, why: `${u.U.name}은(는) 더 큰 배부터야!` };
+  if (!canPay(S, u.cost)) return { ok: false, why: '재료가 모자라! 더 건져 오라고!' };
+  pay(S, u.cost); m.id = u.to; S.rev++; noteBest(S);
+  return { ok: true };
+}
 export function removeModule(S, col, row) {
   if (!S.docked) return false;
   const m = SH.moduleAt(S.ship, col, row);
   if (!m) return false;
-  for (const [k, v] of Object.entries(moduleCost(S, m.id))) S.res[k] += Math.ceil(v / 2);
+  refundHalf(S, m);
   S.ship.mods = S.ship.mods.filter((o) => o !== m); S.rev++; noteBest(S);
   return true;
 }
 // ── 조선소 ──
-const refundHalf = (S, m) => { for (const [k, v] of Object.entries(moduleCost(S, m.id))) S.res[k] += Math.ceil(v / 2); };
+// 올린 모듈(Mk2)은 처음 모듈 값과 올린 값을 합쳐 절반을 돌려줘요
+const paidFor = (S, id) => { const base = Object.keys(MODULES).find((b) => MODULES[b].up === id); const c = { ...moduleCost(S, id) }; if (base) for (const [k, v] of Object.entries(paidFor(S, base))) c[k] = (c[k] || 0) + v; return c; };
+function refundHalf(S, m) { for (const [k, v] of Object.entries(paidFor(S, m.id))) add(S.res, k, Math.ceil(v / 2)); }
 // 타이틀에 보여 줄 가장 높은 배. 구조로 모듈을 잃어도 그대로 두고, 직접 고칠 때만 새로 적어 둔다
 function noteBest(S) {
   if (!S.best || HULL_ORDER.indexOf(S.ship.hull) >= HULL_ORDER.indexOf(S.best.hull)) S.best = JSON.parse(JSON.stringify(S.ship));
@@ -388,7 +499,7 @@ export function buildHull(S, id) {
     // 노 자리 하나는 달아 준다(움직일 수 있게)
     const free = SH.validCells(id).find(([c, r]) => r >= Math.floor(H.rows / 2) && c === Math.floor(H.cols / 2)) || SH.validCells(id)[0];
     S.ship.mods.push({ id: 'oar', col: free[0], row: free[1], rot: 0 });
-    S.food = Math.min(S.food, SH.statsOf(S.ship, 0, 0).foodCap);
+    S.food = Math.min(S.food, SH.statsOf(S.ship, 0, 0).foodCap); syncPantry(S);
     S.crew = [];
   }
   S.hull = 1; S.cap.x = H.helmX; S.rev++;
@@ -423,8 +534,7 @@ export function passGate(S, gate) {
   placeAtPort(S, gate.entry);
   S.docked = gate.entry;
   S.cap.x = HULLS[S.ship.hull].helmX; S.cap.at = 'helm'; S.cap.to = null;
-  const got = { ...S.hold };
-  for (const k of Object.keys(S.hold)) { S.res[k] += S.hold[k]; S.hold[k] = 0; }
+  const got = unload(S);
   emit(S, 'region', { from, to: gate.to, got, first });
   checkAch(S);
   return true;
@@ -456,7 +566,7 @@ export function nextHull(S) {
 export function canAffordHull(S, H) {
   if (!H) return false;
   const st = buildStatus(S, H.id);
-  return st.legal && st.list.every((q) => q.ok) && Object.entries(H.price).every(([k, v]) => S.res[k] + S.hold[k] >= v);
+  return st.legal && st.list.every((q) => q.ok) && Object.entries(H.price).every(([k, v]) => (S.res[k] || 0) + (S.hold[k] || 0) >= v);
 }
 export function checkAch(S) {
   const next = nextHull(S);
@@ -512,6 +622,8 @@ function spawnFlot(S) {
     const x = x0 + rnd(S) * (x1 - x0), y = y0 + rnd(S) * (y1 - y0);
     if (w.dist(x, y) < 10) continue;
     if (Math.hypot(x - S.boat.x, y - S.boat.y) < 40) continue;
+    // 아주 드물게 병 속 편지: 아직 못 찾은 발견지 하나를 해도에 알려 줘요
+    if (rnd(S) < 0.025 && findsOf(S).some((f) => !S.found[f.id] && !S.letters?.[f.id])) { list.push({ x, y, k: 'bottle', n: 1, ph: rnd(S) * TAU }); return; }
     const total = def.table.reduce((a, e) => a + e[1], 0); let r = rnd(S) * total, pick = def.table[0];
     for (const e of def.table) { if (r < e[1]) { pick = e; break; } r -= e[1]; }
     list.push({ x, y, k: pick[0], n: pick[2] + Math.floor(rnd(S) * (pick[3] - pick[2] + 1)), ph: rnd(S) * TAU });
@@ -523,16 +635,31 @@ function collectFlot(S) {
   for (let i = list.length - 1; i >= 0; i--) {
     const f = list[i];
     if (Math.hypot(f.x - b.x, f.y - b.y) > R) continue;
+    if (f.k === 'bottle') { list.splice(i, 1); readLetter(S, f); continue; }
     const room = st.holdCap - holdUsed(S);
     if (room <= 0) { if (!S.holdFullWarned) { S.holdFullWarned = 1; emit(S, 'holdFull'); } return; }
-    const n = Math.min(room, f.n);
-    S.hold[f.k] += n;
-    emit(S, 'pick', { k: f.k, n, x: f.x, y: f.y });
+    // 반짝이는 곳: 무엇이 나올지는 건질 때까지 몰라요(수역 교역품 표)
+    const k = f.k === 'shiny' ? rollTrade(S) : f.k, n = Math.min(room, f.n);
+    add(S.hold, k, n);
+    emit(S, 'pick', { k, n, x: f.x, y: f.y, shiny: f.k === 'shiny' });
     list.splice(i, 1);
   }
   S.holdFullWarned = 0;
 }
 
+function rollTrade(S) {
+  const t = REGIONS[S.region].trade || [['coffee', 1]], total = t.reduce((a, e) => a + e[1], 0);
+  let r = rnd(S) * total;
+  for (const [k, w] of t) { if (r < w) return k; r -= w; }
+  return t[0][0];
+}
+function readLetter(S, f) {
+  const left = findsOf(S).filter((q) => !S.found[q.id] && !S.letters[q.id]);
+  if (!left.length) return;
+  const q = left[Math.floor(rnd(S) * left.length)];
+  S.letters[q.id] = 1; S.stats.letters = (S.stats.letters || 0) + 1;
+  emit(S, 'letter', { id: q.id, name: q.name, x: f.x, y: f.y });
+}
 // ── 발견 ──
 // 망원경: 볼 수 있는 거리가 26m에서 70m로 늘고, 내륙 발견지와 뭍짐승을 찾을 수 있다
 export const sightRange = (S) => ((stats(S).telescope ? 70 : 26) + (hasRole(S, 'lookout') ? 14 : 0)) * (hasTrait(S, 'lucky') ? 1.1 : 1);
@@ -552,9 +679,11 @@ function checkFinds(S) {
     }
     if (d > R) continue;
     S.found[f.id] = 1;
-    S.res.coin += f.coin || 0; S.res.wood += f.wood || 0; S.res.cloth += f.cloth || 0;
+    const give = {};
+    for (const k of Object.keys(ITEMS)) if (typeof f[k] === 'number' && f[k] > 0) { add(S.res, k, f[k]); give[k] = f[k]; }
     if (f.blueprint) S.blueprints[f.blueprint] = 1;
-    emit(S, 'found', { id: f.id, name: f.name, coin: f.coin, wood: f.wood, cloth: f.cloth, blueprint: f.blueprint });
+    if (f.relic) S.relics[f.id] = 1;
+    emit(S, 'found', { id: f.id, name: f.name, give, coin: f.coin, wood: f.wood, cloth: f.cloth, blueprint: f.blueprint, relic: f.relic });
     checkAch(S);
   }
 }
@@ -569,20 +698,21 @@ function disaster(S, cause) {
 export function rescue(S) {
   if (!S.disaster) return null;
   const lost = { ...S.hold }, port = S.lastPort, broke = [];
-  for (const k of Object.keys(S.hold)) S.hold[k] = 0;
+  S.hold = {};
   // 돛대·노는 남기고 모듈 하나가 부서진다
   const opts = S.ship.mods.filter((m) => !MODULES[m.id].sail && m.id !== 'oar');
   if (opts.length) { const m = opts[Math.floor(rnd(S) * opts.length)]; S.ship.mods = S.ship.mods.filter((o) => o !== m); broke.push(m.id); S.rev++; }
   const left = S.crew.length ? S.crew.pop() : null;
   const fee = Math.min(S.res.coin, 10 * HULLS[S.ship.hull].grade);
   S.res.coin -= fee;
-  S.hull = 0.35; S.vigor = 0.8; S.food = Math.max(S.food, 1);
+  S.hull = 0.35; S.vigor = 0.8; if (S.food < 1) { syncPantry(S); stock(S, 'bread', 1 - S.food); }
   S.region = port.region;
   placeAtPort(S, port.id);
   S.boat.sailLevel = 0; S.boat.sailNow = 0;
   S.cap.x = HULLS[S.ship.hull].helmX; S.cap.at = 'helm'; S.cap.to = null; S.cap.then = null;
   S.stats.rescues++;
-  const out = { lost, broke, left: left && left.name, fee, cause: S.disaster.cause, port: port.id };
+  const patched = patchIfBroke(S);
+  const out = { lost, broke, left: left && left.name, fee, cause: S.disaster.cause, port: port.id, patched };
   S.disaster = null;
   return out;
 }
@@ -766,12 +896,18 @@ export function step(S, dt) {
 
   // 식량·기력
   const persons = 1 + S.crew.length;
-  S.food = Math.max(0, S.food - persons * dt / CAL.day);
+  // 날이 바뀌면 상한 것부터 버린다
+  const dayNow = today(S);
+  if (S.foodDay !== dayNow) { if (S.foodDay != null) spoil(S); S.foodDay = dayNow; }
+  const fresh = S.pantry?.[0]?.k === 'ffish' && S.food > 0; // 지금 먹는 것이 신선한 물고기면 기력이 빨리 돌아온다
+  eat(S, persons * dt / CAL.day);
   S.owed += S.crew.reduce((a, q) => a + q.wage, 0) * dt / CAL.day;
-  if (st.net && b.spd > 1) S.food = Math.min(st.foodCap, S.food + dt / 60);
+  if (st.net && b.spd > 1 && S.food < st.foodCap) { syncPantry(S); stock(S, 'ffish', Math.min(st.foodCap - S.food, dt / 60)); }
   if (wx.heat && !st.awning) S.vigor -= WEATHER.heatVigor * dt;
-  else if (S.food > 0) S.vigor = Math.min(1, S.vigor + WEATHER.restVigor * dt);
+  else if (S.food > 0) S.vigor = Math.min(1, S.vigor + WEATHER.restVigor * dt * (fresh ? SUPPLY.ffish.vigor : 1));
   if (S.food <= 0) S.vigor -= WEATHER.hungerVigor * dt;
+  // 약초: 기력이 바닥나기 전에 알아서 씹어 먹는다
+  if (S.vigor < HERB.at && S.herb > 0) { S.herb--; S.vigor = Math.min(1, S.vigor + HERB.vigor); emit(S, 'herb', { left: S.herb }); }
   if (wx.heat && st.awning) { S.heatSafe = (S.heatSafe || 0) + dt; if (S.heatSafe >= CAL.day) { S.stats.heatDays++; S.heatSafe = 0; checkAch(S); } }
   S.foodLowWarned = S.food < persons * 0.5 ? (S.foodLowWarned || (emit(S, 'foodLow'), 1)) : 0;
 
@@ -799,10 +935,24 @@ export function serialize(S) { const { events, ...rest } = S; return JSON.string
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || ![1, 2].includes(o.v) || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2, 3].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
+    // v2 → v3(S2 아이템): 목재·천은 잡목·마포로 이어 받는다. 화물칸의 금화는 창고로, 식량은 빵으로(5일 뒤 상함), 찾은 발견지의 유물을 준다
+    if (o.v < 3) {
+      o.hold ||= {};
+      if (o.hold.coin) { o.res.coin = (o.res.coin || 0) + o.hold.coin; }
+      delete o.hold.coin;
+      for (const k of Object.keys(o.hold)) if (!o.hold[k]) delete o.hold[k];
+      const day = Math.floor((o.clock || 0) / CAL.day);
+      o.pantry = o.food > 0 ? [{ k: 'bread', n: o.food, exp: day + SUPPLY.bread.keep }] : [];
+      o.herb = 0; o.letters = {}; o.relics = {};
+      for (const r of Object.keys(REGIONS)) for (const f of REGIONS[r].finds) if (o.found?.[f.id] && f.relic) o.relics[f.id] = 1;
+      // 떠 있던 금화 상자는 반짝이는 곳으로
+      for (const list of Object.values(o.flot || {})) for (const f of list) if (f.k === 'coin') { f.k = 'shiny'; f.n = 1; }
+    }
+    o.relics ||= {}; o.letters ||= {}; o.pantry ||= []; o.herb ||= 0;
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
-    o.v = 2;
+    o.v = 3;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
     if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다

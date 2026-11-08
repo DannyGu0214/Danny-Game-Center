@@ -47,6 +47,15 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 #chips span { display: inline-flex; align-items: center; gap: 4px; }
 #chips svg { width: 15px; height: 15px; flex: none; }
 #chips .gap { margin-left: auto; }
+.emo { font-style: normal; font-size: .95em; line-height: 1; }
+.wRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding: 8px 10px; border-radius: 12px; background: var(--card); border: 1px solid rgba(190,226,232,.1); font-size: 13px; color: var(--muted); }
+.wRow .ic { width: 22px; flex: none; text-align: center; font-size: 17px; } .wRow .ic svg { width: 19px; height: 19px; display: block; margin: 0 auto; }
+.wRow .grow { flex: 1; min-width: 0; line-height: 1.3; } .wRow .grow b { color: var(--text); font-size: 14px; } .wRow .grow .n { float: right; color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.wRow .pBtn { flex: none; margin: 0; min-height: 32px; padding: 5px 8px; font-size: 12.5px; min-width: 0; }
+.wRow .want { color: var(--on); font-weight: 700; }
+.wRow .pBtn svg, .pCard .pBtn > svg { width: 16px; height: 16px; flex: none; }
+.wNote { margin: 0 2px 8px; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.relic { margin-top: 2px; font-size: 11px; color: #e2c482; }
 #chips .low { color: var(--bad); }
 /* 배 상태: 아이템 줄과 나눠 조종부 바로 위에 둔다 */
 #statusRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; margin-bottom: 6px; }
@@ -378,6 +387,11 @@ body.intro #hud, body.intro #panel, body.intro #tabs { visibility: hidden; }
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-wood" viewBox="0 0 16 16"><rect x="1" y="3.6" width="11.5" height="4" rx="2" fill="#a8743f"/><rect x="2.6" y="8.6" width="11.5" height="4" rx="2" fill="#8d5f32"/><circle cx="12.4" cy="5.6" r="2" fill="#e8c78f"/><circle cx="14" cy="10.6" r="2" fill="#e8c78f"/></symbol>
   <symbol id="i-cloth" viewBox="0 0 16 16"><path d="M5 2.8h8.6v9l-1.7-1.1-1.7 1.1-1.7-1.1-1.7 1.1L5 13.2z" fill="#f2e9d2"/><rect x="2.2" y="2.8" width="5" height="10.4" rx="2.4" fill="#cdbb94"/><ellipse cx="4.7" cy="4.8" rx="1.3" ry="1" fill="#8e7c58"/></symbol>
+  <symbol id="i-oak" viewBox="0 0 16 16"><rect x="1" y="3.4" width="12" height="4.4" rx="2.2" fill="#6b4c2c"/><rect x="2.4" y="8.4" width="12" height="4.4" rx="2.2" fill="#5a3f24"/><ellipse cx="12.6" cy="5.6" rx="1.5" ry="2" fill="#c9a46c"/><ellipse cx="13.9" cy="10.6" rx="1.5" ry="2" fill="#b8915a"/></symbol>
+  <symbol id="i-canvas" viewBox="0 0 16 16"><path d="M5 2.8h8.6v9l-1.7-1.1-1.7 1.1-1.7-1.1-1.7 1.1L5 13.2z" fill="#fbf8ee"/><rect x="2.2" y="2.8" width="5" height="10.4" rx="2.4" fill="#e3dccb"/><path d="M8 6h4.4M8 8.6h4.4" stroke="#b8ae96" stroke-width=".8"/></symbol>
+  <symbol id="i-hemp" viewBox="0 0 16 16"><ellipse cx="8" cy="8.6" rx="6.2" ry="4.4" fill="none" stroke="#b8975c" stroke-width="2"/><ellipse cx="8" cy="8.6" rx="3.2" ry="2.1" fill="none" stroke="#d9c79a" stroke-width="1.8"/><path d="M13.6 7.4c1.4-1 1.4-3 .4-4" stroke="#b8975c" stroke-width="1.8" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="i-tar" viewBox="0 0 16 16"><ellipse cx="8" cy="8.6" rx="6.2" ry="4.4" fill="none" stroke="#3a2e22" stroke-width="2"/><ellipse cx="8" cy="8.6" rx="3.2" ry="2.1" fill="none" stroke="#6a5a44" stroke-width="1.8"/><path d="M13.6 7.4c1.4-1 1.4-3 .4-4" stroke="#3a2e22" stroke-width="1.8" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="i-nail" viewBox="0 0 16 16"><path d="M4.2 3.4h5.4M6.9 3.4v10.2l-.9-1.4" stroke="#9aa3a8" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M9.6 5.4h4M11.6 5.4v8" stroke="#7d8388" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-coin" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.6" fill="#eec04a"/><circle cx="8" cy="8" r="4.6" fill="none" stroke="#b78a1f" stroke-width="1.1"/><path d="M8 5.4v5.2" stroke="#a87c18" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-hold" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10.4" rx="1.3" fill="#b98c53"/><path d="M2 6.6h12M2 9.8h12" stroke="#7f5b30" stroke-width="1"/><path d="M5 3v10.4M11 3v10.4" stroke="#8d6738" stroke-width="1"/></symbol>
   <symbol id="i-food" viewBox="0 0 16 16"><path d="M1.8 9.2C1.8 5.6 4.5 3.6 8 3.6s6.2 2 6.2 5.6v2.3a1.1 1.1 0 0 1-1.1 1.1H2.9a1.1 1.1 0 0 1-1.1-1.1z" fill="#dd9f53"/><path d="M5.2 6l1 2M8.2 5.4l.8 2.2M11 6.2l.3 1.8" stroke="#a76d2d" stroke-width="1.2" stroke-linecap="round"/></symbol>
@@ -492,7 +506,7 @@ import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound } from './sound.js';
 import { createMusic } from './music.js';
 import { worldOf } from './world.js';
-import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES } from './data.js';
+import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view'), ctx = view.getContext('2d', { alpha: false });
@@ -761,9 +775,12 @@ function drainEvents() {
       case 'tack': showHint('맞바람이다! 지그재그로 뚫고 간다!', 2.4); break;
       case 'swing': snd.play('swing'); break;
       case 'ground': snd.play('ground'); showHint('쿵! 물가에 박았어! 선체가 좀 상했다고!', 2.6, true); break;
-      case 'pick': snd.play('pick'); wake.ring(ev.x, ev.y, 1); toast(`${RES[ev.k].icon} +${ev.n}`); break;
+      case 'pick': snd.play(ev.shiny ? 'found' : 'pick'); wake.ring(ev.x, ev.y, 1); toast(ev.shiny ? `✨ ${ITEMS[ev.k].icon} ${ITEMS[ev.k].name} +${ev.n}!` : `${ITEMS[ev.k].icon} ${ITEMS[ev.k].name} +${ev.n}`); break;
+      case 'letter': snd.play('found'); wake.ring(ev.x, ev.y, 1); overlay(`<h3>🍾 병 속 편지</h3><p>“${ev.name} 근처에 뭔가 있다네…”</p><p>해도에 ? 표시를 해 뒀어!</p>`); break;
+      case 'spoiled': toast(`🤢 ${Object.entries(ev.gone).map(([k, n]) => `${SUPPLY[k].name} ${Math.round(n * 10) / 10}`).join(', ')} 상해서 버렸어!`); break;
+      case 'herb': toast(`🌿 약초 씹고 기운 차렸다!${ev.left ? ` (남은 ${ev.left})` : ' 이제 없어!'}`); break;
       case 'holdFull': showHint('화물칸이 꽉 찼어! 항구로 돌아가자!', 3); break;
-      case 'found': snd.play('found'); overlay(`<h3>🗺 ${ev.name}</h3><p>으하하! 새로운 곳을 찾았다!</p><p>${fmt({ wood: ev.wood, cloth: ev.cloth, coin: ev.coin })}${ev.blueprint ? `<br>📜 설계도: ${(MODULES[ev.blueprint] || HULLS[ev.blueprint]).name}` : ''}</p>`, '계속 가자!', null); break;
+      case 'found': snd.play('found'); overlay(`<h3>🗺 ${ev.name}</h3><p>으하하! 새로운 곳을 찾았다!</p><p>${fmt(ev.give || {})}${ev.relic ? `</p><p>🏺 유물: <b>${ev.relic}</b> (도감에 모았다!)` : ''}${ev.blueprint ? `<br>📜 설계도: ${(MODULES[ev.blueprint] || HULLS[ev.blueprint]).name}` : ''}</p>`, '계속 가자!', null); break;
       case 'species': showHint(`📖 ${SPECIES[ev.id].name}! 도감에 적어 뒀어!`, 2.4); break;
       case 'ach': { snd.play('ach'); const a = ACHIEVEMENTS.find((q) => q.id === ev.id); toast(`🏆 ${a.name} 🪙+${a.coin}`); showHint(`🏆 ${a.name}${a.decor ? ` · ${DECOR[a.decor].name} 꾸미기 열림` : ''}`, 3); break; }
       case 'gustSoon': snd.play('warn'); showHint('돌풍이 온다! 돛 줄여, 어서!', 4, true); break;
@@ -877,9 +894,12 @@ function row(ttl, txt, actText, fn, off = false, leftIcon = '') {
   if (actText) { const b = el('button', `act${off ? ' off' : ''}`, actText); b.addEventListener('click', fn); r.append(b); }
   return r;
 }
-const costHtml = (c) => Object.entries(c).map(([k, v]) => `<span class="cost${S.res[k] < v ? ' short' : ''}"><svg><use href="#i-${k}"/></svg>${v}</span>`).join('') || '<span class="cost">무료</span>';
+// 아이템 아이콘: 재료·금화는 그린 아이콘, 교역품·보급품은 이모지
+const ICON_SVG = new Set(['wood', 'oak', 'cloth', 'canvas', 'hemp', 'tar', 'nail', 'coin', 'food', 'hold']);
+const icon = (k) => (ICON_SVG.has(k) ? `<svg><use href="#i-${k}"/></svg>` : `<i class="emo">${(ITEMS[k] || SUPPLY[k] || {}).icon || '•'}</i>`);
+const costHtml = (c) => Object.entries(c).map(([k, v]) => `<span class="cost${(S.res[k] || 0) < v ? ' short' : ''}" title="${ITEMS[k]?.name || ''}">${icon(k)}${v}</span>`).join('') || '<span class="cost">무료</span>';
 const costText = (c) => Object.entries(c).map(([k, v]) => `${RES[k].icon}${v}`).join(' ') || '무료';
-const canAfford = (c) => Object.entries(c).every(([k, v]) => S.res[k] >= v);
+const canAfford = (c) => Object.entries(c).every(([k, v]) => (S.res[k] || 0) >= v);
 
 // ── 항구 ──
 function portFoot() {
@@ -896,8 +916,9 @@ function portFoot() {
 }
 function openPort(ev) {
   openTab('port');
-  if (ev && (ev.got?.wood || ev.got?.cloth || ev.got?.coin)) toast(`창고로: ${fmt(ev.got)}`);
+  if (ev?.got && Object.values(ev.got).some((v) => v)) toast(`창고로: ${fmt(ev.got)}`);
   if (ev?.gift) toast('마을 사람들이 하루치 식량을 나눠 줬어. 인심 좋네!');
+  if (ev?.patched) toast('부두 사람들이 구멍 난 데를 대충 때워 줬어! 다음엔 금화나 잡목을 챙기라고!');
 }
 const weatherIcon = (d) => ((d.gust !== null ? '💨' : '') + (d.heat && REGIONS[S.region].heat ? '🥵' : '') + (d.drought && S.region === 'river' ? '🏜' : '')) || '☀️';
 const weatherWord = (d) => (d.gust !== null ? '돌풍' : d.heat && REGIONS[S.region].heat ? '무더위' : d.drought && S.region === 'river' ? '가뭄' : '맑음');
@@ -907,26 +928,56 @@ function forecastTiles(fc) {
   return days;
 }
 function portCard(icon, name, value, pct, sub, label, fn, off, low) {
-  const card = el('div', 'pCard', `<div class="t"><svg><use href="#i-${icon}"/></svg>${name}<b class="${low ? 'low' : ''}">${value}</b></div>${pct != null ? `<div class="m"><b class="${low ? 'low' : ''}" style="width:${Math.min(100, pct * 100)}%"></b></div>` : ''}<div class="d">${sub}</div><div class="btnGap"></div>`);
+  const card = el('div', 'pCard', `<div class="t">${icon.startsWith('<') ? icon : `<svg><use href="#i-${icon}"/></svg>`}${name}<b class="${low ? 'low' : ''}">${value}</b></div>${pct != null ? `<div class="m"><b class="${low ? 'low' : ''}" style="width:${Math.min(100, pct * 100)}%"></b></div>` : ''}<div class="d">${sub}</div><div class="btnGap"></div>`);
   const b = el('button', `pBtn${off ? ' off' : ''}`, label); b.addEventListener('click', fn); card.append(b);
   return card;
 }
 function renderPort(body) {
-  const st = G.stats(S), c = G.departureCheck(S), cost = G.repairCost(S), room = Math.floor(st.foodCap - S.food), eat = 1 + S.crew.length;
+  const st = G.stats(S), c = G.departureCheck(S), cost = G.repairCost(S), room = Math.floor(st.foodCap - S.food + 1e-9), eat = 1 + S.crew.length, pan = G.pantryOf(S);
   // 출항 점검이 먼저 보이게 맨 위에 둔다
   const lines = [...c.blockers.map((b) => `✗ ${b}`), ...c.warns.map((w) => `⚠ ${w}`)];
   body.append(el('div', `portBanner${c.blockers.length ? ' no' : c.warns.length ? ' warn' : ''}`, lines.length ? lines.map((l) => `<div>${l}</div>`).join('') : '✓ 출항 준비 끝! 닻만 올리면 돼'));
-  const buy = Math.min(room, S.res.coin), coin = (n) => `<span class="cost"><svg><use href="#i-coin"/></svg>${n}</span>`;
+  const coin = (n) => `<span class="cost"><svg><use href="#i-coin"/></svg>${n}</span>`, again = () => { drainEvents(); renderSheet(); };
+  // 보급: 식량(빵·건어), 약초, 수리
   body.append(el('div', 'dexSec', '보급'));
   const sup = el('div', 'pGrid');
-  sup.append(portCard('food', '식량', `${S.food.toFixed(1)} / ${st.foodCap}`, S.food / st.foodCap, `하루 ${eat}개씩 먹어치우지`, buy > 0 ? `채우기 ${coin(buy)}` : room <= 0 ? '가득' : '금화 부족', () => { if (G.buyFood(S, buy)) renderSheet(); }, buy <= 0, S.food < eat));
-  sup.append(portCard('hull', '내구도', `${Math.ceil(S.hull * st.hull.hp)} / ${st.hull.hp}`, S.hull, cost > 0 ? '상한 곳을 고치자고' : '어디 하나 멀쩡해!', cost > 0 ? `수리 ${coin(cost)}` : '수리할 곳 없음', () => { if (G.repair(S)) { snd.play('place'); renderSheet(); } else if (cost > 0) showHint('금화가 모자라, 선장!', 2); }, cost <= 0 || S.res.coin < cost, S.hull < 0.5));
+  const mix = Object.entries(pan).filter(([, o]) => o.n > 0.05).map(([k, o]) => `${SUPPLY[k].icon}${Math.round(o.n * 10) / 10}${o.left != null ? `(${Math.max(0, o.left)}일)` : ''}`).join(' ');
+  const bread = Math.min(room, Math.floor(S.res.coin / SUPPLY.bread.price)), fish = Math.min(room, 2, Math.floor(S.res.coin / SUPPLY.dfish.price));
+  sup.append(portCard('food', '식량', `${S.food.toFixed(1)} / ${st.foodCap}`, S.food / st.foodCap, `하루 ${eat}개 · ${mix || '텅 비었어'}`, bread > 0 ? `🍞 빵 채우기 ${coin(bread * SUPPLY.bread.price)}` : room <= 0 ? '가득' : '금화 부족', () => { if (G.buyFood(S, bread, 'bread')) again(); }, bread <= 0, S.food < eat));
+  sup.append(portCard('<i class="emo">🐟</i>', '건어', `${Math.round((pan.dfish?.n || 0) * 10) / 10}`, null, SUPPLY.dfish.desc, fish > 0 ? `2개 사기 ${coin(fish * SUPPLY.dfish.price)}` : room <= 0 ? '창고 가득' : '금화 부족', () => { if (G.buyFood(S, fish, 'dfish')) again(); }, fish <= 0));
+  const herbRoom = HERB.cap - (S.herb || 0), herbOk = herbRoom > 0 && S.res.coin >= HERB.price;
+  sup.append(portCard('<i class="emo">🌿</i>', '약초', `${S.herb || 0} / ${HERB.cap}`, null, HERB.desc, herbRoom <= 0 ? '가득' : `1개 사기 ${coin(HERB.price)}`, () => { if (G.buyHerb(S, 1)) again(); }, !herbOk));
+  // 금화가 모자라면 잡목으로 손수 고친다
+  const byWood = cost > 0 && S.res.coin < cost && (S.res.wood || 0) >= cost;
+  sup.append(portCard('hull', '내구도', `${Math.ceil(S.hull * st.hull.hp)} / ${st.hull.hp}`, S.hull, cost > 0 ? (byWood ? '금화가 없으면 잡목으로 손수!' : '상한 곳을 고치자고') : '어디 하나 멀쩡해!', cost > 0 ? (byWood ? `수리 ${icon('wood')}${cost}` : `수리 ${coin(cost)}`) : '수리할 곳 없음', () => { if (byWood ? G.repairWithWood(S) : G.repair(S)) again(); }, cost <= 0 || (!byWood && S.res.coin < cost), S.hull < 0.5));
   body.append(sup);
-  body.append(el('div', 'dexSec', '팔기'));
-  const sale = el('div', 'pGrid');
-  sale.append(portCard('wood', '목재', `${S.res.wood}개`, null, `2개에 ${coin(1)}`, '10개 팔기', () => { if (G.sell(S, 'wood', 10)) renderSheet(); }, S.res.wood < 2));
-  sale.append(portCard('cloth', '천', `${S.res.cloth}개`, null, `1개에 ${coin(1)}`, '5개 팔기', () => { if (G.sell(S, 'cloth', 5)) renderSheet(); }, S.res.cloth < 1));
-  body.append(sale);
+  // 교역품: 이 공간이 찾는 품목은 1.5배
+  body.append(el('div', 'dexSec', '교역품<span>★ 이 물이 찾는 건 1.5배</span>'));
+  if (!TRADE_IDS.some((k) => S.res[k])) body.append(el('p', 'wNote', '물 위에 <b style="color:var(--on)">금빛으로 반짝이는 곳</b>을 지나가면 뭔가 건진다고! 무엇이 나올진 건져 봐야 알지.'));
+  for (const k of TRADE_IDS.filter((q) => S.res[q] || G.wanted(S, q))) {
+    const n = S.res[k] || 0, P = G.priceOf(S, k), want = G.wanted(S, k);
+    const r = el('div', 'wRow', `<div class="ic">${icon(k)}</div><div class="grow"><b>${ITEMS[k].name}</b>${want ? ' <span class="want">★</span>' : ''}<span class="n">${n}</span><br>1개에 ${coin(P)}</div>`);
+    const b = el('button', `pBtn${n ? '' : ' off'}`, n ? `모두 팔기 ${coin(Math.floor(n * P * (G.hasTrait(S, 'trader') ? 1.1 : 1)))}` : '없음');
+    b.addEventListener('click', () => { if (n && G.sell(S, k, n)) { snd.play('found'); again(); } });
+    r.append(b); body.append(r);
+  }
+  // 창고: 재료. 팔기, 공방(낮은 등급 3개 + 금화 → 높은 등급 1개, 강부터), 기본 재료 사기
+  body.append(el('div', 'dexSec', `창고 · 재료${S.visited.river ? `<span>공방: ${WORKSHOP.ratio}개 + ${WORKSHOP.fee}닢 → 윗급 1개</span>` : ''}`));
+  for (const k of MAT_IDS) {
+    const I = ITEMS[k], n = S.res[k] || 0, up = WORKSHOP.pairs[k];
+    if (!n && !I.buy) continue;
+    const r = el('div', 'wRow', `<div class="ic">${icon(k)}</div><div class="grow"><b>${I.name}</b>${I.tier > 1 ? ' <small>고급</small>' : ''}<span class="n">${n}</span><br>${I.sell < 1 ? `${Math.round(1 / I.sell)}개에 ${coin(1)}` : `1개에 ${coin(I.sell)}`}</div>`);
+    const lot = I.sell < 1 ? 10 : 5;
+    const sb = el('button', `pBtn${n >= (I.sell < 1 ? 2 : 1) ? '' : ' off'}`, `${lot}개 팔기`); sb.addEventListener('click', () => { if (G.sell(S, k, lot)) again(); }); r.append(sb);
+    if (up && S.visited.river) {
+      const ok = n >= WORKSHOP.ratio && S.res.coin >= WORKSHOP.fee, cb = el('button', `pBtn${ok ? '' : ' off'}`, `→${icon(up)}`);
+      cb.title = `${I.name} ${WORKSHOP.ratio}개로 ${ITEMS[up].name} 1개`;
+      cb.addEventListener('click', () => { if (G.craft(S, k, 1)) { snd.play('place'); again(); } else showHint(`${I.name} ${WORKSHOP.ratio}개와 금화 ${WORKSHOP.fee}닢이 있어야 해!`, 2); });
+      r.append(cb);
+    }
+    if (I.buy) { const bb = el('button', `pBtn${S.res.coin >= I.buy ? '' : ' off'}`, `사기 ${coin(I.buy)}`); bb.addEventListener('click', () => { if (G.buyMat(S, k, 1)) again(); }); r.append(bb); }
+    body.append(r);
+  }
   body.append(el('div', 'dexSec', '날씨'), forecastTiles(G.forecast(S)));
   const wait = el('div', 'waitRow', '<div class="grow"><b>하루 묵기</b>보수 챙겨 주고 하루 쉬는 거야</div>');
   const w = el('button', 'pBtn', '기다리기'); w.addEventListener('click', () => { G.waitDay(S); drainEvents(); renderSheet(); }); wait.append(w);
@@ -1060,13 +1111,22 @@ function designDrawer() {
     const c = G.moduleCost(S, design.sel), [w, h] = design.rot ? [S_M.h, S_M.w] : [S_M.w, S_M.h];
     info.innerHTML = `<div class="ic">${S_M.icon}</div><div class="grow"><div class="nm">${S_M.name}${costHtml(c)}</div>${S_M.desc} · ${w}×${h}칸</div>`;
     if (S_M.w !== S_M.h) { const r = el('button', '', '↻ 돌리기'); r.addEventListener('click', () => { design.rot = design.rot ? 0 : 1; renderSheet(); }); info.append(r); }
-  } else if (arm) info.innerHTML = `<div class="ic">${arm.icon}</div><div class="grow"><div class="nm">${arm.name}</div>한 번 더 누르면 뜯어낸다(값 절반)!</div>`;
+  } else if (arm) {
+    const u = G.upgradeStatus(S, design.armed);
+    info.innerHTML = `<div class="ic">${arm.icon}</div><div class="grow"><div class="nm">${arm.name}${arm.mk > 1 ? ` <small>Mk${arm.mk}</small>` : ''}</div>한 번 더 누르면 뜯어낸다(값 절반)!${u ? `<br>⬆ ${u.U.name}: ${u.U.desc} ${costHtml(u.cost)}` : ''}</div>`;
+    if (u) {
+      const ub = el('button', u.okGrade ? '' : 'off', u.okGrade ? '⬆ 올리기' : '🔒 슬루프부터');
+      ub.addEventListener('click', () => { const before = specKeys(G.stats(S)), r = G.upgradeModule(S, design.armed.col, design.armed.row); if (r.ok) { snd.play('place'); design.armed = null; bakeIfNeeded(); renderSheet(); flashChange(before); } else showHint(r.why, 2); });
+      info.append(ub);
+    }
+  }
   else info.innerHTML = '<div class="grow">모듈을 고르고 칸을 눌러! 놓인 건 두 번 누르면 뜯어낸다!</div>';
   box.append(info);
   const pal = el('div', 'palette');
   for (const [id, M] of Object.entries(MODULES)) {
+    if (M.upOnly) continue; // Mk2는 놓인 모듈을 올려서 만든다
     const open = G.isUnlocked(S, id);
-    const need = M.need.blueprint ? '설계도 필요' : M.need.region ? `${REGIONS[M.need.region].name}부터` : '';
+    const need = M.future ? `${HULL_TIERS[(M.need.grade || 3) - 1].name}부터` : M.need.blueprint ? '설계도 필요' : M.need.grade && HULLS[S.ship.hull].grade < M.need.grade ? `${HULL_TIERS[M.need.grade - 1].name}부터` : M.need.region ? `${REGIONS[M.need.region]?.name || '앞바다'}부터` : '';
     const b = el('button', `mod${design.sel === id ? ' on' : ''}${open ? '' : ' lock'}`, `<div class="ic">${open ? M.icon : '🔒'}</div><div class="nm">${M.name}</div><div class="ct">${open ? costHtml(G.moduleCost(S, id)) : need}</div>`);
     b.addEventListener('click', () => { if (!open) { showHint(need, 2); return; } design.sel = design.sel === id ? null : id; design.armed = null; design.palX = pal.scrollLeft; renderSheet(); });
     pal.append(b);
@@ -1214,6 +1274,8 @@ function renderChart(body) {
     // 찾은 발견지
     g.strokeStyle = '#a8301f'; g.lineWidth = 2.4; g.lineCap = 'round';
     for (const f of G.findsOf(S)) if (S.found[f.id]) { const x = toX(f.x), y = toY(f.y); g.beginPath(); g.moveTo(x - 3.6, y - 3.6); g.lineTo(x + 3.6, y + 3.6); g.moveTo(x + 3.6, y - 3.6); g.lineTo(x - 3.6, y + 3.6); g.stroke(); }
+    // 병 속 편지가 알려 준 곳: 금빛 물음표
+    for (const f of G.findsOf(S)) if (S.letters?.[f.id] && !S.found[f.id]) { const x = toX(f.x), y = toY(f.y); g.fillStyle = 'rgba(242,193,78,.9)'; g.beginPath(); g.arc(x, y, 7, 0, Math.PI * 2); g.fill(); g.fillStyle = '#3a2a10'; g.font = '700 10px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', x, y + 0.5); }
     // 항로
     if (S.route || chartPick) {
       const pts = chartPick ? [chartPick] : S.route.pts.slice(S.route.i);
@@ -1307,7 +1369,8 @@ function renderSpecies(body) {
 }
 function renderFinds(body) {
   const total = REGION_ORDER.reduce((a, r) => a + REGIONS[r].finds.length, 0), got = REGION_ORDER.reduce((a, r) => a + REGIONS[r].finds.filter((f) => S.found[f.id]).length, 0);
-  body.append(dexHead('찾은 발견물', got, total, '<div class="tip"><div>맵마다 발견물 수는 정해져 있어.</div><div>물 위, 물가, 내륙에 숨어 있고</div><div>내륙은 망원경이 있어야 찾지!</div></div>'));
+  const relics = Object.keys(S.relics || {}).length;
+  body.append(dexHead('찾은 발견물', got, total, `<div class="tip"><div>맵마다 발견물 수는 정해져 있어.</div><div>내륙은 망원경이 있어야 찾지!</div><div>🏺 모은 유물 ${relics}개 · 🍾 편지 ${S.stats.letters || 0}통</div></div>`));
   for (const r of REGION_ORDER) {
     const list = REGIONS[r].finds, n = list.filter((f) => S.found[f.id]).length;
     body.append(el('div', 'dexSec', `${REGIONS[r].name}<span>${S.visited[r] ? `${n} / ${list.length}` : `아직 못 가 봤어 · ${n} / ${list.length}`}</span>`));
@@ -1320,6 +1383,7 @@ function renderFinds(body) {
         cell.append(cv);
       } else cell.append(el('div', 'q', '?'));
       cell.append(el('div', '', known ? f.name : '???'));
+      if (known && S.relics?.[f.id]) cell.append(el('div', 'relic', `🏺 ${f.relic}`));
       grid.append(cell);
     }
     body.append(grid);
@@ -1386,7 +1450,10 @@ function syncTop() {
   $('regionName').classList.toggle('warn', !!alert);
   // 윗줄은 아이템, 배 상태는 조종부 위 게이지
   const item = (icon, text, cls = '') => `<span class="${cls}"><svg><use href="#i-${icon}"/></svg>${text}</span>`;
-  $('chips').innerHTML = Object.entries(S.res).filter(([k, v]) => v || k === 'coin').map(([k, v]) => item(k, v)).join('')
+  // 금화 + 많이 가진 재료 3가지(나머지는 항구 창고에서 봐요) + 교역품 수
+  const mats = MAT_IDS.filter((k) => S.res[k]).sort((a, b) => S.res[b] - S.res[a]).slice(0, 3);
+  const trade = TRADE_IDS.reduce((a, k) => a + (S.res[k] || 0) + (S.hold[k] || 0), 0);
+  $('chips').innerHTML = item('coin', S.res.coin || 0) + mats.map((k) => `<span>${icon(k)}${S.res[k]}</span>`).join('') + (trade ? `<span><i class="emo">✨</i>${trade}</span>` : '')
     + item('hold', `${G.holdUsed(S)}/${st.holdCap}`, 'gap') + item('food', S.food.toFixed(0), S.food < persons ? 'low' : '');
   setGauge('hull', S.hull); setGauge('vigor', S.vigor);
 }
