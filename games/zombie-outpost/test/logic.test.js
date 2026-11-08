@@ -2044,3 +2044,19 @@ test('습격 30초 전에 경고를 한 번 보낸다', () => {
   assert.equal(warns.length, 1);
   assert.ok(warns[0].in <= G.RAID_WARN_S && warns[0].in >= G.RAID_WARN_S - 1);
 });
+
+test('낮과 밤: 플레이 5분마다 바뀌고 부드럽게 이어지며, 게임 규칙에는 영향이 없다', () => {
+  assert.equal(G.nightness(0), 0, '처음 5분은 낮');
+  assert.equal(G.nightness(200), 0);
+  assert.equal(G.nightness(G.DAY_PHASE_S), 0.5, '5분 지점이 낮→밤의 한가운데');
+  assert.equal(G.nightness(400), 1, '5~10분은 밤');
+  assert.equal(G.nightness(2 * G.DAY_PHASE_S), 0.5, '10분 지점이 밤→낮의 한가운데');
+  assert.equal(G.nightness(700), 0, '10~15분은 다시 낮');
+  let prev = 0;
+  for (let t = 0; t < 1300; t += 0.5) { const n = G.nightness(t); assert.ok(n >= 0 && n <= 1 && Math.abs(n - prev) < 0.05); prev = n; }
+  // 같은 시드에서 낮에 시작해도 밤에 시작해도 좀비 생성·진행이 똑같다(시각 전용)
+  const a = fresh(21), b = fresh(21);
+  b.stats.playTime = 400;
+  for (let t = 0; t < 20; t += DT) { G.step(a, DT); G.step(b, DT); }
+  assert.deepEqual(a.zombies.map((z) => [z.type, Math.round(z.x), Math.round(z.y)]), b.zombies.map((z) => [z.type, Math.round(z.x), Math.round(z.y)]));
+});

@@ -459,7 +459,7 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
     </div>
     <div class="xpbar" aria-hidden="true"><span id="xpFill"></span></div>
     <div class="stat-row wrap">
-      <div class="zone-tag" id="dayTag" aria-label="오늘 날짜(게임 1분 = 하루)"></div>
+      <div class="zone-tag" id="dayTag" aria-label="오늘 날짜(게임 1분 = 하루)와 낮·밤(플레이 5분마다 바뀜)"></div>
       <div class="zone-tag" id="zoneTag"></div>
       <div class="raid-pill" id="raidPill" hidden></div>
     </div>
@@ -1029,7 +1029,7 @@ function handleEvents(list) {
         break;
       case 'fire': fx.fires.push({ x: e.x, y: e.y, t: 0 }); sfx.play('fire'); mark(e.x, e.y, 70, '20,16,12', 0.55, 14, true); break;
       case 'guide': showGuide(e); break;
-      case 'raid-warn': showAlert({ title: '긴급 무전', sub: `습격까지 약 ${e.in}초`, text: '본부에서 긴급 무전이 왔어요. 좀비들이 달려오고 있어요. 빨리 본부로 오세요.', raid: true, ttl: 12000 }); break;
+      case 'raid-warn': showAlert({ title: '긴급 무전', sub: `습격까지 약 ${e.in}초`, text: '본부에서 긴급 무전이 왔어요. 좀비들이 달려오고 있어요. 빨리 본부로 오세요.', raid: true, ttl: 30000 }); break;
       case 'item-auto': toast('위급해서 구급상자를 자동으로 썼어요', 'warn'); sfx.play('use', { id: 'medkit' }); break;
       case 'job-done':
         toast(`${e.name} 완료${e.kind === 'craft' ? ' · 장착했어요' : ''}${e.posted ? ` · ${e.posted.name}(${G.ROLES[e.posted.role].name}) 방벽 배치` : ''}`, 'good');
@@ -1551,7 +1551,7 @@ function render(t) {
     const [sx, sy] = P(x, y, z), rr = r * zoom, f = 0.92 + Math.sin(t * 9 + x) * 0.05;
     if (sx < -rr || sx > VW + rr || sy < -rr || sy > VH + rr) continue;
     const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, rr);
-    g.addColorStop(0, `rgba(${rgb},${a * f})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    g.addColorStop(0, `rgba(${rgb},${a * f * (0.2 + 0.8 * nightN)})`); g.addColorStop(1, `rgba(${rgb},0)`); // 낮에는 등불·창문 불빛이 흐리다
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, rr, 0, Math.PI * 2); ctx.fill();
   }
   // 밝은 효과(어둠 위에 더한다): 총구 화염·불똥·불꽃·레벨업 고리
@@ -1601,12 +1601,17 @@ function render(t) {
   }
 }
 
-// 밤: 화면 전체를 어둡게 하고 플레이어·기지·전진기지 주변만 밝힌다.
+// 낮과 밤(시각 전용): 플레이 5분마다 바뀐다(G.nightness 0~1). 밤에는 화면 전체를 어둡게 하고 플레이어·기지·전진기지 주변만 밝힌다.
+// 낮에는 따뜻한 햇빛 색조만 얹고, 바뀌는 30초 동안은 노을빛이 돈다. 습격 중에는 낮에도 붉고 어둡게 가라앉는다.
+let nightN = 0; // 이번 프레임의 어둠 정도(불빛 세기 조절에 쓴다)
 function drawNight(t) {
+  const n = G.nightness(S.stats.playTime), dusk = 4 * n * (1 - n); // dusk: 해 질 녘·동틀 녘에만 1
+  nightN = S.raid ? Math.max(n, 0.4) : n;
   sctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   sctx.globalCompositeOperation = 'source-over';
   sctx.clearRect(0, 0, VW, VH);
-  sctx.fillStyle = S.raid ? 'rgba(24, 6, 8, 0.56)' : 'rgba(5, 8, 18, 0.5)'; // 디테일이 보이도록 예전(0.58)보다 조금 밝게, 대신 가장자리를 어둡게
+  const a = (S.raid ? 0.56 : 0.5) * nightN; // 디테일이 보이도록 예전(0.58)보다 조금 밝게, 대신 가장자리를 어둡게
+  sctx.fillStyle = S.raid ? `rgba(24, 6, 8, ${a})` : `rgba(5, 8, 18, ${a})`;
   sctx.fillRect(0, 0, VW, VH);
   sctx.globalCompositeOperation = 'destination-out';
   const light = (x, y, r, a = 1) => {
@@ -1620,13 +1625,15 @@ function drawNight(t) {
   for (const o of S.outposts) light(S.sites[o.site].x, S.sites[o.site].y, 190, 0.8);
   for (const f of fx.tracers) light(f.x1, f.y1, 60, 0.5);
   for (const f of fx.fires) light(f.x, f.y, 160, 0.9 * (1 - f.t / 1.2));
-  ctx.drawImage(shade, 0, 0, VW, VH);
+  if (nightN > 0.01) ctx.drawImage(shade, 0, 0, VW, VH);
+  if (n < 0.99) { ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = `rgba(255, 236, 190, ${0.24 * (1 - n)})`; ctx.fillRect(0, 0, VW, VH); ctx.globalCompositeOperation = 'source-over'; } // 낮: 따뜻한 햇빛(화면을 밝게 얹는다)
+  if (dusk > 0.01) { ctx.fillStyle = `rgba(255, 110, 50, ${0.16 * dusk})`; ctx.fillRect(0, 0, VW, VH); } // 노을
   const vg = ctx.createRadialGradient(VW / 2, VH * 0.48, Math.min(VW, VH) * 0.45, VW / 2, VH * 0.48, Math.hypot(VW, VH) * 0.62);
-  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.45)');
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,0,0,${0.12 + 0.33 * nightN})`);
   ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
-  // 기지 모닥불
+  // 기지 모닥불(밤에 또렷하다)
   const [fx_, fy] = P(G.CENTER.x + 40, G.CENTER.y + 40, 4);
-  const flick = 0.85 + Math.sin(t * 13) * 0.05 + Math.sin(t * 7.3) * 0.05;
+  const flick = (0.85 + Math.sin(t * 13) * 0.05 + Math.sin(t * 7.3) * 0.05) * (0.3 + 0.7 * nightN);
   const g = ctx.createRadialGradient(fx_, fy, 0, fx_, fy, 90 * zoom);
   g.addColorStop(0, `rgba(255,170,70,${0.32 * flick})`); g.addColorStop(1, 'rgba(255,170,70,0)');
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fx_, fy, 90 * zoom, 0, Math.PI * 2); ctx.fill();
@@ -1745,7 +1752,8 @@ function hud() {
     : `<b>${G.ZONE_NAMES[G.zoneIndex(d)]}</b>`;
   if (hudCache.zone !== zoneHtml) { hudCache.zone = zoneHtml; $('#zoneTag').innerHTML = zoneHtml; }
   const day = G.dayOf(S);
-  if (hudCache.day !== day) { hudCache.day = day; $('#dayTag').innerHTML = `<b>${day}일차</b>`; }
+  const night = G.isNight(S), dayKey = `${day}${night}`;
+  if (hudCache.day !== dayKey) { hudCache.day = dayKey; $('#dayTag').innerHTML = `<b>${day}일차</b> ${night ? '🌙 밤' : '☀️ 낮'}`; }
   const pill = $('#raidPill');
   const showRaid = G.raidsEnabled(S);
   if (pill.hidden === showRaid) pill.hidden = !showRaid;
@@ -1922,8 +1930,12 @@ function toast(text, kind = '') {
 
 // ---------- 초심자 가이드 말풍선 ----------
 // 오래 발전이 없으면 logic이 'guide' 이벤트로 시급한 과제 2개를 보낸다. 시트가 열려 있으면 닫힐 때까지 미룬다.
-let guidePending = null, guideTimer = 0;
+let guidePending = null, guideTimer = 0, guideLeft = 0;
+const GUIDE_MIN_MS = 30000; // 말풍선은 최소 30초 보인다. 관리 시트(기지·무기 등)를 열어 가려진 시간은 세지 않는다
+const armGuide = (ms) => { guideLeft = Math.max(GUIDE_MIN_MS, ms); };
+setInterval(() => { if (guideLeft > 0 && !tab && $('#guide').firstElementChild) { guideLeft -= 250; if (guideLeft <= 0) closeGuide(); } }, 250);
 function closeGuide() {
+  guideLeft = 0;
   clearTimeout(guideTimer);
   const card = $('#guide').firstElementChild;
   if (!card) return;
@@ -1931,7 +1943,7 @@ function closeGuide() {
   guideTimer = setTimeout(() => $('#guide').replaceChildren(), 360);
 }
 // 알림 말풍선(내용 한 덩어리): 카카오톡 저장 주의, 습격 무전 경고. raid면 빨간 테두리
-function showAlert({ title, sub, bold, text, raid = false, ttl = 25000 }) {
+function showAlert({ title, sub, bold, text, raid = false, ttl = GUIDE_MIN_MS }) {
   const card = document.createElement('div');
   card.className = `guide-card${raid ? ' raid' : ''}`;
   const head = document.createElement('div'), h = document.createElement('b'), sm = document.createElement('small'), x = document.createElement('button');
@@ -1944,7 +1956,7 @@ function showAlert({ title, sub, bold, text, raid = false, ttl = 25000 }) {
   card.append(head, note);
   $('#guide').replaceChildren(card);
   clearTimeout(guideTimer);
-  guideTimer = setTimeout(closeGuide, ttl);
+  armGuide(ttl);
 }
 // 카카오톡 인앱 브라우저로 열면 시작하자마자 한 번 알린다(저장이 지워질 수 있다)
 let kakaoShown = false;
@@ -1979,7 +1991,7 @@ function showGuide(e) {
     row.append(name, why);
     if (Object.keys(a.cost).length) row.append(cost);
     if (a.late > 0) { const late = document.createElement('em'); late.className = 'late'; late.textContent = `표준보다 ${a.late}분 늦어요 (목표 ${a.by}분)`; row.append(late); }
-    row.addEventListener('click', () => { closeGuide(); openTab(a.tab); });
+    row.addEventListener('click', () => openTab(a.tab)); // 말풍선은 남겨 둔다: 돌아와서 나머지 과제를 이어 볼 수 있게
     card.append(row);
   }
   // 카카오톡 인앱 브라우저는 저장소가 지워질 수 있다: 항상 알리고, 지금 카카오톡 안이면 더 눈에 띄게 한다
@@ -1990,7 +2002,7 @@ function showGuide(e) {
   card.append(note);
   box.replaceChildren(card);
   clearTimeout(guideTimer);
-  guideTimer = setTimeout(closeGuide, kakao ? 40000 : 25000);
+  armGuide(kakao ? 40000 : GUIDE_MIN_MS);
 }
 
 // ---------- 관리 시트 ----------
@@ -2002,7 +2014,7 @@ $('#sheetClose').addEventListener('click', () => openTab(null));
 
 function openTab(id) {
   tab = id;
-  if (id) closeGuide(); else if (guidePending && !S.over) { const g = guidePending; guidePending = null; setTimeout(() => showGuide(g), 600); }
+  if (!id && guidePending && !S.over) { const g = guidePending; guidePending = null; setTimeout(() => showGuide(g), 600); }
   document.querySelectorAll('.tab').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.tab === id));
     if (b.dataset.tab === id) b.querySelector('.dot')?.remove();

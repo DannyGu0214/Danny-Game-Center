@@ -1554,6 +1554,21 @@ function checkEnding(s, ev) {
 export const DAY_S = 60;
 export const daysOf = (sec) => Math.floor(sec / DAY_S) + 1; // 진행 시간(초) → 그날이 며칠째인지(생존 일수)
 export const dayOf = (s) => daysOf(s.stats.playTime);
+// 낮과 밤(시각 전용: 좀비의 행동·빈도·습격에는 영향이 없다). 실제로 플레이한 시간 5분마다 낮 ↔ 밤이 바뀌고(처음 5분은 낮),
+// 바뀔 때는 앞뒤 15초씩 30초에 걸쳐 서서히 어두워지거나 밝아진다. 메뉴를 연 동안·자리 비움은 세지 않는다(playTime 기준).
+export const DAY_PHASE_S = 300, DAY_FADE_S = 30;
+// 어둠의 정도 0(한낮) ~ 1(한밤)
+export function nightness(playTime) {
+  const c = ((playTime % (2 * DAY_PHASE_S)) + 2 * DAY_PHASE_S) % (2 * DAY_PHASE_S), h = DAY_FADE_S / 2;
+  const k = (x) => { const u = clamp(x, 0, 1); return u * u * (3 - 2 * u); };
+  if (playTime < DAY_PHASE_S - h) return 0; // 새 판은 한낮에서 시작
+  if (c < h) return 1 - k((c + h) / DAY_FADE_S); // 밤 → 낮의 뒤쪽 절반
+  if (c < DAY_PHASE_S - h) return 0;
+  if (c < DAY_PHASE_S + h) return k((c - (DAY_PHASE_S - h)) / DAY_FADE_S);
+  if (c < 2 * DAY_PHASE_S - h) return 1;
+  return 1 - k((c - (2 * DAY_PHASE_S - h)) / DAY_FADE_S);
+}
+export const isNight = (s) => nightness(s.stats.playTime) >= 0.5;
 
 // 한 판의 결과(게임 오버 화면·최고 기록용)
 export function runSummary(s) {
