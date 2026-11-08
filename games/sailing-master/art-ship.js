@@ -79,7 +79,9 @@ function sliceRaft(g, z, H) {
 function sliceRowboat(g, z, paint, H) {
   const deck = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap; // ★3 보강재는 쇠붙이 색
   if (z > deck) return;
-  const color = z < 0.06 ? BOTTOM : z < 0.1 ? BOOT : z > deck - DZ ? cap : paint;
+  // 겹쳐 붙인 판자(클링커): 판마다 아래쪽이 조금 어둡고 이음매가 진하다
+  const strake = (z - 0.1) / 0.09, seam = strake % 1 < 0.45 && z > 0.12;
+  const color = z < 0.06 ? BOTTOM : z < 0.1 ? BOOT : z > deck - DZ ? cap : seam ? shade(paint, -0.22) : Math.floor(strake) % 2 ? shade(paint, -0.07) : paint;
   hullPath(g, H.id, z);
   g.fillStyle = color; g.fill();
   if (z > 0.17) {
@@ -88,21 +90,31 @@ function sliceRowboat(g, z, paint, H) {
     hullPath(g, H.id, z, 0.13); g.fill(); g.restore();
   } else if (z > 0.1) {
     hullPath(g, H.id, z, 0.05); g.fillStyle = WOOD.floor; g.fill();
+    g.save(); hullPath(g, H.id, z, 0.05); g.clip();
     g.strokeStyle = 'rgba(40,24,10,.3)'; g.lineWidth = 0.02;
     for (let y = -0.8; y < 0.9; y += 0.2) { g.beginPath(); g.moveTo(-H.len / 2, y); g.lineTo(H.len / 2, y); g.stroke(); }
+    g.strokeStyle = 'rgba(70,45,20,.55)'; g.lineWidth = 0.06; // 늑골
+    for (let x = -H.len / 2 + 0.5; x < H.len / 2 - 0.3; x += 0.42) { g.beginPath(); g.moveTo(x, -1.2); g.lineTo(x, 1.2); g.stroke(); }
+    g.restore();
   }
   if (z > 0.2 && z < 0.34) {
     g.fillStyle = WOOD.deck; // 가로 의자
     for (const x of H.star === 1 ? [-1.5, 1.1] : [-2, -0.2, 1.6]) g.fillRect(x - 0.17, -planW(H.id, x / (H.len / 2)) * 0.9, 0.34, planW(H.id, x / (H.len / 2)) * 1.8);
   }
   if (H.star === 3 && z > 0.2 && z < 0.3) drawPerk(g, H);
+  if (z > deck - DZ) { // 뱃전 위 노걸이와 이물 기둥
+    g.fillStyle = '#4a3322'; for (const x of [-0.5, 0.2]) for (const sd of [-1, 1]) { const w = planW(H.id, x / (H.len / 2)); g.fillRect(x - 0.06, sd * w - 0.06, 0.12, 0.12); }
+    g.fillStyle = '#6b4a2e'; g.beginPath(); g.ellipse(H.len / 2 - 0.12, 0, 0.12, 0.08, 0, 0, TAU); g.fill();
+  }
 }
 function sliceSloop(g, z, paint, H) {
   const DECK = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap, [ck0, ck1] = H.cockpit;
   let from = -1;
   if (z > DECK) from = Math.pow((z - DECK) / 0.42, 1 / 2.2);
   if (from >= 0.98) return;
-  const color = z < 0.08 ? BOTTOM : z < 0.17 ? BOOT : z < 0.72 ? paint : z < 0.83 ? STRIPE : z < DECK - 0.05 ? paint : cap;
+  const strake = (z - 0.17) / 0.11, seam = strake % 1 < 0.35 && z > 0.2;
+  const side = seam ? shade(paint, -0.16) : Math.floor(strake) % 2 ? shade(paint, -0.05) : paint;
+  const color = z < 0.08 ? BOTTOM : z < 0.17 ? BOOT : z < 0.72 ? side : z < 0.83 ? STRIPE : z < DECK - 0.05 ? side : cap;
   hullPath(g, H.id, z, 0, from);
   g.fillStyle = color; g.fill();
   if (z > DECK - 0.05) {
@@ -111,7 +123,11 @@ function sliceSloop(g, z, paint, H) {
     g.save(); hullPath(g, H.id, z, 0.14, from); g.clip();
     g.strokeStyle = WOOD.deckDark; g.lineWidth = 0.025;
     for (let y = -1.6; y < 1.6; y += 0.22) { g.beginPath(); g.moveTo(-H.len / 2, y); g.lineTo(H.len / 2, y); g.stroke(); }
+    // 판자 끝 이음(엇갈림)과 갑판 쇠고리
+    g.strokeStyle = 'rgba(80,55,30,.35)'; g.lineWidth = 0.02;
+    for (let r = 0; r < 15; r++) { const y = -1.6 + r * 0.22, x = -H.len / 2 + 0.6 + ((r * 0.37) % 1) * 1.6; for (let xx = x; xx < H.len / 2; xx += 1.9) { g.beginPath(); g.moveTo(xx, y); g.lineTo(xx, y + 0.22); g.stroke(); } }
     g.restore();
+    if (from < 0) { g.fillStyle = '#5a5e62'; for (const [x, y] of [[H.len / 2 - 1.2, 0.55], [H.len / 2 - 1.2, -0.55], [ck0 - 0.3, 0.9], [ck0 - 0.3, -0.9]]) { g.beginPath(); roundRect(g, x - 0.12, y - 0.04, x + 0.12, y + 0.04, 0.03); g.fill(); } }
   }
   // 고물 쪽 움푹한 조종석
   if (z >= 0.6 && z <= DECK + 0.02) {
