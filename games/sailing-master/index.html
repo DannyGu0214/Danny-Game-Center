@@ -359,6 +359,8 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 #title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding-top: calc(9vh + var(--safe-t)); text-align: center; background: linear-gradient(to bottom, rgba(10,44,62,.72), rgba(10,44,62,0) 30%, rgba(10,44,62,0) 74%, rgba(10,44,62,.72)); }
 #title h1 { margin: 0; font-size: 42px; letter-spacing: .01em; font-weight: 800; text-shadow: 0 3px 16px rgba(0,0,0,.35); }
 #title .go { position: absolute; bottom: calc(112px + var(--safe-b)); left: 0; right: 0; font-size: 16px; font-weight: 700; color: var(--on); text-shadow: 0 1px 6px rgba(0,0,0,.6); animation: blink 1.8s infinite; }
+#titleNew { display: none; position: absolute; bottom: calc(150px + var(--safe-b)); padding: 7px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(8,30,42,.55); color: rgba(255,255,255,.85); font-size: 13px; font-weight: 600; }
+#titleNew.on { display: block; } #titleNew.arm { border-color: #f2c14e; color: #f2c14e; background: rgba(60,40,10,.6); }
 #title .tag { position: absolute; bottom: calc(22px + var(--safe-b)); display: flex; flex-direction: column; align-items: center; gap: 7px; }
 #title .logoMark { width: 54px; height: 54px; display: block; filter: drop-shadow(0 3px 8px rgba(0,0,0,.45)); }
 #title .logoWord { display: flex; align-items: center; gap: 10px; }
@@ -465,6 +467,7 @@ body.intro #hud, body.intro #panel, body.intro #tabs { visibility: hidden; }
 <div id="title">
   <h1>Sailing Master</h1>
   <div class="go" id="titleGo">눌러서 출항하자!</div>
+  <button id="titleNew" type="button">새로 시작하기</button>
   <div class="tag" aria-label="Danny Soft">
     <svg class="logoMark" viewBox="0 0 64 64" aria-hidden="true">
       <defs><linearGradient id="logoBrass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbeec2"/><stop offset=".5" stop-color="#d9b265"/><stop offset="1" stop-color="#8f6d33"/></linearGradient></defs>
@@ -534,6 +537,17 @@ const fmt = (o) => Object.entries(o).filter(([, v]) => v).map(([k, v]) => `${RES
 // ── 시작 ──
 let started = false, paused = false;
 $('titleGo').textContent = saved ? '눌러서 다시 바다로!' : '눌러서 출항하자!';
+// 타이틀의 새로 시작: 저장이 있을 때만 보이고, 실수로 지우지 않게 두 번 눌러야 해요
+const titleNew = $('titleNew');
+if (saved) titleNew.classList.add('on');
+let titleNewTimer = 0;
+titleNew.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  if (titleNew.classList.contains('arm')) { try { localStorage.removeItem(SAVE_KEY); } catch { /* 무시 */ } location.reload(); return; }
+  titleNew.classList.add('arm'); titleNew.textContent = '지금 판을 지우고 처음부터? 한 번 더 눌러!';
+  clearTimeout(titleNewTimer);
+  titleNewTimer = setTimeout(() => { titleNew.classList.remove('arm'); titleNew.textContent = '새로 시작하기'; }, 4000);
+});
 $('title').addEventListener('pointerdown', () => {
   started = true; $('title').style.display = 'none'; document.body.classList.remove('intro');
   if (titleShip) { titleShip.atlas.width = titleShip.atlas.height = 0; titleShip = null; } // iOS 캔버스 메모리 반환
