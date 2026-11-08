@@ -32,6 +32,7 @@
   .hint { font-size: 12px; }
   .notice { padding: 12px 14px; border: 1px solid var(--amber); border-radius: 14px; background: rgba(242, 169, 59, .08); color: var(--text); font-size: 14px; line-height: 1.6; } /* 첫 실행 안내 */
   @media (max-width: 350px) { a.game { grid-template-columns: 56px 1fr; gap: 12px; } a.game img { width: 56px; height: 56px; border-radius: 13px; } a.game .one { font-size: 12.5px; } } /* 아주 좁은 휴대폰에서도 한 줄 소개가 한 줄에 */
+  .notice.warn { border-color: #e0533f; background: rgba(224, 83, 63, .1); } /* 카카오톡 저장 주의 */
 </style>
 </head>
 <body>
@@ -39,6 +40,7 @@
   <h1>Danny Game Center</h1>
   <p>by Danny Soft</p>
   <p class="notice">ℹ️ 처음 게임을 실행하면 자동으로 다운로드가 진행돼서 시간이 조금 걸려요.</p>
+  <p class="notice warn">⚠️ 카카오톡에서 플레이하면 세이브가 사라질 수 있으니, 게임을 하기 전에 아래 설명을 읽고 따라해 주세요.</p>
   <a class="game" href="games/zombie-outpost/">
     <img src="games/zombie-outpost/icons/icon-192.png" alt="">
     <span><b>Zombie Outpost</b><span class="one">마지막 불빛을 지키는 좀비 서바이벌</span></span>
