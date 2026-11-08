@@ -1610,8 +1610,9 @@ function drawNight(t) {
   sctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   sctx.globalCompositeOperation = 'source-over';
   sctx.clearRect(0, 0, VW, VH);
-  const a = (S.raid ? 0.56 : 0.5) * nightN; // 디테일이 보이도록 예전(0.58)보다 조금 밝게, 대신 가장자리를 어둡게
-  sctx.fillStyle = S.raid ? `rgba(24, 6, 8, ${a})` : `rgba(5, 8, 18, ${a})`;
+  // 어둠은 '곱하기'로 입힌다: 반투명 색막을 덮으면 검은 곳이 들뜨고 대비가 흐려져 뿌옇게 보이므로, 밝기만 곱해 줄이고 검은색은 그대로 둔다
+  const mul = (S.raid ? [128, 60, 64] : [96, 106, 148]).map((c) => Math.round(255 + (c - 255) * nightN));
+  sctx.fillStyle = `rgb(${mul[0]}, ${mul[1]}, ${mul[2]})`;
   sctx.fillRect(0, 0, VW, VH);
   sctx.globalCompositeOperation = 'destination-out';
   const light = (x, y, r, a = 1) => {
@@ -1625,11 +1626,14 @@ function drawNight(t) {
   for (const o of S.outposts) light(S.sites[o.site].x, S.sites[o.site].y, 190, 0.8);
   for (const f of fx.tracers) light(f.x1, f.y1, 60, 0.5);
   for (const f of fx.fires) light(f.x, f.y, 160, 0.9 * (1 - f.t / 1.2));
-  if (nightN > 0.01) ctx.drawImage(shade, 0, 0, VW, VH);
-  if (n < 0.99) { ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = `rgba(255, 236, 190, ${0.24 * (1 - n)})`; ctx.fillRect(0, 0, VW, VH); ctx.globalCompositeOperation = 'source-over'; } // 낮: 따뜻한 햇빛(화면을 밝게 얹는다)
-  if (dusk > 0.01) { ctx.fillStyle = `rgba(255, 110, 50, ${0.16 * dusk})`; ctx.fillRect(0, 0, VW, VH); } // 노을
+  if (nightN > 0.01) { ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(shade, 0, 0, VW, VH); }
+  // 낮: 소프트 라이트로 중간 밝기만 끌어올린다(검은색은 들뜨지 않아 뿌옇지 않다)
+  if (n < 0.99) { ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = `rgba(255, 246, 222, ${1 - n})`; ctx.fillRect(0, 0, VW, VH); }
+  // 노을: 곱하기로 주황빛 색감만 입힌다
+  if (dusk > 0.01) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(255, 170, 110, ${0.5 * dusk})`; ctx.fillRect(0, 0, VW, VH); }
+  ctx.globalCompositeOperation = 'source-over';
   const vg = ctx.createRadialGradient(VW / 2, VH * 0.48, Math.min(VW, VH) * 0.45, VW / 2, VH * 0.48, Math.hypot(VW, VH) * 0.62);
-  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,0,0,${0.12 + 0.33 * nightN})`);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,0,0,${0.08 + 0.37 * nightN})`);
   ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
   // 기지 모닥불(밤에 또렷하다)
   const [fx_, fy] = P(G.CENTER.x + 40, G.CENTER.y + 40, 4);
