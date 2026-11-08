@@ -1,6 +1,6 @@
 # Sailing Master
 
-배를 설계해 작은 호수에서 대양까지 항해하는 세로 화면 모바일 게임이에요. 전투는 없고 자연이 위협이에요. 지금은 **담수 세 수역**(작은 호수 → 큰 호수 → 강)까지 플레이할 수 있어요. 기획과 측정값은 [DESIGN.md](DESIGN.md)에 있어요.
+배를 설계해 작은 호수에서 대양까지 항해하는 세로 화면 모바일 게임이에요. 전투는 없고 자연이 위협이에요. 지금은 **담수 세 수역**(작은 호수 → 큰 호수 → 강)까지 플레이할 수 있어요. 기획과 측정값은 [DESIGN.md](DESIGN.md)에 있어요. 다음 작업 기획은 [PLAN-M1.5.md](PLAN-M1.5.md)(체계 심화)와 [PLAN-M2.md](PLAN-M2.md)(앞바다)예요.
 
 **바로 하기:** https://dannygu0214.github.io/Danny-Game-Center/games/sailing-master/
 
