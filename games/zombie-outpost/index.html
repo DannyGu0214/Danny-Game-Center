@@ -1029,7 +1029,7 @@ function handleEvents(list) {
         break;
       case 'fire': fx.fires.push({ x: e.x, y: e.y, t: 0 }); sfx.play('fire'); mark(e.x, e.y, 70, '20,16,12', 0.55, 14, true); break;
       case 'guide': showGuide(e); break;
-      case 'raid-warn': showAlert({ title: '긴급 무전', sub: `습격까지 약 ${e.in}초`, text: '본부에서 긴급 무전이 왔어요. 좀비들이 달려오고 있어요. 빨리 본부로 오세요.', raid: true, ttl: 12000 }); break;
+      case 'raid-warn': showAlert({ title: '긴급 무전', sub: `습격까지 약 ${e.in}초`, text: '본부에서 긴급 무전이 왔어요. 좀비들이 달려오고 있어요. 빨리 본부로 오세요.', raid: true, ttl: 30000 }); break;
       case 'item-auto': toast('위급해서 구급상자를 자동으로 썼어요', 'warn'); sfx.play('use', { id: 'medkit' }); break;
       case 'job-done':
         toast(`${e.name} 완료${e.kind === 'craft' ? ' · 장착했어요' : ''}${e.posted ? ` · ${e.posted.name}(${G.ROLES[e.posted.role].name}) 방벽 배치` : ''}`, 'good');
@@ -1922,8 +1922,12 @@ function toast(text, kind = '') {
 
 // ---------- 초심자 가이드 말풍선 ----------
 // 오래 발전이 없으면 logic이 'guide' 이벤트로 시급한 과제 2개를 보낸다. 시트가 열려 있으면 닫힐 때까지 미룬다.
-let guidePending = null, guideTimer = 0;
+let guidePending = null, guideTimer = 0, guideLeft = 0;
+const GUIDE_MIN_MS = 30000; // 말풍선은 최소 30초 보인다. 관리 시트(기지·무기 등)를 열어 가려진 시간은 세지 않는다
+const armGuide = (ms) => { guideLeft = Math.max(GUIDE_MIN_MS, ms); };
+setInterval(() => { if (guideLeft > 0 && !tab && $('#guide').firstElementChild) { guideLeft -= 250; if (guideLeft <= 0) closeGuide(); } }, 250);
 function closeGuide() {
+  guideLeft = 0;
   clearTimeout(guideTimer);
   const card = $('#guide').firstElementChild;
   if (!card) return;
@@ -1931,7 +1935,7 @@ function closeGuide() {
   guideTimer = setTimeout(() => $('#guide').replaceChildren(), 360);
 }
 // 알림 말풍선(내용 한 덩어리): 카카오톡 저장 주의, 습격 무전 경고. raid면 빨간 테두리
-function showAlert({ title, sub, bold, text, raid = false, ttl = 25000 }) {
+function showAlert({ title, sub, bold, text, raid = false, ttl = GUIDE_MIN_MS }) {
   const card = document.createElement('div');
   card.className = `guide-card${raid ? ' raid' : ''}`;
   const head = document.createElement('div'), h = document.createElement('b'), sm = document.createElement('small'), x = document.createElement('button');
@@ -1944,7 +1948,7 @@ function showAlert({ title, sub, bold, text, raid = false, ttl = 25000 }) {
   card.append(head, note);
   $('#guide').replaceChildren(card);
   clearTimeout(guideTimer);
-  guideTimer = setTimeout(closeGuide, ttl);
+  armGuide(ttl);
 }
 // 카카오톡 인앱 브라우저로 열면 시작하자마자 한 번 알린다(저장이 지워질 수 있다)
 let kakaoShown = false;
@@ -1979,7 +1983,7 @@ function showGuide(e) {
     row.append(name, why);
     if (Object.keys(a.cost).length) row.append(cost);
     if (a.late > 0) { const late = document.createElement('em'); late.className = 'late'; late.textContent = `표준보다 ${a.late}분 늦어요 (목표 ${a.by}분)`; row.append(late); }
-    row.addEventListener('click', () => { closeGuide(); openTab(a.tab); });
+    row.addEventListener('click', () => openTab(a.tab)); // 말풍선은 남겨 둔다: 돌아와서 나머지 과제를 이어 볼 수 있게
     card.append(row);
   }
   // 카카오톡 인앱 브라우저는 저장소가 지워질 수 있다: 항상 알리고, 지금 카카오톡 안이면 더 눈에 띄게 한다
@@ -1990,7 +1994,7 @@ function showGuide(e) {
   card.append(note);
   box.replaceChildren(card);
   clearTimeout(guideTimer);
-  guideTimer = setTimeout(closeGuide, kakao ? 40000 : 25000);
+  armGuide(kakao ? 40000 : GUIDE_MIN_MS);
 }
 
 // ---------- 관리 시트 ----------
@@ -2002,7 +2006,7 @@ $('#sheetClose').addEventListener('click', () => openTab(null));
 
 function openTab(id) {
   tab = id;
-  if (id) closeGuide(); else if (guidePending && !S.over) { const g = guidePending; guidePending = null; setTimeout(() => showGuide(g), 600); }
+  if (!id && guidePending && !S.over) { const g = guidePending; guidePending = null; setTimeout(() => showGuide(g), 600); }
   document.querySelectorAll('.tab').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.tab === id));
     if (b.dataset.tab === id) b.querySelector('.dot')?.remove();
