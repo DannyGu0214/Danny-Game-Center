@@ -144,7 +144,7 @@ function sharedArt() {
       rock: [treeSprite('rock', 0.5)],
       pier: pierSprite(), hut: hutSprite(), sign: signSprite(), stone: stoneSprite(), stump: stumpSprite(), wreck: wreckSprite(), tower: towerSprite(), cabin: cabinSprite(), mill: millSprite(), shrine: shrineSprite(), camp: campSprite(), logpile: logpileSprite(), beacon: beaconSprite(), shelter: shelterSprite(), beached: beachedSprite(),
     },
-    flot: { wood: flotSprite('wood'), cloth: flotSprite('cloth'), coin: flotSprite('coin') },
+    flot: Object.fromEntries(['wood', 'oak', 'cloth', 'canvas', 'hemp', 'tar', 'nail', 'shiny', 'bottle', 'coin'].map((k) => [k, flotSprite(k)])),
   };
   return shared;
 }
@@ -972,19 +972,43 @@ function beachedSprite() {
 function flotSprite(k) {
   const [c, g] = canvas(128, 96), cx = 64, cy = 58;
   g.fillStyle = 'rgba(14,50,70,.3)'; g.beginPath(); g.ellipse(cx, cy + 10, 44, 13, 0, 0, TAU); g.fill();
-  if (k === 'wood') {
-    // 통나무 두 개: 껍질 결과 밝은 단면
-    for (const [y, x0, len, col] of [[2, -40, 76, '#7d5a35'], [-12, -34, 70, '#94703f']]) {
+  if (k === 'wood' || k === 'oak') {
+    // 통나무 두 개: 껍질 결과 밝은 단면(참나무는 짙고 굵다)
+    const oak = k === 'oak';
+    for (const [y, x0, len, col] of oak ? [[2, -42, 80, '#5a3f24'], [-13, -36, 74, '#6b4c2c']] : [[2, -40, 76, '#7d5a35'], [-12, -34, 70, '#94703f']]) {
       g.fillStyle = col; g.beginPath(); g.roundRect(cx + x0, cy + y - 8, len, 16, 8); g.fill();
       g.fillStyle = 'rgba(255,236,200,.22)'; g.fillRect(cx + x0 + 6, cy + y - 6, len - 14, 3);
       g.strokeStyle = 'rgba(60,40,20,.45)'; g.lineWidth = 1.4; for (let i = 0; i < 5; i++) { const xx = cx + x0 + 10 + i * 12; g.beginPath(); g.moveTo(xx, cy + y - 2 + (i % 2) * 3); g.lineTo(xx + 9, cy + y - 1 + (i % 2) * 3); g.stroke(); }
       g.fillStyle = '#d8bb8a'; g.beginPath(); g.ellipse(cx + x0 + len - 4, cy + y, 5, 8, 0, 0, TAU); g.fill();
       g.strokeStyle = 'rgba(140,100,55,.7)'; g.lineWidth = 1; g.beginPath(); g.ellipse(cx + x0 + len - 4, cy + y, 2.4, 4, 0, 0, TAU); g.stroke();
     }
-  } else if (k === 'cloth') {
+  } else if (k === 'hemp' || k === 'tar') {
+    // 밧줄 사리
+    const dark = k === 'tar';
+    for (const [r, w] of [[26, 7], [17, 7], [8, 6]]) { g.strokeStyle = dark ? '#3a2e22' : '#a88a55'; g.lineWidth = w; g.beginPath(); g.ellipse(cx, cy - 4, r, r * 0.55, 0, 0, TAU); g.stroke(); g.strokeStyle = dark ? '#5a4a36' : '#d9c79a'; g.lineWidth = w * 0.45; g.beginPath(); g.ellipse(cx - 1, cy - 5, r, r * 0.55, 0, PI * 1.1, PI * 1.9); g.stroke(); }
+    g.strokeStyle = dark ? '#3a2e22' : '#a88a55'; g.lineWidth = 6; g.beginPath(); g.moveTo(cx + 24, cy - 2); g.quadraticCurveTo(cx + 40, cy + 2, cx + 46, cy - 8); g.stroke();
+  } else if (k === 'nail') {
+    // 쇠못 상자
+    g.fillStyle = '#6b5032'; g.fillRect(cx - 22, cy - 18, 44, 26); g.fillStyle = '#86653e'; g.fillRect(cx - 22, cy - 24, 44, 8);
+    g.fillStyle = '#7d8388'; for (let i = 0; i < 5; i++) { g.fillRect(cx - 16 + i * 7, cy - 32, 2.4, 12); g.fillRect(cx - 18 + i * 7, cy - 33, 6, 2.4); }
+    g.strokeStyle = 'rgba(40,28,15,.6)'; g.lineWidth = 1.5; g.strokeRect(cx - 22, cy - 18, 44, 26);
+  } else if (k === 'shiny') {
+    // 반짝이는 곳: 물 밑에 무엇이 있는지 모르는 금빛 반짝임
+    const gr = g.createRadialGradient(cx, cy - 6, 2, cx, cy - 6, 40); gr.addColorStop(0, 'rgba(255,236,160,.95)'); gr.addColorStop(0.4, 'rgba(255,214,110,.45)'); gr.addColorStop(1, 'rgba(255,214,110,0)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(cx, cy - 6, 40, 24, 0, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(120,80,30,.55)'; g.beginPath(); g.roundRect(cx - 14, cy - 12, 28, 14, 4); g.fill();
+  } else if (k === 'bottle') {
+    g.save(); g.translate(cx, cy - 8); g.rotate(-0.35);
+    g.fillStyle = 'rgba(120,190,170,.85)'; g.beginPath(); g.roundRect(-26, -10, 40, 20, 9); g.fill(); g.fillRect(12, -5, 14, 10);
+    g.fillStyle = '#8a6a44'; g.fillRect(25, -5, 6, 10);
+    g.fillStyle = '#f2e6c4'; g.beginPath(); g.roundRect(-18, -6, 24, 12, 3); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(-22, -8, 30, 3);
+    g.restore();
+  } else if (k === 'cloth' || k === 'canvas') {
     // 끈으로 묶은 천 꾸러미
-    g.fillStyle = '#cfbf98'; g.beginPath(); g.ellipse(cx, cy - 4, 34, 20, 0, 0, TAU); g.fill();
-    g.fillStyle = '#e8dbb8'; g.beginPath(); g.ellipse(cx - 4, cy - 9, 28, 14, 0, 0, TAU); g.fill();
+    const cv = k === 'canvas';
+    g.fillStyle = cv ? '#e8e2d2' : '#cfbf98'; g.beginPath(); g.ellipse(cx, cy - 4, 34, 20, 0, 0, TAU); g.fill();
+    g.fillStyle = cv ? '#faf6ea' : '#e8dbb8'; g.beginPath(); g.ellipse(cx - 4, cy - 9, 28, 14, 0, 0, TAU); g.fill();
     g.strokeStyle = 'rgba(150,125,85,.6)'; g.lineWidth = 1.5; for (const d of [-14, 0, 14]) { g.beginPath(); g.moveTo(cx + d - 6, cy - 20); g.quadraticCurveTo(cx + d + 4, cy - 6, cx + d - 2, cy + 10); g.stroke(); }
     g.strokeStyle = '#8a6a3a'; g.lineWidth = 3; for (const d of [-12, 12]) { g.beginPath(); g.ellipse(cx + d, cy - 4, 3.5, 20, 0, 0, TAU); g.stroke(); }
     g.beginPath(); g.moveTo(cx + 12, cy - 22); g.quadraticCurveTo(cx + 20, cy - 30, cx + 26, cy - 24); g.stroke();
@@ -1009,11 +1033,12 @@ export function drawFlotsam(g, sc, list, cam, W, H, t, dpr) {
   for (const f of list) {
     const sx = W / 2 + (f.x - cam.x) * z, sy = cam.cy + (f.y - cam.y) * z * k + Math.sin(t * 1.4 + f.ph) * 0.12 * z;
     if (sx < -size || sx > W + size || sy < -size || sy > H + size) continue;
-    // 건질 것만 금빛 고리와 반짝임을 쓴다(동물과 헷갈리지 않게)
-    const q = (t * 0.6 + f.ph) % 1, pulse = 0.8 + 0.7 * q;
-    g.strokeStyle = `rgba(255,214,102,${0.85 * (1 - q)})`; g.lineWidth = 1.6;
+    // 재료는 옅은 흰 고리, 금빛 고리와 반짝임은 반짝이는 곳(교역품)·병 속 편지에만 써요(PLAN-M1.5 3-4절)
+    const q = (t * 0.6 + f.ph) % 1, pulse = 0.8 + 0.7 * q, gold = f.k === 'shiny' || f.k === 'bottle';
+    g.strokeStyle = gold ? `rgba(255,214,102,${0.85 * (1 - q)})` : `rgba(240,250,250,${0.35 * (1 - q)})`; g.lineWidth = gold ? 1.6 : 1.2;
     g.beginPath(); g.ellipse(sx, sy + size * 0.1, size * 0.6 * pulse, size * 0.6 * pulse * k, 0, 0, TAU); g.stroke();
-    g.drawImage(sc.flot[f.k], sx - size / 2, sy - size * 0.55, size, size * 0.75);
+    g.drawImage(sc.flot[f.k] || sc.flot.wood, sx - size / 2, sy - size * 0.55, size, size * 0.75);
+    if (!gold) continue;
     const tw = 0.55 + 0.45 * Math.sin(t * 4 + f.ph * 3), r = size * 0.26 * tw, gx = sx + size * 0.3, gy = sy - size * 0.5;
     g.fillStyle = '#ffe9a8';
     g.beginPath(); g.moveTo(gx, gy - r); g.quadraticCurveTo(gx, gy, gx + r, gy); g.quadraticCurveTo(gx, gy, gx, gy + r); g.quadraticCurveTo(gx, gy, gx - r, gy); g.quadraticCurveTo(gx, gy, gx, gy - r); g.fill();

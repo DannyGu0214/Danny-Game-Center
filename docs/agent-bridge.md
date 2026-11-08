@@ -1,9 +1,9 @@
-<!-- agent-bridge-guide v3 -->
+<!-- agent-bridge-guide v4 -->
 <!-- 정본: DannyGu0214/agent-bridge project-kit/agent-bridge.md. 이 파일은 install.sh가 덮어쓴다. 여기서 고치지 않는다. -->
 
 # agent-bridge 의뢰서 작성 지침 (원격 세션용)
 
-지침 버전: **3** (의뢰서 `guide_version`에 이 숫자를 쓴다)
+지침 버전: **4** (의뢰서 `guide_version`에 이 숫자를 쓴다)
 
 이 프로젝트는 공용 브리지 저장소 `DannyGu0214/agent-bridge`로 로컬 PC(macbook-15·mac-mini)에 작업을 맡길 수 있다.
 
@@ -28,14 +28,24 @@
 
 ### id 규칙
 
-`YYYY-MM-DD-<저장소 이름 소문자>-NNN` (예: `2026-11-06-danny-game-center-001`). 같은 날 같은 저장소에서 번호를 1씩 올린다.
+`YYYY-MM-DD-<저장소 이름 소문자>[-<하위 프로젝트>]-NNN`
+
+- 한 저장소에 여러 프로젝트가 있으면(예: Danny-Game-Center의 `games/<이름>/`) 하위 프로젝트 폴더 이름을 넣는다. 예: `2026-11-08-danny-game-center-zombie-outpost-001`. 단일 프로젝트 저장소는 뺀다. 예: `2026-11-08-commodity-radar-001`.
+- 번호는 `inbox/`를 보고 정한다. 다른 세션이 같은 저장소로 의뢰서를 넣고 있을 수 있다.
+
+**기존 의뢰서를 덮어쓰지 않는다.** 2026-11-08에 같은 저장소의 다른 게임 세션이 같은 id로 의뢰서를 덮어써 한 의뢰가 처리되지 않고 사라졌다. 의뢰서는 늘 새 파일로만 만든다.
+
+1. 쓰기 직전에 `git pull`로 최신 `inbox/`를 받는다.
+2. `inbox/<id>.md`나 `outbox/<id>.result.md`가 이미 있으면 번호를 올린다. 남이 쓴 파일인지 따지지 않는다.
+3. 커밋 전 `git diff --cached --name-status`에서 의뢰서가 `A`(새 파일)인지 확인한다. `M`이면 커밋하지 않는다.
+4. push가 거절되면 `git pull --rebase` 후 다시 확인한다. 같은 이름 파일과 충돌하면 상대 것을 지우거나 덮지 말고, 내 파일을 다음 번호로 바꿔 다시 커밋한다.
 
 ### 의뢰서 형식
 
 ```markdown
 ---
-id: 2026-11-06-danny-game-center-001
-guide_version: 3
+id: 2026-11-06-danny-game-center-sailing-master-001
+guide_version: 4
 type: asset_gen            # asset_gen | web_task
 target_repo: DannyGu0214/Danny-Game-Center
 target_branch: claude/stage-2   # 필수. 결과를 커밋할 원격 작업 브랜치
@@ -65,7 +75,7 @@ supersedes:                # 대체하는 이전 의뢰서 id (없으면 비움)
 ```markdown
 ---
 id: 2026-11-08-commodity-radar-002
-guide_version: 3
+guide_version: 4
 type: deploy
 target_repo: DannyGu0214/commodity-radar
 target_branch: main          # 그 서비스의 운영 브랜치

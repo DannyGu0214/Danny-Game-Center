@@ -150,7 +150,14 @@ function sliceModule(g, m, hullId, z) {
   // 모듈 칸(가로 = 배 폭 방향, 세로 = 배 길이 방향)
   const hx = (h * H.cell) / 2 - 0.05, hy = (w * H.cell) / 2 - 0.05, x0 = cx - hx, x1 = cx + hx, y0 = cy - hy, y1 = cy + hy, top = z > M.z - DZ * 1.1;
   g.fillStyle = M.color;
-  switch (m.id) {
+  // Mk2는 Mk1 그림에 쇠띠를 두른다
+  const kind = m.id === 'food2' ? 'food' : m.id === 'hold2' ? 'hold' : m.id, mk2 = kind !== m.id;
+  if (mk2 && (top || Math.abs(z - M.z * 0.3) < DZ * 0.6 || Math.abs(z - M.z * 0.7) < DZ * 0.6)) {
+    g.fillStyle = '#4a4a4c'; g.beginPath(); kind === 'food' ? g.arc(cx, cy, Math.min(hx, hy) * 0.86, 0, TAU) : roundRect(g, x0 - 0.04, y0 - 0.04, x1 + 0.04, y1 + 0.04, 0.1); g.fill();
+    if (!top) return;
+  }
+  g.fillStyle = M.color;
+  switch (kind) {
     case 'food': {
       // 나무통
       g.fillStyle = top ? '#d6b07a' : M.color;

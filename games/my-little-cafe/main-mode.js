@@ -7,6 +7,7 @@ import { runBrew, runRoast } from './stations.js';
 import { MENUS, DAY_SEC, PATIENCE, AUTO_SEC, EQUIP, PEOPLE, BIZ_REGULARS, WEATHER_NAME, COLDBREW_COST, RENT_PER_SEASON, SEASON_NAME, DAYS_PER_SEASON, SIDE, ROAST } from './data.js';
 import { REG_TALK, OWNER_VISIT, REACT } from './story.js';
 import { EVENTS, FAIR } from './events.js';
+import { TRIVIA, TRIVIA_KIND } from './trivia.js';
 
 const PANEL = 214; // 아래 주문판 높이
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -89,8 +90,21 @@ export function createBusiness(env) {
     renderTickets();
   }
 
+  // 커피 이야기 말풍선: 영업 화면 위에 잠깐 떠 있다가 사라진다. 눌러도 닫힌다. 영업은 멈추지 않는다
+  function showTrivia(id) {
+    const x = TRIVIA.find((v) => v.id === id), box = $('trivia');
+    if (!x) return;
+    box.innerHTML = `<b>☕ ${TRIVIA_KIND[x.kind]}</b><p></p><small>눌러서 닫기</small>`;
+    box.querySelector('p').textContent = x.text;
+    box.classList.remove('hide');
+    clearTimeout(showTrivia.t); showTrivia.t = setTimeout(hideTrivia, 14000);
+  }
+  function hideTrivia() { clearTimeout(showTrivia.t); $('trivia').classList.add('hide'); }
+  $('trivia').addEventListener('click', hideTrivia);
+
   // 일반 손님 직접 만들기: 시간은 계속 흐른다. 이 손님은 만드는 동안 기다려 준다
   async function makeByHand(t) {
+    hideTrivia();
     t.state = 'hand'; day.busy = true; day.sig = null;
     $('tickets').classList.add('hide');
     let steps = MENUS[t.menu].steps.filter((s) => s !== 'grind' || t.menu === 'drip' || t.menu === 'origin');
@@ -125,6 +139,7 @@ export function createBusiness(env) {
   async function talkTo(t) {
     const id = t.regular, R = BIZ_REGULARS[day.place][id];
     t.state = 'talk';
+    hideTrivia();
     day.clockOn = false; day.busy = true;
     $('tickets').classList.add('hide');
     env.setFront(id); env.barView();
@@ -185,6 +200,8 @@ export function createBusiness(env) {
           }
         }
       }
+      const tv = d.trivia; // 하루 하나까지. 손이 빌 때만 띄우고, 마감 직전이면 그날은 건너뛴다
+      if (tv && !tv.shown && !d.busy && d.clock >= tv.at && d.clock < DAY_SEC - 15) { tv.shown = true; B.markTrivia(biz(), tv.id); showTrivia(tv.id); }
       if (d.clock >= DAY_SEC && !d.busy) { d.resolve(); return; }
     }
     d.hudT = (d.hudT || 0) + dt;
@@ -311,7 +328,7 @@ export function createBusiness(env) {
     prefill(F, place === 'home' ? 3 : 1, Math.random, () => randomLook(place));
     day = {
       place, F, err, clock: 0, clockOn: true, busy: false, tickets: [], pending: [], nextId: 1, sig: null, stats: B.newDayStats(),
-      arrivals: B.planDay(place, b.day, b.weather, b.rep), regs: B.regularsOfDay(place, b.day).sort((a, x) => a.at - x.at), resolve: null,
+      arrivals: B.planDay(place, b.day, b.weather, b.rep), regs: B.regularsOfDay(place, b.day).sort((a, x) => a.at - x.at), resolve: null, trivia: B.planTrivia(b, TRIVIA.map((x) => x.id)),
     };
     mainView();
     $('tickets').classList.remove('hide');
@@ -327,6 +344,7 @@ export function createBusiness(env) {
     ticks.delete(tick);
     day = null;
     $('tickets').classList.add('hide');
+    hideTrivia();
     const lost = d.tickets.filter((t) => !t.regular).length; // 문 닫을 때 남은 손님은 놓친 걸로 치지 않지만 알려 준다
     const wasted = B.endOfDayStock(b);
     return { ...B.closeDay(b, d.stats), leftAtClose: lost, wasted };
@@ -357,12 +375,13 @@ export function createBusiness(env) {
   function seasonScreen(s) {
     return new Promise((done) => {
       const box = $('settle');
-      box.innerHTML = `<h2>봄 결산</h2>
-        <p class="sLead">${s.money >= 0 ? '봄을 무사히 넘겼어요.' : '월세를 내고 나니 빚이 생겼어요. 그래도 가게는 계속돼요.'}</p>
+      const b = biz(), name = SEASON_NAME[b.season], next = B.canContinue(b) ? SEASON_NAME[B.nextSeasonOf(b.season)] : null;
+      box.innerHTML = `<h2>${name} 결산</h2>
+        <p class="sLead">${s.money >= 0 ? `${name}을 무사히 넘겼어요.` : '월세를 내고 나니 빚이 생겼어요. 그래도 가게는 계속돼요.'}</p>
         <div class="sRows"><div><span>영업한 날</span><b>${s.days}일</b></div><div><span>번 돈(재료비 뺌)</span><b>${won(s.income)}</b></div><div><span>월세</span><b>- ${won(s.rent)}</b></div><div><span>손님</span><b>${s.served}명</b></div><div><span>기다리다 간 손님</span><b>${s.lost}명</b></div><div><span>별 평균</span><b>${s.avgStars}</b></div><div><span>평판</span><b>${s.rep}</b></div></div>
         <div class="sMoney">가진 돈 <b>${won(s.money)}</b></div>
-        <p class="sLead">여름부터는 지금 만들고 있어요. 다음 계절이 열리면 여기서 이어져요.</p>
-        <button class="mainBtn sNext" id="settleNext">타이틀로</button>`;
+        <p class="sLead">${next ? `이제 ${next}이에요. 가진 돈과 단골, 해금한 것은 그대로 가져가요.` : `${SEASON_NAME[B.nextSeasonOf(b.season)]}은 지금 만들고 있어요. 업데이트되면 이 가게 그대로 이어서 할 수 있어요.`}</p>
+        <button class="mainBtn sNext" id="settleNext">${next ? `${next} 시작하기` : '타이틀로'}</button>`;
       box.classList.remove('hide');
       $('settleNext').onclick = () => { box.classList.add('hide'); done(); };
     });
@@ -372,7 +391,10 @@ export function createBusiness(env) {
     async run() {
       for (;;) {
         const b = biz();
-        if (b.finished) { env.toTitle(); return; }
+        if (b.finished) { // 지난 계절을 마친 저장: 이 버전에 다음 계절이 있으면 이어서 한다
+          if (!B.canContinue(b)) { env.toTitle(); return; }
+          B.startNextSeason(b); env.save();
+        }
         if (b.fairTomorrow) await fairDay();
         else {
           const err = await morning();
@@ -387,8 +409,9 @@ export function createBusiness(env) {
           const s = B.settleSeason(b, env.S.choices.place);
           b.finished = true; env.save();
           await seasonScreen(s);
-          env.toTitle();
-          return;
+          if (!B.canContinue(b)) { env.toTitle(); return; }
+          B.startNextSeason(b); env.save();
+          continue;
         }
         B.nextDay(b); env.save();
       }
