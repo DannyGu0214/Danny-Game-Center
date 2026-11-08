@@ -50,24 +50,38 @@ function drawPerk(g, H) {
 function sliceRaft(g, z, H) {
   const L = H.len / 2, W2 = H.beam / 2;
   if (z > H.deck) return;
-  // 통나무 다섯 개를 옆으로 나란히
-  const n = 5, w = H.beam / n, top = z > H.deck - DZ * 1.2;
+  // 통나무 다섯 개를 옆으로 나란히. 아래층일수록 좁아서 옆에서 보면 둥글다
+  const n = 5, w = H.beam / n, top = z > H.deck - DZ * 1.2, r = H.deck / 2, f = Math.max(0.55, Math.sqrt(Math.max(0, 1 - ((z - r) / r) ** 2)));
   for (let i = 0; i < n; i++) {
-    const y = -W2 + (i + 0.5) * w;
+    const y = -W2 + (i + 0.5) * w, x0 = -L - (i % 3) * 0.08 - (i === 2 ? 0.06 : 0), x1 = L + (i % 2) * 0.1 + (i === 3 ? 0.05 : 0), hw = w * 0.46 * (top ? 1 : f);
     g.fillStyle = top ? (i % 2 ? WOOD.logLit : WOOD.log) : WOOD.logDark;
-    g.beginPath(); roundRect(g, -L - (i % 3) * 0.08, y - w * 0.46, L + (i % 2) * 0.1, y + w * 0.46, w * 0.42); g.fill();
+    g.beginPath(); roundRect(g, x0, y - hw, x1, y + hw, hw * 0.9); g.fill();
+    if (!top) continue;
+    g.fillStyle = 'rgba(255,236,200,.22)'; g.beginPath(); roundRect(g, x0 + 0.12, y - hw * 0.78, x1 - 0.12, y - hw * 0.4, hw * 0.2); g.fill(); // 빛 받는 등
+    g.fillStyle = 'rgba(60,40,20,.28)'; g.beginPath(); roundRect(g, x0 + 0.1, y + hw * 0.45, x1 - 0.1, y + hw * 0.85, hw * 0.2); g.fill();
+    // 나무껍질 결과 옹이
+    g.strokeStyle = 'rgba(70,46,24,.45)'; g.lineWidth = 0.025;
+    for (let k = 0; k < 7; k++) { const a = x0 + 0.3 + ((k * 0.61 + i * 0.37) % 1) * (x1 - x0 - 0.6), yy = y + (((k * 0.43 + i * 0.29) % 1) - 0.5) * hw * 1.1; g.beginPath(); g.moveTo(a, yy); g.lineTo(a + 0.35 + (k % 3) * 0.1, yy + 0.01); g.stroke(); }
+    g.fillStyle = 'rgba(70,46,24,.55)'; g.beginPath(); g.ellipse(x0 + (x1 - x0) * (0.3 + (i % 3) * 0.2), y + hw * 0.1, 0.07, 0.05, 0, 0, TAU); g.fill();
+    // 잘린 끝: 밝은 단면과 나이테
+    for (const xe of [x0 + 0.06, x1 - 0.06]) { g.fillStyle = '#d8bb8a'; g.beginPath(); g.ellipse(xe, y, 0.07, hw * 0.88, 0, 0, TAU); g.fill(); g.strokeStyle = 'rgba(140,100,55,.6)'; g.lineWidth = 0.02; g.beginPath(); g.ellipse(xe, y, 0.035, hw * 0.45, 0, 0, TAU); g.stroke(); }
   }
   if (top) {
-    // 묶은 밧줄
-    g.fillStyle = '#d9c9a0';
-    for (const x of H.star === 1 ? [-L * 0.68, L * 0.68] : [-L * 0.72, 0, L * 0.72]) g.fillRect(x - 0.05, -W2, 0.1, H.beam);
+    // 묶은 밧줄: 꼬인 줄무늬와 통나무 사이 매듭
+    for (const x of H.star === 1 ? [-L * 0.68, L * 0.68] : [-L * 0.72, 0, L * 0.72]) {
+      g.fillStyle = '#d9c9a0'; g.fillRect(x - 0.06, -W2, 0.12, H.beam);
+      g.strokeStyle = 'rgba(120,95,55,.7)'; g.lineWidth = 0.02; for (let k = 0; k < 22; k++) { const yy = -W2 + k * H.beam / 22; g.beginPath(); g.moveTo(x - 0.06, yy); g.lineTo(x + 0.06, yy + 0.05); g.stroke(); }
+      g.fillStyle = '#b8a375'; for (let i = 1; i < n; i++) { g.beginPath(); g.ellipse(x, -W2 + i * w, 0.09, 0.06, 0, 0, TAU); g.fill(); }
+    }
     if (H.star === 3) { g.fillStyle = '#6f7478'; for (const x of [-L * 0.36, L * 0.36]) g.fillRect(x - 0.04, -W2, 0.08, H.beam); drawPerk(g, H); }
   }
 }
 function sliceRowboat(g, z, paint, H) {
   const deck = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap; // ★3 보강재는 쇠붙이 색
   if (z > deck) return;
-  const color = z < 0.06 ? BOTTOM : z < 0.1 ? BOOT : z > deck - DZ ? cap : paint;
+  // 겹쳐 붙인 판자(클링커): 판마다 아래쪽이 조금 어둡고 이음매가 진하다
+  const strake = (z - 0.1) / 0.09, seam = strake % 1 < 0.45 && z > 0.12;
+  const color = z < 0.06 ? BOTTOM : z < 0.1 ? BOOT : z > deck - DZ ? cap : seam ? shade(paint, -0.22) : Math.floor(strake) % 2 ? shade(paint, -0.07) : paint;
   hullPath(g, H.id, z);
   g.fillStyle = color; g.fill();
   if (z > 0.17) {
@@ -76,21 +90,31 @@ function sliceRowboat(g, z, paint, H) {
     hullPath(g, H.id, z, 0.13); g.fill(); g.restore();
   } else if (z > 0.1) {
     hullPath(g, H.id, z, 0.05); g.fillStyle = WOOD.floor; g.fill();
+    g.save(); hullPath(g, H.id, z, 0.05); g.clip();
     g.strokeStyle = 'rgba(40,24,10,.3)'; g.lineWidth = 0.02;
     for (let y = -0.8; y < 0.9; y += 0.2) { g.beginPath(); g.moveTo(-H.len / 2, y); g.lineTo(H.len / 2, y); g.stroke(); }
+    g.strokeStyle = 'rgba(70,45,20,.55)'; g.lineWidth = 0.06; // 늑골
+    for (let x = -H.len / 2 + 0.5; x < H.len / 2 - 0.3; x += 0.42) { g.beginPath(); g.moveTo(x, -1.2); g.lineTo(x, 1.2); g.stroke(); }
+    g.restore();
   }
   if (z > 0.2 && z < 0.34) {
     g.fillStyle = WOOD.deck; // 가로 의자
     for (const x of H.star === 1 ? [-1.5, 1.1] : [-2, -0.2, 1.6]) g.fillRect(x - 0.17, -planW(H.id, x / (H.len / 2)) * 0.9, 0.34, planW(H.id, x / (H.len / 2)) * 1.8);
   }
   if (H.star === 3 && z > 0.2 && z < 0.3) drawPerk(g, H);
+  if (z > deck - DZ) { // 뱃전 위 노걸이와 이물 기둥
+    g.fillStyle = '#4a3322'; for (const x of [-0.5, 0.2]) for (const sd of [-1, 1]) { const w = planW(H.id, x / (H.len / 2)); g.fillRect(x - 0.06, sd * w - 0.06, 0.12, 0.12); }
+    g.fillStyle = '#6b4a2e'; g.beginPath(); g.ellipse(H.len / 2 - 0.12, 0, 0.12, 0.08, 0, 0, TAU); g.fill();
+  }
 }
 function sliceSloop(g, z, paint, H) {
   const DECK = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap, [ck0, ck1] = H.cockpit;
   let from = -1;
   if (z > DECK) from = Math.pow((z - DECK) / 0.42, 1 / 2.2);
   if (from >= 0.98) return;
-  const color = z < 0.08 ? BOTTOM : z < 0.17 ? BOOT : z < 0.72 ? paint : z < 0.83 ? STRIPE : z < DECK - 0.05 ? paint : cap;
+  const strake = (z - 0.17) / 0.11, seam = strake % 1 < 0.35 && z > 0.2;
+  const side = seam ? shade(paint, -0.16) : Math.floor(strake) % 2 ? shade(paint, -0.05) : paint;
+  const color = z < 0.08 ? BOTTOM : z < 0.17 ? BOOT : z < 0.72 ? side : z < 0.83 ? STRIPE : z < DECK - 0.05 ? side : cap;
   hullPath(g, H.id, z, 0, from);
   g.fillStyle = color; g.fill();
   if (z > DECK - 0.05) {
@@ -99,7 +123,11 @@ function sliceSloop(g, z, paint, H) {
     g.save(); hullPath(g, H.id, z, 0.14, from); g.clip();
     g.strokeStyle = WOOD.deckDark; g.lineWidth = 0.025;
     for (let y = -1.6; y < 1.6; y += 0.22) { g.beginPath(); g.moveTo(-H.len / 2, y); g.lineTo(H.len / 2, y); g.stroke(); }
+    // 판자 끝 이음(엇갈림)과 갑판 쇠고리
+    g.strokeStyle = 'rgba(80,55,30,.35)'; g.lineWidth = 0.02;
+    for (let r = 0; r < 15; r++) { const y = -1.6 + r * 0.22, x = -H.len / 2 + 0.6 + ((r * 0.37) % 1) * 1.6; for (let xx = x; xx < H.len / 2; xx += 1.9) { g.beginPath(); g.moveTo(xx, y); g.lineTo(xx, y + 0.22); g.stroke(); } }
     g.restore();
+    if (from < 0) { g.fillStyle = '#5a5e62'; for (const [x, y] of [[H.len / 2 - 1.2, 0.55], [H.len / 2 - 1.2, -0.55], [ck0 - 0.3, 0.9], [ck0 - 0.3, -0.9]]) { g.beginPath(); roundRect(g, x - 0.12, y - 0.04, x + 0.12, y + 0.04, 0.03); g.fill(); } }
   }
   // 고물 쪽 움푹한 조종석
   if (z >= 0.6 && z <= DECK + 0.02) {
@@ -313,20 +341,75 @@ function line(g, P, a, b, color, w) {
   g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
 }
 
-// 사람: 작은 원통 몸 + 머리 + 모자. 선장은 흰 모자, 선원은 맨머리
-function drawPerson(g, P, x, y, z, zoom, rowPhase, coat, captain) {
-  const s = Math.max(1, zoom / 6.5), lean = rowPhase === null ? 0 : Math.cos(rowPhase) * 0.34;
-  const base = P(x, y, z), top = P(x + lean, y, z + (rowPhase === null ? 1.1 : 0.82));
-  g.lineCap = 'round';
-  g.strokeStyle = coat; g.lineWidth = 3.2 * s;
-  g.beginPath(); g.moveTo(base[0], base[1]); g.lineTo(top[0], top[1]); g.stroke();
-  g.fillStyle = '#f0c8a0'; g.beginPath(); g.arc(top[0], top[1] - 2.1 * s, 1.8 * s, 0, TAU); g.fill();
+// 사람: 다리·코트·팔·머리·모자를 화면에 세워 그린다. look = { coat, hair, style(short·long·perm·bald), hat(tricorn·bandana·knit·flat) }
+const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16), f = (v) => Math.max(0, Math.min(255, Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k)))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; };
+function drawPerson(g, P, x, y, z, zoom, rowPhase, look, captain) {
+  const s = Math.max(1, zoom / 6.5) * 1.12, rowing = rowPhase !== null, lean = rowing ? Math.cos(rowPhase) * 0.34 : 0;
+  const H = rowing ? 0.86 : 1.18, base = P(x, y, z), top = P(x + lean, y, z + H);
+  const L = (f, side = 0) => [base[0] + (top[0] - base[0]) * f + side * s, base[1] + (top[1] - base[1]) * f];
+  const coat = look.coat || '#25506f', hair = look.hair || '#3a2a1c', skin = look.skin || '#f2c9a1';
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.fillStyle = 'rgba(20,30,35,.22)'; g.beginPath(); g.ellipse(base[0], base[1], 2.3 * s, 0.9 * s, 0, 0, TAU); g.fill();
+  // 다리와 장화(앉아서 노 저을 때는 무릎만)
+  if (!rowing) {
+    g.strokeStyle = look.pants || '#2f3440'; g.lineWidth = 1.35 * s;
+    for (const d of [-0.62, 0.62]) { const h = L(0.42, d * 0.8); g.beginPath(); g.moveTo(base[0] + d * s, base[1] - 0.2 * s); g.lineTo(h[0], h[1]); g.stroke(); }
+    g.fillStyle = '#1e1a17'; for (const d of [-0.62, 0.62]) { g.beginPath(); g.ellipse(base[0] + d * s + 0.25 * s, base[1] - 0.2 * s, 0.85 * s, 0.5 * s, 0, 0, TAU); g.fill(); }
+  } else { g.strokeStyle = look.pants || '#2f3440'; g.lineWidth = 1.35 * s; const k = L(0.25, 1.4); g.beginPath(); g.moveTo(...L(0.12, -0.4)); g.lineTo(k[0] + 1.2 * s, k[1] - 0.6 * s); g.stroke(); }
+  // 긴 머리는 몸 뒤로 늘어진다
+  const head = L(1), hx = head[0], hy = head[1] - 2 * s, hr = 1.75 * s;
+  if (look.style === 'long') { g.fillStyle = shade(hair, -0.1); g.beginPath(); g.ellipse(hx - 0.2 * s, hy + 1.6 * s, 2.05 * s, 2.9 * s, 0, 0, TAU); g.fill(); }
+  // 코트: 아래로 벌어지는 자락, 왼쪽이 밝다
+  const hem = rowing ? 0.12 : 0.2, pts = [L(hem, -1.85), L(0.52, -1.3), L(0.9, -1.55), L(0.9, 1.55), L(0.52, 1.3), L(hem, 1.85)];
+  g.fillStyle = coat; g.beginPath(); for (const q of pts) g.lineTo(q[0], q[1]); g.closePath(); g.fill();
+  g.fillStyle = shade(coat, 0.2); g.beginPath(); g.lineTo(...L(hem, -1.85)); g.lineTo(...L(0.52, -1.3)); g.lineTo(...L(0.9, -1.55)); g.lineTo(...L(0.9, -0.35)); g.lineTo(...L(hem, -0.4)); g.closePath(); g.fill();
+  g.strokeStyle = shade(coat, -0.35); g.lineWidth = Math.max(0.8, 0.35 * s); g.beginPath(); g.moveTo(...L(hem + 0.02, 0.05)); g.lineTo(...L(0.85, 0.05)); g.stroke(); // 여밈
   if (captain) {
-    g.fillStyle = '#fbfbf6'; g.beginPath(); g.ellipse(top[0], top[1] - 3.3 * s, 2.5 * s, 1 * s, 0, 0, TAU); g.fill();
-    g.fillStyle = '#1b3550'; g.fillRect(top[0] - 2 * s, top[1] - 3.6 * s, 4 * s, 0.6 * s);
-  } else { g.fillStyle = '#4a3322'; g.beginPath(); g.arc(top[0], top[1] - 2.6 * s, 1.5 * s, PI, TAU); g.fill(); }
+    g.fillStyle = '#efe6d6'; g.beginPath(); g.moveTo(...L(0.9, -0.7)); g.lineTo(...L(0.72, 0)); g.lineTo(...L(0.9, 0.7)); g.closePath(); g.fill(); // 셔츠 깃
+    g.fillStyle = '#e7b64a'; for (const f of [0.62, 0.45]) { const q = L(f, 0.5); g.beginPath(); g.arc(q[0], q[1], 0.32 * s, 0, TAU); g.fill(); }
+  }
+  g.strokeStyle = shade(coat, -0.45); g.lineWidth = Math.max(0.8, 0.45 * s); g.beginPath(); g.moveTo(...L(0.5, -1.32)); g.lineTo(...L(0.5, 1.32)); g.stroke(); // 허리띠
+  // 팔: 노를 저을 때는 앞으로 뻗는다
+  g.strokeStyle = shade(coat, -0.12); g.lineWidth = 1.15 * s;
+  for (const side of [-1, 1]) {
+    const sh = L(0.86, side * 1.45);
+    const hand = rowing ? P(x + lean + 0.42, y + side * 0.24, z + 0.5) : L(0.42, side * 2.05);
+    g.beginPath(); g.moveTo(sh[0], sh[1]); g.quadraticCurveTo(sh[0] + side * 0.6 * s, (sh[1] + hand[1]) / 2, hand[0], hand[1]); g.stroke();
+    g.fillStyle = skin; g.beginPath(); g.arc(hand[0], hand[1], 0.55 * s, 0, TAU); g.fill();
+  }
+  // 목과 머리
+  g.fillStyle = shade(skin, -0.12); g.fillRect(hx - 0.55 * s, hy + hr * 0.6, 1.1 * s, 0.9 * s);
+  g.fillStyle = skin; g.beginPath(); g.arc(hx, hy, hr, 0, TAU); g.fill();
+  g.fillStyle = 'rgba(255,240,220,.35)'; g.beginPath(); g.arc(hx - 0.55 * s, hy - 0.5 * s, hr * 0.45, 0, TAU); g.fill();
+  if (s > 1.5) { g.fillStyle = '#2a2320'; for (const d of [-0.6, 0.6]) { g.beginPath(); g.arc(hx + d * s, hy + 0.1 * s, 0.22 * s, 0, TAU); g.fill(); } }
+  g.fillStyle = hair;
+  if (look.style === 'bald') {
+    g.fillStyle = hair; for (const d of [-1, 1]) { g.beginPath(); g.ellipse(hx + d * hr * 0.88, hy + 0.1 * s, 0.45 * s, 0.75 * s, 0, 0, TAU); g.fill(); }
+    g.beginPath(); g.ellipse(hx, hy + hr * 0.78, hr * 0.78, hr * 0.62, 0, 0, PI); g.fill(); // 수염
+  } else if (look.style === 'perm') {
+    for (const [dx, dy, r] of [[-1.2, -0.6, 0.85], [-0.55, -1.35, 0.9], [0.45, -1.4, 0.9], [1.15, -0.7, 0.85], [-1.45, 0.4, 0.7], [1.45, 0.35, 0.7]]) { g.beginPath(); g.arc(hx + dx * s, hy + dy * s, r * s, 0, TAU); g.fill(); }
+  } else {
+    g.beginPath(); g.ellipse(hx, hy - hr * 0.35, hr * 1.04, hr * 0.72, 0, PI, TAU); g.fill();
+    g.beginPath(); g.ellipse(hx - hr * 0.45, hy - hr * 0.3, hr * 0.6, hr * 0.32, 0.4, 0, TAU); g.fill(); // 앞머리
+    if (look.style === 'long') { for (const d of [-1, 1]) { g.beginPath(); g.ellipse(hx + d * hr * 0.92, hy + 0.5 * s, 0.5 * s, 1.3 * s, 0, 0, TAU); g.fill(); } }
+  }
+  // 모자
+  const hat = captain ? 'tricorn' : look.hat;
+  if (hat === 'tricorn') {
+    const cy = hy - hr * 0.7;
+    g.fillStyle = '#1d2a3a'; g.beginPath(); g.moveTo(hx - 3 * s, cy + 0.2 * s); g.quadraticCurveTo(hx, cy + 1.25 * s, hx + 3 * s, cy + 0.2 * s); g.lineTo(hx + 2.2 * s, cy - 0.95 * s); g.quadraticCurveTo(hx, cy - 0.25 * s, hx - 2.2 * s, cy - 0.95 * s); g.closePath(); g.fill();
+    g.beginPath(); g.ellipse(hx, cy - 0.55 * s, 1.55 * s, 1.15 * s, 0, PI, TAU); g.fill();
+    g.strokeStyle = '#d9b25a'; g.lineWidth = Math.max(0.8, 0.32 * s); g.beginPath(); g.moveTo(hx - 2.7 * s, cy + 0.15 * s); g.quadraticCurveTo(hx, cy + 1.05 * s, hx + 2.7 * s, cy + 0.15 * s); g.stroke();
+  } else if (hat === 'bandana') {
+    g.fillStyle = look.band || '#c8452f'; g.beginPath(); g.ellipse(hx, hy - hr * 0.3, hr * 1.06, hr * 0.78, 0, PI, TAU); g.fill();
+    g.beginPath(); g.moveTo(hx + hr * 0.9, hy - hr * 0.3); g.lineTo(hx + hr * 1.6, hy + 0.2 * s); g.lineTo(hx + hr * 1.2, hy + 0.5 * s); g.closePath(); g.fill();
+  } else if (hat === 'knit') {
+    g.fillStyle = look.band || '#3f7a5a'; g.beginPath(); g.ellipse(hx, hy - hr * 0.35, hr * 1.04, hr * 0.95, 0, PI, TAU); g.fill();
+    g.fillStyle = shade(look.band || '#3f7a5a', -0.25); g.fillRect(hx - hr * 1.04, hy - hr * 0.4, hr * 2.08, 0.55 * s);
+  } else if (hat === 'flat') {
+    g.fillStyle = '#4a3a2c'; g.beginPath(); g.ellipse(hx + 0.3 * s, hy - hr * 0.55, hr * 1.2, hr * 0.5, -0.1, 0, TAU); g.fill();
+  }
 }
-
 // 수면 그늘과 비친 돛(선체보다 먼저 그린다)
 const rotateLocal = (a, h) => [a[0] * Math.cos(h) - a[1] * Math.sin(h), a[0] * Math.sin(h) + a[1] * Math.cos(h)];
 export function drawShipOnWater(g, sprite, st, zoom, sx, sy) {
@@ -349,6 +432,10 @@ export function drawShipOnWater(g, sprite, st, zoom, sx, sy) {
 }
 
 const COATS = { deckhand: '#8a3f3a', lookout: '#3f7a4f', helmsman: '#7a5a2a' };
+const CAP_LOOK = { coat: '#25506f', hair: '#3a2a1c', style: 'short' };
+// 선원 모습: 역할마다 옷과 모자(갑판원 두건, 망보기 털모자, 키잡이 납작모자), 머리색은 사람마다
+const CREW_HAIR = ['#2a1c12', '#3a2a1c', '#5a3a22', '#1f1a18', '#6d4a2a'], CREW_HAT = { deckhand: 'bandana', lookout: 'knit', helmsman: 'flat' }, BANDS = ['#c8452f', '#2f6f8f', '#e7b64a'];
+const crewLookOf = (c) => ({ coat: COATS[c.role] || '#555', hair: CREW_HAIR[(c.id || 0) % CREW_HAIR.length], style: c.gender === '여' ? 'long' : 'short', hat: CREW_HAT[c.role], band: c.role === 'lookout' ? '#3f7a5a' : BANDS[(c.id || 0) % BANDS.length], pants: '#3a3a44' });
 
 // 배 전체: 선체 그림 한 장 + 그 위의 돛대·돛·사람
 export function drawShip(g, sprite, st, zoom, sx, sy) {
@@ -406,14 +493,14 @@ export function drawShip(g, sprite, st, zoom, sx, sy) {
   const capX = st.capX ?? hull.helmX;
   const manP = P(capX, 0, floor);
   items.push({ d: manP[2], draw() {
-    drawPerson(g, P, capX, 0, floor, zoom, row ? rowPhase : null, '#25506f', true);
+    drawPerson(g, P, capX, 0, floor, zoom, row ? rowPhase : null, st.capLook || CAP_LOOK, true);
     if (!row && Math.abs(capX - hull.helmX) < 0.6) line(g, P, [-hull.len / 2 + 0.25, 0, deck + 0.08], [hull.helmX + 0.2, -st.rudder * 0.65, deck + 0.14], '#6b4a2e', 1.3 * s);
   } });
   if (row) items.push({ d: manP[2] + 0.01, draw() { drawOars(g, P, sprite, rowPhase, s); } });
   (st.crew || []).forEach((c) => {
     const pos = c.role === 'deckhand' ? [(rig ? rig.x : 0) - 0.5, 0.45, deck] : c.role === 'lookout' ? [hull.len / 2 - 1.5, 0, deck] : [hull.helmX, 0.35, floor];
     const q = P(pos[0], pos[1], pos[2]);
-    items.push({ d: q[2], draw() { drawPerson(g, P, pos[0], pos[1], pos[2], zoom, null, COATS[c.role] || '#555', false); } });
+    items.push({ d: q[2], draw() { drawPerson(g, P, pos[0], pos[1], pos[2], zoom, null, crewLookOf(c), false); } });
   });
 
   items.sort((a, b) => a.d - b.d);

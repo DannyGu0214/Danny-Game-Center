@@ -94,7 +94,7 @@ export function stats(S) {
   const st = SH.statsOf(S.ship, holdUsed(S), S.food);
   // 선원의 항해술도 속도에 더해진다(유머 감각·주량은 효과가 없는 개성)
   const crewK = S.crew.reduce((a, c) => a + ((c.skill ?? CREW.baseStat) / CREW.baseStat - 1) * CREW.speedPerSkill, 0);
-  st.speedK = (hasTrait(S, 'sailor') ? 1.1 : 1) * (1 + crewK);
+  st.speedK = (st.hull.speed || 1) * (hasTrait(S, 'sailor') ? 1.1 : 1) * (1 + crewK);
   st.maxSpeed *= st.speedK; st.rowSpeed *= st.speedK;
   return st;
 }

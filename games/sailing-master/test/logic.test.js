@@ -146,11 +146,17 @@ test('노: 맞바람에도 가고 오래 저으면 지친다. 돛대 없는 뗏�
   const S = G.newGame(1); G.undock(S);
   G.setRow(S, true); run(S, 1);
   for (let i = 0; i < 10 * 30; i++) { G.step(S, G.FIXED_DT); S.boat.h = S.wind.from; }
-  assert.ok(S.boat.spd > 2.4, `뗏목 ${S.boat.spd}`);
+  assert.ok(S.boat.spd > 4.8, `뗏목 ${S.boat.spd}`);
   S.boat.stamina = 0;
   for (let i = 0; i < 12 * 30; i++) { G.step(S, G.FIXED_DT); S.boat.h = S.wind.from; }
-  assert.ok(S.boat.spd < 2.7, `지친 뗏목 ${S.boat.spd}`);
+  assert.ok(S.boat.spd < 5.4, `지친 뗏목 ${S.boat.spd}`);
   assert.equal(G.setSail(S, 2), false, '돛대 없음');
+});
+
+test('선체 속도 배율: 뗏목 2배, 나룻배·슬루프는 이전 값의 1.5배', () => {
+  assert.equal(HULLS.raft.speed, 2); assert.equal(HULLS.raft3.speed, 2);
+  assert.equal(HULLS.rowboat.speed, 1.5); assert.equal(HULLS.rowboat3.speed, 1.5);
+  assert.equal(HULLS.sloop.speed, 1.5); assert.equal(HULLS.sloop3.speed, 1.5);
 });
 
 test('물가에 부딪혀도 땅에 올라가지 않고 선체가 조금 상한다', () => {
@@ -433,7 +439,7 @@ test('선장 특성 4가지가 효과를 낸다', () => {
   assert.deepEqual(G.moduleCost(base, 'hold'), { wood: 12 });
   // 특성이 없는 예전 저장도 그대로 돌아간다
   const old = G.deserialize(G.serialize(G.newGame(3)));
-  assert.equal(old.captain, undefined); assert.equal(G.stats(old).speedK, 1);
+  assert.equal(old.captain, undefined); assert.equal(G.stats(old).speedK, 2); // 뗏목 기본 배율(선장·선원 보정은 없음)
 });
 
 test('망원경: 내륙 발견지와 뭍짐승은 망원경이 있어야 찾고, 보는 거리가 늘어난다', () => {

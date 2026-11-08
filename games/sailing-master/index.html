@@ -115,6 +115,7 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 /* 선원 명부 */
 .capCard { display: flex; align-items: center; gap: 12px; padding: 11px 13px; margin-bottom: 14px; border-radius: 14px; background: linear-gradient(120deg, #21506a, #173a4c); border: 1px solid rgba(226,196,130,.4); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
 .face { flex: none; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 40% 30%, #3f7f96, #143444); box-shadow: 0 0 0 1.5px rgba(226,196,130,.75); }
+.face { position: relative; }
 .face canvas { display: block; width: 100%; height: 100%; }
 .capCard .lab { font-size: 11px; font-weight: 700; letter-spacing: .05em; color: #e2c482; }
 .capCard .nm { font-size: 18px; font-weight: 800; line-height: 1.25; }
@@ -314,19 +315,31 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 #picker.on { display: flex; }
 #picker h2 { margin: 0; font-size: 20px; }
 #picker .lead { margin: 4px 0 10px; color: var(--muted); font-size: 13.5px; }
-#capGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.cap { background: var(--card); border: 2px solid transparent; border-radius: 13px; padding: 8px; text-align: center; }
-.cap.on { border-color: var(--on); }
-.cap canvas { display: block; width: 100%; height: 92px; }
-.cap .nm { font-size: 14px; font-weight: 700; margin-top: 3px; color: var(--on); }
-.cap .lk { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
-.cap .ds { font-size: 12px; margin-top: 3px; line-height: 1.3; }
+/* 선장 고르기: 고른 선장 초상화(3:4)를 크게, 아래 네 명 목록을 누르면 바뀐다 */
+#capHero { position: relative; flex: none; width: min(100%, 38vh); aspect-ratio: 5 / 6; margin: 0 auto; border-radius: 16px; overflow: hidden; background: #143444; box-shadow: 0 6px 20px rgba(0,0,0,.35), 0 0 0 1.5px rgba(226,196,130,.55); }
+#capHero img, #capHero canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 78%; display: block; }
+#capHero img { transition: opacity .25s; }
+#capHero canvas { display: none; }
+#capHero.noimg img { display: none; } #capHero.noimg canvas { display: block; }
+#capInfo { position: absolute; left: 0; right: 0; bottom: 0; padding: 34px 14px 11px; background: linear-gradient(to bottom, rgba(10,30,40,0), rgba(10,30,40,.88) 45%); }
+#capInfo .nm { font-size: 19px; font-weight: 800; color: #f2d48a; }
+#capInfo .lk { font-size: 12px; color: rgba(255,255,255,.75); margin-top: 1px; }
+#capInfo .ds { font-size: 13.5px; margin-top: 4px; }
+#capGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.cap { background: var(--card); border: 2px solid transparent; border-radius: 12px; padding: 6px 2px 7px; text-align: center; }
+.cap.on { border-color: var(--on); background: rgba(242,193,78,.12); }
+.cap .th { position: relative; width: 44px; height: 44px; margin: 0 auto 4px; border-radius: 50%; overflow: hidden; background: #143444; box-shadow: 0 0 0 1.5px rgba(226,196,130,.6); }
+/* 초상화에서 얼굴 둘레만: 3:4 그림을 두 배로 키워 얼굴(가로 57%, 세로 52% 근처)을 가운데로 */
+.th img { position: absolute; width: 210%; height: auto; left: -70%; top: -88%; display: block; }
+.th canvas { width: 100%; height: 100%; display: block; }
+.cap .nm { font-size: 13px; font-weight: 700; color: var(--on); }
+.cap .lk { font-size: 10.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; }
 #capNames { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0; }
 #capNames button { padding: 7px 2px; white-space: nowrap; border-radius: 10px; background: rgba(255,255,255,.08); font-size: 13.5px; }
 #capNames button.on { background: var(--on); color: #203038; font-weight: 700; }
 #capName { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.2); color: var(--text); }
 #capGo { margin-top: 12px; flex: none; }
-@media (max-height: 640px) { .cap canvas { height: 62px; } .cap { padding: 5px; } #picker .lead { margin-bottom: 6px; } }
+@media (max-height: 640px) { #capHero { width: min(100%, 30vh); } .cap .th { width: 36px; height: 36px; } #picker .lead { margin-bottom: 6px; } }
 /* 출항 이야기: 그림 아래로 종이 한 장이 겹친 그림책 */
 #story { position: absolute; inset: 0; background: #0b2531; display: none; flex-direction: column; padding-top: var(--safe-t); overflow-y: auto; }
 #story.on { display: flex; }
@@ -441,6 +454,7 @@ body.intro #hud, body.intro #panel, body.intro #tabs { visibility: hidden; }
 <div id="picker">
   <h2>자, 선장을 골라 봐!</h2>
   <p class="lead">어떤 선장이 될 텐가? 한번 정하면 끝까지 가는 거다!</p>
+  <div id="capHero"><img id="capImg" alt=""><canvas id="capCv"></canvas><div id="capInfo"><div class="nm"></div><div class="lk"></div><div class="ds"></div></div></div>
   <div id="capGrid"></div>
   <div class="h3">이름</div>
   <div id="capNames"></div>
@@ -470,7 +484,7 @@ import * as G from './logic.js';
 import * as A from './art.js';
 import * as SA from './art-ship.js';
 import * as SH from './ship.js';
-import { drawStoryScene, isJourney, STORY_W, STORY_H } from './art-story.js';
+import { drawStoryScene, isJourney, storyImage, STORY_W, STORY_H } from './art-story.js';
 import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound } from './sound.js';
 import { createMusic } from './music.js';
@@ -528,23 +542,41 @@ $('title').addEventListener('pointerdown', () => {
 });
 // 선장 고르기: 새 게임과, 선장이 없던 예전 저장에서 한 번 뜬다
 const pick = { id: 'sailor', name: '' };
+// 선장 초상화 그림(없거나 못 읽으면 캔버스 얼굴로)
+const portraitSrc = (id) => `assets/portraits/${id}.webp`;
+function portraitEl(id, size) {
+  const box = el('div', 'th'), img = new Image(); img.alt = ''; img.src = portraitSrc(id);
+  if (size) box.style.cssText = `width:${size}px;height:${size}px`;
+  img.onerror = () => { const cv = document.createElement('canvas'), dpr = Math.min(2.5, devicePixelRatio || 1), n = size || 44; cv.width = cv.height = n * dpr; const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); SA.drawCaptainPortrait(g, CAPTAINS[id], n / 2, n * 0.53, n / 62, true); img.replaceWith(cv); };
+  box.append(img); return box;
+}
 function openPicker() {
   const grid = $('capGrid'); grid.innerHTML = '';
   pick.name = CAPTAINS[pick.id].names[0];
   for (const [id, C] of Object.entries(CAPTAINS)) {
     const b = document.createElement('button'); b.className = 'cap'; b.dataset.id = id;
-    const cv = document.createElement('canvas'), dpr = Math.min(2, devicePixelRatio || 1); cv.width = 150 * dpr; cv.height = 92 * dpr;
-    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); SA.drawCaptainPortrait(g, C, 75, 52, 1.05);
-    b.append(cv);
-    b.insertAdjacentHTML('beforeend', `<div class="nm">${C.name}</div><div class="lk">${C.look} · ${C.age}</div><div class="ds">${C.desc}</div>`);
-    b.addEventListener('click', () => { pick.id = id; pick.name = C.names[0]; $('capName').value = ''; syncPicker(); snd.play('tap'); });
+    b.append(portraitEl(id));
+    b.insertAdjacentHTML('beforeend', `<div class="nm">${C.name}</div><div class="lk">${C.look}</div>`);
+    b.addEventListener('click', () => { if (pick.id === id) return; pick.id = id; pick.name = C.names[0]; $('capName').value = ''; syncPicker(); snd.play('tap'); });
     grid.append(b);
+    new Image().src = portraitSrc(id); // 미리 받아 둔다
   }
   syncPicker();
   $('picker').classList.add('on');
 }
+$('capImg').addEventListener('error', () => {
+  $('capHero').classList.add('noimg');
+  const cv = $('capCv'), r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); cv.width = r.width * dpr; cv.height = r.height * dpr;
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, r.width, r.height); SA.drawCaptainPortrait(g, CAPTAINS[pick.id], r.width / 2, r.height * 0.42, r.width / 75, true);
+});
 function syncPicker() {
   for (const b of $('capGrid').children) b.classList.toggle('on', b.dataset.id === pick.id);
+  const C = CAPTAINS[pick.id], img = $('capImg'), src = portraitSrc(pick.id);
+  $('capHero').classList.remove('noimg');
+  if (!img.src.endsWith(src)) { img.style.opacity = 0; img.onload = () => { img.style.opacity = 1; }; img.src = src; }
+  $('capInfo').querySelector('.nm').textContent = C.name;
+  $('capInfo').querySelector('.lk').textContent = `${C.look} · ${C.age}`;
+  $('capInfo').querySelector('.ds').textContent = C.desc;
   const box = $('capNames'); box.innerHTML = '';
   for (const n of CAPTAINS[pick.id].names) {
     const b = document.createElement('button'); b.textContent = n; b.classList.toggle('on', n === pick.name && !$('capName').value);
@@ -560,7 +592,7 @@ $('capGo').addEventListener('click', () => {
 });
 // 출항 이야기: 선장을 고른 뒤 한 번, 3쪽. 마지막 쪽은 호수까지 가는 길이 그려진다
 const story = { cap: null, page: 0, raf: 0, t0: 0 };
-function openStory(cap) { story.cap = cap; story.page = 0; $('story').classList.add('on'); showStoryPage(); }
+function openStory(cap) { story.cap = cap; story.page = 0; for (const P of STORIES[cap.id].pages) storyImage(P.scene); $('story').classList.add('on'); showStoryPage(); }
 function closeStory() { cancelAnimationFrame(story.raf); $('story').classList.remove('on'); enterGame(); }
 function drawStoryPage(t) {
   const cv = $('storyArt'), g = cv.getContext('2d'), k = cv.width / STORY_W;
@@ -583,6 +615,10 @@ function showStoryPage() {
   $('storyDots').innerHTML = St.pages.map((_, i) => `<i class="${i === story.page ? 'on' : ''}"></i>`).join('');
   $('storyNext').textContent = last ? '갈대 나루에 내리기 →' : '다음 →';
   $('storySkip').style.display = last ? 'none' : '';
+  // 일러스트가 늦게 도착하면 그때 다시 그린다(여정은 움직이는 동안 어차피 다시 그린다)
+  const page = story.page;
+  storyImage(P.scene, () => { if (story.page === page && $('story').classList.contains('on') && (!isJourney(P.scene) || performance.now() - story.t0 > 4500)) drawStoryPage(1); });
+  story.t0 = 0;
   if (isJourney(P.scene) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     story.t0 = performance.now();
     const frame = (now) => { const t = Math.min(1, (now - story.t0) / 4500); drawStoryPage(t < 1 ? t * t * (3 - 2 * t) : 1); if (t < 1) story.raf = requestAnimationFrame(frame); };
@@ -1091,7 +1127,7 @@ function renderCrew(body) {
   if (cap) {
     const C = CAPTAINS[cap.id], card = el('div', 'capCard'), info = el('div', 'grow');
     info.append(el('div', 'lab', '선장')); const nm = el('div', 'nm'); nm.textContent = cap.name; info.append(nm, el('div', 'tr', `<b>${C.name}</b>${C.desc}`));
-    card.append(faceEl(C, 56, true), info); body.append(card);
+    const face = portraitEl(cap.id, 56); face.className = 'face'; card.append(face, info); body.append(card);
   }
   const seats = Array.from({ length: st.hull.crew }, (_, i) => `<i class="seat${i < S.crew.length ? ' on' : ''}"></i>`).join('');
   body.append(el('div', 'rosterHead', `승선 선원<span class="cnt">${seats}<span style="margin-left:3px">${S.crew.length} / ${st.crewCap}</span></span>`));
@@ -1396,7 +1432,7 @@ function shipState(x, y, h, t, heelV, zoom, still = false) {
   const bob = still ? 0 : Math.sin(t * 1.25) * 0.09 * swell + Math.sin(t * 0.73 + 1) * 0.05 * swell;
   const pitch = still ? 0 : Math.sin(t * 1.1 + 0.6) * 0.022 * swell + Math.min(0.03, b.spd * 0.004);
   const heel = heelV + (still ? 0 : Math.sin(t * 0.93) * 0.015 * swell);
-  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: S.crew };
+  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: S.crew, capLook: CAPTAINS[S.captain?.id] || null };
 }
 function render() {
   const b = S.boat, t = S.t;
@@ -1443,7 +1479,7 @@ function render() {
     A.drawProp(ctx, sc, cam, W, p, t);
     if (p.name && cam.zoom > 3.2) {
       ctx.font = '600 12px system-ui'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,30,40,.75)'; ctx.fillStyle = '#fff';
-      const lx = sx(p.x), ly = sy(p.y) - (p.port ? 6.5 : 5) * cam.zoom;
+      const lx = sx(p.x), ly = sy(p.y) - (p.port ? 7.8 : 5) * cam.zoom;
       ctx.strokeText(p.name, lx, ly); ctx.fillText(p.name, lx, ly);
     }
   }

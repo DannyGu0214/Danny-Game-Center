@@ -1,0 +1,204 @@
+version: 1
+style: games/sailing-master/docs/art-style.md
+# 경로는 모두 저장소 루트 기준. 개발 중 placeholder = 지금의 캔버스 초상화(art-ship.js drawCaptainPortrait)와 Web Audio 합성곡(music.js)
+assets:
+  - id: portrait-sailor
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/portraits/sailor.webp
+    spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경(2026-11-08 대니님 확정: 한 화면에 한 명씩 크게 보여 주는 선택 화면용)"
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a confident young man in his twenties, an Age of Sail sea captain from a Southern European port town. Short dark brown hair, sun-tanned skin, bright determined eyes, light stubble, a former fast mail rider turned sailor. Deep sea-blue (#25506f) long captain's coat with brass buttons over a linen shirt, tricorn hat optional. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "OpenRouter google/gemini-3.1-flash-image $0.067 · 896x1200(3:4, spec 1024 정사각과 다름 — 1인 1화면 선택 UI용, 대니님 확정) · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: portrait-lucky
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/portraits/lucky.webp
+    spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경(2026-11-08 대니님 확정: 한 화면에 한 명씩 크게 보여 주는 선택 화면용)"
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a cheerful young woman in her twenties, an Age of Sail sea captain from a Spanish or Latin American port town. Long wavy brown hair, warm curious eyes, a playful knowing smile, a former customs lost-and-found keeper known for her luck. Teal-green (#2f6b5a) fitted captain's coat over a cream blouse, an old rolled sea chart tucked under her arm. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "OpenRouter google/gemini-3.1-flash-image $0.068 · 896x1200(3:4) · sailor 초상화를 화풍 참고로 사용 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: portrait-trader
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/portraits/trader.webp
+    spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경(2026-11-08 대니님 확정: 한 화면에 한 명씩 크게 보여 주는 선택 화면용)"
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a shrewd, dignified woman in her fifties, an Age of Sail sea captain who ran a spice shop in a Portuguese or Spanish port market for thirty years. Graying permed wavy hair pinned up, sharp appraising eyes, a confident half smile, gold hoop earrings. Plum-mauve (#7a4a5e) captain's coat with embroidered cuffs over a dark dress, a small coin purse at her belt. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "Google AI Studio gemini-3.1-flash-image(OpenRouter 잔액 부족 폴백), 출력 1537토큰 · 896x1200(3:4) · sailor 화풍 참고 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: portrait-crafter
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/portraits/crafter.webp
+    spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경(2026-11-08 대니님 확정: 한 화면에 한 명씩 크게 보여 주는 선택 화면용)"
+    prompt: "Semi-realistic painterly digital oil portrait, bust shot, three-quarter view, of a sturdy, kind-faced man in his fifties, an Age of Sail sea captain who was a master clockmaker in a European port town for thirty years. Bald head with graying hair only on the sides, a full graying beard, warm wise eyes, a brass jeweler's loupe hanging on a cord around his neck, a small leather tool bag strap on his shoulder. Ochre-brown (#6b5a3a) work-worn captain's coat over a leather apron. Warm sunset side lighting, softly blurred harbor docks and ship masts in the background, background darker and less saturated than the subject. Face and shoulders within the vertical center 62% of the frame. Visible brush strokes, storybook game illustration. No text, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "Google AI Studio gemini-3.1-flash-image(폴백), 출력 1481토큰 · 896x1200(3:4) · sailor 화풍 참고 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: bgm-pond
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/pond.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 앞뒤 무음 0.1초 이하, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental tavern folk jig in 6/8, about 112 BPM (dotted quarter), D Dorian. Fiddle carries the melody, accordion answers on the repeat, plucked mandolin chords, upright bass, stomping on a wooden tavern floor, tambourine, an occasional clink of mugs at phrase ends. Warm, lively, slightly rough sailors' tavern by a reed-lined lake dock at dusk. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: done
+    license: "Suno 무료 플랜 생성 — 비상업 전용, 저작권은 Suno 보유(상업 이용 시 유료 플랜으로 재생성 필요)"
+    note: "곡 이름: 갈대 나루 선술집(작은 호수) · Suno v6-mini 연주곡, 길이 2:24~2:27 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드해 루프 이음새 처리(ffmpeg) · 128kbps 44.1kHz"
+  - id: bgm-lake
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/lake.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 앞뒤 무음 0.1초 이하, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental tavern polka in 4/4, about 132 BPM, G major. Accordion leads the melody, tin whistle takes it on the repeat, plucked mandolin offbeat chords, upright bass oom-pah, foot stomps on wooden floor, tambourine, cheerful clink of mugs. Bright, rowdy 'one more round!' drinking-hall energy on a wide lake harbor. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: done
+    license: "Suno 무료 플랜 생성 — 비상업 전용, 저작권은 Suno 보유(상업 이용 시 유료 플랜으로 재생성 필요)"
+    note: "곡 이름: 한 잔 더!(큰 호수) · Suno v6-mini 연주곡, 길이 2:24~2:27 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드해 루프 이음새 처리(ffmpeg) · 128kbps 44.1kHz"
+  - id: bgm-river
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/river.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 앞뒤 무음 0.1초 이하, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental sea-shanty style rowing tune in 4/4, about 118 BPM, A harmonic minor. Fiddle leads, accordion doubles on the repeat, plucked mandolin chords, driving upright bass, steady foot stomps like oar strokes, tambourine. Determined, adventurous, a crew rowing together down a winding river, minor-key but warm, not gloomy. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: done
+    license: "Suno 무료 플랜 생성 — 비상업 전용, 저작권은 Suno 보유(상업 이용 시 유료 플랜으로 재생성 필요)"
+    note: "곡 이름: 노 저어라, 친구(강) · Suno v6-mini 연주곡, 길이 2:24~2:27 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드해 루프 이음새 처리(ffmpeg) · 128kbps 44.1kHz"
+  - id: bgm-sea
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/sea.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 앞뒤 무음 0.1초 이하, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental sailing song, sea shanty folk, 6/8, 100 BPM, D major. Fiddle and accordion melody, tin whistle, plucked mandolin, upright bass, bodhran and foot stomps. Swelling open-ocean feel, wind in the sails, adventurous and hopeful, rolling waves rhythm. Short wooden-room reverb. No vocals."
+    url: ""
+    status: done
+    license: "Suno 무료 플랜 생성 — 비상업 전용, 저작권은 Suno 보유(상업 이용 시 유료 플랜으로 재생성 필요)"
+    note: "곡 이름: 넓은 바다(바다·대양) · 2026-11-08 대니님 지시로 로컬이 추가한 항목 · Suno v6-mini 연주곡, 길이 2:24~2:27 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드해 루프 이음새 처리(ffmpeg) · 128kbps 44.1kHz"
+  - id: story-ride
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/ride.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 1/3 'The Last Letter': the young sailor captain (twenties, short dark brown hair, tanned, light stubble, deep sea-blue #25506f coat) as a young postal courier galloping on a chestnut horse through a narrow cobblestone alley of a hillside port town, a leather mail bag flying, laundry lines and stucco houses with terracotta roofs, glimpse of the harbor and ships far below, bright morning light. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 sailor · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-poleNotice
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/poleNotice.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 2/3: rainy night in the port town. the young sailor captain (twenties, short dark brown hair, tanned, light stubble, deep sea-blue #25506f coat) in a wet riding cloak with an empty mail bag stops under an iron street lamp post and looks at a single paper notice pinned to the post. Rain streaks, glowing lamp light reflecting on wet cobblestones, dark harbor silhouettes behind. Quiet, decisive moment. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 sailor · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-journeyHorse
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/journeyHorse.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 3/3 travel map scene, slightly elevated bird's-eye view of countryside: the port town with terracotta roofs and a harbor in the lower-left corner, rolling green meadows and small pine trees in the middle, distant blue-gray mountains on the horizon, and a small reed-fringed lake on the right side (center of the lake around 82% across, 46% down) with a tiny wooden jetty and a log raft at its left shore. Soft sunny afternoon, sun in the upper right. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons. Do NOT paint any road, path or route line between the town and the lake: the game draws the road, the animated red dotted route and the traveling figure on top. Keep the meadow between them open and simple."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 sailor · 여정 배경(길·경로·인물은 게임이 위에 그림) · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-lostFound
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/lostFound.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 1/3 'The Unclaimed Chest': the young lucky captain (twenties, long wavy brown hair, teal-green #2f6b5a coat over cream blouse) as a keeper of the customs lost-and-found warehouse, smiling as she hands a lost walking cane back to a grateful old sailor. Tall wooden shelves full of tagged bags, hats, umbrellas, lanterns and chests, dusty sunbeams through a high window. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 lucky · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-oldBox
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/oldBox.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 2/3: in the same warehouse, the young lucky captain (twenties, long wavy brown hair, teal-green #2f6b5a coat over cream blouse) kneels and opens an old dusty sea chest that nobody claimed for a year. Inside she finds a rolled antique sea chart and a folded paper notice, a soft golden glow coming from the chest onto her surprised face. Dim warm lantern light. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 lucky · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-journeyCoach
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/journeyCoach.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 3/3 travel map scene, slightly elevated bird's-eye view of countryside: a stone customs warehouse by the harbor of the port town in the lower-left corner, rolling green meadows and small pine trees in the middle, distant blue-gray mountains on the horizon, and a small reed-fringed lake on the right side (center of the lake around 82% across, 46% down) with a tiny wooden jetty and a log raft at its left shore. Soft sunny afternoon, sun in the upper right. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons. Do NOT paint any road, path or route line between the town and the lake: the game draws the road, the animated red dotted route and the traveling figure on top. Keep the meadow between them open and simple."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 lucky · 여정 배경(길·경로·인물은 게임이 위에 그림) · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-market
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/market.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 1/3 'The Last Market Day': the trader captain (woman in her fifties, graying permed hair pinned up, gold hoop earrings, plum-mauve #7a4a5e coat) behind the counter of her lively spice stall in a bustling port market, sacks and baskets of colorful spices (saffron, paprika, cinnamon, pepper), brass scales, hanging dried herbs, customers in period clothing, crates stamped with shipping marks (no letters). Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 trader · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-lastDay
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/lastDay.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 2/3: the last market day. An empty, half-demolished market alley with boarded stalls and rubble, workers' scaffolding near the harbor. the trader captain (woman in her fifties, graying permed hair pinned up, gold hoop earrings, plum-mauve #7a4a5e coat) stands with her adult daughter, looking at a paper notice pasted on a bare wall. Late afternoon golden light, bittersweet but hopeful. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 trader · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-journeyCart
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/journeyCart.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 3/3 travel map scene, slightly elevated bird's-eye view of countryside: a demolished market square with a few empty stalls in the port town in the lower-left corner, rolling green meadows and small pine trees in the middle, distant blue-gray mountains on the horizon, and a small reed-fringed lake on the right side (center of the lake around 82% across, 46% down) with a tiny wooden jetty and a log raft at its left shore. Soft sunny afternoon, sun in the upper right. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons. Do NOT paint any road, path or route line between the town and the lake: the game draws the road, the animated red dotted route and the traveling figure on top. Keep the meadow between them open and simple."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 trader · 여정 배경(길·경로·인물은 게임이 위에 그림) · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-clockShop
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/clockShop.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 1/3 \"The Grandchild's Question\": the crafter captain (man in his fifties, bald with gray sides, full gray beard, brass loupe on a cord, ochre-brown #6b5a3a coat over leather apron) as a clockmaker at his workbench in a cozy workshop full of brass gears, pendulum clocks and a large tower-clock mechanism, examining a tiny gear through his loupe, warm lamplight, tools neatly hung on the wall. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 crafter · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-basinBoat
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/basinBoat.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 2/3: in a homey kitchen-yard, the crafter captain (man in his fifties, bald with gray sides, full gray beard, brass loupe on a cord, ochre-brown #6b5a3a coat over leather apron) kneels beside a wooden wash basin where a small hand-carved toy sailboat floats; his young grandchild (about 6 years old) points at the boat and looks up at him asking a question. Afternoon light, gentle and warm. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 crafter · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  - id: story-journeyDonkey
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/journeyDonkey.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Semi-realistic painterly digital oil illustration, storybook game cutscene, wide landscape composition 36:25. Age of Sail (16th-18th century) Southern European port city. Story 3/3 travel map scene, slightly elevated bird's-eye view of countryside: a small clockmaker's workshop with a clock sign shape (no letters) in the port town in the lower-left corner, rolling green meadows and small pine trees in the middle, distant blue-gray mountains on the horizon, and a small reed-fringed lake on the right side (center of the lake around 82% across, 46% down) with a tiny wooden jetty and a log raft at its left shore. Soft sunny afternoon, sun in the upper right. Warm, slightly rough adventurous mood, visible brush strokes, same art style as the captain portraits. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere (posters and papers show only illegible scribbles), no logo, no watermark, no border, no weapons. Do NOT paint any road, path or route line between the town and the lake: the game draws the road, the animated red dotted route and the traveling figure on top. Keep the meadow between them open and simple."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "선장 crafter · 여정 배경(길·경로·인물은 게임이 위에 그림) · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"

@@ -229,7 +229,13 @@ export function createWorld(def) {
     const [x, y] = landSpot(w.x, w.y, f.inland || 3);
     return { ...f, x, y, where: f.inland ? 'inland' : 'shore' };
   });
-  const ports = def.ports.map(snap), gates = def.gates.map(snap);
+  // 배 대는 자리는 물가에서 12m 안쪽으로 당긴다. 너무 멀면 부두가 닿지 않아 배가 물 한가운데 떠 보인다
+  const dockSpot = (p) => {
+    let { x, y } = p;
+    for (let i = 0; i < 20 && dist(x, y) > 12.5; i++) { const [gx, gy] = gradient(x, y), d = dist(x, y); x -= gx * (d - 12); y -= gy * (d - 12); }
+    return { ...p, x, y };
+  };
+  const ports = def.ports.map(snap).map(dockSpot), gates = def.gates.map(snap);
   // 2등급 이상 맵: 처음 들어갈 때 발견지 자리를 정한다. 목록과 개수는 표 그대로이고 자리만 달라진다
   function randomFinds(rnd) {
     const taken = [...ports, ...gates], out = [];

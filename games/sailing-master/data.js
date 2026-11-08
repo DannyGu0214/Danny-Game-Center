@@ -53,10 +53,10 @@ export const WEATHER = {
 };
 
 // 선체(배 평면 격자는 cols × rows, 칸 한 변 cell m. x0: 0행 앞쪽 끝의 배 좌표). id는 등급과 별을 함께 나타낸다: sloop = 슬루프 ★1, sloop2 = ★2
-// hp: 내구도(피해는 절대값으로 들어온다), yard: 필요한 조선소 등급
-const raft = { id: 'raft', kind: 'raft', star: 1, grade: 1, name: '뗏목', len: 4.6, beam: 3.1, deck: 0.34, cols: 3, rows: 4, cell: 1, x0: 2, drag: 0.55, row: 3.8, turn: 0.8, stability: 1.4, buoy: 26, draft: 0.2, crew: 0, foodBase: 4, holdBase: 14, helmX: -1.45, hp: 40, yard: 1, price: {} };
-const rowboat = { id: 'rowboat', kind: 'rowboat', star: 1, grade: 2, name: '나룻배', len: 6.4, beam: 2.1, deck: 0.5, cols: 2, rows: 6, cell: 0.8, x0: 2.4, drag: 0.9, row: 4.6, turn: 0.82, stability: 0.8, buoy: 30, draft: 0.3, crew: 1, foodBase: 5, holdBase: 18, helmX: -2.65, hp: 70, yard: 1, price: { wood: 40, coin: 15 } };
-const sloop = { id: 'sloop', kind: 'sloop', star: 1, grade: 3, name: '슬루프', len: 9, beam: 3, deck: 1, cols: 3, rows: 7, cell: 0.72, x0: 3.1, drag: 1, row: 4, turn: 0.62, stability: 1, buoy: 70, draft: 0.68, crew: 2, foodBase: 6, holdBase: 24, helmX: -3.1, cockpit: [-3.95, -2.2], hp: 120, yard: 3, blueprint: 'sloop', price: { wood: 160, cloth: 60, coin: 110 } };
+// hp: 내구도(피해는 절대값으로 들어온다), yard: 필요한 조선소 등급, speed: 항해 속도 배율(노·돛 모두. 뗏목 2배, 이후 배는 이전 값의 1.5배)
+const raft = { id: 'raft', kind: 'raft', star: 1, grade: 1, name: '뗏목', len: 4.6, beam: 3.1, deck: 0.34, cols: 3, rows: 4, cell: 1, x0: 2, drag: 0.55, row: 3.8, turn: 0.8, stability: 1.4, buoy: 26, draft: 0.2, crew: 0, foodBase: 4, holdBase: 14, helmX: -1.45, hp: 40, yard: 1, speed: 2, price: {} };
+const rowboat = { id: 'rowboat', kind: 'rowboat', star: 1, grade: 2, name: '나룻배', len: 6.4, beam: 2.1, deck: 0.5, cols: 2, rows: 6, cell: 0.8, x0: 2.4, drag: 0.9, row: 4.6, turn: 0.82, stability: 0.8, buoy: 30, draft: 0.3, crew: 1, foodBase: 5, holdBase: 18, helmX: -2.65, hp: 70, yard: 1, speed: 1.5, price: { wood: 40, coin: 15 } };
+const sloop = { id: 'sloop', kind: 'sloop', star: 1, grade: 3, name: '슬루프', len: 9, beam: 3, deck: 1, cols: 3, rows: 7, cell: 0.72, x0: 3.1, drag: 1, row: 4, turn: 0.62, stability: 1, buoy: 70, draft: 0.68, crew: 2, foodBase: 6, holdBase: 24, helmX: -3.1, cockpit: [-3.95, -2.2], hp: 120, yard: 3, speed: 1.5, blueprint: 'sloop', price: { wood: 160, cloth: 60, coin: 110 } };
 // ★2 선체 연장: 길이·칸·부력이 늘고 회전은 조금 느려진다. rowOff: 놓인 모듈을 뒤로 미는 행 수
 const star2 = (b, over) => ({ ...b, id: `${b.kind}2`, star: 2, turn: b.turn * 0.93, blueprint: undefined, ...over });
 // ★3 보강: 내구·복원력이 늘고 등급 고유 개조가 붙는다
@@ -176,15 +176,15 @@ export const REGIONS = {
     gates: [{ id: 'toLake', name: '북쪽 수로', x: 0, y: -135, to: 'lake', entry: 'southGate', req: {} }],
     finds: [
       // 뗏목은 느리니 발견지 보상만으로 나룻배 값을 빨리 모으게 한다(나루 가까이에 먼저 놓음)
-      { id: 'logpile', name: '물가의 통나무 더미', x: -56, y: 92, coin: 4, wood: 8, art: 'stump' },
-      { id: 'raftcamp', name: '뗏목꾼의 빈 야영지', x: 50, y: 112, coin: 6, wood: 7, cloth: 3, art: 'stone' },
+      { id: 'logpile', name: '물가의 통나무 더미', x: -56, y: 92, coin: 4, wood: 8, art: 'logpile' },
+      { id: 'raftcamp', name: '뗏목꾼의 빈 야영지', x: 50, y: 112, coin: 6, wood: 7, cloth: 3, art: 'camp' },
       { id: 'stone', name: '이끼 낀 표지석', x: -72, y: 18, coin: 12, wood: 8, art: 'stone' },
       { id: 'hollow', name: '속이 빈 고목', x: 92, y: 40, coin: 10, wood: 14, art: 'stump' },
       { id: 'fishtrap', name: '부서진 통발', x: -46, y: -62, coin: 6, wood: 10, cloth: 3, art: 'wreck' },
       { id: 'skiff', name: '가라앉은 쪽배', x: 18, y: -84, coin: 18, cloth: 8, blueprint: 'telescope', art: 'wreck' },
       // 내륙(inland: 물가에서 안쪽으로 들어간 거리 m)은 망원경이 있어야 찾아요
       { id: 'grove', name: '숲속 돌 제단', x: 62, y: -108, inland: 28, coin: 20, cloth: 10, art: 'stone' },
-      { id: 'hunter', name: '사냥꾼의 빈 오두막', x: -90, y: -70, inland: 42, coin: 30, wood: 20, art: 'hut' },
+      { id: 'hunter', name: '사냥꾼의 빈 오두막', x: -90, y: -70, inland: 42, coin: 30, wood: 20, art: 'cabin' },
     ],
     flot: { cap: 9, table: [['wood', 5, 3, 6], ['cloth', 1, 1, 3], ['coin', 2, 2, 4]] },
   },
@@ -197,12 +197,12 @@ export const REGIONS = {
     gates: [{ id: 'toRiver', name: '강 어귀', x: 16, y: -285, to: 'river', entry: 'head', req: { grade: 2 } }, { id: 'toPond', name: '남쪽 수로', x: 24, y: 276, to: 'pond', entry: 'stonePier', req: {} }],
     finds: [
       { id: 'lighthouse', name: '작은 등대', x: 118, y: -30, coin: 30, cloth: 20, blueprint: 'mast_m', art: 'tower' },
-      { id: 'cove', name: '조용한 만', x: -166, y: 45, coin: 22, wood: 30, art: 'stump' },
+      { id: 'cove', name: '조용한 만', x: -166, y: 45, coin: 22, wood: 30, art: 'beached' },
       { id: 'isleStone', name: '섬의 돌탑', x: 0, y: -88, coin: 25, cloth: 15, art: 'stone' },
       { id: 'barge', name: '버려진 바지선', x: 118, y: 170, coin: 40, wood: 40, art: 'wreck' },
-      { id: 'hut', name: '어부의 빈 오두막', x: -68, y: -212, coin: 30, blueprint: 'barometer', art: 'tower' },
+      { id: 'hut', name: '어부의 빈 오두막', x: -68, y: -212, coin: 30, blueprint: 'barometer', art: 'cabin' },
       { id: 'pineTower', name: '솔숲 망루', x: -170, y: -160, inland: 32, coin: 40, cloth: 25, art: 'tower' },
-      { id: 'oldCamp', name: '숲속 옛 야영지', x: 175, y: 60, inland: 45, coin: 45, wood: 40, art: 'stump' },
+      { id: 'oldCamp', name: '숲속 옛 야영지', x: 175, y: 60, inland: 45, coin: 45, wood: 40, art: 'camp' },
       { id: 'hillStone', name: '언덕 위 선돌', x: -60, y: 300, inland: 26, coin: 35, cloth: 20, art: 'stone' },
     ],
     flot: { cap: 14, table: [['wood', 4, 4, 9], ['cloth', 3, 3, 7], ['coin', 2, 4, 8]] },
@@ -216,14 +216,14 @@ export const REGIONS = {
     gates: [{ id: 'toSea', name: '넓어지는 강', x: -24, y: -972, to: null, req: { grade: 3 } }, { id: 'toLake', name: '호수 어귀', x: -20, y: 985, to: 'lake', entry: 'northPier', req: {} }],
     finds: [
       { id: 'rapidsStone', name: '여울목 표지', x: 70, y: 760, coin: 30, wood: 30, art: 'stone' },
-      { id: 'mill2', name: '멈춘 물레방아', x: -40, y: 540, coin: 35, cloth: 20, blueprint: 'sloop', art: 'tower' },
-      { id: 'hermit', name: '강가의 은둔처', x: 120, y: 170, coin: 40, art: 'stump' },
+      { id: 'mill2', name: '멈춘 물레방아', x: -40, y: 540, coin: 35, cloth: 20, blueprint: 'sloop', art: 'mill' },
+      { id: 'hermit', name: '강가의 은둔처', x: 120, y: 170, coin: 40, art: 'shelter' },
       { id: 'oldBridge', name: '무너진 옛 다리', x: -90, y: -180, coin: 50, wood: 40, art: 'wreck' },
       { id: 'cairn', name: '순례자의 돌무지', x: 50, y: -560, coin: 45, art: 'stone' },
-      { id: 'beacon', name: '강 끝 봉화대', x: 12, y: -860, coin: 60, cloth: 30, art: 'tower' },
-      { id: 'watchHut', name: '산지기 오두막', x: 90, y: 620, inland: 30, coin: 50, wood: 40, art: 'hut' },
+      { id: 'beacon', name: '강 끝 봉화대', x: 12, y: -860, coin: 60, cloth: 30, art: 'beacon' },
+      { id: 'watchHut', name: '산지기 오두막', x: 90, y: 620, inland: 30, coin: 50, wood: 40, art: 'cabin' },
       { id: 'ridgeStone', name: '능선의 돌탑', x: -130, y: 200, inland: 40, coin: 55, cloth: 30, art: 'stone' },
-      { id: 'hermitage', name: '숲속 암자', x: 90, y: -470, inland: 28, coin: 60, art: 'tower' },
+      { id: 'hermitage', name: '숲속 암자', x: 90, y: -470, inland: 28, coin: 60, art: 'shrine' },
     ],
     shoals: [{ x: 40, y: 760, r: 34, depth: 1.1 }, { x: -70, y: 520, r: 40, depth: 1.05 }, { x: 110, y: 170, r: 42, depth: 1 }, { x: -60, y: -300, r: 34, depth: 1.1 }, { x: 50, y: -640, r: 50, depth: 0.95 }],
     flot: { cap: 18, table: [['wood', 4, 6, 12], ['cloth', 3, 4, 9], ['coin', 3, 6, 12]] },
