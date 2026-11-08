@@ -1,0 +1,79 @@
+version: 1
+style: docs/bgm-style.md   # BGM 스타일·스펙 기준(곡별 대응표 포함). 아래 prompt는 여기서 뽑은 것
+assets:
+  - id: bgm-01-gray-field
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/01-gray-field.mp3
+    spec: "잿빛 들판 · D minor, 68 BPM, chords Dm - Bb - F - C · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental, drumless post-apocalyptic ambient, D minor, 68 BPM, slow and bleak. low detuned analog sawtooth synth pad muffled by a low-pass filter, sparse plucked acoustic guitar melody, soft deep sine bass, faint wind noise in the background. chords Dm - Bb - F - C, 4 bars per phrase. starts with only the pad, then bass enters, then the guitar melody. desolate, empty grey fields, long reverb, no vocals, no drums, calm and steady, no climax"
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+
+  - id: bgm-02-rusty-radio
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/02-rusty-radio.mp3
+    spec: "녹슨 라디오 · A minor, 84 BPM, chords Am - G - F - E · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental, drumless lo-fi post-apocalyptic, A minor, 84 BPM, melancholic. small flat square-wave lead like an old broken radio (band-pass filtered, narrow and nasal), pulsing quarter-note sine and triangle bass alternating octaves, sparkling music box notes in later phrases, subtle radio static crackle. chords Am - G - F - E, one chord per bar. lonely signal in the ruins, light reverb, no vocals, no drums, calm, no climax"
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+
+  - id: bgm-03-last-light
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/03-last-light.mp3
+    spec: "마지막 불빛 · E minor, 58 BPM, chords Em - C - G - D · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental solo piano ballad, E minor, 58 BPM, very slow and intimate. steady eighth-note piano arpeggios (root, fifth, octave, third pattern), a slow sparse piano melody entering in later phrases, one long sustained low bass note per bar. chords Em - C - G - D. the last light in the dark, lonely but a faint ember of hope, soft room reverb, no vocals, no drums, no other instruments, no climax"
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+
+  - id: bgm-04-dawn-patrol
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/04-dawn-patrol.mp3
+    spec: "새벽 정찰 · G major, 76 BPM, chords G - D - Em - C · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental drumless folk ambient, G major, 76 BPM, cautiously hopeful dawn. faint airy pad, nylon acoustic guitar eighth-note arpeggios, soft round bass, then a gently rising piano melody. chords G - D - Em - C, one chord per bar. dawn scouting through quiet ruins, calm and clear, light reverb, no vocals, no drums, no climax"
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+
+  - id: bgm-05-first-harvest
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/05-first-harvest.mp3
+    spec: "첫 수확 · D major, 88 BPM, chords D - Bm - G - A · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental drumless pastoral, D major, 88 BPM, gentle and cheerful. bass playing root and fifth on half notes, piano chords on beats 2 and 4 (off-beat), sparkling music box accents, a whistled melody with soft vibrato in the later phrases. chords D - Bm - G - A, one chord per bar. first harvest after the apocalypse, small joy, warm and light, light reverb, no vocals, no drums, no climax"
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+
+  - id: bgm-06-under-the-lantern
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/06-under-the-lantern.mp3
+    spec: "등불 아래 · F major, 66 BPM, chords F - Am - Bb - C · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental drumless lullaby, F major, 66 BPM, warm and cozy. warm soft synth pad, piano broken chords on quarter notes, soft low bass, a music box melody like a lullaby entering in later phrases. chords F - Am - Bb - C, one chord per bar, rising progression. night under a lantern in a safe shelter, tender and calm, soft reverb, no vocals, no drums, no climax"
+    url: ""
+    status: pending
+    license: ""
+    note: ""
+
+  - id: bgm-07-campfire-song
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/07-campfire-song.mp3
+    spec: "모닥불 노래 · A major, 84 BPM, chords A - D - F#m - E · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental drumless campfire folk, A major, 84 BPM, warm and hopeful. strummed acoustic guitar with a down-up strum from low to high strings, soft bass notes, then a harmonica lead melody with light vibrato. chords A - D - F#m - E, one chord per bar. singing around a campfire in the ruins, gentle and homely, light reverb, no vocals, no drums, no climax"
+    url: ""
+    status: pending
+    license: ""
+    note: ""
