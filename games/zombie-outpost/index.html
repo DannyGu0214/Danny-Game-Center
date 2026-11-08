@@ -225,6 +225,10 @@ button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .guide-row em { font-style: normal; font-size: 11px; color: var(--teal); }
 .guide-row em.lack { color: var(--red); }
 .guide-row em.late { color: var(--amber); }
+.guide-note { margin: 7px 0 0; padding: 6px 9px; border-radius: 9px; background: #2a2216; border: 1px solid #5a4520; font-size: 11.5px; line-height: 1.45; color: var(--text); }
+.guide-note b { color: var(--amber); font-weight: 600; }
+.guide-note.kakao { background: #3a1a16; border-color: var(--red); }
+.guide-note.kakao b { color: #ff8f7c; }
 @keyframes guideIn { from { opacity: 0; transform: translateY(8px); } }
 
 #toasts {
@@ -1950,9 +1954,15 @@ function showGuide(e) {
     row.addEventListener('click', () => { closeGuide(); openTab(a.tab); });
     card.append(row);
   }
+  // 카카오톡 인앱 브라우저는 저장소가 지워질 수 있다: 항상 알리고, 지금 카카오톡 안이면 더 눈에 띄게 한다
+  const kakao = /KAKAOTALK/i.test(navigator.userAgent), note = document.createElement('p'), nb = document.createElement('b');
+  note.className = `guide-note${kakao ? ' kakao' : ''}`;
+  nb.textContent = kakao ? '지금 카카오톡에서 하고 있어요! ' : '저장 주의 · ';
+  note.append(nb, '카카오톡에서 플레이하면 세이브가 날아갈 수 있어요. 꼭 크롬 같은 브라우저에서 플레이하세요.');
+  card.append(note);
   box.replaceChildren(card);
   clearTimeout(guideTimer);
-  guideTimer = setTimeout(closeGuide, 25000);
+  guideTimer = setTimeout(closeGuide, kakao ? 40000 : 25000);
 }
 
 // ---------- 관리 시트 ----------
