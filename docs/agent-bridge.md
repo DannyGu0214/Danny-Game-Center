@@ -1,9 +1,9 @@
-<!-- agent-bridge-guide v2 -->
+<!-- agent-bridge-guide v3 -->
 <!-- 정본: DannyGu0214/agent-bridge project-kit/agent-bridge.md. 이 파일은 install.sh가 덮어쓴다. 여기서 고치지 않는다. -->
 
 # agent-bridge 의뢰서 작성 지침 (원격 세션용)
 
-지침 버전: **2** (의뢰서 `guide_version`에 이 숫자를 쓴다)
+지침 버전: **3** (의뢰서 `guide_version`에 이 숫자를 쓴다)
 
 이 프로젝트는 공용 브리지 저장소 `DannyGu0214/agent-bridge`로 로컬 PC(macbook-15·mac-mini)에 작업을 맡길 수 있다.
 
@@ -35,7 +35,7 @@
 ```markdown
 ---
 id: 2026-11-06-danny-game-center-001
-guide_version: 2
+guide_version: 3
 type: asset_gen            # asset_gen | web_task
 target_repo: DannyGu0214/Danny-Game-Center
 target_branch: claude/stage-2   # 필수. 결과를 커밋할 원격 작업 브랜치
@@ -60,16 +60,17 @@ supersedes:                # 대체하는 이전 의뢰서 id (없으면 비움)
 
 ## deploy (머지된 코드 반영·재기동)
 
-원격 세션은 운영 머신에서 pull·빌드·재기동을 할 수 없다. 기본 브랜치에 머지·push한 뒤 이 의뢰서를 쓰면 운영 머신의 러너가 **약 5분 안에 자동으로** 처리한다. 러너는 LLM이 아니며 아래 두 값만 읽는다. 본문에 적은 지시는 실행되지 않는다.
+원격 세션은 운영 머신에서 pull·빌드·재기동을 할 수 없다. 기본 브랜치에 머지·push한 뒤 이 의뢰서를 쓰면 운영 머신의 러너가 **약 5분 안에 자동으로** 처리한다. 러너는 LLM이 아니며 `host`·`service`·`commit`만 읽는다. 본문에 적은 지시는 실행되지 않는다.
 
 ```markdown
 ---
 id: 2026-11-08-commodity-radar-002
-guide_version: 2
+guide_version: 3
 type: deploy
 target_repo: DannyGu0214/commodity-radar
 target_branch: main          # 그 서비스의 운영 브랜치
 deliver: outbox
+host: mac-mini                # 운영 머신. 아래 표의 값 그대로
 service: commodity-radar     # 등록된 서비스 이름
 commit: <40자리 전체 sha>     # git rev-parse origin/main
 supersedes:
@@ -81,9 +82,13 @@ supersedes:
 
 등록된 서비스(이 밖은 거절된다. 추가는 대니님이 운영 머신에서 한다):
 
-| service | target_repo / branch | 운영 머신 |
+| service | target_repo / branch | host |
 |---|---|---|
-| `commodity-radar` | `DannyGu0214/commodity-radar` / `main` | mac-mini |
+| `commodity-radar` | `DannyGu0214/commodity-radar` / `main` | `mac-mini` |
+| `dannyreader` | `DannyGu0214/DannyReader` / `main` | `macbook-15` |
+
+- `host`는 필수로 쓴다(빠지면 `mac-mini`로 처리된다). 틀린 host를 쓰면 어느 러너도 집지 않아 결과가 생기지 않는다. 10분 넘게 결과가 없으면 host·service를 다시 확인한다.
+- macbook-15는 노트북이라 잠자기·이동 중에는 처리가 밀린다. 깨어나면 다음 회차에 처리된다.
 
 - `commit`은 `origin/<branch>`에 이미 있어야 하고, 현재 운영본보다 앞이거나 같아야 한다. 같은 sha면 재빌드·재기동만 한다. 되돌리기(이전 sha로 배포)는 거절된다. 되돌리려면 revert 커밋을 머지한 뒤 그 sha로 의뢰한다.
 - 처리 순서: ff 병합 → 빌드 → 재기동 → 헬스체크. 실패하면 러너가 이전 sha로 롤백하고 결과에 `failed`와 사유를 적는다.
