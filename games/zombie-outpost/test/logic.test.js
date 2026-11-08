@@ -1973,3 +1973,65 @@ test('기지 모양: 판마다 다른 비정형 사각형(직각·정사각형 �
     for (let i = 4; i < 6; i++) { const q = G.postPosition(s, i, 6), e = G.hqEdgeDist(s, q.x, q.y).d; assert.ok(e < 0 && e > -12, `자리 ${i}: ${e.toFixed(1)}`); }
   }
 });
+
+test('초심자 가이드: 3분 동안 발전이 없으면 시급한 과제 2개를 알리고, 작업을 시작하면 시계가 다시 시작한다', () => {
+  const s = fresh(11);
+  const guides = [];
+  const run = (sec) => { for (let t = 0; t < sec; t += DT) for (const e of G.step(s, DT)) if (e.t === 'guide') guides.push(e); };
+  run(G.GUIDE_IDLE_S - 5);
+  assert.equal(guides.length, 0, '3분 전에는 조용하다');
+  run(10);
+  assert.equal(guides.length, 1);
+  const g = guides[0];
+  assert.equal(g.items.length, 2);
+  assert.equal(g.items[0].title, '공방 1레벨 짓기', '초반 1순위는 공방(무기 제작의 전제)');
+  assert.ok(g.items.every((a) => a.why && a.tab && a.cost), '이유·탭·비용이 함께 온다');
+  assert.ok(g.due >= 1 && g.done === 0 && g.total === G.TECH_STANDARD.length);
+  run(100);
+  assert.equal(guides.length, 1, '알린 뒤 3분은 다시 조용하다');
+  // 작업을 시작하면 시계가 0으로: 시작 직전까지 80초를 보내도, 시작한 뒤 3분 전에는 알리지 않는다
+  rich(s);
+  assert.equal(G.buyBuilding(s, 'workbench').ok, true);
+  run(G.GUIDE_IDLE_S - 10);
+  assert.equal(guides.length, 1, '작업을 시작한 뒤 3분이 지나기 전에는 알리지 않는다');
+  run(20);
+  assert.equal(guides.length, 2, '그 뒤로 다시 3분 동안 발전이 없으면 알린다');
+});
+
+test('발전 조언: 선행 조건을 풀어서 보여 주고, 이미 도는 작업 줄은 건너뛴다', () => {
+  const s = rich(fresh(12));
+  assert.deepEqual(G.devAdvice(s).map((a) => a.title), ['공방 1레벨 짓기', '제재소 1레벨 짓기']);
+  // 공방이 없으면 쇠파이프 제작 대신 공방을 권한다
+  assert.ok(!G.devAdvice(s, 5).some((a) => a.title === '쇠파이프 제작'));
+  G.buyBuilding(s, 'workbench');
+  assert.ok(G.devAdvice(s, 5).every((a) => a.lane !== 'base'), '건설 줄이 돌고 있으면 건설 과제는 빠진다');
+  finish(s);
+  const a = G.devAdvice(s, 3);
+  assert.equal(a[0].title, '쇠파이프 제작');
+  assert.equal(a[0].lane, 'forge');
+  assert.deepEqual(a[0].lack, {}, '자원이 충분하면 모자란 것이 없다');
+  // 자원이 모자라면 모자란 양을 알려 준다
+  s.res.scrap = 10;
+  assert.equal(G.devAdvice(s, 1)[0].lack.scrap, 30);
+  // 표준보다 늦으면 늦은 분을 알려 준다
+  s.time = 10 * 60;
+  assert.ok(G.devAdvice(s, 1)[0].late >= 7);
+});
+
+test('발전 조언: 본부 레벨이 모자란 건물·전진기지는 본부 확장을 먼저 권한다', () => {
+  const s = rich(fresh(13));
+  for (const id of ['workbench', 'sawmill', 'scrapyard', 'barricade', 'watchtower', 'repair']) { G.buyBuilding(s, id); finish(s); }
+  for (const id of ['pipe', 'pistol']) { G.craftWeapon(s, id); finish(s); }
+  assert.equal(G.devAdvice(s, 1)[0].title, '본부 2레벨', '재활용 작업장·전진기지는 본부 2레벨부터');
+  G.upgradeHq(s); finish(s);
+  const titles = G.devAdvice(s, 6).map((a) => a.title);
+  assert.ok(titles.includes('숙소 1레벨 짓기'));
+});
+
+test('가이드 시계는 저장하지 않고, 불러오면 0에서 다시 센다', () => {
+  const s = fresh(14);
+  stepFor(s, 60);
+  assert.ok(s.idleT > 50);
+  const r = G.deserialize(typeof G.serialize(s) === 'string' ? G.serialize(s) : JSON.stringify(G.serialize(s)));
+  assert.equal(r.idleT, 0);
+});

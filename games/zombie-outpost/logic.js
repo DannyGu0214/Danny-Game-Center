@@ -717,6 +717,125 @@ function avoidObstacles(s, x, y, vx, vy, er) {
 
 export const RAID_FIRST_S = 240;
 
+// ---------- 초심자 가이드(발전 조언) ----------
+// 건축·강화·제작·훈련·전진기지 공사를 GUIDE_IDLE_S(3분) 동안 하나도 시작하지 않으면, 아래 '표준 테크'와 비교해
+// 가장 시급한 과제 2개를 'guide' 이벤트로 알린다(화면은 말풍선). 알린 뒤에는 다시 3분을 센다.
+// 표준 테크: 초반은 무기·건축 위주로 짠 목표 순서. by는 그때까지(게임 분) 끝내면 표준 속도라는 뜻이고, 순서가 곧 우선순위다.
+//   k = bld 건물 lv · hq 본부 lv · craft 무기 제작 · wup 무기 강화(lv 2 = +1) · outpost 전진기지 n곳 · train 동료 최고 레벨 lv
+export const GUIDE_IDLE_S = 180;
+export const TECH_STANDARD = [
+  { k: 'bld', key: 'workbench', lv: 1, by: 2, why: '무기를 만들려면 먼저 필요해요' },
+  { k: 'craft', key: 'pipe', by: 3, why: '맨주먹보다 훨씬 세요. 첫 무기로 딱이에요' },
+  { k: 'bld', key: 'sawmill', lv: 1, by: 3, why: '목재가 저절로 쌓여요' },
+  { k: 'bld', key: 'scrapyard', lv: 1, by: 4, why: '고철이 저절로 쌓여요. 무기와 건물의 주재료예요' },
+  { k: 'bld', key: 'barricade', lv: 1, by: 4, why: '첫 습격(4분)을 막는 방벽이 튼튼해져요' },
+  { k: 'bld', key: 'watchtower', lv: 1, by: 5, why: '방어 동료를 한 명 더 세우고 방어 피해가 올라요' },
+  { k: 'craft', key: 'pistol', by: 6, why: '먼 좀비를 총으로 잡아요. 총기 스위치를 켜 주세요' },
+  { k: 'bld', key: 'repair', lv: 1, by: 6, why: '근접 무기는 닳아요. 본부에서 고칠 수 있어요' },
+  { k: 'hq', lv: 2, by: 7, why: '재활용 작업장·총알 제작소·배낭 공방과 전진기지가 열려요' },
+  { k: 'bld', key: 'dorm', lv: 1, by: 8, why: '구출한 동료를 더 데려올 수 있어요' },
+  { k: 'bld', key: 'recycler', lv: 1, by: 8, why: '플라스틱이 저절로 쌓여요. 총과 장비에 필요해요' },
+  { k: 'bld', key: 'ammo', lv: 1, by: 9, why: '고철·플라스틱으로 탄약을 만들어요' },
+  { k: 'wup', key: 'pipe', lv: 2, by: 9, why: '무기 강화는 공격력과 내구도가 +10%씩 올라요' },
+  { k: 'bld', key: 'workbench', lv: 2, by: 10, why: '2등급 무기(못 박은 방망이·산탄총)를 만들 수 있어요' },
+  { k: 'craft', key: 'bat', by: 11, why: '한 방이 강한 2등급 근접 무기예요' },
+  { k: 'craft', key: 'shotgun', by: 12, why: '2등급 총이에요. 가까운 좀비에게 특히 세요' },
+  { k: 'outpost', n: 1, by: 13, why: '자원이 늘고 먼 곳에도 안전지대가 생겨요' },
+  { k: 'hq', lv: 3, by: 14, why: '의무실이 열리고 탐험 동행이 가능해져요' },
+  { k: 'bld', key: 'clinic', lv: 1, by: 15, why: '최대 체력 +25, 오래 버텨요' },
+  { k: 'train', lv: 2, by: 15, why: '동료가 강해져 방어와 생산이 좋아져요' },
+  { k: 'bld', key: 'pack', lv: 1, by: 16, why: '가방이 25% 커져 한 번에 더 많이 날라요' },
+  { k: 'bld', key: 'workbench', lv: 3, by: 18, why: '3등급 무기(마체테·사냥 소총)를 만들 수 있어요' },
+  { k: 'craft', key: 'machete', by: 20, why: '빠르게 베는 3등급 근접 무기예요' },
+  { k: 'craft', key: 'rifle', by: 22, why: '치명타가 잘 터지는 3등급 총이에요' },
+  { k: 'hq', lv: 4, by: 24, why: '건물 한도가 늘고 전진기지를 하나 더 세울 수 있어요' },
+  { k: 'outpost', n: 2, by: 26, why: '생산이 두 배로 늘어요' },
+  { k: 'wup', key: 'machete', lv: 3, by: 28, why: '주력 무기를 강화해 더 깊은 구역으로 나가요' },
+  { k: 'hq', lv: 5, by: 32, why: '탐험 동행 2명, 건물 5레벨까지 열려요' },
+  { k: 'train', lv: 5, by: 36, why: '주력 동료를 키워 습격을 안정적으로 막아요' },
+  { k: 'hq', lv: 6, by: 42, why: '전진기지 3곳, 건물 6레벨까지 열려요' },
+];
+
+// 표준 테크 한 항목을 지금 누를 수 있는 구체적 행동으로 풀어낸다. 선행 조건이 모자라면 그 선행 행동을 돌려준다(끝났으면 null).
+function techAction(s, t, depth = 0) {
+  if (depth > 4) return null;
+  const act = (o) => ({ ...o, why: t.why, by: t.by });
+  switch (t.k) {
+    case 'hq': {
+      if (s.hq >= t.lv || s.hq >= HQ_MAX) return null;
+      return act({ kind: 'hq', lane: 'base', tab: 'base', title: `본부 ${s.hq + 1}레벨`, cost: hqCost(s.hq + 1) });
+    }
+    case 'bld': {
+      const b = BUILDINGS[t.key], next = s.bld[t.key] + 1;
+      if (next > t.lv) return null;
+      const needHq = Math.max(b.unlockHq, next);
+      if (next > (b.max ?? HQ_MAX)) return null;
+      if (s.hq < needHq) return techAction(s, { ...t, k: 'hq', lv: needHq }, depth + 1);
+      return act({ kind: 'bld', lane: 'base', tab: 'base', title: `${b.name} ${next}레벨 ${next === 1 ? '짓기' : '올리기'}`, cost: buildCost(t.key, next) });
+    }
+    case 'craft': {
+      if (s.weapons[t.key]) return null;
+      const w = WEAPONS[t.key];
+      if (s.bld.workbench < w.tier) return techAction(s, { ...t, k: 'bld', key: 'workbench', lv: w.tier }, depth + 1);
+      return act({ kind: 'craft', lane: 'forge', tab: 'arms', title: `${w.name} 제작`, cost: w.cost });
+    }
+    case 'wup': {
+      if (!s.weapons[t.key]) return techAction(s, { ...t, k: 'craft' }, depth + 1);
+      const lv = s.weapons[t.key];
+      if (lv >= t.lv || lv >= WEAPON_MAX_LV) return null;
+      return act({ kind: 'wup', lane: 'forge', tab: 'arms', title: `${WEAPONS[t.key].name} +${lv} 강화`, cost: weaponUpgradeCost(s, t.key) });
+    }
+    case 'outpost': {
+      if (s.outposts.length >= t.n) return null;
+      if (outpostLimit(s) < t.n) return techAction(s, { ...t, k: 'hq', lv: Math.min(HQ_MAX, 2 * t.n) }, depth + 1);
+      const free = s.sites.map((o, i) => i).filter((i) => !s.outposts.some((o) => o.site === i));
+      if (!free.length) return null;
+      const cost = (i) => Object.values(outpostCost(s, i)).reduce((a, v) => a + v, 0);
+      const best = free.sort((a, b) => cost(a) - cost(b))[0];
+      return act({ kind: 'obuild', lane: 'outpost', tab: 'outposts', title: '전진기지 세우기', cost: outpostCost(s, best), note: `${s.sites[best].name}처럼 가까운 후보지에 직접 가서 지어요` });
+    }
+    case 'train': {
+      if (s.survivors.some((v) => v.lv >= t.lv)) return null;
+      if (!s.survivors.length) return act({ kind: 'rescue', lane: null, tab: 'crew', title: '조난자 구출', cost: {}, note: '화면에 뜨는 조난 신호를 따라가 동료를 구해요' });
+      const v = s.survivors.slice().sort((a, b) => b.lv - a.lv || survivorPower(b) - survivorPower(a))[0];
+      return act({ kind: 'lvl', lane: 'train', tab: 'crew', title: `${v.name} ${v.lv + 1}레벨 훈련`, cost: levelUpCost(v) });
+    }
+    default: return null;
+  }
+}
+
+// 지금 가장 시급한 발전 과제(최대 n개): 표준 테크 순서대로, 이미 끝났거나 해당 줄이 이미 작업 중인 것은 건너뛴다.
+// 표준 테크 비교: 표준대로면 지금까지 끝냈어야 할 항목(by ≤ 지금 분) 중 실제로 끝낸 수.
+export function devAdvice(s, n = 2) {
+  const min = s.time / 60, cands = [], seen = new Set();
+  const lackOf = (cost) => Object.fromEntries(Object.entries(cost).filter(([r, v]) => s.res[r] < v).map(([r, v]) => [r, Math.ceil(v - s.res[r])]));
+  for (const t of TECH_STANDARD) {
+    const a = techAction(s, t);
+    if (!a || seen.has(a.title) || (a.lane && laneJob(s, a.lane))) continue;
+    seen.add(a.title);
+    cands.push({ ...a, lack: lackOf(a.cost), late: Math.max(0, Math.floor(min - a.by)) });
+  }
+  // 표준 테크를 다 마친 뒤에는 본부 → 가장 낮은 건물 → 주력 무기 강화 순으로 권한다
+  if (!cands.length) {
+    const fb = [];
+    if (s.hq < HQ_MAX) fb.push(techAction(s, { k: 'hq', lv: s.hq + 1, why: '건물 한도와 전진기지 한도가 함께 늘어요' }));
+    const low = Object.keys(BUILDINGS).filter((id) => s.bld[id] < buildingMax(s, id) && s.hq >= BUILDINGS[id].unlockHq).sort((a, b) => s.bld[a] - s.bld[b])[0];
+    if (low) fb.push(techAction(s, { k: 'bld', key: low, lv: s.bld[low] + 1, why: '가장 낮은 건물부터 고르게 올려요' }));
+    const w = s.equip.melee !== 'fist' ? s.equip.melee : s.equip.gun;
+    if (w && s.weapons[w] < WEAPON_MAX_LV) fb.push(techAction(s, { k: 'wup', key: w, lv: s.weapons[w] + 1, why: '주력 무기를 강화해요' }));
+    for (const a of fb) if (a && !(a.lane && laneJob(s, a.lane))) cands.push({ ...a, lack: lackOf(a.cost), late: 0 });
+  }
+  // 가장 시급한 것 하나 + 이어서 다른 작업 줄(건설·장비·훈련·공사)의 것을 먼저 고른다: 줄마다 한 번에 하나만 돌아서 같은 줄 둘은 동시에 못 한다
+  const out = cands.slice(0, 1);
+  for (const c of cands.slice(1, 4)) if (out.length < n && c.lane && !out.some((o) => o.lane === c.lane)) out.push(c); // 앞쪽 후보 중에서만(표준 순서를 크게 어기지 않게)
+  for (const c of cands.slice(1)) if (out.length < n && !out.includes(c)) out.push(c);
+  return out;
+}
+export function techProgress(s) {
+  const min = s.time / 60, due = TECH_STANDARD.filter((t) => t.by <= min);
+  return { min, due: due.length, done: due.filter((t) => !techAction(s, t)).length, total: TECH_STANDARD.length, finished: TECH_STANDARD.filter((t) => !techAction(s, t)).length };
+}
+
 export function newGame(seed = (Date.now() & 0x7fffffff) || 1) {
   const s = {
     v: VERSION,
@@ -776,6 +895,7 @@ function resetTransient(s) {
   s.autoT = 0;
   s.autoRetreat = false;
   s.waypoint = null;
+  s.idleT = 0; // 마지막 발전 행동(작업 시작) 이후 흐른 시간(저장하지 않는다)
   s.player.reload = 0;
   return s;
 }
@@ -898,6 +1018,7 @@ function startJob(s, kind, key, next, cost) {
   const total = jobDuration(kind, key, next);
   const j = { lane: JOB_KINDS[kind], kind, key, next, t: total, total };
   s.jobs.push(j);
+  s.idleT = 0; // 발전 행동을 했으니 가이드 시계를 다시 센다
   return ok(`${jobName(s, j)} 시작 · ${durText(total)} 걸려요`);
 }
 function finishJob(s, j) {
@@ -1298,6 +1419,13 @@ export function step(s, dt, input = null) {
   makeAmmo(s, dt);
   advanceJobs(s, dt, ev);
   updateRaid(s, dt, ev);
+  // 초심자 가이드: 오래 발전이 없으면 시급한 과제를 알린다(습격 중에는 끝날 때까지 미룬다)
+  s.idleT = (s.idleT ?? 0) + dt;
+  if (s.idleT >= GUIDE_IDLE_S && !s.raid) {
+    s.idleT = 0;
+    const items = devAdvice(s);
+    if (items.length) ev.push({ t: 'guide', items, ...techProgress(s) });
+  }
 
   const P = s.player;
   if (P.stim > 0) P.stim = Math.max(0, P.stim - dt);
