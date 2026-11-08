@@ -1432,7 +1432,7 @@ function shipState(x, y, h, t, heelV, zoom, still = false) {
   const bob = still ? 0 : Math.sin(t * 1.25) * 0.09 * swell + Math.sin(t * 0.73 + 1) * 0.05 * swell;
   const pitch = still ? 0 : Math.sin(t * 1.1 + 0.6) * 0.022 * swell + Math.min(0.03, b.spd * 0.004);
   const heel = heelV + (still ? 0 : Math.sin(t * 0.93) * 0.015 * swell);
-  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: S.crew };
+  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: S.crew, capLook: CAPTAINS[S.captain?.id] || null };
 }
 function render() {
   const b = S.boat, t = S.t;
