@@ -10,9 +10,9 @@ assets:
     spec: "780x1398 세로 WebP, 불투명, 150KB 이하. 가운데 아래(세로 55~95%)는 비교적 비워 둠"
     prompt: "Vertical background illustration in a realistic Japanese animated film style, clean line art, soft cel shading. An outdoor summer coffee bean festival in a riverside park in Korea at late morning: rows of white canvas tents along a paved path, wooden tables with burlap coffee sacks, small drum coffee roasters, glass jars of beans, iced coffee in clear cups, string lights between tents, green trees, bright blue summer sky with big white cumulus clouds, warm sunlight and soft shadows. Only a few small distant people. Keep the lower middle area of the image simple and open (a wide paved path). No text, no signs with letters, no logos, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3 Pro Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "Google AI Studio gemini-3-pro-image(기존 그림과 같은 모델, OpenRouter 잔액 부족으로 직접 호출) · 2026-11-08 · bg-fair를 화풍 참고로 사용(구도는 따르지 않음) · 768x1376 생성 → 780x1398 WebP q82 · 병 라벨은 읽을 수 없는 작은 무늬"
   - id: roaster-smile
     kind: image
     source: generate
@@ -20,9 +20,9 @@ assets:
     spec: "640x857 WebP, 배경 투명, 정면 흉상. 표정: 편안한 미소"
     prompt: "Bust portrait in a realistic Japanese animated film style, clean line art, soft cel shading, front-facing, chest up, transparent background. A Korean man in his mid forties who runs a small coffee roastery: short neat black hair with a little gray at the temples, light stubble, sun-tanned skin, friendly calm eyes, rolled-up sleeves of a light denim work shirt under a brown canvas apron with a small towel tucked in the strap. Gentle relaxed smile. Soft natural light. No text, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3 Pro Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "Google AI Studio gemini-3-pro-image(기존 그림과 같은 모델, OpenRouter 잔액 부족으로 직접 호출) · 2026-11-08 · baker-smile·mom-smile 화풍 참고 · 흰 배경으로 생성 → macOS Vision 전경 분리로 배경 투명 처리 → 640x857 WebP"
   - id: roaster-surprised
     kind: image
     source: generate
@@ -30,9 +30,9 @@ assets:
     spec: "640x857 WebP, 배경 투명. roaster-smile과 같은 사람·옷·각도, 표정만 놀람"
     prompt: "Same character, outfit, angle and framing as roaster-smile (use it as the reference image). Expression: pleasantly surprised and impressed, eyebrows raised, eyes a little wider, small open-mouthed smile. Transparent background. No text, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3 Pro Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "Google AI Studio gemini-3-pro-image(기존 그림과 같은 모델, OpenRouter 잔액 부족으로 직접 호출) · 2026-11-08 · roaster-smile을 참고 이미지로 같은 인물 유지 · 흰 배경으로 생성 → macOS Vision 전경 분리로 배경 투명 처리 → 640x857 WebP"
   - id: dad-smile
     kind: image
     source: generate
@@ -40,9 +40,9 @@ assets:
     spec: "640x857 WebP, 배경 투명, 정면 흉상. 이름은 smile이지만 표정은 무뚝뚝한 무표정(기본 표정 파일)"
     prompt: "Bust portrait in a realistic Japanese animated film style, clean line art, soft cel shading, front-facing, chest up, transparent background. A reserved Korean father in his mid sixties: short gray hair neatly combed, thin-rimmed glasses, slightly weathered face, a plain beige short-sleeved collared summer shirt. Stoic, quiet, almost expressionless face with a very faint softness in the eyes, mouth closed. Soft natural light. Should look like the father of a 35-year-old cafe owner and the husband of assets/mom-smile.webp (similar age and simple everyday clothing). No text, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3 Pro Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "Google AI Studio gemini-3-pro-image(기존 그림과 같은 모델, OpenRouter 잔액 부족으로 직접 호출) · 2026-11-08 · mom-smile·baker-smile 화풍 참고 · 흰 배경으로 생성 → macOS Vision 전경 분리로 배경 투명 처리 → 640x857 WebP"
   - id: influencer-smile
     kind: image
     source: generate
@@ -50,9 +50,9 @@ assets:
     spec: "640x857 WebP, 배경 투명, 정면 흉상. 표정: 밝은 미소"
     prompt: "Bust portrait in a realistic Japanese animated film style, clean line art, soft cel shading, front-facing, chest up, transparent background. A cheerful Korean woman in her mid twenties who makes short videos about neighborhood cafes: shoulder-length light brown hair with a small clip, bright friendly eyes, a white summer T-shirt under a light green open shirt, a small camera on a neck strap. Bright open smile. Soft natural light. No text, no logo, no brand marks on the camera, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3 Pro Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "Google AI Studio gemini-3-pro-image(기존 그림과 같은 모델, OpenRouter 잔액 부족으로 직접 호출) · 2026-11-08 · mom-smile·baker-smile 화풍 참고 · 카메라 상표 없음 확인 · 흰 배경으로 생성 → macOS Vision 전경 분리로 배경 투명 처리 → 640x857 WebP"
   - id: influencer-surprised
     kind: image
     source: generate
@@ -60,6 +60,6 @@ assets:
     spec: "640x857 WebP, 배경 투명. influencer-smile과 같은 사람·옷·각도, 표정만 놀람"
     prompt: "Same character, outfit, angle and framing as influencer-smile (use it as the reference image). Expression: delighted surprise, eyes wide, mouth open in an excited 'wow', one hand slightly raised near the cheek. Transparent background. No text, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3 Pro Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "Google AI Studio gemini-3-pro-image(기존 그림과 같은 모델, OpenRouter 잔액 부족으로 직접 호출) · 2026-11-08 · influencer-smile을 참고 이미지로 같은 인물 유지 · 흰 배경으로 생성 → macOS Vision 전경 분리로 배경 투명 처리 → 640x857 WebP"
