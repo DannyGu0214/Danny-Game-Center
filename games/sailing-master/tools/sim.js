@@ -1,11 +1,11 @@
-// 밸런스 봇: 사람이 할 만한 순서로 건지고, 입항하고, 배를 키워 강 끝까지 간다. node tools/sim.js [시드] [최대 분] [v]
+// 밸런스 봇: 사람이 할 만한 순서로 건지고, 입항하고, 배를 키워 강 끝까지 간다. node tools/sim.js [시드] [최대 분] [v] [nocrew]
 // 표류물과 발견지 자리는 아는 채로 움직여서, 실제 사람보다 조금 빠르다.
 import * as G from '../logic.js';
 import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
 import { HULLS, MODULES, ROLES, ITEMS, MAT_IDS, TRADE_IDS, WORKSHOP } from '../data.js';
 
-const seed = Number(process.argv[2]) || 1, maxMin = Number(process.argv[3]) || 240, verbose = process.argv[4] === 'v';
+const seed = Number(process.argv[2]) || 1, maxMin = Number(process.argv[3]) || 240, verbose = process.argv[4] === 'v', noCrew = process.argv.includes('nocrew'); // nocrew: 선원 없이(배치 효과 비교용)
 const S = G.newGame(seed), log = {}, income = {};
 const mark = (k) => { if (!(k in log)) { log[k] = +(S.t / 60).toFixed(1); if (verbose) console.log(log[k], '분', k, JSON.stringify(S.res)); } };
 
@@ -48,9 +48,14 @@ function shop() {
   const ready = g && (g.kind !== 'sloop' || g.star > 1 || (S.blueprints.mast_m && Object.entries(need).every(([k, v]) => (S.res[k] || 0) >= v)));
   if (ready && G.buildHull(S, g.id).ok) mark(g.star > 1 ? `${g.name} ★${g.star}` : g.name);
   const H2 = HULLS[S.ship.hull]; // 방금 지었으면 새 배 기준으로
-  const list = H2.kind === 'raft' ? [] : H2.kind === 'rowboat' ? ['mast_s', 'telescope', 'hold', 'food', 'hammock', 'awning'] : ['mast_m', 'telescope', 'hold', 'food', 'hammock', 'awning', 'ballast'];
+  const list = H2.kind === 'raft' ? [] : H2.kind === 'rowboat' ? ['mast_s', 'telescope', 'hold', 'food', 'hammock', 'awning'] : ['mast_m', 'telescope', 'hold', 'food', 'hammock', 'awning', 'ballast', 'net'];
   for (const id of list) tryPlace(id);
-  if (S.crew.length < G.stats(S).crewCap) for (const c of G.candidatesAt(S)) if (!G.hasRole(S, c.role) && S.res.coin > c.hireCost * 2 && G.hire(S, c.id).ok) { mark(`고용 ${c.role}`); break; }
+  // 비어 있는 일자리에 맞는 사람부터 뽑는다(자리 없는 역할은 안 뽑음)
+  if (!noCrew && S.crew.length < G.stats(S).crewCap) {
+    const free = new Set(G.seatsOf(S).filter((q) => q.type !== 'rest' && q.type !== 'helm' && !S.crew.some((c) => c.seat === q.key)).map((q) => q.type));
+    if (!G.workerAt(S, 'helm')) free.add('helm');
+    for (const c of G.candidatesAt(S)) if (free.has(ROLES[c.role].seat) && !G.hasRole(S, c.role) && S.res.coin > c.hireCost * 2 && G.hire(S, c.id).ok) { mark(`고용 ${c.role}`); break; }
+  }
   const need2 = Math.min(G.stats(S).foodCap - S.food, S.res.coin - 5);
   if (need2 > 0) G.buyFood(S, Math.floor(need2), 'bread');
   if ((S.herb || 0) < 1 && S.res.coin > 60) G.buyHerb(S, 1);

@@ -5,7 +5,7 @@ import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
 import { advanceFlow, waveAngle, FLOW_LAYERS } from '../art.js';
 import { createCreatures, hitRadius } from '../creatures.js';
-import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS, ROLES, CAPTAINS, STORIES, MAT_IDS, ITEMS, SUPPLY, HERB, WORKSHOP } from '../data.js';
+import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS, ROLES, CAPTAINS, STORIES, MAT_IDS, ITEMS, SUPPLY, HERB, WORKSHOP, TRAITS, CREW_GROW } from '../data.js';
 // 모든 재료와 금화를 n개씩(S2 아이템부터 배 값에 여러 재료가 들어가요)
 const rich = (n) => Object.fromEntries([...MAT_IDS, 'coin'].map((k) => [k, n]));
 import { isJourney } from '../art-story.js';
@@ -303,7 +303,10 @@ test('선원 후보: 항구마다 1~3명, 능력치는 ±25%, 이름·성별이 
           const R = ROLES[c.role];
           assert.ok(['남', '여'].includes(c.gender) && c.name);
           for (const v of [c.skill, c.humor, c.drink]) assert.ok(v >= 75 && v <= 125, `능력치 ${v}`);
-          assert.ok(c.hireCost >= Math.floor(R.hire * 0.75) && c.hireCost <= Math.ceil(R.hire * 1.25), `고용비 ${c.hireCost}`);
+          // 숙련이 높을수록 고용비가 40%씩 비싸요(S3)
+          const lvK = 1 + 0.4 * (c.lv - 1);
+          assert.ok(c.lv >= 1 && c.lv <= 3 && c.trait, `숙련 ${c.lv}`);
+          assert.ok(c.hireCost >= Math.floor(R.hire * 0.75 * lvK) && c.hireCost <= Math.ceil(R.hire * 1.25 * lvK) + 1, `고용비 ${c.hireCost}`);
           assert.ok(REGIONS[R.region].order <= REGIONS[r].order, `${r}에 ${c.role}`);
         }
       }
@@ -325,7 +328,7 @@ test('선원 후보: 항구마다 1~3명, 능력치는 ±25%, 이름·성별이 
   assert.equal(S.res.coin, coin - b[0].hireCost, '고용비를 그 사람 값대로 내요');
   assert.equal(G.hire(S, 999999).ok, false, '없는 사람은 못 뽑아요');
   S.cands[S.docked].list = [{ ...b[0], id: 777 }];
-  assert.equal(G.hire(S, 777).ok, false, '같은 역할은 한 명만');
+  assert.ok(G.hire(S, 777).ok, '같은 역할도 둘째를 뽑아 교대할 수 있어요(S3)');
   S.cands[S.docked].list = [];
   assert.ok(G.candidatesAt(S).length >= 1);
   // 항해술은 속도에 더해지고 유머·주량은 효과가 없다
@@ -835,7 +838,7 @@ test('저장 v1 → v3: 예전 배는 ★1, 슬루프로 있던 판도 그대로
   const old = JSON.parse(G.serialize(sloopAt('lake')));
   old.v = 1; delete old.best; old.found = { mill2: 1 };
   const T = G.deserialize(JSON.stringify(old));
-  assert.equal(T.v, 3);
+  assert.equal(T.v, 4);
   assert.equal(T.ship.hull, 'sloop');
   assert.equal(HULLS[T.ship.hull].star, 1);
   assert.equal(T.best.hull, 'sloop');
@@ -1022,7 +1025,7 @@ test('저장 v2 → v3: 화물칸 금화는 창고로, 식량은 빵으로, 찾�
   o.v = 2; o.hold = { wood: 3, cloth: 0, coin: 7 }; o.res = { wood: 1, cloth: 2, coin: 5 }; o.food = 4; delete o.pantry; delete o.relics; delete o.letters; delete o.herb;
   o.found = { logpile: 1 }; o.flot = { pond: [{ x: 0, y: 0, k: 'coin', n: 3, ph: 0 }] };
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 3); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
+  assert.equal(T.v, 4); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
   assert.equal(T.pantry[0].k, 'bread'); assert.equal(T.pantry[0].n, 4);
   assert.ok(T.relics.logpile); assert.equal(T.flot.pond[0].k, 'shiny');
 });
@@ -1034,4 +1037,85 @@ test('교착 방지: 금화가 없으면 잡목으로 고치고, 둘 다 없으�
   const T = G.newGame(1); G.undock(T); T.hull = 0.2; T.res = { coin: 0, wood: 0 };
   const ev = G.dock(T, 'reed') && drain(T).find((e) => e.type === 'docked');
   assert.equal(T.hull, 0.5); assert.ok(ev.patched);
+});
+
+// ── S3 선원 ──
+const mate = (role, extra = {}) => ({ id: Math.floor(Math.random() * 1e6), role, name: role, gender: '남', wage: 2, baseWage: 2, lv: 1, xp: 0, fatigue: 0, morale: 0.7, trait: 'diligent', ...extra });
+test('S3 자리: 모듈마다 자리가 생기고, 맞는 자리에 알아서 앉는다. 자리가 없으면 쉼 자리로 가서 일을 못 한다', () => {
+  const S = sloopAt('river', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }, { id: 'hammock', col: 2, row: 5, rot: 0 }, { id: 'net', col: 0, row: 3, rot: 0 }]);
+  const types = G.seatsOf(S).map((q) => q.type).sort();
+  assert.deepEqual(types, ['fish', 'helm', 'oar', 'rest', 'rest', 'sail']);
+  S.crew = [mate('fisher'), mate('lookout')];
+  assert.equal(G.seatType(S, S.crew[0]) ?? G.workerAt(S, 'fish')?.role, 'fish');
+  assert.equal(G.workerAt(S, 'fish').role, 'fisher');
+  assert.equal(G.seatType(S, S.crew[1]), 'rest', '망원경이 없으니 견시는 쉼 자리');
+  assert.equal(G.lookK(S), 0);
+  // 자리 바꾸기: 둘이 서로 바뀐다
+  const fishSeat = S.crew[0].seat, restSeat = S.crew[1].seat;
+  assert.ok(G.setSeat(S, S.crew[1].id, fishSeat));
+  assert.equal(S.crew[1].seat, fishSeat); assert.equal(S.crew[0].seat, restSeat);
+  assert.ok(G.crewEff(S, S.crew[1]) < G.crewEff(S, S.crew[0], 'fish'), '안 맞는 자리는 효과 절반');
+});
+test('S3 노잡이: 노 자리에 앉아 있으면 선장은 키에 남고 체력 대신 노잡이가 지친다', () => {
+  const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }]); S.crew = [mate('rower', { trait: 'singer' })];
+  G.setRow(S, true);
+  assert.ok(S.boat.row); assert.equal(S.cap.to, null); assert.equal(S.cap.at, 'helm');
+  run(S, 20);
+  assert.equal(S.boat.stamina, 1);
+  assert.ok(S.crew[0].fatigue > 0, '노잡이 피로');
+  const T = sloopAt('lake', 1); G.setRow(T, true); run(T, 20);
+  assert.ok(T.boat.stamina < 1, '선장이 저으면 선장 체력');
+});
+test('S3 숙련·피로: 맞는 자리에서 일하면 숙련이 오르고 보수도 오르며, 쉼 자리에서 피로가 풀린다', () => {
+  const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }]); S.crew = [mate('deckhand')];
+  S.crew[0].xp = CREW_GROW.lvDays * CAL.day - 1;
+  run(S, 2);
+  assert.equal(S.crew[0].lv, 2); assert.ok(drain(S).some((e) => e.type === 'crewLevel'));
+  assert.equal(S.crew[0].wage, G.wageOf(S.crew[0])); assert.ok(S.crew[0].wage >= 2);
+  const f = S.crew[0].fatigue; assert.ok(f > 0);
+  G.setSeat(S, S.crew[0].id, G.seatsOf(S).find((q) => q.type === 'rest').key);
+  run(S, 10);
+  assert.ok(S.crew[0].fatigue < f, '쉼 자리에서 풀림');
+  assert.equal(TRAITS.diligent.name, '부지런함');
+});
+test('S3 사기: 굶으면 사기가 떨어지고, 바닥나면 입항할 때 떠난다', () => {
+  const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }]); S.crew = [mate('deckhand')];
+  S.food = 0; S.pantry = [];
+  for (let i = 0; i < 30 * 30; i++) { G.step(S, G.FIXED_DT); S.food = 0; S.vigor = 1; }
+  assert.ok(S.crew[0].morale < 0.7);
+  S.crew[0].morale = 0.1; S.res.coin = 99;
+  G.dock(S, worldOf('lake').ports[0].id);
+  assert.equal(S.crew.length, 0); assert.ok(drain(S).some((e) => e.type === 'crewLeft' && e.why === 'morale'));
+});
+test('S3 편성: 항해·폭풍 배치를 저장해 단추로 바꾸고, 규칙을 켜면 돌풍 때 폭풍 편성으로 갔다가 돌아온다', () => {
+  const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }, { id: 'hammock', col: 2, row: 5, rot: 0 }]);
+  S.crew = [mate('deckhand'), mate('rower')];
+  const [a, b] = S.crew, seats = G.seatsOf(S), rest = seats.filter((q) => q.type === 'rest').map((q) => q.key);
+  G.workerAt(S, 'sail');
+  assert.ok(G.savePlan(S, 'sail'));
+  G.setSeat(S, a.id, rest[0]); G.setSeat(S, b.id, rest[1]);
+  assert.ok(G.savePlan(S, 'storm'));
+  assert.ok(G.applyPlan(S, 'sail')); assert.equal(G.seatType(S, a), 'sail');
+  assert.ok(G.applyPlan(S, 'storm')); assert.equal(G.seatType(S, a), 'rest');
+  G.applyPlan(S, 'sail'); G.setRule(S, 'storm', true);
+  S.weather = { gustOn: false }; S.wind = G.windAt(S);
+  // 돌풍이 올 때까지 돌린다
+  let switched = false;
+  for (let i = 0; i < 30 * 60 * 20 && !switched; i++) { G.step(S, G.FIXED_DT); S.food = 50; S.vigor = 1; S.hull = 1; if (S.events.some((e) => e.type === 'plan' && e.name === 'storm')) switched = true; S.events.length = 0; }
+  assert.ok(switched, '돌풍 때 폭풍 편성'); assert.equal(S.plan, 'storm');
+});
+test('S3 목수: 수리대에 앉으면 선체 50% 아래에서 화물칸 잡목으로 고친다', () => {
+  const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }, { id: 'bench', col: 0, row: 3, rot: 0 }]);
+  S.crew = [mate('carpenter')]; S.hull = 0.3; S.hold.wood = 20;
+  run(S, 30);
+  assert.ok(S.hull > 0.3); assert.ok(S.hold.wood < 20);
+  const T = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }, { id: 'bench', col: 0, row: 3, rot: 0 }]); T.crew = [mate('carpenter')]; T.hull = 0.3;
+  run(T, 2); assert.ok(drain(T).some((e) => e.type === 'carpNoWood'), '잡목이 없으면 알린다');
+});
+test('저장 v3 → v4: 예전 선원은 숙련 1·지금 보수를 기본 보수로, 자리는 알아서 앉는다', () => {
+  const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }]); const o = JSON.parse(G.serialize(S));
+  o.v = 3; o.crew = [{ id: 5, role: 'deckhand', name: '빌럼', gender: '남', wage: 2, skill: 100, humor: 100, drink: 100 }]; delete o.rules;
+  const T = G.deserialize(JSON.stringify(o));
+  assert.equal(T.v, 4); assert.equal(T.crew[0].lv, 1); assert.equal(T.crew[0].baseWage, 2); assert.ok(T.crew[0].trait); assert.ok(T.rules.reef);
+  assert.equal(G.workerAt(T, 'sail')?.name, '빌럼');
 });

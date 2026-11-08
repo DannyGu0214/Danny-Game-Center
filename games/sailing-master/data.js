@@ -110,18 +110,41 @@ export const MODULES = {
   water: { name: '물통', icon: '🛢', fam: 'supply', mk: 1, w: 1, h: 1, kg: 4, z: 0.5, color: '#4a7f95', cost: {}, desc: '식수 4통. 앞바다부터(PLAN-M2.md)', need: { grade: 3, region: 'coast' }, future: true },
   lounge: { name: '휴게실', icon: '🛋', fam: 'rest', mk: 3, seat: 'rest', w: 2, h: 2, kg: 6, z: 0.8, color: '#e8dcc2', cost: {}, desc: '쉬면 사기가 오른다. 스쿠너부터', need: { grade: 4 }, future: true },
   galley: { name: '조리실', icon: '🍲', fam: 'work', mk: 1, seat: 'cook', w: 1, h: 1, kg: 3, z: 0.7, color: '#b56a4a', cost: {}, desc: '같은 식량으로 기력이 더 돈다', need: { grade: 4 }, future: true },
-  bench: { name: '수리대', icon: '🔨', fam: 'work', mk: 1, seat: 'carpenter', w: 1, h: 1, kg: 3, z: 0.5, color: '#8a6a44', cost: {}, desc: '실은 목재·천으로 항해 중에 고친다', need: { grade: 4 }, future: true },
+  bench: { name: '수리대', icon: '🔨', fam: 'work', mk: 1, seat: 'carpenter', w: 1, h: 1, kg: 3, z: 0.5, color: '#8a6a44', cost: { oak: 8, nail: 4, wood: 6 }, desc: '목수가 앉으면 화물칸 잡목으로 항해 중에 고친다', need: { grade: 3 } },
   sickbay: { name: '의무실', icon: '⚕', fam: 'work', mk: 1, seat: 'medic', w: 1, h: 1, kg: 2, z: 0.6, color: '#e8e4dc', cost: {}, desc: '무더위·추위에 쓰러지지 않게', need: { grade: 4 }, future: true },
   crowsnest: { name: '망루', icon: '🗼', fam: 'watch', mk: 2, seat: 'look', w: 1, h: 1, kg: 3, z: 1.2, color: '#a88a4a', cost: {}, desc: '망원경 다음. 더 멀리, 안개 속까지', need: { grade: 4 }, future: true },
   station: { name: '측후소', icon: '📡', fam: 'watch', mk: 2, seat: 'weather', w: 1, h: 1, kg: 2, z: 1, color: '#b9b4a0', cost: {}, desc: '기압계 다음. 예보 +4일', need: { grade: 4 }, future: true },
   bulkhead: { name: '방수 격벽', icon: '🧱', fam: 'watch', mk: 1, w: 1, h: 1, kg: 4, z: 0.3, color: '#6f7478', cost: {}, desc: '너울에 덜 상한다. 앞바다부터', need: { grade: 3, region: 'coast' }, future: true },
   lifeboat: { name: '구명정', icon: '🛟', fam: 'watch', mk: 1, w: 1, h: 2, kg: 4, z: 0.6, color: '#d8634f', cost: {}, desc: '침몰해도 짐 절반을 건진다', need: { grade: 4 }, future: true },
 };
+// 선원 역할(S3, 2026-11-08). seat: 앉는 자리 종류(모듈의 seat). grade: 이 등급 배부터 후보로 와요. future: 뒤 공간 역할(표에만)
 export const ROLES = {
-  deckhand: { name: '갑판원', icon: '🪢', desc: '돛은 내게 맡겨! 선장이 돛대까지 안 뛰어도 되고, 돌풍이면 알아서 줄이지', brief: '돛은 내게 맡겨! 돌풍이면 알아서 줄이지', hire: 15, wage: 2, region: 'pond', z: 1 },
-  lookout: { name: '견시', icon: '🔭', desc: '건질 건 더 멀리서 줍고, 해도도 더 넓게 밝히지', brief: '멀리서도 줍고 해도도 넓게 밝히지!', hire: 15, wage: 2, region: 'pond', z: 1 },
-  helmsman: { name: '조타수', icon: '☸️', desc: '선장이 키를 떠나도 항로는 지키지. 돛·노를 오가도 배가 안 헤맨다고', brief: '선장이 자리를 떠도 항로는 지키지!', hire: 25, wage: 3, region: 'river', z: 1 },
+  rower: { name: '노잡이', icon: '🚣', seat: 'oar', desc: '노는 내가 젓지! 선장은 키만 잡으라고', brief: '노는 내가 젓지! 선장은 키만 잡아', hire: 12, wage: 1, region: 'pond', grade: 2, z: 1 },
+  deckhand: { name: '갑판원', icon: '🪢', seat: 'sail', desc: '돛은 내게 맡겨! 선장이 돛대까지 안 뛰어도 되고, 돌풍이면 알아서 줄이지', brief: '돛은 내게 맡겨! 돌풍이면 알아서 줄이지', hire: 15, wage: 1, region: 'pond', grade: 2, z: 1 },
+  lookout: { name: '견시', icon: '🔭', seat: 'look', desc: '망원경 자리에서 건질 건 더 멀리서 줍고, 해도도 더 넓게 밝히지', brief: '망원경만 있으면 멀리서도 줍지!', hire: 15, wage: 1, region: 'pond', grade: 2, z: 1 },
+  helmsman: { name: '조타수', icon: '☸️', seat: 'helm', desc: '선장이 키를 떠나도 항로는 지키지. 돛·노를 오가도 배가 안 헤맨다고', brief: '선장이 자리를 떠도 항로는 지키지!', hire: 20, wage: 2, region: 'river', grade: 3, z: 1 },
+  fisher: { name: '어부', icon: '🎣', seat: 'fish', desc: '어망 자리에서 물고기를 두 배로 낚지', brief: '어망만 주면 저녁은 걱정 마!', hire: 15, wage: 1, region: 'river', grade: 3, z: 1 },
+  carpenter: { name: '목수', icon: '🔨', seat: 'carpenter', desc: '수리대 자리에서 화물칸 잡목으로 항해 중에 배를 고치지', brief: '잡목만 실어 주면 바다 위에서 고친다!', hire: 20, wage: 2, region: 'river', grade: 3, z: 1 },
+  cook: { name: '요리사', icon: '🍲', seat: 'cook', desc: '식량 효율과 사기', hire: 20, wage: 3, region: 'river', grade: 4, future: true },
+  engineer: { name: '기관사', icon: '⚙️', seat: 'engine', desc: '기관·배터리 효율', hire: 30, wage: 4, region: 'river', grade: 4, future: true },
+  bosun: { name: '갑판장', icon: '📯', seat: 'sail', desc: '갑판원 효과 증가, 돌풍 대응이 빨라져', hire: 30, wage: 4, region: 'river', grade: 4, future: true },
+  medic: { name: '의무원', icon: '⚕', seat: 'medic', desc: '탈진·질병 회복', hire: 30, wage: 4, region: 'river', grade: 4, future: true },
+  weather: { name: '기상사', icon: '📡', seat: 'weather', desc: '예보 기간·정확도', hire: 35, wage: 4, region: 'river', grade: 5, future: true },
+  mate: { name: '일등 항해사', icon: '🧭', seat: 'bridge', desc: '선장 대리, 다른 선원 지휘', hire: 50, wage: 6, region: 'river', grade: 5, future: true },
 };
+// 자리 이름(선원 탭 평면도). helm은 모든 배의 고물에 있고, rest는 해먹·선실이에요
+export const SEATS = { helm: '조타', oar: '노', sail: '돛', look: '견시', fish: '어망', carpenter: '수리대', rest: '쉼', weather: '기상' };
+// 특성: 사람마다 하나
+export const TRAITS = {
+  diligent: { name: '부지런함', desc: '피로가 30% 덜 쌓여' },
+  seasick: { name: '뱃멀미', desc: '돌풍이 불면 피로가 두 배' },
+  singer: { name: '노래꾼', desc: '다른 선원 사기가 덜 떨어져' },
+  sharp: { name: '눈썰미', desc: '견시 자리에서 보는 거리 +30%' },
+  strong: { name: '장사', desc: '노잡이·목수 일이 20% 빨라' },
+};
+// 숙련: 1~5. 효과 = 기본 × (0.7 + 0.15 × 숙련), 맞지 않는 자리는 50%. 숙련 n→n+1에 필요한 근무 = n × lvDays 일
+// 피로: 일하면 tireDays 일에 꽉 차고 쉼 자리에서 restDays 일이면 풀려요. 사기 0.2 아래로 입항하면 떠나요
+export const CREW_GROW = { lvDays: 1.2, maxLv: 5, tireDays: 1.5, restDays: 0.4, idleDays: 1.2, wageStep: 0.25, leaveMorale: 0.2 };
 export const CREW_NAMES = { 남: ['라파엘', '니콜라스', '루이스', '파블로', '세바스티안', '올리버', '토마스 2세', '후안 3세', '얀', '페드로', '알론소 2세', '빌럼'], 여: ['마리아', '클라라', '이네스', '줄리에타', '페르난다', '브리타', '로사', '비앙카', '솔레다드', '아나벨 2세', '마르타', '엘로이사'] };
 // 선원 후보: 항구마다 1~3명. 능력치는 기준값의 ±25% 안에서 정해지고, 며칠 지나면 후보가 바뀐다
 export const CREW = { spread: 0.25, baseStat: 100, refreshDays: 3, minCands: 1, maxCands: 3, speedPerSkill: 0.1, rumDrink: 115 }; // rumDrink: 이 주량부터 보수를 럼주 값으로 받겠다고 한다

@@ -438,10 +438,10 @@ export function drawShipOnWater(g, sprite, st, zoom, sx, sy) {
   g.beginPath(); g.moveTo(mir[0][0], mir[0][1]); g.lineTo(mir[1][0], mir[1][1]); g.lineTo(mir[2][0], mir[2][1]); g.closePath(); g.fill();
 }
 
-const COATS = { deckhand: '#8a3f3a', lookout: '#3f7a4f', helmsman: '#7a5a2a' };
+const COATS = { deckhand: '#8a3f3a', lookout: '#3f7a4f', helmsman: '#7a5a2a', rower: '#6a4a3a', fisher: '#3f6a7a', carpenter: '#7a6a3a' };
 const CAP_LOOK = { coat: '#25506f', hair: '#3a2a1c', style: 'short' };
 // 선원 모습: 역할마다 옷과 모자(갑판원 두건, 망보기 털모자, 키잡이 납작모자), 머리색은 사람마다
-const CREW_HAIR = ['#2a1c12', '#3a2a1c', '#5a3a22', '#1f1a18', '#6d4a2a'], CREW_HAT = { deckhand: 'bandana', lookout: 'knit', helmsman: 'flat' }, BANDS = ['#c8452f', '#2f6f8f', '#e7b64a'];
+const CREW_HAIR = ['#2a1c12', '#3a2a1c', '#5a3a22', '#1f1a18', '#6d4a2a'], CREW_HAT = { deckhand: 'bandana', lookout: 'knit', helmsman: 'flat', rower: 'bandana', fisher: 'knit', carpenter: 'flat' }, BANDS = ['#c8452f', '#2f6f8f', '#e7b64a'];
 const crewLookOf = (c) => ({ coat: COATS[c.role] || '#555', hair: CREW_HAIR[(c.id || 0) % CREW_HAIR.length], style: c.gender === '여' ? 'long' : 'short', hat: CREW_HAT[c.role], band: c.role === 'lookout' ? '#3f7a5a' : BANDS[(c.id || 0) % BANDS.length], pants: '#3a3a44' });
 
 // 배 전체: 선체 그림 한 장 + 그 위의 돛대·돛·사람
@@ -500,14 +500,16 @@ export function drawShip(g, sprite, st, zoom, sx, sy) {
   const capX = st.capX ?? hull.helmX;
   const manP = P(capX, 0, floor);
   items.push({ d: manP[2], draw() {
-    drawPerson(g, P, capX, 0, floor, zoom, row ? rowPhase : null, st.capLook || CAP_LOOK, true);
+    drawPerson(g, P, capX, 0, floor, zoom, row && !st.rower ? rowPhase : null, st.capLook || CAP_LOOK, true);
     if (!row && Math.abs(capX - hull.helmX) < 0.6) line(g, P, [-hull.len / 2 + 0.25, 0, deck + 0.08], [hull.helmX + 0.2, -st.rudder * 0.65, deck + 0.14], '#6b4a2e', 1.3 * s);
   } });
   if (row) items.push({ d: manP[2] + 0.01, draw() { drawOars(g, P, sprite, rowPhase, s); } });
-  (st.crew || []).forEach((c) => {
-    const pos = c.role === 'deckhand' ? [(rig ? rig.x : 0) - 0.5, 0.45, deck] : c.role === 'lookout' ? [hull.len / 2 - 1.5, 0, deck] : [hull.helmX, 0.35, floor];
-    const q = P(pos[0], pos[1], pos[2]);
-    items.push({ d: q[2], draw() { drawPerson(g, P, pos[0], pos[1], pos[2], zoom, null, crewLookOf(c), false); } });
+  // 선원: 앉은 자리(S3)로 걸어가 서 있다. 노 자리의 노잡이는 노를 젓는다. 자리 정보가 없으면(점검 도구) 역할로 정한다
+  (st.crew || []).forEach((q0) => {
+    const c = q0.c || q0, onDeck = q0.c ? [q0.x, Math.min(Math.abs(q0.y), hull.beam / 2 - 0.35) * Math.sign(q0.y || 1), q0.type === 'helm' ? floor : deck] : null;
+    const pos = onDeck || (c.role === 'deckhand' ? [(rig ? rig.x : 0) - 0.5, 0.45, deck] : c.role === 'lookout' ? [hull.len / 2 - 1.5, 0, deck] : [hull.helmX, 0.35, floor]);
+    const rowingHere = row && q0.type === 'oar', q = P(pos[0], pos[1], pos[2]);
+    items.push({ d: q[2], draw() { drawPerson(g, P, pos[0], pos[1], pos[2], zoom, rowingHere ? rowPhase : null, crewLookOf(c), false); } });
   });
 
   items.sort((a, b) => a.d - b.d);

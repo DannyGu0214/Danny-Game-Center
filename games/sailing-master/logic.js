@@ -1,4 +1,4 @@
-import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB } from './data.js';
+import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB, TRAITS, CREW_GROW } from './data.js';
 import { worldOf } from './world.js';
 import * as SH from './ship.js';
 // 게임 규칙 전부. 화면이 없고, 시드와 고정 시간 단계만으로 결과가 같다.
@@ -59,7 +59,7 @@ export function windAt(S) {
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 3, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 4, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: { heat: false, drought: false, gustOn: false, gustSoon: false },
@@ -121,6 +121,111 @@ function unload(S) { const got = {}; for (const [k, v] of Object.entries(S.hold)
 export const isTrade = (k) => ITEMS[k]?.kind === 'trade';
 export const isUnlocked = (S, id) => { const M = MODULES[id], n = M.need; return !M.future && !M.upOnly && (!n.region || S.visited[n.region]) && (!n.blueprint || S.blueprints[n.blueprint]) && (!n.grade || HULLS[S.ship.hull].grade >= n.grade); };
 export const hasRole = (S, role) => S.crew.some((c) => c.role === role);
+// ── 선원 자리(S3): 모듈 → 자리 → 사람 ──
+// 자리 목록: 모든 배의 고물에 조타 자리가 있고, 모듈마다 seat 종류의 자리가 하나씩 생겨요. x·y는 배 좌표(m)
+const seatCache = new WeakMap();
+const shipKey = (S) => `${S.ship.hull}|${S.ship.mods.map((m) => `${m.id}${m.col},${m.row}`).join(';')}`;
+export function seatsOf(S) {
+  const key = shipKey(S), hit = seatCache.get(S);
+  if (hit && hit.key === key) return hit.seats;
+  const H = HULLS[S.ship.hull], seats = [{ key: 'helm', type: 'helm', x: H.helmX, y: 0.4 }];
+  for (const m of S.ship.mods) {
+    const M = MODULES[m.id];
+    if (!M.seat || M.seat === 'helm') continue;
+    const [x, y] = SH.modulePos(S.ship.hull, m);
+    seats.push({ key: `${m.id}@${m.col},${m.row}`, type: M.seat, x: M.seat === 'sail' ? x - 0.5 : x, y: M.seat === 'sail' ? 0.4 : y, mod: m });
+  }
+  seatCache.set(S, { key, seats });
+  return seats;
+}
+const seatOf = (S, c) => (c.seat ? seatsOf(S).find((q) => q.key === c.seat) : null);
+export const seatType = (S, c) => { if (c.seat === undefined) ensureSeats(S); return seatOf(S, c)?.type ?? null; };
+// 비었거나 없어진 자리의 선원을 맞는 자리로, 없으면 쉼 자리로 앉힌다(기본값으로 알아서 앉게)
+export function autoSeat(S) {
+  const seats = seatsOf(S), taken = new Set();
+  for (const c of S.crew) { if (c.seat && seats.some((q) => q.key === c.seat) && !taken.has(c.seat)) taken.add(c.seat); else c.seat = null; }
+  for (const c of S.crew) {
+    if (c.seat) continue;
+    const want = ROLES[c.role]?.seat, q = seats.find((v) => v.type === want && !taken.has(v.key)) || seats.find((v) => v.type === 'rest' && !taken.has(v.key));
+    if (q) { c.seat = q.key; taken.add(q.key); }
+  }
+}
+function ensureSeats(S) {
+  if (!S.crew.length) return;
+  const seats = seatsOf(S);
+  if (S.crew.some((c) => c.seat === undefined || (c.seat && !seats.some((q) => q.key === c.seat)))) autoSeat(S);
+}
+// 그 자리에 앉아 일하는 선원(없으면 null)
+export function workerAt(S, type) { ensureSeats(S); return S.crew.find((c) => seatType(S, c) === type) || null; }
+// 효과 배율: 기본 × (0.7 + 0.15 × 숙련), 맞지 않는 자리는 50%, 피로가 쌓이면 최대 절반, 사기가 바닥이면 80%
+export function crewEff(S, c, type = seatType(S, c)) {
+  if (!c || !type) return 0;
+  const lv = c.lv || 1, apt = ROLES[c.role]?.seat === type ? 1 : 0.5;
+  return (0.7 + 0.15 * lv) * apt * (1 - 0.5 * (c.fatigue || 0)) * ((c.morale ?? 0.7) < 0.3 ? 0.8 : 1);
+}
+const BASE_EFF = 0.85; // 숙련 1, 맞는 자리, 쌩쌩할 때
+const work = (S, type) => { const c = workerAt(S, type); return c ? crewEff(S, c, type) / BASE_EFF * (c.trait === 'strong' && (type === 'oar' || type === 'carpenter') ? 1.2 : 1) : 0; };
+// 자리 바꾸기: 그 자리에 누가 있으면 서로 바꾼다. key가 null이면 내린다
+export function setSeat(S, id, key) {
+  ensureSeats(S);
+  const c = S.crew.find((q) => q.id === id);
+  if (!c || (key && !seatsOf(S).some((q) => q.key === key))) return false;
+  const other = key && S.crew.find((q) => q !== c && q.seat === key);
+  if (other) other.seat = c.seat;
+  c.seat = key;
+  return true;
+}
+// 편성: 항해 · 폭풍 · 입항. 지금 배치를 저장해 두고 단추 하나로 바꾼다
+export const PLANS = { sail: '항해', storm: '폭풍', port: '입항' };
+export function savePlan(S, name) {
+  if (!PLANS[name]) return false;
+  ensureSeats(S); S.plans ||= {}; S.plans[name] = Object.fromEntries(S.crew.map((c) => [c.id, c.seat])); S.plan = name;
+  return true;
+}
+export function applyPlan(S, name) {
+  const p = S.plans?.[name];
+  if (!p) return false;
+  const keys = new Set(seatsOf(S).map((q) => q.key)), used = new Set();
+  for (const c of S.crew) { const k = p[c.id]; c.seat = k && keys.has(k) && !used.has(k) ? k : null; if (c.seat) used.add(c.seat); }
+  autoSeat(S); S.plan = name;
+  return true;
+}
+// 위임 규칙: reef 돌풍이면 갑판원이 돛 줄이기, repair 선체 50% 아래면 목수가 고치기, storm 돌풍이면 폭풍 편성으로
+export const rulesOf = (S) => (S.rules ||= { reef: true, repair: true, storm: false });
+export function setRule(S, k, on) { if (!(k in rulesOf(S))) return false; S.rules[k] = !!on; return true; }
+export const wageOf = (c) => Math.round((c.baseWage ?? c.wage) * (1 + CREW_GROW.wageStep * ((c.lv || 1) - 1)));
+// 일하면 숙련·피로가 쌓이고, 쉬면 풀린다. 사기는 굶주림·밀린 보수·무더위에 떨어지고 쉼·신선한 물고기에 오른다
+function crewTick(S, dt, wx, st) {
+  if (!S.crew.length) return;
+  ensureSeats(S);
+  const g = CREW_GROW, day = CAL.day, singer = S.crew.some((c) => c.trait === 'singer');
+  for (const c of S.crew) {
+    const type = seatType(S, c);
+    c.lv ||= 1; c.xp ||= 0; c.fatigue ??= 0; c.morale ??= 0.7;
+    if (type && type !== 'rest') {
+      const k = (c.trait === 'diligent' ? 0.7 : 1) * (c.trait === 'seasick' && wx.gustOn ? 2 : 1);
+      c.fatigue = Math.min(1, c.fatigue + dt / (g.tireDays * day) * k);
+      if (ROLES[c.role]?.seat === type && c.lv < g.maxLv) {
+        c.xp += dt;
+        const need = c.lv * g.lvDays * day;
+        if (c.xp >= need) { c.xp -= need; c.lv++; c.wage = wageOf(c); emit(S, 'crewLevel', { name: c.name, lv: c.lv }); }
+      }
+    } else c.fatigue = Math.max(0, c.fatigue - dt / ((type === 'rest' ? g.restDays : g.idleDays) * day));
+    let dm = 0;
+    if (S.food <= 0) dm -= 0.6;
+    if (S.owed > 1) dm -= 0.25;
+    if (wx.heat && !st.awning) dm -= 0.2;
+    if (type === 'rest') dm += 0.12;
+    if (S.pantry?.[0]?.k === 'ffish' && S.food > 0) dm += 0.1;
+    if (dm < 0 && singer && c.trait !== 'singer') dm *= 0.6;
+    c.morale = clamp(c.morale + dm * dt / day, 0, 1);
+  }
+}
+// 화면용: 갑판 위 선원 자리(그림이 걸어가는 위치)
+export function crewOnDeck(S) {
+  ensureSeats(S);
+  return S.crew.map((c) => { const q = seatOf(S, c); return { c, type: q?.type ?? null, x: c.px ?? q?.x ?? HULLS[S.ship.hull].helmX, y: q?.y ?? 0.4 }; });
+}
 function emit(S, type, data) { S.events.push({ type, ...data }); }
 
 function placeAtPort(S, portId) {
@@ -152,28 +257,29 @@ function applyAction(S, a) {
   const b = S.boat;
   if (a.type === 'sail') {
     b.sailLevel = a.level; if (a.level > 0) b.lastSail = a.level;
-    if (!b.row) walkTo(S, 'helm');
+    if (!b.row || workerAt(S, 'oar')) walkTo(S, 'helm');
     else walkTo(S, 'oar');
   } else if (a.type === 'row') { b.row = a.on; if (!a.on) walkTo(S, 'helm'); }
 }
-const canSteer = (S) => hasRole(S, 'helmsman') || S.cap.to === null && (S.cap.at === 'helm' || S.cap.at === 'oar');
+const canSteer = (S) => !!workerAt(S, 'helm') || S.cap.to === null && (S.cap.at === 'helm' || S.cap.at === 'oar');
 export function setRudder(S, r) {
   if (S.docked) return;
   S.boat.rudder = clamp(r, -1, 1);
   S.route = null;
-  if (!hasRole(S, 'helmsman') && S.cap.at !== 'helm' && S.cap.at !== 'oar' && !S.cap.to) walkTo(S, 'helm');
+  if (!workerAt(S, 'helm') && S.cap.at !== 'helm' && S.cap.at !== 'oar' && !S.cap.to) walkTo(S, 'helm');
 }
 export function setSail(S, level) {
   if (!stats(S).sailArea) return false;
   level = clamp(level, 0, SAIL_LEVELS.length - 1);
-  if (hasRole(S, 'deckhand')) { S.boat.sailLevel = level; if (level > 0) S.boat.lastSail = level; return true; }
+  if (workerAt(S, 'sail')) { S.boat.sailLevel = level; if (level > 0) S.boat.lastSail = level; return true; }
   walkTo(S, 'mast', { type: 'sail', level });
   return true;
 }
 export function setRow(S, on) {
   if (on && !stats(S).oars) return false;
+  if (on && workerAt(S, 'oar')) { S.boat.row = true; return true; } // 노잡이가 앉아 있으면 선장은 키에 남는다
   if (on) walkTo(S, 'oar', { type: 'row', on: true });
-  else { S.boat.row = false; walkTo(S, 'helm'); }
+  else { S.boat.row = false; if (S.cap.at === 'oar' || S.cap.to === 'oar') walkTo(S, 'helm'); }
   return true;
 }
 // 탭한 곳으로 자동 항로. 움직일 힘이 없으면 돛을 올리거나 노를 젓는다
@@ -187,7 +293,7 @@ export function setDest(S, x, y, target = null) {
     if (st.sailArea) setSail(S, b.lastSail);
     else if (st.oars) setRow(S, true);
   }
-  if (!hasRole(S, 'helmsman') && !S.cap.to && S.cap.at === 'mast') walkTo(S, 'helm');
+  if (!workerAt(S, 'helm') && !S.cap.to && S.cap.at === 'mast') walkTo(S, 'helm');
   return true;
 }
 
@@ -199,6 +305,8 @@ export function dock(S, portId) {
   const got = unload(S);
   S.boat.sailLevel = 0; S.boat.row = false;
   S.vigor = 1; S.boat.stamina = 1;
+  for (const c of S.crew) { c.fatigue = 0; c.px = undefined; }
+  if (S.plans?.port) applyPlan(S, 'port');
   S.cap.to = null; S.cap.then = null; S.cap.at = 'helm'; S.cap.x = HULLS[S.ship.hull].helmX;
   payWages(S);
   // 굶는 사람은 돌려보내지 않는다: 코인이 없으면 마을에서 하루치를 나눠 줘요
@@ -216,18 +324,21 @@ function patchIfBroke(S) {
   return false;
 }
 function payWages(S) {
+  // 사기가 바닥난 선원은 입항하면 떠난다(보수를 받기 전에 마음을 정했다)
+  const sad = S.crew.filter((c) => (c.morale ?? 0.7) < CREW_GROW.leaveMorale);
+  if (sad.length) { S.crew = S.crew.filter((c) => !sad.includes(c)); for (const c of sad) emit(S, 'crewLeft', { name: c.name, why: 'morale' }); }
   const due = Math.ceil(S.owed);
-  if (due <= 0) return;
-  if (S.res.coin >= due) { S.res.coin -= due; S.owed = 0; emit(S, 'wages', { pay: due }); return; }
-  S.res.coin = 0; S.owed = 0;
-  const left = S.crew.pop();
-  if (left) emit(S, 'crewLeft', { name: left.name });
+  if (due > 0) {
+    if (S.res.coin >= due) { S.res.coin -= due; S.owed = 0; emit(S, 'wages', { pay: due }); for (const c of S.crew) c.morale = Math.min(1, (c.morale ?? 0.7) + 0.1); }
+    else { S.res.coin = 0; S.owed = 0; const left = S.crew.pop(); if (left) emit(S, 'crewLeft', { name: left.name }); }
+  }
 }
 export function undock(S) {
   if (!S.docked) return { ok: false };
   const c = departureCheck(S);
   if (!c.ok) return { ok: false, why: c.blockers[0] };
   S.docked = null; S.boat.spd = 0.5;
+  if (S.plans?.sail) applyPlan(S, 'sail');
   S.cap.x = HULLS[S.ship.hull].helmX; S.cap.at = 'helm';
   return { ok: true };
 }
@@ -376,14 +487,19 @@ export const wantsRum = (c) => (c.drink ?? CREW.baseStat) >= CREW.rumDrink;
 // 기준값의 ±25% 안에서 고른다
 const vary = (S, base) => Math.max(1, Math.round(base * (1 - CREW.spread + rnd(S) * 2 * CREW.spread)));
 function makeCandidate(S, taken) {
-  const open = Object.entries(ROLES).filter(([, r]) => REGIONS[r.region].order <= REGIONS[S.region].order);
+  const grade = Math.max(2, HULLS[S.ship.hull].grade);
+  const open = Object.entries(ROLES).filter(([, r]) => !r.future && REGIONS[r.region].order <= REGIONS[S.region].order && r.grade <= grade);
   const fresh = open.filter(([id]) => !hasRole(S, id)), roles = fresh.length ? fresh : open; // 아직 없는 역할부터 온다
   const [role, R] = roles[Math.floor(rnd(S) * roles.length)];
   const gender = rnd(S) < 0.5 ? '남' : '여', pool = CREW_NAMES[gender].filter((n) => !taken.has(n));
   const list = pool.length ? pool : CREW_NAMES[gender], name = list[Math.floor(rnd(S) * list.length)];
   taken.add(name);
   S.crewSeq = (S.crewSeq || 0) + 1;
-  return { id: S.crewSeq, role, name, gender, skill: vary(S, CREW.baseStat), hireCost: vary(S, R.hire), humor: vary(S, CREW.baseStat), drink: vary(S, CREW.baseStat), wage: R.wage };
+  // 숙련은 1, 가끔 2(강부터는 3도). 숙련이 높으면 고용비·보수가 비싸요
+  const lv = 1 + (rnd(S) < 0.3 ? 1 : 0) + (REGIONS[S.region].order >= 2 && rnd(S) < 0.15 ? 1 : 0), traits = Object.keys(TRAITS);
+  const c = { id: S.crewSeq, role, name, gender, skill: vary(S, CREW.baseStat), hireCost: Math.round(vary(S, R.hire) * (1 + 0.4 * (lv - 1))), humor: vary(S, CREW.baseStat), drink: vary(S, CREW.baseStat), baseWage: R.wage, lv, xp: 0, trait: traits[Math.floor(rnd(S) * traits.length)], fatigue: 0, morale: 0.7 };
+  c.wage = wageOf(c);
+  return c;
 }
 // 지금 항구의 선원 후보(1~3명). 날이 지나거나 다 뽑으면 새로 온다
 export function candidatesAt(S) {
@@ -401,10 +517,9 @@ export function hire(S, id) {
   if (!S.docked || !c) return { ok: false, why: '그런 녀석은 이 항구에 없어, 선장!' };
   if (!st.hull.crew) return { ok: false, why: `${st.hull.name}엔 선원 태울 자리가 없다고!` };
   if (S.crew.length >= st.crewCap) return { ok: false, why: '재울 데가 없잖아! 해먹부터 달아, 선장!' };
-  if (hasRole(S, c.role)) return { ok: false, why: `${ROLES[c.role].name}은(는) 이미 있다고!` };
   if (S.res.coin < c.hireCost) return { ok: false, why: '금화가 모자라, 선장! 주머니가 가볍다고!' };
   S.res.coin -= c.hireCost;
-  S.crew.push(c);
+  S.crew.push(c); c.seat = null; autoSeat(S);
   S.cands[S.docked].list = list.filter((q) => q !== c);
   S.hiredEver[c.role] = 1;
   checkAch(S);
@@ -601,7 +716,7 @@ export function fogOf(S, region) {
   return S.fog[region];
 }
 function revealFog(S) {
-  const g = fogGrid(S.region), st = stats(S), R = 70 + (st.telescope ? 40 : 0) + (hasRole(S, 'lookout') ? 40 : 0);
+  const g = fogGrid(S.region), st = stats(S), R = 70 + (st.telescope ? 40 : 0) + 40 * lookK(S);
   const arr = fogOf(S, S.region).split(''); let changed = false;
   const b = S.boat, ci = Math.floor((b.x - g.x0) / FOG_CELL), cj = Math.floor((b.y - g.y0) / FOG_CELL), n = Math.ceil(R / FOG_CELL);
   for (let j = cj - n; j <= cj + n; j++) for (let i = ci - n; i <= ci + n; i++) {
@@ -631,7 +746,7 @@ function spawnFlot(S) {
   }
 }
 function collectFlot(S) {
-  const st = stats(S), b = S.boat, list = flotsamOf(S), R = 6 + (hasRole(S, 'lookout') ? 6 : 0);
+  const st = stats(S), b = S.boat, list = flotsamOf(S), R = 6 + 10 * lookK(S);
   for (let i = list.length - 1; i >= 0; i--) {
     const f = list[i];
     if (Math.hypot(f.x - b.x, f.y - b.y) > R) continue;
@@ -662,7 +777,9 @@ function readLetter(S, f) {
 }
 // ── 발견 ──
 // 망원경: 볼 수 있는 거리가 26m에서 70m로 늘고, 내륙 발견지와 뭍짐승을 찾을 수 있다
-export const sightRange = (S) => ((stats(S).telescope ? 70 : 26) + (hasRole(S, 'lookout') ? 14 : 0)) * (hasTrait(S, 'lucky') ? 1.1 : 1);
+// 견시: 망원경 자리에 앉아야 일해요. 눈썰미면 30% 더
+export const lookK = (S) => { const c = workerAt(S, 'look'); return c ? work(S, 'look') * (c.trait === 'sharp' ? 1.3 : 1) : 0; };
+export const sightRange = (S) => ((stats(S).telescope ? 70 : 26) + 14 * lookK(S)) * (hasTrait(S, 'lucky') ? 1.1 : 1);
 // 내륙 발견지는 찾기 전까지 그림도 보이지 않는다(끌어서 둘러봐도 미리 알 수 없게)
 export function canSeeFind(S, f) {
   if (S.found[f.id] || !f.inland) return true;
@@ -800,10 +917,15 @@ export function step(S, dt) {
 
   // 돌풍: 전조·시작·끝
   if (wx.gustSoon && !prev.gustSoon) emit(S, 'gustSoon');
-  if (wx.gustOn && !prev.gustOn) { S.gustHurt = 0; emit(S, 'gustOn'); if (hasRole(S, 'deckhand') && b.sailLevel === 2) { b.sailLevel = 1; S.reefedByCrew = 1; } }
+  if (wx.gustOn && !prev.gustOn) {
+    S.gustHurt = 0; emit(S, 'gustOn');
+    if (rulesOf(S).storm && applyPlan(S, 'storm')) emit(S, 'plan', { name: 'storm' });
+    if (rulesOf(S).reef && workerAt(S, 'sail') && b.sailLevel === 2) { b.sailLevel = 1; S.reefedByCrew = 1; }
+  }
   if (!wx.gustOn && prev.gustOn) {
     S.stats.gusts++; if (S.gustHurt > 0.005) S.stats.gustHurt++;
     if (S.reefedByCrew) { b.sailLevel = 2; S.reefedByCrew = 0; }
+    if (rulesOf(S).storm && S.plan === 'storm' && applyPlan(S, 'sail')) emit(S, 'plan', { name: 'sail' });
     emit(S, 'gustOff', { hurt: S.gustHurt }); checkAch(S);
   }
   if (wx.heat && !prev.heat) emit(S, 'heatOn', { shade: st.awning });
@@ -834,8 +956,11 @@ export function step(S, dt) {
     const before = Math.sin(b.rowPhase);
     b.rowPhase = (b.rowPhase + dt * TAU / BOAT.rowPeriod) % TAU;
     if (before <= 0 && Math.sin(b.rowPhase) > 0) emit(S, 'stroke');
-    b.stamina = Math.max(0, b.stamina - BOAT.staminaDrain * (wx.heat && !st.awning ? 1.5 : 1) * dt);
-    rowT = st.rowSpeed * (b.stamina > 0 ? 1 : BOAT.tired) * (0.82 + 0.36 * Math.max(0, Math.sin(b.rowPhase)));
+    // 노잡이가 저으면 선장 체력이 아니라 노잡이 피로가 쌓인다(crewTick)
+    const rower = work(S, 'oar');
+    if (!rower) b.stamina = Math.max(0, b.stamina - BOAT.staminaDrain * (wx.heat && !st.awning ? 1.5 : 1) * dt);
+    else b.stamina = Math.min(1, b.stamina + BOAT.staminaRest * dt);
+    rowT = st.rowSpeed * (rower ? 0.85 + 0.3 * rower : b.stamina > 0 ? 1 : BOAT.tired) * (0.82 + 0.36 * Math.max(0, Math.sin(b.rowPhase)));
   } else b.stamina = Math.min(1, b.stamina + BOAT.staminaRest * dt);
 
   // 여울: 배가 수심보다 깊으면 걸린다
@@ -902,7 +1027,16 @@ export function step(S, dt) {
   const fresh = S.pantry?.[0]?.k === 'ffish' && S.food > 0; // 지금 먹는 것이 신선한 물고기면 기력이 빨리 돌아온다
   eat(S, persons * dt / CAL.day);
   S.owed += S.crew.reduce((a, q) => a + q.wage, 0) * dt / CAL.day;
-  if (st.net && b.spd > 1 && S.food < st.foodCap) { syncPantry(S); stock(S, 'ffish', Math.min(st.foodCap - S.food, dt / 60)); }
+  if (st.net && b.spd > 1 && S.food < st.foodCap) { syncPantry(S); stock(S, 'ffish', Math.min(st.foodCap - S.food, dt / 60 * (1 + work(S, 'fish')))); } // 어부가 앉으면 두 배
+  // 목수: 선체가 50% 아래면 화물칸 잡목으로 고친다(잃은 내구도 1에 잡목 1개)
+  const carp = work(S, 'carpenter');
+  if (carp && rulesOf(S).repair && S.hull < 0.5) {
+    if ((S.hold.wood || 0) >= 1) { const hp = st.hull.hp, fix = Math.min((1 - S.hull) * hp, 0.15 * carp * dt); S.carpWood = (S.carpWood || 0) + fix; S.hull += fix / hp; if (S.carpWood >= 1) { S.carpWood -= 1; S.hold.wood -= 1; if (!S.hold.wood) delete S.hold.wood; } S.carpNoWood = 0; }
+    else if (!S.carpNoWood) { S.carpNoWood = 1; emit(S, 'carpNoWood'); }
+  }
+  crewTick(S, dt, wx, st);
+  // 선원은 자리까지 걸어간다(그림)
+  for (const q of crewOnDeck(S)) { const seat = seatOf(S, q.c); if (!seat) continue; const cx = q.c.px ?? seat.x, mv = BOAT.walk * dt; q.c.px = Math.abs(seat.x - cx) <= mv ? seat.x : cx + Math.sign(seat.x - cx) * mv; }
   if (wx.heat && !st.awning) S.vigor -= WEATHER.heatVigor * dt;
   else if (S.food > 0) S.vigor = Math.min(1, S.vigor + WEATHER.restVigor * dt * (fresh ? SUPPLY.ffish.vigor : 1));
   if (S.food <= 0) S.vigor -= WEATHER.hungerVigor * dt;
@@ -935,7 +1069,7 @@ export function serialize(S) { const { events, ...rest } = S; return JSON.string
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || ![1, 2, 3].includes(o.v) || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2, 3, 4].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
     // v2 → v3(S2 아이템): 목재·천은 잡목·마포로 이어 받는다. 화물칸의 금화는 창고로, 식량은 빵으로(5일 뒤 상함), 찾은 발견지의 유물을 준다
     if (o.v < 3) {
@@ -951,8 +1085,12 @@ export function deserialize(raw) {
       for (const list of Object.values(o.flot || {})) for (const f of list) if (f.k === 'coin') { f.k = 'shiny'; f.n = 1; }
     }
     o.relics ||= {}; o.letters ||= {}; o.pantry ||= []; o.herb ||= 0;
+    // v3 → v4(S3 선원): 숙련 1, 지금 보수를 기본 보수로, 특성은 번호로 정하고, 자리는 처음 볼 때 알아서 앉힌다
+    const traitIds = Object.keys(TRAITS);
+    for (const c of o.crew || []) { c.lv ??= 1; c.xp ??= 0; c.fatigue ??= 0; c.morale ??= 0.7; c.baseWage ??= c.wage; c.trait ??= traitIds[(c.id || 0) % traitIds.length]; }
+    o.rules ||= { reef: true, repair: true, storm: false };
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
-    o.v = 3;
+    o.v = 4;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
     if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다
