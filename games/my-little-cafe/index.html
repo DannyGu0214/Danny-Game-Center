@@ -807,12 +807,14 @@ function showTitle() {
     for (const [place, label] of [['office', '🏢 오피스 가게'], ['home', '🏘️ 동네 가게']]) {
       const slot = loadSlot(place), row = document.createElement('div');
       row.className = 'slotRow';
-      const info = !slot ? '처음 열어요' : slot.biz.finished ? `봄을 마쳤어요 · ${slot.choices.cafe}` : `${SEASON_NAME[slot.biz.season]} ${slot.biz.day}일차 · ${slot.choices.cafe}`;
-      add(`${label}<small>${info}</small>`, !saved && !slot?.biz.finished ? 'mainBtn' : '', () => {
+      // 계절을 마친 저장: 다음 계절이 이 버전에 있으면 이어 하기, 없으면 준비 중으로 잠근다
+      const done = !!slot?.biz.finished, go = done && B.canContinue(slot.biz), next = slot ? SEASON_NAME[B.nextSeasonOf(slot.biz.season)] : '';
+      const info = !slot ? '처음 열어요' : done ? `${SEASON_NAME[slot.biz.season]}을 마쳤어요 · ${go ? `${next} 이어 하기` : `${next} 준비 중`} · ${slot.choices.cafe}` : `${SEASON_NAME[slot.biz.season]} ${slot.biz.day}일차 · ${slot.choices.cafe}`;
+      add(`${label}<small>${info}</small>`, !saved && (!done || go) ? 'mainBtn' : '', () => {
         if (slot) startBusiness(slot);
         else if (B.needsNewName(base, place)) openSlotName(base, place);
         else startBusiness({ ...base, choices: B.slotChoices(base, place), biz: null });
-      }, !!slot?.biz.finished, row);
+      }, done && !go, row);
       if (slot) {
         const again = add('↺', 'slotAgain', async () => {
           if (!(await confirmBox(`${place === 'office' ? '오피스' : '동네'} 가게를 봄 1일차부터 다시 할까요? 이 가게 기록이 지워져요.`))) return;

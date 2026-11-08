@@ -288,3 +288,27 @@ test('커피 이야기: 하루 하나까지, 없는 날도 있고, 다 볼 때�
   const back = B.normalizeBiz(JSON.parse(JSON.stringify({ ...biz, unlocked: {} })));
   assert.deepEqual(back.trivia, biz.trivia);
 });
+
+test('업데이트 뒤 이어 하기: 계절을 마친 저장은 다음 계절이 생기면 그대로 이어져요', () => {
+  const biz = B.newBiz(seeded(5));
+  biz.day = 20; biz.money = 777000; biz.rep = 3.4; biz.unlocked = { equip: true, dessert: true }; biz.equip = { grinder: true };
+  biz.starsTotal = 820; biz.friend = { kim: 3 }; biz.seen = { 'fair-news': 3, fair: 4, baker: 8 }; biz.trivia = ['bach'];
+  B.settleSeason(biz, 'office'); biz.finished = true;
+  // 지금 버전(봄만 있음): 기다려요
+  assert.equal(B.canContinue(biz), false);
+  // 저장을 다시 읽어도 그대로예요
+  const saved = B.normalizeBiz(JSON.parse(JSON.stringify(biz)));
+  assert.equal(saved.finished, true); assert.equal(saved.season, 'spring');
+  // 여름이 들어간 버전: 이어져요. 돈·평판·해금·장비·단골·별·본 이야기는 그대로, 월세는 다시 내지 않아요
+  assert.equal(B.canContinue(saved, ['spring', 'summer']), true);
+  const money = saved.money;
+  B.startNextSeason(saved, seeded(2));
+  assert.deepEqual([saved.season, saved.day, saved.finished, saved.money, saved.starsTotal], ['summer', 1, false, money, 820]);
+  assert.deepEqual([saved.unlocked, saved.equip, saved.friend, saved.trivia], [{ equip: true, dessert: true }, { grinder: true }, { kim: 3 }, ['bach']]);
+  // 봄 이벤트는 여름에 다시 나오지 않아요
+  saved.day = 6;
+  for (const ph of ['morning', 'close']) { const e = B.eventDue(saved, EVENTS, ph); assert.ok(!e || e.season === 'summer', e?.id); }
+  // 겨울 다음(2년 차)은 아직 이어지지 않아요
+  saved.season = 'winter'; saved.finished = true;
+  assert.equal(B.canContinue(saved, ['spring', 'summer', 'autumn', 'winter']), false);
+});

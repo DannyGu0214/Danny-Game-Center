@@ -3,6 +3,18 @@ import * as G from './logic.js';
 import { ESPRESSO, DAYS_PER_SEASON, DAY_SEC, OPEN_HOUR, HOURS, WEEK, WEATHER_ODDS, MENUS, COST, COLDBREW_COST, SIDE, ROAST, START_MONEY, RENT_PER_SEASON, FAST_TIP_SEC, TIP, EQUIP, BIZ_REGULARS, SEASON_NAME } from './data.js';
 
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+// 이 버전에 들어 있는 계절. 새 계절을 만들면 여기에 더한다. 그 전 계절을 마친 저장은 다음에 열 때 새 계절로 이어진다(DESIGN 5.12절)
+export const SEASONS_READY = ['spring'];
+export const nextSeasonOf = (season) => SEASONS[(SEASONS.indexOf(season) + 1) % SEASONS.length];
+export const canContinue = (biz, ready = SEASONS_READY) => !!biz.finished && biz.season !== 'winter' && ready.includes(nextSeasonOf(biz.season));
+// 다음 계절 1일차로 넘어간다. 돈·평판·해금·단골·별은 그대로 가져간다. 월세는 결산 때 이미 냈다
+export function startNextSeason(biz, rand = Math.random) {
+  biz.season = nextSeasonOf(biz.season);
+  biz.day = 1; biz.finished = false;
+  biz.weather = rollWeather(biz.season, rand);
+  biz.eventDay = 0; biz.fairTomorrow = false; biz.snooze = {};
+  return biz;
+}
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 export function rollWeather(season, rand = Math.random) {
@@ -84,7 +96,7 @@ export const isInstant = (menu) => menu === 'coldbrew';
 
 export function newBiz(rand = Math.random) {
   const season = 'spring';
-  return { season, day: 1, money: START_MONEY, rep: 2.5, equip: {}, friend: {}, visits: {}, stock: { coldbrew: 0, dessert: 0, beans: 0, beansQ: 0.7 }, weather: rollWeather(season, rand), history: [], finished: false, starsTotal: 0, unlocked: {}, seen: {}, snooze: {}, eventDay: 0, fairTomorrow: false, equipHint: null, trivia: [] };
+  return { season, day: 1, money: START_MONEY, rep: 2.5, equip: {}, friend: {}, visits: {}, stock: { coldbrew: 0, dessert: 0, beans: 0, beansQ: 0.7 }, weather: rollWeather(season, rand), history: [], finished: false, starsTotal: 0, unlocked: {}, seen: {}, snooze: {}, eventDay: 0, fairTomorrow: false, equipHint: null, trivia: [], year: 1 };
 }
 export function newDayStats() { return { served: 0, lost: 0, stars: 0, sales: 0, cost: 0, tips: 0, regulars: 0, dessert: 0, beans: 0, sideSales: 0, prep: 0 }; }
 // 내준 잔 하나를 장부에 적는다
@@ -190,6 +202,7 @@ export function eventDue(biz, events, phase) {
   if (biz.eventDay === biz.day) return null;
   return events.find((e) => {
     if (e.phase !== phase || biz.seen[e.id]) return false;
+    if ((e.season || 'spring') !== biz.season) return false; // 계절이 적히지 않은 이벤트는 봄 것이다
     if (e.minDay && biz.day < e.minDay) return false;
     if (e.maxDay && biz.day > e.maxDay) return false;
     if (e.minStars && biz.starsTotal < e.minStars) return false;
@@ -227,6 +240,7 @@ export function normalizeBiz(raw) {
   if (raw.stock) for (const k of Object.keys(b.stock)) if (Number.isFinite(raw.stock[k])) b.stock[k] = raw.stock[k];
   b.history = Array.isArray(raw.history) ? raw.history.slice(-100) : [];
   b.finished = !!raw.finished;
+  b.year = Math.max(1, Math.floor(Number(raw.year) || 1));
   b.trivia = Array.isArray(raw.trivia) ? raw.trivia.filter((x) => typeof x === 'string') : [];
   if (raw.unlocked && typeof raw.unlocked === 'object') {
     for (const k of ['unlocked', 'seen', 'snooze']) if (raw[k] && typeof raw[k] === 'object') b[k] = { ...raw[k] };
