@@ -1443,7 +1443,7 @@ function render() {
     A.drawProp(ctx, sc, cam, W, p, t);
     if (p.name && cam.zoom > 3.2) {
       ctx.font = '600 12px system-ui'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,30,40,.75)'; ctx.fillStyle = '#fff';
-      const lx = sx(p.x), ly = sy(p.y) - (p.port ? 6.5 : 5) * cam.zoom;
+      const lx = sx(p.x), ly = sy(p.y) - (p.port ? 7.8 : 5) * cam.zoom;
       ctx.strokeText(p.name, lx, ly); ctx.fillText(p.name, lx, ly);
     }
   }
