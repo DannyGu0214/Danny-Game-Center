@@ -1,4 +1,4 @@
-// 배경음악: 기본은 Suno로 만든 mp3 7곡(assets/bgm, 아래 FILES — 합성곡 7곡과 1:1 대응)을 틀고,
+// 배경음악: 기본은 Suno로 만든 mp3 4곡(assets/bgm, 아래 FILES — 합성곡 7곡 중 같은 번호 4곡에 대응)을 틀고,
 // 파일을 못 불러오면(오프라인·차단 등) 아래 Web Audio 합성곡으로 이어서 틀어 소리가 끊기지 않게 한다.
 // 합성곡 설명:
 // 포스트 아포칼립스 분위기의 단순한 멜로디 7곡(단조 3곡 + 조금 희망적인 장조 4곡). 무작위로 한 곡을 골라 5분 동안 틀고,
@@ -7,7 +7,8 @@
 
 export const SEGMENT_S = 300; // 한 곡을 트는 시간(5분). mp3는 약 4분 58초라 파일 끝에서 넘어간다
 // TRACKS와 같은 순서(1:1): 잿빛 들판 · 녹슨 라디오 · 마지막 불빛 · 새벽 정찰 · 첫 수확 · 등불 아래 · 모닥불 노래
-export const FILES = ['01-gray-field', '02-rusty-radio', '03-last-light', '04-dawn-patrol', '05-first-harvest', '06-under-the-lantern', '07-campfire-song'].map((n) => `${n}.mp3`);
+// null은 mp3가 없는 곡(새벽 정찰·첫 수확·모닥불 노래, 공포 분위기 재생성 대기)이라 mp3 재생 중에는 고르지 않는다. 합성곡으로 넘어가면 7곡 모두 쓴다.
+export const FILES = ['01-gray-field', '02-rusty-radio', '03-last-light', null, null, '06-under-the-lantern', null].map((n) => n && `${n}.mp3`);
 const FILE_BASE = new URL('./assets/bgm/', import.meta.url);
 const FADE_S = 4;
 const LOOKAHEAD_S = 0.6;
@@ -242,7 +243,7 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
     return c;
   }
   function pick() {
-    const choices = TRACKS.map((_, k) => k).filter((k) => k !== (cur?.k ?? fcur?.k));
+    const choices = TRACKS.map((_, k) => k).filter((k) => k !== (cur?.k ?? fcur?.k) && (!filesOk || FILES[k]));
     return choices[Math.floor(rand() * choices.length)];
   }
   // 한 곡 시작: 곡마다 자기 볼륨 노드(겹쳐 넘어가기용)를 가진다
