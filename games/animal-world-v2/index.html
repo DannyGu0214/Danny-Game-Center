@@ -1,0 +1,1385 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Animal World v2</title>
+<!-- v2 개발판(PixiJS 렌더러). 설치(PWA)는 합칠 때 다시 켠다 -->
+<meta name="theme-color" content="#8fcbe6">
+<link rel="icon" href="../animal-world/icons/icon-192.png">
+<link rel="apple-touch-icon" href="../animal-world/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Animal World">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<style>
+/* Layout: 세로 한 화면 관찰 게임 — 쿼터뷰 캔버스가 화면을 채우고, 위에 HUD, 아래에 메뉴·지역 버튼.
+   동물 목록·꾸미기·요청·앨범은 아래에서 올라오는 시트로 연다. 낮의 초원 한 가지 분위기라 밝은 단일 테마다. */
+:root {
+  color-scheme: light;
+  --ink: #3b2f22;
+  --muted: #7d6c57;
+  --panel: #fffaf0;
+  --panel-2: #f5ecd9;
+  --line: #e4d5b7;
+  --accent: #ec8a2c;
+  --accent-ink: #ffffff;
+  --green: #4f9a3a;
+  --red: #c9503c;
+  --blue: #3f8fc7;
+  --gold: #e9a91e;
+  --f-display: "Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-body: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --gutter: max(10px, env(safe-area-inset-left, 0px));
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: #cfe9ee; color: var(--ink); font-family: var(--f-body); font-size: 14px;
+  overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+button { font: inherit; color: inherit; touch-action: manipulation; cursor: pointer; border: 0; background: none; padding: 0; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { cursor: default; }
+#app { position: relative; height: 100%; overflow: hidden; }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#over { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; } /* v2: PixiJS 층 위에 선택·놓을 자리·파티클 */
+
+/* HUD */
+.hud {
+  position: absolute; left: var(--gutter); right: var(--gutter); top: calc(var(--safe-t) + 8px);
+  display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: stretch; pointer-events: none;
+}
+.hud > * { min-width: 0; background: rgba(255, 250, 240, 0.9); border: 1px solid rgba(160, 130, 90, 0.25); border-radius: 14px; padding: 6px 10px; box-shadow: 0 2px 6px rgba(80, 60, 30, 0.12); }
+.pop { display: flex; flex-direction: column; justify-content: center; }
+.pop .n { font-family: var(--f-display); font-size: 19px; line-height: 1; white-space: nowrap; }
+.pop small { color: var(--muted); font-size: 11px; margin-top: 2px; white-space: nowrap; }
+.dev .line { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
+.dev .line b { font-family: var(--f-display); font-size: 16px; font-weight: 400; }
+.hud .dev { pointer-events: auto; cursor: pointer; } /* 지역 이름 칸: 누르면 지역 고르기 */
+.dev .caret { font-style: normal; color: var(--muted); font-size: 12px; margin-left: -3px; }
+.item.here { border-color: var(--accent); background: #fff8ec; }
+.tier { font-family: var(--f-display); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 1px 7px; font-size: 13px; }
+.dev .line span:last-child { margin-left: auto; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.meter { height: 7px; border-radius: 4px; background: #eadfc8; margin-top: 5px; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #8cc152, #4f9a3a); border-radius: 4px; transition: width .3s; }
+.happy { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.happy .n { font-family: var(--f-display); font-size: 15px; line-height: 1.1; }
+.happy small { font-size: 10px; color: var(--muted); }
+/* HUD 아래 한 줄: 진행일수·시간대 + 힌트 */
+.subhud { position: absolute; left: var(--gutter); right: var(--gutter); top: calc(var(--safe-t) + 66px); display: flex; gap: 6px; align-items: center; pointer-events: none; }
+.clock {
+  flex: none; background: rgba(255, 250, 240, 0.9); border: 1px solid rgba(160, 130, 90, 0.25); border-radius: 12px; padding: 4px 10px;
+  font: 13px var(--f-display); white-space: nowrap; box-shadow: 0 2px 6px rgba(80, 60, 30, 0.12);
+}
+.hint {
+  min-width: 0; background: rgba(59, 47, 34, 0.78); color: #fff8ea; border-radius: 12px; padding: 5px 11px; font-size: 12.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 아래 메뉴 위 한 줄: 소리 켜기·끄기(왼쪽), 확대 단계(오른쪽, 1× = 땅 전체가 한 화면) */
+.controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; }
+.zoombar { display: flex; gap: 3px; background: var(--panel-2); border-radius: 12px; padding: 3px; }
+.zoombar button { min-width: 40px; height: 32px; padding: 0 5px; border-radius: 9px; font: 14px var(--f-display); color: var(--muted); }
+.zoombar button.on { background: var(--accent); color: var(--accent-ink); }
+#soundbar button { font-size: 17px; }
+#soundbar button.off { opacity: 0.4; }
+
+/* 아래 메뉴 */
+.bar {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 6px var(--gutter) calc(var(--safe-b) + 6px);
+  background: linear-gradient(180deg, rgba(255, 250, 240, 0.95), #fffaf0); border-top: 1px solid var(--line); z-index: 5;
+}
+.menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.menu button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 0 4px; border-radius: 12px; font-size: 20px; line-height: 1.1; }
+.menu button span { font-size: 11.5px; font-family: var(--f-display); color: var(--muted); }
+.menu button.on { background: var(--panel-2); }
+.menu button.on span { color: var(--ink); }
+.dot { position: absolute; top: 2px; right: calc(50% - 22px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font: 11px/16px var(--f-display); }
+
+/* 정보 카드·놓기 막대(메뉴 위에 뜬다) */
+.float {
+  position: absolute; left: var(--gutter); right: var(--gutter); bottom: calc(var(--bar-h, 110px) + 8px); z-index: 6;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; box-shadow: 0 6px 18px rgba(70, 50, 20, 0.2);
+}
+.card-top { display: flex; gap: 10px; align-items: center; }
+.card-top canvas { width: 64px; height: 52px; flex: none; background: var(--panel-2); border-radius: 10px; }
+.card-top h3 { margin: 0; font: 400 18px var(--f-display); }
+.card-top p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.needs { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 0; }
+.needs span { background: var(--panel-2); border-radius: 9px; padding: 3px 8px; font-size: 12px; }
+.needs span.bad { background: #fbe1da; color: #9a3a26; }
+.needs span.ok { background: #e3f1d6; color: #2f6a20; }
+.row-btns { display: flex; gap: 6px; margin-top: 9px; }
+.btn { flex: 1; border-radius: 11px; padding: 9px 6px; background: var(--panel-2); font-family: var(--f-display); font-size: 14px; }
+.btn.main { background: var(--accent); color: var(--accent-ink); }
+.btn.warn { background: #f6d9cf; color: #8a2f1c; }
+.btn:disabled { opacity: 0.45; }
+.placebar .ph { display: flex; align-items: center; gap: 10px; }
+.placebar canvas { width: 48px; height: 40px; flex: none; }
+.placebar b { font: 400 16px var(--f-display); }
+.placebar p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+
+/* 시트 */
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: var(--bar-h, 110px); z-index: 4; max-height: calc(100% - var(--bar-h, 110px) - var(--safe-t) - 92px); display: flex; flex-direction: column;
+  background: var(--panel); border-radius: 20px 20px 0 0; box-shadow: 0 -8px 24px rgba(70, 50, 20, 0.22); border-bottom: 1px solid var(--line);
+}
+.sheet > header { display: flex; align-items: baseline; gap: 8px; padding: 14px 14px 8px; }
+.sheet h2 { margin: 0; font: 400 21px var(--f-display); }
+.sheet header span { color: var(--muted); font-size: 12.5px; }
+.sheet header button { margin-left: auto; width: 34px; height: 34px; border-radius: 17px; background: var(--panel-2); font-size: 15px; align-self: center; }
+.tabs { display: flex; gap: 6px; padding: 0 14px 8px; }
+.tabs button { padding: 6px 14px; border-radius: 16px; background: var(--panel-2); font-family: var(--f-display); }
+.tabs button.on { background: var(--ink); color: var(--panel); }
+.sheet .body { overflow-y: auto; padding: 0 12px 14px; -webkit-overflow-scrolling: touch; }
+.item { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 8px; border-radius: 14px; background: #fff; border: 1px solid var(--line); margin-bottom: 7px; }
+.item canvas { width: 64px; height: 52px; background: var(--panel-2); border-radius: 10px; }
+.item h4 { margin: 0; font: 400 16px var(--f-display); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.item p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.tag { font: 11px var(--f-body); padding: 1px 6px; border-radius: 7px; background: var(--panel-2); color: var(--muted); }
+.tag.new { background: var(--red); color: #fff; }
+.item .buy { min-width: 86px; border-radius: 11px; padding: 9px 8px; background: var(--accent); color: #fff; font: 15px var(--f-display); text-align: center; }
+.item .buy:disabled { background: #e8dcc6; color: #9b8b74; }
+.item .why { display: block; font-size: 10.5px; color: var(--muted); text-align: center; margin-top: 3px; max-width: 96px; }
+.item.locked { opacity: 0.62; }
+.req { padding: 10px 12px; border-radius: 14px; background: #fff; border: 1px solid var(--line); margin-bottom: 8px; }
+.req h4 { margin: 0 0 6px; font: 400 16px var(--f-display); }
+.req .meter { margin: 0 0 8px; }
+/* T8 섬 꾸미기 6항목(요청 시트 맨 위) */
+.isle { padding: 10px 12px 4px; border-radius: 14px; background: #eaf5ee; border: 1px solid #b8d9c3; margin-bottom: 10px; }
+.isle h4 { margin: 0 0 4px; font: 400 16px var(--f-display); display: flex; align-items: baseline; gap: 6px; }
+.isle h4 span { margin-left: auto; color: var(--muted); font: 12.5px var(--f-body); }
+.isle .goal { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px dashed #c5dfcd; }
+.isle .goal > b { flex: none; width: 16px; text-align: center; font-weight: 400; color: var(--green); }
+.isle .goal > span { flex: 1; min-width: 0; font-size: 13.5px; }
+.isle .goal small { display: block; color: var(--muted); font-size: 11.5px; }
+.isle .goal .btn { flex: none; min-width: 84px; padding: 7px 8px; font-size: 13px; }
+.album { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.album div { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px; text-align: center; }
+.album canvas { width: 100%; height: 70px; background: var(--panel-2); border-radius: 10px; }
+.album b { display: block; font: 400 15px var(--f-display); margin-top: 4px; }
+.album small { color: var(--muted); font-size: 11.5px; }
+.album .stamp { grid-column: 1 / -1; border: 2px dashed var(--gold); background: #fff8e2; font: 17px var(--f-display); padding: 10px; }
+.album .stamp small { display: block; font: 11.5px var(--f-body); margin-top: 2px; }
+
+/* 알림 */
+.modal { position: absolute; inset: 0; z-index: 20; background: rgba(40, 30, 15, 0.45); display: grid; place-items: center; padding: 20px; }
+.modal .box { width: min(360px, 100%); background: var(--panel); border-radius: 20px; padding: 20px 18px 16px; text-align: center; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
+.modal h2 { margin: 0 0 8px; font: 400 25px var(--f-display); }
+.modal p { margin: 6px 0; line-height: 1.55; color: var(--ink); }
+.modal ul { text-align: left; margin: 8px 0 4px; padding-left: 20px; line-height: 1.6; }
+.modal .btn { margin-top: 12px; width: 100%; }
+.unlocks { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+.unlocks span { background: var(--panel-2); border-radius: 10px; padding: 4px 9px; font-size: 13px; }
+#toasts { position: absolute; left: 0; right: 0; top: calc(var(--safe-t) + 96px); display: grid; justify-items: center; gap: 6px; pointer-events: none; z-index: 15; }
+.toast { background: rgba(59, 47, 34, 0.9); color: #fff8ea; padding: 7px 14px; border-radius: 14px; font-size: 13.5px; animation: toast 2.4s forwards; }
+@keyframes toast { 0% { opacity: 0; transform: translateY(-6px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+#fx { position: absolute; inset: 0; pointer-events: none; z-index: 12; }
+.pop-num { position: absolute; transform: translate(-50%, -100%); font: 20px var(--f-display); color: #fff; text-shadow: 0 1px 0 #9a6a12, 0 2px 6px rgba(0, 0, 0, 0.35); animation: rise 1.3s ease-out forwards; white-space: nowrap; }
+@keyframes rise { 0% { opacity: 0; margin-top: 6px; } 15% { opacity: 1; } 100% { opacity: 0; margin-top: -40px; } }
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 13; }
+#flash.go { animation: flash .45s ease-out; }
+@keyframes flash { 0% { opacity: 0.85; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pop-num, .toast { animation-duration: 0.01s; } #flash.go { animation: none; } }
+</style>
+<body>
+<div id="app">
+  <canvas id="view" aria-label="동물 지역 쿼터뷰. 동물이나 물건을 탭하면 정보가 보여요"></canvas>
+  <canvas id="over" aria-hidden="true"></canvas>
+  <header class="hud" id="hud">
+    <div class="pop"><span class="n">⭐ <b id="pop">0</b></span><small id="rate">+0/분</small></div>
+    <div class="dev" id="regionBtn" role="button" tabindex="0" aria-label="지역 고르기">
+      <div class="line"><b id="rname">초원</b><i class="caret">▾</i><span class="tag new" id="rnew" hidden>NEW</span><span class="tier" id="tier">T1</span><span id="devtxt">발전도 0 / 60</span></div>
+      <div class="meter"><i id="devbar"></i></div>
+    </div>
+    <div class="happy"><span class="n" id="happy">-</span><small>행복도</small></div>
+  </header>
+  <div class="subhud"><span class="clock" id="clock">🌅 1일차 · 아침</span><div class="hint" id="hint" hidden></div></div>
+  </div>
+  <div class="float card" id="card" hidden></div>
+  <div class="float placebar" id="placebar" hidden>
+    <div class="ph"><canvas id="placeIcon"></canvas><div><b id="placeName"></b><p id="placeInfo"></p></div></div>
+    <div class="row-btns"><button class="btn" id="placeDone">완료</button><button class="btn main" id="placeGo">놓기</button></div>
+  </div>
+  <nav class="bar" id="bar">
+    <div class="controls">
+      <div class="zoombar" id="soundbar" role="group" aria-label="소리">
+        <button id="musicBtn" aria-pressed="true" aria-label="배경음악">🎵</button><button id="sfxBtn" aria-pressed="true" aria-label="동물 소리">🔊</button>
+      </div>
+      <div class="zoombar" id="zoombar" role="group" aria-label="확대">
+        <button data-z="0" class="on">1×</button><button data-z="1">1.5×</button><button data-z="2">2×</button><button data-z="3">3×</button><button data-z="4">4×</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button data-open="animals" id="mAnimals">🦒<span>동물</span><i class="dot" hidden>N</i></button>
+      <button data-open="decor" id="mDecor">🌳<span>꾸미기</span><i class="dot" hidden>N</i></button>
+      <button data-open="requests" id="mRequests">📋<span>요청</span><i class="dot" hidden></i></button>
+      <button data-open="album" id="mAlbum">📷<span>앨범</span></button>
+    </div>
+  </nav>
+  <section class="sheet" id="sheet" hidden aria-modal="true" role="dialog">
+    <header><h2 id="sheetTitle"></h2><span id="sheetSub"></span><button id="sheetClose" aria-label="닫기">✕</button></header>
+    <div class="tabs" id="sheetTabs" hidden></div>
+    <div class="body" id="sheetBody"></div>
+  </section>
+  <div class="modal" id="modal" hidden><div class="box" id="modalBox"></div></div>
+  <div id="toasts"></div>
+  <div id="fx"></div>
+  <div id="flash"></div>
+</div>
+<script type="module">
+import * as G from '../animal-world/logic.js';
+import { GRID, GW, GH, ISLE, ISLE_THEME, MAX_TIER, TIERS, ECON, SIZE, SPECIES, ITEMS, REGIONS, NEED_NAME, NEED_ICON, caps, speciesOf, itemsOf, itemPrice, animalPrice } from '../animal-world/data.js';
+import * as A from '../animal-world/art.js';
+import { LEVEL, TERRAIN, heightAt, kindAt, allowedOn } from '../animal-world/terrain.js';
+import { createMusic } from '../animal-world/music.js';
+import { createSound } from '../animal-world/sound.js';
+import * as D from '../animal-world/data.js';
+import { createPixi } from './render/pixi.js';
+import { buildScenario, createPerf } from './perf.js';
+
+const $ = (s) => document.querySelector(s);
+// v2 주소 옵션: renderer=pixi(기본)·2d, perf=1(측정 장면, perf.js 참고)
+const Q = Object.fromEntries(new URLSearchParams(location.search));
+const RENDERER = Q.renderer === '2d' ? '2d' : 'pixi', OUTLINE2D = Q.outline === '2d', PERF = Q.perf === '1', SYNC = Q.sync === '1';
+const view = $('#view'), ctx = view.getContext('2d');
+const over = $('#over'), octx = over.getContext('2d');
+let PX = null; // PixiJS 렌더러(켜지면). 없으면 v1과 같은 Canvas 2D 그리기
+let PF = null; // 측정 표(perf=1)
+const mark = (name, t) => { if (PF) PF.mark(name, performance.now() - t); };
+// 땅·물건·동물은 따로 그려 시간대 빛을 입힌 뒤 하늘 위에 얹는다
+const scene = document.createElement('canvas'), sctx = scene.getContext('2d');
+const T = A.TILE, WG = GRID * T, ISO_A = A.ISO_A, ISO_B = A.ISO_B, SLAB = A.slabOf(WG), TOPZ = 3 * LEVEL + A.PEAK_EXTRA; // TOPZ = 가장 높은 지형(봉우리 꼭대기)
+const SAVE_KEY = 'animal-world-v2.save', V1_SAVE_KEY = 'animal-world.save'; // v2는 따로 저장한다(같은 주소라 저장소를 같이 써서)
+// 땅 범위(배율 1의 화면 좌표 u = (x−y)·ISO_A, v = (x+y)·ISO_B): 본섬만, 또는 앞쪽 T8 섬까지(섬은 본섬 왼쪽 아래로 붙는다)
+const MAIN_BOX = { u0: -WG * ISO_A, u1: WG * ISO_A, v0: 0, v1: 2 * WG * ISO_B };
+const FULL_BOX = { ...MAIN_BOX, u0: Math.min(MAIN_BOX.u0, (ISLE.x0 - ISLE.y1) * T * ISO_A), v1: Math.max(MAIN_BOX.v1, (ISLE.x1 + ISLE.y1) * T * ISO_B) };
+
+let S = null;
+const UI = { sheet: null, tab: 'terrain', place: null, sel: null, follow: null, zl: 0, zf: 1, cam: { x: 0, y: 0 }, seen: { animals: {}, decor: {}, regions: {} }, confirm: null };
+
+// ---------- 저장 ----------
+function save() {
+  if (!S || PERF) return;
+  try { localStorage.setItem(SAVE_KEY, G.serialize(S, Date.now())); S.savedAt = Date.now(); } catch { /* 저장 불가 환경에서도 게임은 계속 */ }
+}
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(V1_SAVE_KEY); } catch { return null; } // v2 세이브가 없으면 v1 세이브로 시작(v1은 고치지 않는다)
+  if (!raw) return null;
+  const s = G.deserialize(raw);
+  if (!s) { try { localStorage.setItem(SAVE_KEY + '.bad', raw); } catch { /* 무시 */ } }
+  return s;
+}
+function loadSeen() {
+  try { const o = JSON.parse(localStorage.getItem(SAVE_KEY + '.seen') || '{}'); return { animals: o.animals ?? {}, decor: o.decor ?? {}, regions: o.regions ?? {} }; } catch { return { animals: {}, decor: {}, regions: {} }; }
+}
+function saveSeen() { try { localStorage.setItem(SAVE_KEY + '.seen', JSON.stringify(UI.seen)); } catch { /* 무시 */ } }
+
+// ---------- 화면 크기·투영 ----------
+let VW = 0, VH = 0, DPR = 1, Z0 = 1, zoom = 1, cx = 0, cy = 0, horizon = 0, barTop = 0;
+// VB = 1×에 화면에 맞추는 땅 범위(T8 섬이 열린 지역이면 섬까지), (uc, vc) = 그 가운데. 화면 (cx, cy)에 온다
+let VB = MAIN_BOX, uc = 0, vc = WG * ISO_B;
+const ny = () => (G.isleOpen(S, S.view) ? GH : GRID); // 지금 갈 수 있는 행 수(잠긴 섬은 뺀다)
+// zoom = 지금 화면 배율(Z0 × UI.zf), artZoom = 땅·물건 그림을 마지막으로 그린 배율. 핀치하는 동안은 그 그림을 늘려 보여 주고, 손을 떼면 다시 그린다
+let artZoom = 1;
+function resize() {
+  DPR = Q.dpr ? Number(Q.dpr) : Math.min(2, window.devicePixelRatio || 1);
+  const r = view.getBoundingClientRect();
+  VW = r.width; VH = r.height;
+  view.width = Math.round(VW * DPR); view.height = Math.round(VH * DPR);
+  if (PX) { scene.width = scene.height = 1; over.width = view.width; over.height = view.height; PX.resize(VW, VH, DPR); } // PixiJS는 장면 캔버스 대신 자기 캔버스에 그린다
+  else { scene.width = view.width; scene.height = view.height; over.width = over.height = 1; }
+  const top = $('#hud').getBoundingClientRect().bottom + 24, bar = $('#bar').getBoundingClientRect();
+  document.documentElement.style.setProperty('--bar-h', `${Math.round(bar.height)}px`);
+  const availH = bar.top - top;
+  barTop = bar.top;
+  // 1× = 땅 전체(T8 섬이 열렸으면 섬까지)가 화면 폭(또는 높이)에 들어오는 배율
+  VB = S && G.isleOpen(S, S.view) ? FULL_BOX : MAIN_BOX;
+  const bw = VB.u1 - VB.u0, bh = VB.v1 - VB.v0;
+  uc = (VB.u0 + VB.u1) / 2; vc = (VB.v0 + VB.v1) / 2;
+  Z0 = Math.max(0.15, Math.min((VW - 16) / bw, (availH - 20) / (bh + SLAB + 80)));
+  cx = VW / 2; cy = top + 80 * Z0 + (vc - VB.v0) * Z0 + (availH - 80 * Z0 - (bh + SLAB) * Z0) * 0.5;
+  horizon = cy - (vc - VB.v0) * Z0 - 10;
+  zoom = Z0 * UI.zf; // 화면 크기가 바뀌면 같은 배율로 다시 맞춘다
+  setZoomF(UI.zf);
+}
+// 확대 단추: 1× · 1.5× · 2× · 3× · 4×(최대). 두 손가락 핀치·Ctrl+휠로는 그 사이 아무 배율이나(1~4×). 지금 배율에 가장 가까운 단추가 켜진다
+const ZOOMS = [1, 1.5, 2, 3, 4];
+function setZoom(i) { setZoomF(ZOOMS[i]); if (i === 0) { UI.cam.x = 0; UI.cam.y = 0; UI.follow = null; } }
+// 배율 f(1~4)로. (ax, ay) 화면 점 아래 땅이 그 자리에 머문다(기본은 화면 가운데). live면 그림은 다시 그리지 않고 늘려 보여 준다
+function setZoomF(f, ax = cx, ay = cy, live = false, toX = ax, toY = ay) {
+  const old = zoom;
+  UI.zf = Math.max(1, Math.min(ZOOMS[ZOOMS.length - 1], f));
+  zoom = Z0 * UI.zf;
+  const u = (ax - cx + UI.cam.x) / old, v = (ay - cy + UI.cam.y) / old; // 고정할 점의 땅 좌표(배율 1 기준)
+  UI.cam.x = cx + u * zoom - toX; UI.cam.y = cy + v * zoom - toY;
+  clampCam();
+  UI.zl = ZOOMS.reduce((b, z, i) => (Math.abs(z - UI.zf) < Math.abs(ZOOMS[b] - UI.zf) ? i : b), 0);
+  for (const b of document.querySelectorAll('#zoombar button')) b.classList.toggle('on', Number(b.dataset.z) === UI.zl);
+  if (!live) commitZoom();
+}
+// 지금 배율로 땅·물건 그림을 다시 그린다
+function commitZoom() { if (artZoom !== zoom) { artZoom = zoom; clearArt(); } }
+// 확대한 만큼만 끌어서 둘러볼 수 있다(땅 가장자리까지)
+function clampCam() {
+  const L = UI.zf - 1, mx = ((VB.u1 - VB.u0) / 2) * Z0 * L, my = ((VB.v1 - VB.v0) / 2) * Z0 * L + (L > 0 ? 40 : 0);
+  UI.cam.x = Math.max(-mx, Math.min(mx, UI.cam.x)); UI.cam.y = Math.max(-my, Math.min(my, UI.cam.y));
+}
+window.addEventListener('resize', resize);
+new ResizeObserver(() => { const r = view.getBoundingClientRect(); if (Math.round(r.width) !== Math.round(VW) || Math.round(r.height) !== Math.round(VH)) resize(); }).observe(view);
+// 메뉴 높이가 바뀌면(글꼴 로딩 등) 카드·놓기 막대를 그 위로 올린다
+new ResizeObserver(() => document.documentElement.style.setProperty('--bar-h', `${Math.round($('#bar').getBoundingClientRect().height)}px`)).observe($('#bar'));
+function P(x, y, z = 0) {
+  return [cx - UI.cam.x + ((x - y) * ISO_A - uc) * zoom, cy - UI.cam.y + ((x + y) * ISO_B - vc) * zoom - z * zoom];
+}
+const pen = { ctx: sctx, zoom: 1, P };
+
+// ---------- 미리 그려 두는 그림 ----------
+// 정적인 그림은 한 번만 그려 두고 찍는다(MDN "Optimizing canvas"). 배율이 바뀌면 새로 그린다.
+const sprites = new Map();
+let island = null;
+function clearArt() {
+  for (const v of sprites.values()) v.c.width = v.c.height = 0;
+  sprites.clear();
+  freeIsland();
+  island = null;
+}
+function freeIsland() {
+  if (!island) return;
+  island.c.width = island.c.height = 0;
+  for (const o of island.occ.values()) o.c.width = o.c.height = 0;
+}
+function canvasOf(w, h, sc = DPR) {
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(w * sc); c.height = Math.ceil(h * sc);
+  const g = c.getContext('2d');
+  g.setTransform(sc, 0, 0, sc, 0, 0);
+  return [c, g];
+}
+// 땅 그림 한 장의 최대 픽셀 수: 4×로 크게 보면 땅 그림이 커져서, 넘으면 해상도를 조금 낮춰 그린다(iOS 캔버스 한도 약 1,670만 픽셀)
+const ISLAND_MAX_PX = 12e6;
+const isoX = (x, y) => (x - y) * ISO_A * artZoom, isoY = (x, y) => (x + y) * ISO_B * artZoom; // 그림 캐시용(artZoom)
+function itemSprite(id, v) {
+  const key = id + '|' + v;
+  let s = sprites.get(key);
+  if (s) return s;
+  const [r, h] = A.ITEM_BOX[id];
+  const az = artZoom, w = Math.ceil(2 * (r + 10) * az), hh = Math.ceil((h + r + 22) * az);
+  const ax = w / 2, ay = Math.ceil((h + r * 0.5 + 12) * az);
+  const [c, g] = canvasOf(w, hh);
+  A.drawItem({ ctx: g, zoom: az, P: (x, y, z = 0) => [isoX(x, y) + ax, isoY(x, y) + ay - z * az] }, id, v + 1);
+  s = { c, ax, ay, w, h: hh };
+  sprites.set(key, s);
+  return s;
+}
+// 땅(지형)과 바닥 물건(풀밭·연못 등)을 한 장으로. 바닥 물건이 바뀌거나 배율·지역이 바뀌거나 T8 섬이 열리면 새로 그린다.
+// 그림은 늘 T8 섬까지 담는다(잠겨 있으면 다리 가운데가 끊기고 섬은 흐리게)
+function islandArt() {
+  const R = S.regions[S.view], open = G.isleOpen(S, S.view);
+  if (island && island.rid === S.view && island.open === open && island.rev === S.rev) return island;
+  const floors = R.items.filter((it) => A.FLOOR.has(it.id)), sig = floors.map((it) => `${it.uid}:${it.x}:${it.y}`).join(',');
+  if (island && island.rid === S.view && island.open === open && island.sig === sig) { island.rev = S.rev; return island; }
+  freeIsland();
+  const B = FULL_BOX, az = artZoom, m = 10, w = (B.u1 - B.u0) * az + 2 * m, h = (B.v1 - B.v0 + SLAB * 1.6 + TOPZ) * az + 2 * m + 10;
+  const ox = -B.u0 * az + m, oy = m + 8 + TOPZ * az;
+  const sc = Math.min(DPR, Math.sqrt(ISLAND_MAX_PX / (w * h))), [c, g] = canvasOf(w, h, sc), IP = (x, y, z = 0) => [ox + isoX(x, y), oy + isoY(x, y) - z * az];
+  const pal = A.PAL[S.view] ?? A.PAL.grassland, opt = { ny: GH, isleY: ISLE.y0 }, cut = ISLE.bridge.y0 + 2; // 잠긴 다리는 cut~cut+1행이 끊긴다
+  // 바닥 물건은 앞 모서리 칸의 대각선까지 땅을 그린 뒤 끼워 그린다(앞쪽 언덕에 가려지게)
+  A.drawIsland({ ctx: g, zoom: az, P: IP }, WG, GRID, pal, 3, S.view, (dg) => {
+    for (const it of floors) {
+      const d = ITEMS[it.id];
+      if (it.x + d.w - 1 + it.y + d.h - 1 !== dg) continue;
+      const s = itemSprite(it.id, it.uid % 3), [sx, sy] = IP((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it));
+      g.drawImage(s.c, sx - s.ax, sy - s.ay, s.w, s.h);
+    }
+  }, open ? opt : { ...opt, skip: (x, y) => y >= cut });
+  if (!open) { // 잠긴 T8 섬: 끊긴 다리 건너편과 섬을 따로 그려 흐리게 얹는다
+    const [c2, g2] = canvasOf(w, h, sc);
+    A.drawIsland({ ctx: g2, zoom: az, P: IP }, WG, GRID, pal, 3, S.view, null, { ...opt, skip: (x, y) => y < cut + 2 });
+    g.globalAlpha = 0.45; g.drawImage(c2, 0, 0, w, h); g.globalAlpha = 1;
+    c2.width = c2.height = 0;
+  }
+  island = { c, ox, oy, w, h, sc, rid: S.view, open, sig, rev: S.rev, occ: new Map() };
+  return island;
+}
+// ---------- 지형 높이 ----------
+const itemZ = (it) => heightAt(S.view, it.x, it.y) * LEVEL;
+const groundZ = (a) => (SPECIES[a.sp].swim ? -LEVEL : heightAt(S.view, Math.min(GW - 1, Math.max(0, Math.floor(a.x))), Math.min(GH - 1, Math.max(0, Math.floor(a.y)))) * LEVEL);
+const isVoid = (rid, x, y) => { const k = kindAt(rid, x, y); return !k || k === 'void'; };
+// 칸 기둥(윗면 + 앞쪽 옆면)의 화면 육각형. 앞 칸이 낮으면 옆면이 그만큼 내려간다(가장자리는 섬 바닥까지)
+function columnOf(rid, x, y, proj = P) {
+  const h = (xx, yy) => (isVoid(rid, xx, yy) ? -SLAB / LEVEL : heightAt(rid, xx, yy));
+  const z = heightAt(rid, x, y) * LEVEL, zb = Math.min(z, h(x + 1, y) * LEVEL, h(x, y + 1) * LEVEL), zt = z + (kindAt(rid, x, y) === 'peak' ? A.PEAK_EXTRA : 0);
+  const x0 = x * T, x1 = x0 + T, y0 = y * T, y1 = y0 + T;
+  return [proj(x0, y0, zt), proj(x1, y0, zt), proj(x1, y0, zb), proj(x1, y1, zb), proj(x0, y1, zb), proj(x0, y1, zt)];
+}
+// 뒤에 있는 동물·물건을 가릴 수 있는 칸: 뒤쪽(64단위, 4칸 안) 칸보다 높은 칸과 봉우리. 지역마다(T8 섬이 열리면 섬까지 넣어 다시) 한 번 계산
+const occCache = {};
+function occludersOf(rid) {
+  const rows = ny(), key = rid + ':' + rows;
+  if (occCache[key]) return occCache[key];
+  const out = [], B = Math.round(64 / T);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < GW; x++) {
+    const k = kindAt(rid, x, y);
+    if (k === 'void' || k === 'bridge') continue;
+    const z = heightAt(rid, x, y);
+    let low = Infinity;
+    for (let dy = 0; dy <= B; dy++) for (let dx = 0; dx <= B; dx++) if ((dx || dy) && x - dx >= 0 && y - dy >= 0 && !isVoid(rid, x - dx, y - dy)) low = Math.min(low, heightAt(rid, x - dx, y - dy));
+    if (k === 'peak' || z > low) out.push({ x, y, key: x + y, zt: z * LEVEL });
+  }
+  return (occCache[key] = out);
+}
+const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+// 가리는 칸의 그림: 땅 그림에서 그 칸 기둥 모양으로 한 번 오려 둔다(땅 그림을 새로 그리면 버린다)
+function occArt(o, isl) {
+  let a = isl.occ.get(o);
+  if (a) return a;
+  const IP = (x, y, z = 0) => [isl.ox + isoX(x, y), isl.oy + isoY(x, y) - z * artZoom];
+  const q = columnOf(S.view, o.x, o.y, IP), xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
+  const sc = isl.sc, l = Math.floor(Math.min(...xs) * sc) / sc, t = Math.floor(Math.min(...ys) * sc) / sc, w = Math.max(...xs) - l, h = Math.max(...ys) - t;
+  const [c, g] = canvasOf(w, h, sc);
+  g.beginPath(); g.moveTo(q[0][0] - l, q[0][1] - t); for (let i = 1; i < 6; i++) g.lineTo(q[i][0] - l, q[i][1] - t); g.closePath(); g.clip();
+  g.drawImage(isl.c, -l, -t, isl.w, isl.h);
+  a = { c, l, t, w: c.width / sc, h: c.height / sc };
+  isl.occ.set(o, a);
+  return a;
+}
+// 가리는 칸을 다시 찍는다(그 칸에 겹치고, 그 칸 윗면보다 낮은 곳에 선, 먼저 그린 동물·물건이 있을 때만). boxes = [왼, 위, 오른, 아래, 발밑 높이]
+function stampColumn(o, boxes, isl, ix, iy) {
+  const a = occArt(o, isl), sk = zoom / artZoom, bb = [ix + a.l * sk, iy + a.t * sk, ix + (a.l + a.w) * sk, iy + (a.t + a.h) * sk];
+  if (!boxes.some((b) => b[4] < o.zt - 0.5 && overlaps(b, bb))) return;
+  blit(a.c, bb[0], bb[1], a.w * sk, a.h * sk);
+}
+function inPoly(q, x, y) {
+  let s = 0;
+  for (let i = 0; i < q.length; i++) {
+    const [ax, ay] = q[i], [bx, by] = q[(i + 1) % q.length], c = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+    if (c !== 0) { if (s && Math.sign(c) !== s) return false; s = Math.sign(c); }
+  }
+  return true;
+}
+// 화면 좌표 → 칸: 앞쪽 칸부터 기둥 육각형에 들어가는 첫 칸(높은 지형이 뒤 칸을 가린다)
+function tileAtScreen(sx, sy) {
+  const rows = ny();
+  for (let dg = GW + rows - 2; dg >= 0; dg--) for (let x = Math.min(GW - 1, dg); x >= Math.max(0, dg - rows + 1); x--) {
+    if (!isVoid(S.view, x, dg - x) && inPoly(columnOf(S.view, x, dg - x), sx, sy)) return [x, dg - x];
+  }
+  return null;
+}
+const snap = (v) => Math.round(v * DPR) / DPR;
+function blitAt(s, sx, sy, alpha = 1) {
+  const sk = zoom / artZoom;
+  if (sk === 1) blit(s.c, snap(sx - s.ax), snap(sy - s.ay), s.w, s.h, alpha);
+  else blit(s.c, sx - s.ax * sk, sy - s.ay * sk, s.w * sk, s.h * sk, alpha); // 핀치 중: 그려 둔 그림을 늘린다
+}
+// v2: 캔버스 한 장 찍기(CSS 픽셀). PixiJS면 그 캔버스를 텍스처로 올린 스프라이트, 2D면 장면 캔버스에 drawImage
+function blit(c, x, y, w, h, alpha = 1, layer = 'depth') {
+  if (PX) return PX.sprite(c, x, y, w, h, alpha, layer);
+  if (alpha !== 1) sctx.globalAlpha = alpha;
+  sctx.drawImage(c, x, y, w, h);
+  if (alpha !== 1) sctx.globalAlpha = 1;
+}
+// 아틀라스 한 칸 찍기(기기 픽셀 좌표)
+function blitDev(c, sx, sy, sw, sh, dx, dy) {
+  if (PX) return PX.sub(c, sx, sy, sw, sh, dx / DPR, dy / DPR, sw / DPR, sh / DPR);
+  sctx.save(); sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.drawImage(c, sx, sy, sw, sh, dx, dy, sw, sh);
+  sctx.restore();
+}
+
+// ---------- 동물 그림 상태(고개 숙임·눕기 부드럽게) ----------
+const mem = new Map();
+// v2: 리그 스프링에 넘기는 시간은 1/30초까지. 프레임이 0.15초를 넘으면 스프링이 불안정해져 몸 일부(바다코끼리 몸통·코끼리 코 등)가 크게 튀어나가던 문제(DESIGN.md 14절)
+const RIG_DT = 1 / 30;
+const STANDS_TO_REST = new Set(['elephant']); // 쉴 때 눕지 않는 종(물에 사는 동물도 눕지 않는다)
+function poseOf(a, dt) {
+  let m = mem.get(a.uid);
+  if (!m) { m = { hd: 0, ly: 0, gait: (a.uid * 0.37) % 1, rig: {}, px: a.x, py: a.y, z: groundZ(a) }; mem.set(a.uid, m); }
+  m.z += (groundZ(a) - m.z) * Math.min(1, dt * 10); // 언덕을 오르내릴 때 높이를 부드럽게
+  const thd = a.st === 'eat' || a.st === 'drink' ? 1 : 0, tly = a.st === 'rest' && !STANDS_TO_REST.has(a.sp) && !SPECIES[a.sp].swim ? 1 : 0;
+  const k = Math.min(1, dt * 4);
+  m.hd += (thd - m.hd) * k; m.ly += (tly - m.ly) * k;
+  // 리그 동물(STRIDE가 있는 종)의 걸음 위상: 화면에서 실제로 움직인 거리(그림 단위) ÷ 보폭. 그래서 발이 미끄러지지 않는다
+  const dx = a.x - m.px, dy = a.y - m.py; m.px = a.x; m.py = a.y;
+  const moved = (Math.hypot((dx - dy) * ISO_A, (dx + dy) * ISO_B) * T) / ANIMAL_SCALE;
+  if (A.STRIDE[a.sp] && moved < 3) m.gait = (m.gait + moved / A.STRIDE[a.sp]) % 1; // 순간이동(빈칸으로 옮김)은 걸음으로 치지 않는다
+  return { face: a.face, st: a.st, ph: a.ph, mv: a.st === 'walk' ? 1 : 0, hd: m.hd, ly: m.ly, sp: a.st === 'special' ? Math.max(0, Math.min(1, 1 - a.t / ECON.chanceLen)) : -1, gait: m.gait, rig: m.rig, dt: Math.min(dt, RIG_DT) };
+}
+const ANIMAL_SCALE = 1.25; // 동물은 칸보다 조금 크게(관찰용)
+const animalK = () => zoom * ANIMAL_SCALE;
+// 외곽선: 리그를 적용한 종은 따로 그린 뒤, 실루엣을 사방 1~2px 밀어 찍은 테두리를 진한 색으로 칠해 깔고 위에 원본을 얹는다.
+// 화면에 보이는 리그 동물은 프레임마다 큰 캔버스 하나(atA)에 모아 그리고, 테두리와 원본을 겹친 그림도 한꺼번에(atB) 만들어 장면에는 한 번씩만 찍는다.
+// 동물마다 작은 캔버스에 그리자마자 장면에 찍으면 그때마다 GPU가 밀린 그리기를 처리해서 44마리에서 느려졌다(헤드리스 실측: 32마리 51fps → 44마리 38fps)
+function animalShadow(g, sp, sx, sy, k) {
+  const [hw] = A.ANIMAL_BOX[sp];
+  if (PX) { // v2: 그림자는 땅 바로 위 한 층에 모아 그린다(v1은 동물마다 그 깊이에서). 동물 앞쪽 물건 위로 그림자가 올라가지 않는다
+    if (SPECIES[sp].swim) for (const f of [1, 1.35]) PX.shadowRing(sx, sy, hw * f * k, hw * f * 0.32 * k, Math.max(0.8, k * 0.8), '#ffffff', 0.75);
+    else PX.shadowEllipse(sx, sy, Math.max(6, hw * 0.8) * k, Math.max(1.6, hw * 0.16) * k, '#281a0a', 0.22);
+    return;
+  }
+  if (SPECIES[sp].swim) { // 물에 사는 동물: 그림자 대신 물결 고리
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(0.8, k * 0.8);
+    for (const f of [1, 1.35]) { g.beginPath(); g.ellipse(sx, sy, hw * f * k, hw * f * 0.32 * k, 0, 0, Math.PI * 2); g.stroke(); }
+  } else { g.fillStyle = 'rgba(40,25,10,0.22)'; g.beginPath(); g.ellipse(sx, sy, Math.max(6, hw * 0.8) * k, Math.max(1.6, hw * 0.16) * k, 0, 0, Math.PI * 2); g.fill(); } // 그림자는 테두리 밖에, 종 크기만큼
+}
+// 한 마리 자리: 상자 w×h(위로 넉넉히, 뛰어오르는 특수 행동) + 테두리 여백 m
+function outlineBox(sp, k) {
+  const [hw, bh] = A.ANIMAL_BOX[sp], w = Math.ceil((hw * 2 + 24) * k * DPR), h = Math.ceil((bh + 30) * k * DPR);
+  const r = Math.max(0.8, Math.min(1.8, k * 1.2)) * DPR, m = Math.ceil(r);
+  return { w, h, r, m, W: w + 2 * m, H: h + 2 * m, ox: w / 2, oy: h - 6 * k * DPR };
+}
+const atA = document.createElement('canvas'), atB = document.createElement('canvas'), outA = document.createElement('canvas'), outB = document.createElement('canvas');
+const AT_W = 2048, AT_MAX_H = 4096;
+// list의 동물마다 o.slot(cA·cB 안의 자리)을 정하고, cA에 원본을, cB에 테두리와 원본을 겹쳐 그린다. 자리가 모자라면 그 동물은 slot 없이 남는다.
+// 자리마다 테두리 여백 m을 두고 원본은 상자 안으로 잘라 그려서, 밀어 찍을 때 옆 자리나 지난 그림이 섞이지 않는다
+function packOutlined(list, cA, cB, maxW, maxH, outline2d = true) {
+  let x = 0, y = 0, rowH = 0, wide = 0;
+  for (const o of list) {
+    const b = outlineBox(o.sp, o.kk);
+    if (x + b.W > maxW) { x = 0; y += rowH; rowH = 0; }
+    if (b.W > maxW || y + b.H > maxH) { o.slot = null; continue; }
+    o.slot = { ...b, x, y, c: cB }; x += b.W; rowH = Math.max(rowH, b.H); wide = Math.max(wide, x);
+  }
+  const used = y + rowH;
+  if (!used) return { wide: 0, used: 0 };
+  if (PX && cA === atA) { // v2: 매 프레임 GPU로 올리므로 쓴 만큼만(256 단위로 맞춰 크기가 자주 바뀌지 않게)
+    const W = Math.ceil(wide / 256) * 256, H = Math.ceil(used / 256) * 256;
+    if (cA.width !== W || cA.height !== H) { cA.width = W; cA.height = H; if (outline2d) { cB.width = W; cB.height = H; } }
+  } else if (cA.width < wide || cA.height < used) { cA.width = cB.width = Math.max(wide, cA.width); cA.height = cB.height = Math.max(used, cA.height); }
+  const ga = cA.getContext('2d'), gb = cB.getContext('2d');
+  ga.setTransform(1, 0, 0, 1, 0, 0); ga.clearRect(0, 0, wide, used);
+  for (const o of list) {
+    const q = o.slot; if (!q) continue;
+    ga.save(); ga.beginPath(); ga.rect(q.x + q.m, q.y + q.m, q.w, q.h); ga.clip(); ga.setTransform(DPR, 0, 0, DPR, 0, 0);
+    A.drawAnimal(ga, o.sp, (q.x + q.m + q.ox) / DPR, (q.y + q.m + q.oy) / DPR, o.kk, { ...o.pose, shadow: false });
+    ga.restore();
+  }
+  if (!outline2d) return { wide, used };
+  gb.setTransform(1, 0, 0, 1, 0, 0); gb.globalCompositeOperation = 'source-over'; gb.clearRect(0, 0, wide, used);
+  for (const o of list) {
+    const q = o.slot; if (!q) continue;
+    for (let i = 0; i < 8; i++) { const t = (i / 8) * Math.PI * 2; gb.drawImage(cA, q.x + q.m, q.y + q.m, q.w, q.h, q.x + q.m + Math.cos(t) * q.r, q.y + q.m + Math.sin(t) * q.r, q.w, q.h); }
+  }
+  gb.globalCompositeOperation = 'source-in'; gb.fillStyle = '#3b2f28'; gb.fillRect(0, 0, wide, used); gb.globalCompositeOperation = 'source-over';
+  for (const o of list) { const q = o.slot; if (q) gb.drawImage(cA, q.x + q.m, q.y + q.m, q.w, q.h, q.x + q.m, q.y + q.m, q.w, q.h); } // 테두리 위에 원본을 미리 얹어 장면에는 한 번만 찍는다
+  return { wide, used };
+}
+function blitOutlined(g, o) {
+  const q = o.slot, x0 = Math.round(o.sx * DPR - q.ox), y0 = Math.round(o.sy * DPR - q.oy);
+  animalShadow(g, o.sp, o.sx, o.sy, o.kk);
+  blitDev(q.c, q.x, q.y, q.W, q.H, x0 - q.m, y0 - q.m);
+}
+// 큰 캔버스에 자리가 없을 때(아주 크게 확대해 큰 동물이 화면을 채울 때): 작은 캔버스로 한 마리씩
+function drawOutlined(g, o) {
+  packOutlined([o], outA, outB, Infinity, Infinity);
+  blitOutlined(g, o);
+}
+function animalScreen(a) { return P(a.x * T, a.y * T, mem.get(a.uid)?.z ?? groundZ(a)); }
+
+// ---------- 효과(물방울·흙먼지) ----------
+const parts = [];
+function emit(a, kind) {
+  const f = a.face;
+  const wz = mem.get(a.uid)?.z ?? 0;
+  if (kind === 'spray') parts.push({ wx: a.x, wy: a.y, wz, dx: 32 * f, dy: -58, vx: (8 + Math.random() * 14) * f, vy: -10 - Math.random() * 18, g: 60, life: 1.1, t: 0, col: '#7cc3e6', r: 1.4 + Math.random() });
+  if (kind === 'dust') parts.push({ wx: a.x, wy: a.y, wz, dx: (Math.random() - 0.5) * 24, dy: -2, vx: (Math.random() - 0.5) * 10, vy: -6 - Math.random() * 8, g: 4, life: 1, t: 0, col: '#d9bf8a', r: 2.5 + Math.random() * 2 });
+}
+
+// ---------- 그리기 ----------
+let lastT = performance.now(), drawT = 0;
+function draw(dt) {
+  drawT += dt;
+  if (!view.width || !view.height) return; // 화면 크기가 0이면(숨은 탭·전환 중) 그리지 않는다. 크기가 생기면 resize가 다시 잡는다
+  // v2: g = 선이나 도형으로 그리는 것(선택 고리·놓을 자리·파티클)을 받는 캔버스. PixiJS면 맨 위 #over, 2D면 장면 캔버스
+  const rid = S.view, L = A.lightAt(S.time), g = PX ? octx : sctx;
+  let t = performance.now();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  A.drawSky(ctx, VW, VH, horizon, drawT, L, rid);
+  mark('sky', t);
+  t = performance.now();
+  if (PX) { PX.begin(); octx.setTransform(1, 0, 0, 1, 0, 0); octx.clearRect(0, 0, over.width, over.height); octx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  else { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, scene.width, scene.height); g.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  const isl = islandArt(), sk = zoom / artZoom, [i0x, i0y] = P(0, 0, 0), ix = sk === 1 ? snap(i0x - isl.ox) : i0x - isl.ox * sk, iy = sk === 1 ? snap(i0y - isl.oy) : i0y - isl.oy * sk;
+  blit(isl.c, ix, iy, isl.w * sk, isl.h * sk, 1, 'base');
+  pen.zoom = zoom; pen.ctx = g;
+  const R = S.regions[rid], st = G.stats(S, rid);
+  // 서 있는 물건·동물·가리는 지형 칸을 깊이(칸 x+y) 순서로. 바닥 물건은 땅 그림에 들어 있다
+  const stand = [];
+  for (const it of R.items) { if (A.FLOOR.has(it.id)) continue; const d = ITEMS[it.id]; stand.push({ key: it.x + d.w - 1 + it.y + d.h - 1 + 0.5, it, d }); }
+  for (const a of R.animals) { const tx = Math.floor(a.x), ty = Math.floor(a.y); stand.push({ key: tx + ty + 0.25 + (a.x + a.y - tx - ty) * 0.25, a }); }
+  for (const o of occludersOf(rid)) stand.push(o);
+  stand.sort((p, q) => p.key - q.key);
+  const k = animalK(), boxes = [], pre = new Map();
+  for (const a of R.animals) { // 자세(높이를 부드럽게 바꾼다)를 먼저 구하고 화면 위치를 잰다
+    const pose = poseOf(a, dt), [sx, sy] = animalScreen(a), kk = k * (0.96 + (a.uid % 5) * 0.02), [bw, bh] = A.ANIMAL_BOX[a.sp], mx = (bw + 14) * kk;
+    const seen = sx > -mx && sx < VW + mx && sy > -8 * kk && sy - (bh + 32) * kk < VH; // 테두리·뛰어오르기까지 넣은 상자가 화면에 걸치면
+    pre.set(a, { sp: a.sp, pose, sx, sy, kk, seen, box: [sx - (bw + 4) * kk, sy - (bh + 8) * kk, sx + (bw + 4) * kk, sy + 2 * kk] });
+  }
+  mark('scene', t); t = performance.now();
+  const rigged = [...pre.values()].filter((p) => p.seen && A.RIGGED.has(p.sp));
+  if (!PX) packOutlined(rigged, atA, atB, AT_W, AT_MAX_H);
+  else { // v2: 아틀라스는 더 크게(노트북 GPU). 외곽선은 셰이더(기본) 또는 v1처럼 2D로 만들어 올리기(outline=2d)
+    const big = Math.min(PX_MAX, 8192), pk = packOutlined(rigged, atA, atB, Number(Q.atw) || 4096, big, OUTLINE2D);
+    mark('rig', t); t = performance.now();
+    const r = rigged[0] ? outlineBox(rigged[0].sp, rigged[0].kk).r : 1;
+    if (OUTLINE2D) PX.upload(atB); else PX.outline(atA, atB, pk.wide, pk.used, r, '#3b2f28');
+    mark('upload', t); t = performance.now();
+  }
+  if (!PX) { mark('rig', t); t = performance.now(); }
+  for (const o of stand) {
+    if (o.it) { boxes.push(drawItemAt(o.it, o.d)); continue; }
+    if (!o.a) { if (boxes.length) stampColumn(o, boxes, isl, ix, iy); continue; }
+    const a = o.a, p = pre.get(a), { pose, sx, sy, kk } = p;
+    if (UI.sel?.type === 'animal' && UI.sel.uid === a.uid) {
+      const [hw] = A.ANIMAL_BOX[a.sp];
+      g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.beginPath(); g.ellipse(sx, sy, hw * k + 4, (hw * k + 4) * 0.42, 0, 0, Math.PI * 2); g.stroke();
+    }
+    if (p.slot) blitOutlined(g, p);
+    else if (!p.seen) { /* 화면 밖 */ }
+    else if (A.RIGGED.has(a.sp)) { if (PX) PX.stats.miss++; else drawOutlined(g, p); } // v2: 아틀라스에 못 들어간 동물은 아직 그리지 않는다(시제품)
+    else A.drawAnimal(g, a.sp, sx, sy, kk, pose);
+    boxes.push([...p.box, mem.get(a.uid)?.z ?? groundZ(a)]);
+    if (a.st === 'special' && a.sp === 'elephant' && Math.random() < dt * 30) emit(a, 'spray');
+    if (a.st === 'special' && a.sp === 'zebra' && Math.random() < dt * 8) emit(a, 'dust');
+  }
+  // 선택한 물건 · 놓을 자리(놓을 수 있는 지형 칸을 밝게, 고른 자리는 초록/빨강)
+  if (UI.sel?.type === 'item') { const it = R.items.find((i) => i.uid === UI.sel.uid); if (it) A.footprint(pen, it.x, it.y, ITEMS[it.id].w, ITEMS[it.id].h, 'rgba(255,255,255,0.18)', '#ffffff', itemZ(it)); }
+  if (UI.place) {
+    const id = UI.place.id, d = ITEMS[id], on = [allowedOn(id), allowedOn(id, true)], z = heightAt(rid, UI.place.x, UI.place.y) * LEVEL; // [본섬, T8 섬]
+    g.beginPath(); // 칸이 많아 한 번에 칠한다
+    for (let y = 0, rows = ny(); y < rows; y++) for (let x = 0; x < GW; x++) {
+      if (!on[y >= ISLE.y0 ? 1 : 0].includes(kindAt(rid, x, y)) || G.itemAt(S, rid, x, y)) continue;
+      const zz = heightAt(rid, x, y) * LEVEL + 0.3, q = [P(x * T + 0.5, y * T + 0.5, zz), P((x + 1) * T - 0.5, y * T + 0.5, zz), P((x + 1) * T - 0.5, (y + 1) * T - 0.5, zz), P(x * T + 0.5, (y + 1) * T - 0.5, zz)];
+      g.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) g.lineTo(q[i][0], q[i][1]); g.closePath();
+    }
+    g.fillStyle = 'rgba(255,255,255,0.22)'; g.fill();
+    const okSpot = G.fits(S, rid, id, UI.place.x, UI.place.y), cash = G.popOf(S) >= itemPrice(d.tier);
+    A.footprint(pen, UI.place.x, UI.place.y, d.w, d.h, okSpot && cash ? 'rgba(120,220,90,0.35)' : 'rgba(230,80,60,0.35)', okSpot && cash ? '#e8ffd8' : '#ffd2c8', z);
+    const s = itemSprite(id, 0), [gx, gy] = P((UI.place.x + d.w / 2) * T, (UI.place.y + d.h / 2) * T, z);
+    blitAt(s, gx, gy, 0.6);
+  }
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.t += dt; if (p.t > p.life) { parts.splice(i, 1); continue; }
+    p.vy += p.g * dt; p.dx += p.vx * dt; p.dy += p.vy * dt;
+    const [sx, sy] = P(p.wx * T, p.wy * T, p.wz);
+    g.globalAlpha = 1 - p.t / p.life; g.fillStyle = p.col;
+    g.beginPath(); g.arc(sx + p.dx * k, sy + p.dy * k, p.r * k, 0, Math.PI * 2); g.fill();
+  }
+  g.globalAlpha = 1;
+  // 시간대 빛: 그려진 땅·물건·동물에만 색을 덧입힌다(source-atop). 하늘은 drawSky가 시간대 색으로 그린다
+  mark('scene', t); t = performance.now();
+  if (PX) { PX.tint(L.tint[0], L.tint[1]); PX.render(SYNC); mark('render', t); }
+  else {
+    if (L.tint[1] > 0.004) { g.globalCompositeOperation = 'source-atop'; g.fillStyle = A.rgba(L.tint[0], L.tint[1]); g.fillRect(0, 0, VW, VH); g.globalCompositeOperation = 'source-over'; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(scene, 0, 0); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    mark('render', t);
+  }
+  UI.isleBadge = G.isleOpen(S, rid) ? null : isleBadge();
+  // 위에 뜨는 표시: 순간 포착 반짝이, 행복도 낮음 물방울(빛을 입히지 않아 밤에도 잘 보인다)
+  for (const a of R.animals) {
+    const [sx, sy] = animalScreen(a), [, bh] = A.ANIMAL_BOX[a.sp], top = sy - bh * k - 6;
+    if (S.chance && S.chance.uid === a.uid && S.chance.region === rid) A.sparkle(ctx, sx, top - 4, Math.max(5, 7 * zoom), drawT);
+    else if ((st.happy[a.sp] ?? 1) < 0.5 && ((S.time + a.uid * 1.37) % 6) < 1.6) A.sadDrop(ctx, sx + 6, top, Math.max(0.7, zoom));
+  }
+}
+// 잠긴 T8 섬 가운데의 🔒 표시(섬이 화면 가장자리에 걸치면 화면 안쪽으로 당긴다). 누를 수 있는 범위 [왼, 위, 폭, 높이]를 돌려준다
+function isleBadge() {
+  const [bx, by] = P(((ISLE.x0 + ISLE.x1) / 2) * T, ((ISLE.y0 + ISLE.y1) / 2) * T, 0), w = 64, h = 26;
+  if (bx < -w || bx > VW + w || by < 0 || by > barTop + h) return null;
+  const x = Math.max(8, Math.min(VW - w - 8, bx - w / 2)), y = Math.min(barTop - h - 8, by - h / 2), ctx = PX ? octx : view.getContext('2d');
+  ctx.fillStyle = 'rgba(42,32,24,0.72)'; ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2); else ctx.rect(x, y, w, h);
+  ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '700 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(`🔒 T${ISLE.tier}`, x + w / 2, y + h / 2 + 1);
+  return [x, y, w, h];
+}
+function drawItemAt(it, d) {
+  const [sx, sy] = P((it.x + d.w / 2) * T, (it.y + d.h / 2) * T, itemZ(it)), s = itemSprite(it.id, it.uid % 3), sk = zoom / artZoom;
+  blitAt(s, sx, sy);
+  return [sx - s.ax * sk, sy - s.ay * sk, sx + (s.w - s.ax) * sk, sy + (s.h - s.ay) * sk, itemZ(it)];
+}
+
+// ---------- 입력: 탭(선택·포착·놓을 자리), 확대 중에는 끌어서 둘러보기 ----------
+const ptr = { id: null, x: 0, y: 0, sx: 0, sy: 0, drag: false };
+const fingers = new Map(); // 화면에 닿은 손가락(pointerId → 화면 위치)
+let pinch = null; // 두 손가락: { d: 처음 거리, f: 처음 배율, mx, my: 직전 가운데 }
+const local = (e) => { const r = view.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+const twoFingers = () => { const [a, b] = [...fingers.values()]; return { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2 }; };
+view.addEventListener('pointerdown', (e) => {
+  fingers.set(e.pointerId, local(e));
+  try { view.setPointerCapture(e.pointerId); } catch { /* 무시 */ }
+  if (fingers.size === 2) { const t = twoFingers(); pinch = { d: t.d, f: UI.zf, mx: t.mx, my: t.my }; ptr.drag = true; UI.follow = null; return; }
+  if (fingers.size === 1) Object.assign(ptr, { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, drag: false });
+});
+view.addEventListener('pointermove', (e) => {
+  if (!fingers.has(e.pointerId)) return;
+  fingers.set(e.pointerId, local(e));
+  if (pinch && fingers.size >= 2) { // 두 손가락 사이 가운데를 기준으로 확대·축소하고, 가운데가 움직인 만큼 둘러본다
+    const t = twoFingers();
+    setZoomF(pinch.f * (t.d / pinch.d), pinch.mx, pinch.my, true, t.mx, t.my);
+    pinch.mx = t.mx; pinch.my = t.my;
+    return;
+  }
+  if (e.pointerId !== ptr.id) return;
+  if (!ptr.drag && Math.hypot(e.clientX - ptr.sx, e.clientY - ptr.sy) > 8) ptr.drag = true;
+  if (ptr.drag && UI.zf > 1) { UI.cam.x -= e.clientX - ptr.x; UI.cam.y -= e.clientY - ptr.y; UI.follow = null; clampCam(); }
+  ptr.x = e.clientX; ptr.y = e.clientY;
+});
+function liftFinger(e, cancel = false) {
+  if (!fingers.delete(e.pointerId)) return;
+  if (pinch) {
+    if (fingers.size < 2) { pinch = null; commitZoom(); } // 손을 떼면 그 배율로 다시 그린다
+    if (fingers.size === 1) { const [id] = fingers.keys(); Object.assign(ptr, { id, x: e.clientX, y: e.clientY, drag: true }); } // 남은 손가락은 끌기만(탭 아님)
+    if (!fingers.size) ptr.id = null;
+    return;
+  }
+  if (e.pointerId !== ptr.id) return;
+  ptr.id = null;
+  if (!cancel && !ptr.drag) tap(...local(e));
+}
+view.addEventListener('pointerup', (e) => liftFinger(e));
+view.addEventListener('pointercancel', (e) => liftFinger(e, true));
+// 데스크톱: Ctrl+휠(트랙패드 두 손가락 오므리기 포함)로 마우스 위치 기준 확대·축소. 멈추면 다시 그린다
+let wheelDone = 0;
+view.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault(); // 브라우저 페이지 확대 막기
+  const [x, y] = local(e);
+  setZoomF(UI.zf * Math.exp(-e.deltaY * 0.01), x, y, true);
+  UI.follow = null;
+  clearTimeout(wheelDone); wheelDone = setTimeout(commitZoom, 180);
+}, { passive: false });
+// iOS Safari: 화면 핀치로 페이지 전체가 확대되지 않게
+for (const evt of ['gesturestart', 'gesturechange']) document.addEventListener(evt, (e) => e.preventDefault(), { passive: false });
+
+function hitAnimal(a, x, y, grow = 1) {
+  // 작은 동물도 손가락으로 맞힐 수 있게 최소 32×40px
+  const k = animalK(), [sx, sy] = animalScreen(a), [hw, h] = A.ANIMAL_BOX[a.sp], m = 6 * grow;
+  const half = Math.max(16, hw * k * grow + m), top = Math.max(40, h * k * grow + m);
+  return Math.abs(x - sx) <= half && y >= sy - top && y <= sy + 8;
+}
+function animalAt(x, y) {
+  const list = [...S.regions[S.view].animals].sort((a, b) => b.x + b.y - (a.x + a.y));
+  return list.find((a) => hitAnimal(a, x, y)) ?? null;
+}
+function tap(x, y) {
+  const rid = S.view;
+  if (UI.place) {
+    const hit = tileAtScreen(x, y), d = ITEMS[UI.place.id];
+    if (!hit) return;
+    const [tx, ty] = hit;
+    UI.place.x = Math.max(0, Math.min(GW - d.w, tx - Math.floor((d.w - 1) / 2)));
+    UI.place.y = Math.max(0, Math.min(ny() - d.h, ty - Math.floor((d.h - 1) / 2)));
+    updatePlacebar();
+    return;
+  }
+  // 반짝이는 동물은 다른 동물에 가려도 먼저, 넉넉하게 맞힌다
+  if (S.chance && S.chance.region === rid) {
+    const a = S.regions[rid].animals.find((b) => b.uid === S.chance.uid);
+    if (a && hitAnimal(a, x, y, 1.6)) {
+      const r = G.capture(S, a.uid);
+      if (r.ok) { camFlash(); const [sx, sy] = animalScreen(a); floatNum(sx, sy - A.ANIMAL_BOX[a.sp][1] * animalK(), `📸 +${r.reward}`); toast(r.first ? `첫 포착! ${SPECIES[a.sp].name} — ${SPECIES[a.sp].special}` : `${SPECIES[a.sp].name} 찰칵!`); save(); }
+      return;
+    }
+  }
+  const a = animalAt(x, y);
+  if (a) { animalSound(a, 'call'); select({ type: 'animal', uid: a.uid }); return; }
+  const bd = UI.isleBadge;
+  if (bd && x >= bd[0] && x <= bd[0] + bd[2] && y >= bd[1] && y <= bd[1] + bd[3]) { toast(`🏝️ ${G.regionDef(rid).name} T${ISLE.tier}이 되면 다리가 이어지고 새 섬이 열려요`); return; }
+  const hit = tileAtScreen(x, y), it = hit && G.itemAt(S, rid, hit[0], hit[1]);
+  if (it) { select({ type: 'item', uid: it.uid }); return; }
+  select(null);
+}
+
+// ---------- HUD ----------
+const fmt = (n) => Math.floor(n).toLocaleString('ko-KR');
+const PHASE_ICON = ['🌅', '☀️', '🌇', '🌙'];
+// 받침 있으면 a, 없으면 b(을/를, 은/는, 이/가)
+const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return w + (c >= 0 && c <= 11171 && c % 28 ? a : b); };
+const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
+function hud() {
+  const rid = S.view, R = S.regions[rid], st = G.stats(S, rid), def = G.regionDef(rid);
+  setText($('#pop'), fmt(G.popOf(S)));
+  setText($('#rate'), `+${(G.incomePerMin(S)).toFixed(1)}/분`);
+  setText($('#rname'), def.name);
+  setText($('#tier'), `T${R.tier}`);
+  const c = G.clock(S);
+  setText($('#clock'), `${PHASE_ICON[c.phase]} ${c.day}일차 · ${G.PHASE_NAME[c.phase]}`);
+  if (R.tier >= MAX_TIER) { setText($('#devtxt'), `🏆 ${st.dev}`); $('#devbar').style.width = '100%'; }
+  else {
+    const lo = TIERS[R.tier - 1], hi = TIERS[R.tier];
+    setText($('#devtxt'), `발전도 ${st.dev} / ${hi}`);
+    $('#devbar').style.width = `${Math.max(0, Math.min(100, ((st.dev - lo) / (hi - lo)) * 100))}%`;
+  }
+  setText($('#happy'), st.animals ? `${Math.round(st.H * 100)}%` : '-');
+  const done = G.requestsOf(S).filter((q) => G.requestDone(S, q)).length + G.isleReady(S, rid), rb = $('#mRequests .dot'); // 지금 지역 요청·섬 꾸미기만
+  rb.hidden = !done; setText(rb, String(done));
+  // 티어가 오른 뒤 아직 열어 보지 않은 메뉴에 N 표시
+  $('#mAnimals .dot').hidden = !(R.tier > (UI.seen.animals[rid] ?? 1));
+  $('#mDecor .dot').hidden = !(R.tier > (UI.seen.decor[rid] ?? 1));
+  $('#rnew').hidden = !newRegions().length;
+  // 섬 첫 방문: 1.5× 이상 확대해서 화면 가운데(땅 높이 0 기준)에 섬 칸이 오면
+  if (UI.zf >= 1.5 && G.isleOpen(S, rid) && !R.isle.done.includes('visit')) {
+    const a = (UI.cam.x / zoom + uc) / ISO_A / T, b = (UI.cam.y / zoom + vc) / ISO_B / T, x = (a + b) / 2, y = (b - a) / 2;
+    if (y >= ISLE.y0 && x >= ISLE.x0 && x < ISLE.x1) G.visitIsle(S, rid);
+  }
+  const h = hintText(st, R);
+  const hint = $('#hint');
+  hint.hidden = !h || !!UI.sheet; if (h) setText(hint, h);
+}
+function hintText(st, R) {
+  if (UI.place) return '칸을 탭해 자리를 고르고 [놓기]를 눌러요';
+  if (!st.animals) return '👇 [동물]에서 첫 동물을 입양해 보세요';
+  const nr = newRegions()[0];
+  if (nr) return `🗺️ ${josa(nr.name, '이', '가')} 열렸어요 — 위쪽 지역 이름을 눌러요`;
+  for (const k of ['food', 'water', 'shelter']) {
+    if (st.ratio[k] >= 1) continue;
+    const who = Object.keys(st.counts).find((sp) => SPECIES[sp].needs.includes(k));
+    const fix = itemsOf(S.view).filter((id) => ITEMS[id].tier <= R.tier && ITEMS[id].give[k]).map((id) => ITEMS[id].name);
+    return `💡 ${SPECIES[who].name}에게 ${josa(NEED_NAME[k], '이', '가')} 모자라요${fix.length ? ` — ${fix.slice(0, 2).join('·')}` : ''}`;
+  }
+  const herd = Object.keys(st.counts).find((sp) => SPECIES[sp].needs.includes('herd') && st.counts[sp] < 3);
+  if (herd) return `💡 ${josa(SPECIES[herd].name, '은', '는')} 3마리 이상 함께 있으면 행복해요`;
+  if (S.chance && S.chance.region === S.view) return '✨ 반짝이는 동물을 탭하면 사진을 찍어요';
+  if (st.next == null) return '🏆 최고 티어! 자유롭게 꾸며 보세요';
+  if (st.species < st.caps.species && speciesOf(S.view).some((sp) => SPECIES[sp].tier <= R.tier && !st.counts[sp])) return '🆕 새 동물을 입양할 수 있어요';
+  return `다음 티어까지 발전도 +${st.next - st.dev}`;
+}
+
+// ---------- 지역 이동 ----------
+// 열렸지만 아직 가 보지 않은 지역(지역 이름 칸 NEW·힌트)
+const newRegions = () => REGIONS.filter((r) => r.id !== S.view && r.ready && G.isUnlocked(S, r.id) && !UI.seen.regions[r.id]);
+function goRegion(rid) {
+  const r = G.setView(S, rid);
+  if (!r.ok) return toast(r.why);
+  const def = G.regionDef(rid);
+  UI.seen.regions[rid] = true; saveSeen();
+  closeSheet(); exitPlace(); select(null); resize(); setZoom(0); // 지역마다 T8 섬이 열렸는지가 달라 1× 범위를 다시 잡는다
+  toast(`${def.icon} ${def.name}에 왔어요${r.rest.gain >= 1 ? ` · 쉬는 동안 ⭐+${fmt(r.rest.gain)}` : ''}`);
+  afterChange();
+}
+$('#regionBtn').onclick = () => (UI.sheet === 'regions' ? closeSheet() : openSheet('regions'));
+$('#regionBtn').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#regionBtn').click(); } };
+function sheetRegions(body) {
+  $('#sheetTitle').textContent = '지역';
+  const rows = [];
+  for (const r of REGIONS) {
+    const row = el('div', 'item'), cv = el('canvas');
+    const info = el('div', null, `<h4>${r.icon} ${r.name} <span class="tag tierTag"></span><span class="tag isleTag" hidden>🏝️✓</span><span class="tag new" hidden>NEW</span></h4><p class="have"></p>`);
+    const side = el('div'), btn = el('button', 'buy'), why = el('small', 'why');
+    side.append(btn, why); row.append(cv, info, side);
+    btn.onclick = () => goRegion(r.id);
+    body.appendChild(row);
+    requestAnimationFrame(() => regionIcon(cv, r.id, !G.isUnlocked(S, r.id)));
+    rows.push({ r, row, info, btn, why });
+  }
+  sheetUpdate = () => {
+    $('#sheetSub').textContent = `열린 지역 ${REGIONS.filter((r) => G.isUnlocked(S, r.id)).length}/${REGIONS.length} · 인기점수는 지역마다 따로`;
+    for (const o of rows) {
+      const { r } = o, open = G.isUnlocked(S, r.id), here = r.id === S.view, R = S.regions[r.id], st = G.stats(S, r.id);
+      o.row.classList.toggle('locked', !open); o.row.classList.toggle('here', here);
+      setText(o.info.querySelector('.tierTag'), open ? `T${R.tier}` : '🔒');
+      o.info.querySelector('.new').hidden = !newRegions().includes(r);
+      o.info.querySelector('.isleTag').hidden = !G.isleMaster(S, r.id); // 섬 마스터
+      setText(o.info.querySelector('.have'), !open ? `${G.regionDef(r.unlock.region).name} T${r.unlock.tier}에서 열려요` : `⭐${fmt(R.pop)} · 동물 ${st.animals} · 발전도 ${st.dev}`);
+      setText(o.btn, here ? '지금 여기' : open ? '가 보기' : '🔒');
+      o.btn.disabled = here || !open || !r.ready;
+      setText(o.why, open && !r.ready ? '준비 중' : '');
+    }
+  };
+}
+
+// ---------- 아이콘 ----------
+function animalIcon(cv, sp, silhouette = false) {
+  const w = cv.clientWidth || 64, h = cv.clientHeight || 52;
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const [hw, bh] = A.ANIMAL_BOX[sp], k = Math.min((h - 8) / bh, (w - 8) / (hw * 2.3));
+  A.drawAnimal(g, sp, w / 2 - hw * k * 0.1, h - 4, k, { face: 1, st: 'idle', ph: 0.4, mv: 0, hd: 0, ly: 0, sp: -1 }, silhouette ? '#3b3127' : null);
+}
+function itemIcon(cv, id) {
+  const w = cv.clientWidth || 64, h = cv.clientHeight || 52;
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const [r, ih] = A.ITEM_BOX[id], z = Math.min((w - 6) / (2 * r * 1.05), (h - 6) / (ih + r * 0.7));
+  const ox = w / 2, oy = h - 4 - r * 0.35 * z;
+  A.drawItem({ ctx: g, zoom: z, P: (x, y, zz = 0) => [ox + (x - y) * ISO_A * z, oy + (x + y) * ISO_B * z - zz * z] }, id, 1);
+}
+
+function regionIcon(cv, rid, locked) {
+  const w = cv.clientWidth || 64, h = cv.clientHeight || 52;
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  const g = cv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (locked) g.filter = 'grayscale(1) opacity(0.55)';
+  const z = (w - 6) / (2 * WG * ISO_A), ox = w / 2, oy = (h - (2 * WG * ISO_B + SLAB) * z) / 2 + TOPZ * z * 0.5;
+  A.drawIsland({ ctx: g, zoom: z, P: (x, y, zz = 0) => [ox + (x - y) * ISO_A * z, oy + (x + y) * ISO_B * z - zz * z] }, WG, GRID, A.PAL[rid], 3, rid);
+}
+
+// ---------- 시트 ----------
+let sheetUpdate = null;
+function openSheet(name) {
+  UI.sheet = name; select(null); exitPlace();
+  for (const b of document.querySelectorAll('.menu [data-open]')) b.classList.toggle('on', b.dataset.open === name);
+  $('#sheet').hidden = false;
+  buildSheet();
+  if (UI.seen[name]) { UI.seen[name][S.view] = S.regions[S.view].tier; saveSeen(); }
+}
+function closeSheet() {
+  UI.sheet = null; sheetUpdate = null;
+  $('#sheet').hidden = true;
+  for (const b of document.querySelectorAll('.menu [data-open]')) b.classList.remove('on');
+}
+$('#sheetClose').onclick = closeSheet;
+for (const b of document.querySelectorAll('.menu [data-open]')) b.onclick = () => (UI.sheet === b.dataset.open ? closeSheet() : openSheet(b.dataset.open));
+for (const b of document.querySelectorAll('#zoombar button')) b.onclick = () => setZoom(Number(b.dataset.z));
+
+function buildSheet() {
+  const body = $('#sheetBody'), tabs = $('#sheetTabs');
+  body.innerHTML = ''; tabs.hidden = true; tabs.innerHTML = '';
+  ({ animals: sheetAnimals, decor: sheetDecor, requests: sheetRequests, album: sheetAlbum, regions: sheetRegions })[UI.sheet](body, tabs);
+  sheetUpdate?.();
+  body.scrollTop = 0;
+}
+function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+const needsText = (sp) => SPECIES[sp].needs.map((k) => `${NEED_ICON[k]}${NEED_NAME[k]}`).join(' ');
+
+function sheetAnimals(body) {
+  const rid = S.view, R = S.regions[rid];
+  $('#sheetTitle').textContent = '동물';
+  const rows = [];
+  for (const sp of speciesOf(rid)) {
+    const d = SPECIES[sp], row = el('div', 'item');
+    const cv = el('canvas'); row.appendChild(cv);
+    const info = el('div', null, `<h4>${d.name} <span class="tag">${d.size} ${SIZE[d.size].name}</span><span class="tag new" hidden>NEW</span></h4><p>${needsText(sp)}</p><p class="have"></p>`);
+    row.appendChild(info);
+    const side = el('div'), btn = el('button', 'buy'), why = el('small', 'why');
+    side.append(btn, why); row.appendChild(side);
+    btn.onclick = () => {
+      const r = G.adopt(S, rid, sp);
+      if (!r.ok) return toast(r.why);
+      toast(`${d.name} 입양! ⭐-${animalPrice(d.tier)}`); animalSound(r.animal, 'call', 0.8); afterChange();
+    };
+    body.appendChild(row);
+    requestAnimationFrame(() => animalIcon(cv, sp, R.tier < d.tier));
+    rows.push({ sp, d, row, info, btn, why });
+  }
+  sheetUpdate = () => {
+    const st = G.stats(S, rid);
+    $('#sheetSub').textContent = `종 ${st.species}/${st.caps.species} · 개체 ${st.animals}/${st.caps.animals}`;
+    for (const o of rows) {
+      const locked = R.tier < o.d.tier, c = G.canAdopt(S, rid, o.sp), n = st.counts[o.sp] || 0;
+      o.row.classList.toggle('locked', locked);
+      o.info.querySelector('.new').hidden = locked || n > 0 || o.d.tier !== R.tier || R.tier === 1;
+      setText(o.info.querySelector('.have'), n ? `${n}마리 · 행복도 ${Math.round(st.happy[o.sp] * 100)}%` : `가치 ${6 + 4 * (o.d.tier - 1)}점`);
+      setText(o.btn, locked ? `🔒 T${o.d.tier}` : `입양 ⭐${animalPrice(o.d.tier)}`);
+      o.btn.disabled = !c.ok;
+      setText(o.why, locked || c.ok ? '' : c.why);
+    }
+  };
+}
+function giveText(id) {
+  const g = ITEMS[id].give, ks = Object.keys(g);
+  return ks.length ? ks.map((k) => `${NEED_ICON[k]}${NEED_NAME[k]} ${g[k]}`).join(' ') : '장식';
+}
+function sheetDecor(body, tabs) {
+  const rid = S.view, R = S.regions[rid];
+  $('#sheetTitle').textContent = '꾸미기';
+  tabs.hidden = false;
+  for (const [k, name] of [['terrain', '지형지물'], ['object', '사물']]) {
+    const b = el('button', UI.tab === k ? 'on' : '', name);
+    b.onclick = () => { UI.tab = k; buildSheet(); };
+    tabs.appendChild(b);
+  }
+  const rows = [];
+  for (const id of itemsOf(rid).filter((i) => ITEMS[i].kind === UI.tab)) {
+    const d = ITEMS[id], row = el('div', 'item');
+    const cv = el('canvas'); row.appendChild(cv);
+    const info = el('div', null, `<h4>${d.name} <span class="tag">${d.w}×${d.h}</span><span class="tag new" hidden>NEW</span></h4><p>${giveText(id)}${d.walk ? ' · 동물이 걸을 수 있어요' : ''}</p><p class="where">📍 ${G.terrainNames(id)}</p><p class="have"></p>`);
+    row.appendChild(info);
+    const side = el('div'), btn = el('button', 'buy'), why = el('small', 'why');
+    side.append(btn, why); row.appendChild(side);
+    btn.onclick = () => startPlace(id);
+    body.appendChild(row);
+    requestAnimationFrame(() => itemIcon(cv, id));
+    rows.push({ id, d, row, info, btn, why });
+  }
+  sheetUpdate = () => {
+    const st = G.stats(S, rid);
+    $('#sheetSub').textContent = `꾸밈 점수 ${Math.round(st.decor)}`;
+    for (const o of rows) {
+      const locked = R.tier < o.d.tier, n = st.items[o.id] || 0, price = itemPrice(o.d.tier), room = !!G.freeSpot(S, rid, o.id);
+      o.row.classList.toggle('locked', locked);
+      o.info.querySelector('.new').hidden = locked || n > 0 || o.d.tier !== R.tier || R.tier === 1;
+      setText(o.info.querySelector('.have'), `${n ? `${n}개 놓음 · ` : ''}점수 ${4 + 2 * o.d.tier}${n >= ECON.itemFull ? ' (3개째부터 절반)' : ''}`);
+      setText(o.btn, locked ? `🔒 T${o.d.tier}` : `놓기 ⭐${price}`);
+      o.btn.disabled = locked || G.popOf(S) < price || !room;
+      setText(o.why, locked ? '' : !room ? `${G.terrainNames(o.id)}에 빈자리가 없어요` : G.popOf(S) < price ? '인기점수가 모자라요' : '');
+    }
+  };
+}
+function reqText(q) {
+  const sp = SPECIES[q.sp], at = q.phase != null ? `${G.PHASE_NAME[q.phase]}에 ` : '';
+  if (q.kind === 'adopt') return `${sp.name} ${q.n}마리 보고 싶어요`;
+  if (q.kind === 'species') return `${G.regionDef(q.region).name} 동물 ${q.n}종을 보고 싶어요`;
+  if (q.kind === 'set') return `${Object.entries(q.need).map(([k, n]) => `${NEED_ICON[k]} ${NEED_NAME[k]} ${n}곳`).join(' · ')}이 있으면 좋겠어요`;
+  if (q.kind === 'terrain') return `${TERRAIN[q.on].name}에 ${ITEMS[q.item].name}${q.n > 1 ? ` ${q.n}개` : ''} 놓아 주세요`;
+  if (q.kind === 'place') return `${ITEMS[q.item].name}${q.n > 1 ? ` ${q.n}개` : ''} 놓아 주세요`;
+  if (q.kind === 'happy') return `행복도 ${q.pct}% 이상인 곳이 좋아요`;
+  return `${at}${sp.name} ‘${sp.special}’ 사진을 찍어 주세요 (✨가 뜨면 탭)`;
+}
+// T8 섬 꾸미기 항목 글자: [할 일, 도움말]
+const ISLE_TEXT = {
+  visit: () => ['다리를 건너 섬 구경하기', '섬을 확대해서 화면 가운데에 두면 돼요'],
+  item: () => ['섬에 첫 물건 놓기', ''],
+  needs: () => [`섬에 ${['food', 'water', 'shelter'].map((k) => `${NEED_ICON[k]} ${NEED_NAME[k]}`).join(' · ')} 물건 하나씩`, ''],
+  theme: (rid) => ['섬에 테마 물건 2개', ISLE_THEME[rid].map((id) => ITEMS[id].name).join(' · ')],
+  residents: () => ['섬에서 지내는 동물 6마리', '섬에 먹이·물이 있으면 동물이 건너와요'],
+  terrain: () => ['섬 언덕에 물건 2개 놓기', ''],
+};
+// 요청 시트 맨 위 섬 꾸미기 칸(섬이 열린 지역만). 달성하면 [받기], 섬 첫 방문은 [가 보기]로 섬을 확대해 보여 준다. 다시 칠하는 함수를 돌려준다
+function isleSection(body, rid) {
+  const box = el('div', 'isle', '<h4>🏝️ 섬 꾸미기 <span></span></h4>'), rows = [];
+  for (const g of G.ISLE_GOALS) {
+    const [t, hint] = ISLE_TEXT[g.key](rid), row = el('div', 'goal', `<b></b><span>${t}${hint ? `<small>${hint}</small>` : ''}</span>`), btn = el('button', 'btn');
+    row.appendChild(btn); box.appendChild(row);
+    btn.onclick = () => {
+      if (g.key === 'visit' && !S.regions[rid].isle.done.includes('visit')) return goIsle();
+      const r = G.claimIsle(S, rid, g.key);
+      if (!r.ok) return toast(r.why);
+      toast(`섬 꾸미기 완료! ⭐+${r.reward}`); afterChange();
+    };
+    rows.push({ g, row, btn });
+  }
+  body.appendChild(box);
+  return () => {
+    const I = S.regions[rid].isle;
+    setText(box.querySelector('h4 span'), G.isleMaster(S, rid) ? '🏆 섬 마스터' : `${I.done.length}/${G.ISLE_GOALS.length}`);
+    for (const o of rows) {
+      const got = I.got.includes(o.g.key), done = I.done.includes(o.g.key), [a, b] = G.isleProgress(S, rid, o.g.key);
+      setText(o.row.querySelector('b'), done ? '✓' : '○');
+      setText(o.btn, got ? '받음' : done ? `받기 ⭐${G.isleReward(S, rid, o.g.minutes)}` : o.g.key === 'visit' ? '가 보기' : `${a}/${b}`);
+      o.btn.className = done && !got ? 'btn main' : 'btn';
+      o.btn.disabled = got || (!done && o.g.key !== 'visit');
+    }
+  };
+}
+// 섬 첫 방문 [가 보기]: 시트를 닫고 2×로 섬 쪽을 보여 준다(hud의 확인에서 방문으로 친다)
+function goIsle() {
+  closeSheet(); select(null);
+  setZoomF(2);
+  const px = ((ISLE.x0 + ISLE.x1) / 2) * T, py = ((ISLE.y0 + ISLE.y1) / 2) * T;
+  UI.cam.x = ((px - py) * ISO_A - uc) * zoom; UI.cam.y = ((px + py) * ISO_B - vc) * zoom; clampCam();
+}
+function sheetRequests(body) {
+  $('#sheetTitle').textContent = '관람객 요청';
+  const rid = S.view, list = () => G.requestsOf(S, rid); // 요청은 지역마다 따로
+  const sig = () => `${G.isleOpen(S, rid)}|${list().map((q) => q.uid).join(',')}`;
+  let built = null, isle = null;
+  const build = () => {
+    body.innerHTML = '';
+    built = sig();
+    const rows = [];
+    isle = G.isleOpen(S, rid) ? isleSection(body, rid) : null;
+    if (!list().length) body.appendChild(el('p', null, '지금은 요청이 없어요. 동물을 입양하면 새 요청이 와요.'));
+    for (const q of list()) {
+      const card = el('div', 'req', `<h4>${reqText(q)}</h4><div class="meter"><i></i></div>`);
+      const btns = el('div', 'row-btns'), swap = el('button', 'btn', '다른 요청'), get = el('button', 'btn main');
+      btns.append(swap, get); card.appendChild(btns); body.appendChild(card);
+      get.onclick = () => { const r = G.claim(S, q.uid); if (!r.ok) return toast(r.why); toast(`요청 완료! ⭐+${r.reward}`); afterChange(); };
+      swap.onclick = () => { const r = G.swapRequest(S, q.uid); if (!r.ok) return toast(r.why); afterChange(); };
+      rows.push({ q, card, swap, get });
+    }
+    return rows;
+  };
+  let rows = build();
+  sheetUpdate = () => {
+    if (sig() !== built) rows = build();
+    $('#sheetSub').textContent = `${G.regionDef(rid).name} 관람객`;
+    isle?.();
+    for (const o of rows) {
+      const [a, b] = G.requestProgress(S, o.q), done = G.requestDone(S, o.q);
+      o.card.querySelector('.meter i').style.width = `${b ? (a / b) * 100 : 0}%`;
+      setText(o.get, done ? `받기 ⭐${o.q.reward}` : `${a}/${b} · ⭐${o.q.reward}`);
+      o.get.disabled = !done;
+      const wait = Math.ceil(S.regions[rid].reqSwapAt - S.time);
+      setText(o.swap, wait > 0 ? `다른 요청 ${wait}초` : '다른 요청');
+      o.swap.disabled = wait > 0;
+    }
+  };
+}
+function sheetAlbum(body) {
+  const rid = S.view;
+  $('#sheetTitle').textContent = '앨범';
+  const list = speciesOf(rid), got = list.filter((sp) => S.album[sp]).length;
+  $('#sheetSub').textContent = `${got}/${list.length}종 포착`;
+  const grid = el('div', 'album');
+  if (G.isleMaster(S, rid)) grid.appendChild(el('div', 'stamp', `🏝️ 섬 마스터<small>${G.regionDef(rid).name} 섬 꾸미기 ${G.ISLE_GOALS.length}가지를 모두 해냈어요</small>`));
+  for (const sp of list) {
+    const d = SPECIES[sp], n = S.album[sp] || 0, cell = el('div'), cv = el('canvas');
+    cell.appendChild(cv);
+    cell.appendChild(el('b', null, n ? d.name : '???'));
+    cell.appendChild(el('small', null, n ? `${d.special} · 📸 ${n}` : `T${d.tier} · 특수 행동을 찍어 보세요`));
+    grid.appendChild(cell);
+    requestAnimationFrame(() => animalIcon(cv, sp, !n));
+  }
+  body.appendChild(grid);
+  sheetUpdate = null;
+}
+
+// ---------- 정보 카드 ----------
+function select(sel) {
+  UI.sel = sel; UI.confirm = null;
+  if (!sel) { $('#card').hidden = true; UI.follow = null; return; }
+  if (UI.sheet) closeSheet();
+  renderCard();
+}
+function renderCard() {
+  const card = $('#card'), rid = S.view, R = S.regions[rid], st = G.stats(S, rid);
+  if (!UI.sel) return;
+  if (UI.sel.type === 'animal') {
+    const a = R.animals.find((b) => b.uid === UI.sel.uid);
+    if (!a) return select(null);
+    const d = SPECIES[a.sp], refund = Math.floor(a.paid * ECON.refund), met = st.needMet[a.sp];
+    const needs = d.needs.map((k) => { const v = met[k], cls = v >= 1 ? 'ok' : v < 0.5 ? 'bad' : ''; return `<span class="${cls}">${NEED_ICON[k]} ${NEED_NAME[k]} ${v >= 1 ? '✓' : Math.round(v * 100) + '%'}</span>`; }).join('');
+    card.innerHTML = `<div class="card-top"><canvas></canvas><div><h3>${d.name}</h3><p>${d.size} ${SIZE[d.size].name} · 행복도 ${Math.round(st.happy[a.sp] * 100)}% · ${stateText(a)}</p><p>특수 행동: ${d.special}</p></div></div>
+      <div class="needs">${needs}</div>
+      <div class="row-btns"><button class="btn" data-a="follow">${UI.follow === a.uid ? '따라보기 끄기' : '따라보기'}</button><button class="btn warn" data-a="release">${UI.confirm === 'release' ? `정말 방생? ⭐+${refund}` : `방생 ⭐+${refund}`}</button><button class="btn" data-a="close">닫기</button></div>`;
+    animalIcon(card.querySelector('canvas'), a.sp);
+    card.querySelector('[data-a=follow]').onclick = () => { if (UI.follow === a.uid) UI.follow = null; else { UI.follow = a.uid; if (UI.zf < 2) setZoom(2); } renderCard(); };
+    card.querySelector('[data-a=release]').onclick = () => {
+      if (UI.confirm !== 'release') { UI.confirm = 'release'; return renderCard(); }
+      const r = G.release(S, rid, a.uid); toast(`${josa(d.name, '을', '를')} 자연으로 돌려보냈어요 ⭐+${r.refund}`); select(null); afterChange();
+    };
+  } else {
+    const it = R.items.find((i) => i.uid === UI.sel.uid);
+    if (!it) return select(null);
+    const d = ITEMS[it.id], refund = Math.floor(it.paid * ECON.refund);
+    card.innerHTML = `<div class="card-top"><canvas></canvas><div><h3>${d.name}</h3><p>${d.kind === 'terrain' ? '지형지물' : '사물'} · ${d.w}×${d.h} · ${giveText(it.id)}</p></div></div>
+      <div class="row-btns"><button class="btn warn" data-a="remove">${UI.confirm === 'remove' ? `정말 치우기? ⭐+${refund}` : `치우기 ⭐+${refund}`}</button><button class="btn" data-a="close">닫기</button></div>`;
+    itemIcon(card.querySelector('canvas'), it.id);
+    card.querySelector('[data-a=remove]').onclick = () => {
+      if (UI.confirm !== 'remove') { UI.confirm = 'remove'; return renderCard(); }
+      const r = G.removeItem(S, rid, it.uid); toast(`${josa(d.name, '을', '를')} 치웠어요 ⭐+${r.refund}`); select(null); afterChange();
+    };
+  }
+  card.querySelector('[data-a=close]').onclick = () => select(null);
+  card.hidden = false;
+}
+const STATE_TEXT = { idle: '쉬는 중', walk: '걷는 중', eat: '먹는 중', drink: '물 마시는 중', rest: '쉼터에서 쉬는 중', special: '✨ 특수 행동 중' };
+const stateText = (a) => STATE_TEXT[a.st] ?? '';
+
+// ---------- 놓기 ----------
+function startPlace(id) {
+  closeSheet();
+  const spot = G.freeSpot(S, S.view, id) ?? [0, 0];
+  UI.place = { id, x: spot[0], y: spot[1] };
+  $('#placebar').hidden = false;
+  itemIcon($('#placeIcon'), id);
+  updatePlacebar();
+}
+function exitPlace() { UI.place = null; $('#placebar').hidden = true; }
+function updatePlacebar() {
+  if (!UI.place) return;
+  const d = ITEMS[UI.place.id], price = itemPrice(d.tier), c = G.canPlace(S, S.view, UI.place.id, UI.place.x, UI.place.y);
+  setText($('#placeName'), `${d.name} ⭐${price}`);
+  setText($('#placeInfo'), c.ok ? `${giveText(UI.place.id)} · ${G.terrainNames(UI.place.id)} · 칸을 탭해 옮겨요` : c.why);
+  $('#placeGo').disabled = !c.ok;
+}
+$('#placeDone').onclick = exitPlace;
+$('#placeGo').onclick = () => {
+  if (!UI.place) return;
+  const { id, x, y } = UI.place, r = G.placeItem(S, S.view, id, x, y);
+  if (!r.ok) return toast(r.why);
+  floatNum(...P((x + ITEMS[id].w / 2) * T, (y + ITEMS[id].h / 2) * T), `-⭐${itemPrice(ITEMS[id].tier)}`);
+  const next = G.freeSpot(S, S.view, id);
+  if (next) { UI.place.x = next[0]; UI.place.y = next[1]; } else exitPlace();
+  afterChange();
+};
+
+// ---------- 알림 ----------
+function toast(msg, ms = 2500) {
+  const t = el('div', 'toast', ''); t.textContent = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(() => t.remove(), ms);
+  while ($('#toasts').children.length > 3) $('#toasts').firstChild.remove();
+}
+function floatNum(x, y, s) {
+  const e = el('div', 'pop-num'); e.textContent = s; e.style.left = `${x}px`; e.style.top = `${y}px`;
+  $('#fx').appendChild(e); setTimeout(() => e.remove(), 1400);
+}
+function camFlash() { const f = $('#flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
+const modalQueue = [];
+function modal(html, onClose) {
+  modalQueue.push({ html, onClose });
+  if (modalQueue.length === 1) showModal();
+}
+function showModal() {
+  const m = modalQueue[0];
+  if (!m) { $('#modal').hidden = true; return; }
+  $('#modalBox').innerHTML = m.html + '<button class="btn main" id="modalOk">좋아요</button>';
+  $('#modal').hidden = false;
+  $('#modalOk').onclick = () => { modalQueue.shift(); m.onClose?.(); showModal(); };
+  for (const b of $('#modalBox').querySelectorAll('[data-go]')) b.onclick = () => { modalQueue.shift(); m.onClose?.(); showModal(); goRegion(b.dataset.go); };
+}
+function tierModal(rid, tier) {
+  const c = caps(tier), def = G.regionDef(rid);
+  const sp = speciesOf(rid).filter((s) => SPECIES[s].tier === tier).map((s) => `🆕 ${SPECIES[s].name}`);
+  const its = itemsOf(rid).filter((i) => ITEMS[i].tier === tier).map((i) => `🆕 ${ITEMS[i].name}`);
+  const unlockedRegion = REGIONS.find((r) => r.unlock && r.unlock.region === rid && r.unlock.tier === tier);
+  modal(`<h2>🎉 ${def.name} T${tier}!</h2><p>종 한도 <b>${c.species}</b> · 개체 한도 <b>${c.animals}</b></p><p>새로 살 수 있어요(인기점수로 사요)</p><div class="unlocks">${[...sp, ...its].map((s) => `<span>${s}</span>`).join('')}</div>${tier === ISLE.tier ? '<p>🏝️ <b>새 섬이 열렸어요</b> — 다리를 건너 꾸며 보세요. 📋 요청에 섬 꾸미기 6가지가 생겼어요</p>' : ''}${unlockedRegion ? `<p>${unlockedRegion.icon} <b>${unlockedRegion.name}</b> 지역이 열렸어요${!unlockedRegion.ready ? ' (콘텐츠는 다음 업데이트)' : ''}</p>${unlockedRegion.ready ? `<button class="btn" data-go="${unlockedRegion.id}">${unlockedRegion.icon} ${josa(unlockedRegion.name, '으로', '로')} 가 보기</button>` : ''}` : ''}`);
+}
+
+// ---------- 변화 뒤 ----------
+function afterChange() {
+  sheetUpdate?.();
+  if (UI.sel) renderCard();
+  updatePlacebar();
+  drainEvents();
+  save();
+}
+function drainEvents() {
+  const ev = S.events.splice(0);
+  for (const e of ev) {
+    if (e.type === 'tier') tierModal(e.region, e.tier);
+    if (e.type === 'tier' && e.tier === ISLE.tier && e.region === S.view) { resize(); setZoom(0); } // 섬까지 한 화면에
+    if (e.type === 'isle' && e.region === S.view) toast(`🏝️ ${ISLE_TEXT[e.key](e.region)[0]} 달성 — 📋 요청에서 보상을 받아요`);
+    if (e.type === 'isleMaster') modal(`<h2>🏆 섬 마스터!</h2><p>${G.regionDef(e.region).name} 섬 꾸미기 ${G.ISLE_GOALS.length}가지를 모두 해냈어요</p><p style="font-size:22px">⭐ +${fmt(e.reward)}</p><p>📷 앨범에 <b>섬 마스터</b> 도장을 찍었어요</p>`);
+    if (e.type === 'terrain') toast(`땅 모양이 바뀌어 물건 ${e.moved}개를 맞는 자리로 옮겼어요${e.refunded ? ` · ${e.refunded}개는 낸 값을 모두 돌려받았어요` : ''}`, 7000);
+  }
+}
+
+// ---------- 소리 ----------
+const sound = createSound(), music = createMusic();
+const AUDIO_KEY = SAVE_KEY + '.audio', audio = { music: true, sfx: true };
+try { Object.assign(audio, JSON.parse(localStorage.getItem(AUDIO_KEY) || '{}')); } catch { /* 저장 불가 */ }
+const saveAudio = () => { try { localStorage.setItem(AUDIO_KEY, JSON.stringify(audio)); } catch { /* 저장 불가 */ } };
+sound.setOn(audio.sfx);
+function syncSoundBtns() {
+  for (const [id, on, ico] of [['#musicBtn', audio.music, '🎵'], ['#sfxBtn', audio.sfx, audio.sfx ? '🔊' : '🔇']]) {
+    const b = $(id); b.classList.toggle('off', !on); b.setAttribute('aria-pressed', String(on)); b.textContent = ico;
+  }
+}
+$('#musicBtn').onclick = () => { audio.music = !audio.music; music.setOn(audio.music); saveAudio(); syncSoundBtns(); toast(audio.music ? '배경음악을 켰어요' : '배경음악을 껐어요'); };
+$('#sfxBtn').onclick = () => { audio.sfx = !audio.sfx; sound.setOn(audio.sfx); saveAudio(); syncSoundBtns(); toast(audio.sfx ? '동물 소리를 켰어요' : '동물 소리를 껐어요'); };
+// 첫 터치 때 소리를 켠다(모바일 자동재생 정책)
+for (const evt of ['pointerdown', 'keydown']) window.addEventListener(evt, () => { sound.unlock(); music.start(sound.ctx); music.setOn(audio.music); }, { capture: true });
+// 동물 소리: 화면 위치에 따라 좌우로, 확대할수록 조금 크게
+function animalSound(a, kind, vol = 1) {
+  if (!a) return;
+  const [sx] = animalScreen(a);
+  sound.play(a.sp, kind, { vol: vol * Math.min(1, 0.75 + 0.25 * (UI.zf - 1)), pan: ((sx / VW) * 2 - 1) * 0.7 });
+}
+let lastChance = null, ambientIn = 10;
+// 특수 행동이 시작되면 그 동물의 special 소리, 가끔 보이는 동물 하나가 call 소리를 낸다
+function soundTick(dt) {
+  const R = S.regions[S.view];
+  if (S.chance && S.chance.uid !== lastChance) { lastChance = S.chance.uid; animalSound(R.animals.find((b) => b.uid === S.chance.uid), 'special', 0.8); }
+  else if (!S.chance) lastChance = null;
+  if ((ambientIn -= dt) <= 0) {
+    ambientIn = 15 + Math.random() * 20;
+    const quiet = R.animals.filter((b) => b.st !== 'special');
+    if (quiet.length) animalSound(quiet[Math.floor(Math.random() * quiet.length)], 'call', 0.35);
+  }
+  music.setBirds(G.clock(S).phase !== 3); // 밤에는 새소리를 끈다
+}
+
+// ---------- 시간 ----------
+let acc = 0, lastSave = 0, lastUi = 0, hiddenAt = null;
+function frame(now) {
+  const dt = Math.min(0.25, (now - lastT) / 1000);
+  lastT = now;
+  acc += dt;
+  let n = 0;
+  while (acc >= G.STEP && n < 10) { G.step(S, G.STEP); acc -= G.STEP; n++; }
+  if (n === 10) acc = 0;
+  if (S.events.length) drainEvents();
+  soundTick(dt);
+  // 따라보기: 카메라가 그 동물을 부드럽게 따라간다
+  if (UI.follow != null) {
+    const a = S.regions[S.view].animals.find((b) => b.uid === UI.follow);
+    if (!a) UI.follow = null;
+    else {
+      const tx = ((a.x - a.y) * T * ISO_A - uc) * zoom, ty = ((a.x + a.y) * T * ISO_B - vc) * zoom - 20 * zoom;
+      UI.cam.x += (tx - UI.cam.x) * Math.min(1, dt * 4); UI.cam.y += (ty - UI.cam.y) * Math.min(1, dt * 4); clampCam();
+    }
+  }
+  draw(dt);
+  if (PF) PF.frame(now, perfInfo());
+  if (now - lastUi > 250) { lastUi = now; hud(); sheetUpdate?.(); if (UI.sel?.type === 'animal') updateCardLive(); updatePlacebar(); }
+  if (now - lastSave > 5000) { lastSave = now; save(); }
+  requestAnimationFrame(frame);
+}
+// 카드가 열려 있으면 상태 글자만 바꾼다(버튼은 그대로 둬서 누르는 중에 사라지지 않게)
+function updateCardLive() {
+  const a = S.regions[S.view].animals.find((b) => b.uid === UI.sel.uid), p = $('#card .card-top p');
+  if (!a || !p) return;
+  const st = G.stats(S, S.view), d = SPECIES[a.sp];
+  setText(p, `${d.size} ${SIZE[d.size].name} · 행복도 ${Math.round(st.happy[a.sp] * 100)}% · ${stateText(a)}`);
+}
+// 화면을 떠났다 돌아오면 그동안의 관람 수익을 정산한다(보던 지역, 최대 30분치)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); save(); music.pause(); return; }
+  music.resume();
+  if (hiddenAt && S) {
+    const r = G.settleOffline(S, Date.now()), sec = (Date.now() - hiddenAt) / 1000;
+    if (sec > 30 && r.gain >= 1) toast(`자리를 비운 동안 ⭐+${fmt(r.gain)}`);
+    hiddenAt = null; lastT = performance.now();
+  }
+});
+window.addEventListener('pagehide', save);
+
+function welcome() {
+  modal(`<h2>🦒 Animal World</h2><p>동물을 입양하고 지역을 꾸며 <b>발전도</b>를 올려요.</p><ul><li>입양과 꾸미기는 <b>⭐ 인기점수</b>로 해요</li><li>동물을 탭하면 필요한 것(먹이·물·쉼터·무리)이 보여요</li><li>✨가 뜬 동물을 탭하면 사진을 찍고 인기점수를 받아요</li><li>발전도가 기준을 넘으면 티어가 올라 더 많은 동물을 키울 수 있어요</li></ul>`);
+}
+let PX_MAX = 4096;
+function perfInfo() {
+  return { renderer: PX ? `pixi ${PX.info().name}${OUTLINE2D ? ' · 외곽선 2D' : ' · 외곽선 셰이더'}` : '2d', region: S.view, animals: S.regions[S.view].animals.length, zoom: UI.zf, dpr: DPR, screen: `${Math.round(VW)}×${Math.round(VH)}`, atlas: `${atA.width}×${atA.height}`, ...(PX ? { uploadKB: Math.round(PX.stats.upKB), miss: PX.stats.miss, textures: PX.info().textures } : {}) };
+}
+async function start() {
+  if (RENDERER === 'pixi') {
+    try { PX = await createPixi($('#app'), over); PX_MAX = PX.info().maxTex || 4096; }
+    catch (e) { console.warn('PixiJS를 켜지 못해 2D로 그려요', e); PX = null; }
+  }
+  if (PERF) {
+    S = buildScenario(G, D, { region: Q.region || 'seaside', n: Math.min(44, Number(Q.n) || 44), seed: Number(Q.seed) || 1, time: Q.time || 'day' });
+    UI.seen = loadSeen(); syncSoundBtns(); resize();
+    if (Q.zoom) setZoomF(Number(Q.zoom));
+    PF = createPerf({ dur: Number(Q.dur) || 30, label: `Animal World v2 측정 · ${Q.region || 'seaside'}` });
+    hud(); lastT = performance.now(); requestAnimationFrame(frame);
+    if (!PX && RENDERER === 'pixi') toast('PixiJS를 켜지 못해 2D로 그려요');
+    return;
+  }
+  S = load();
+  const fresh = !S;
+  if (fresh) S = G.newGame((Date.now() % 1e9) | 0, Date.now());
+  UI.seen = loadSeen();
+  syncSoundBtns();
+  resize();
+  UI.seen.regions[S.view] = true;
+  if (fresh) welcome();
+  else {
+    const r = G.settleOffline(S, Date.now());
+    if (r.sec >= 60 && r.gain >= 1) modal(`<h2>다시 오셨네요!</h2><p>자리를 비운 ${r.sec >= 5400 ? `${Math.round(r.sec / 3600)}시간` : `${Math.round(r.sec / 60)}분`} 동안 ${G.regionDef(S.view).name}에 관람객이 다녀갔어요.</p><p style="font-size:22px">⭐ +${fmt(r.gain)}</p>${r.capped ? '<p style="color:var(--muted);font-size:12px">쉬는 동안은 지역마다 최대 30분치까지 쌓여요</p>' : ''}`);
+  }
+  hud();
+  save();
+  lastT = performance.now();
+  requestAnimationFrame(frame);
+  if (!PX && RENDERER === 'pixi') toast('PixiJS를 켜지 못해 2D로 그려요');
+}
+// v2 개발판: 오프라인 캐시(서비스 워커)는 v1과 합칠 때 다시 켠다
+// 점검용: 첫 동물의 화면 위치(헤드리스 브라우저로 탭을 시험할 때)
+window.__tapTarget = () => { const a = S?.regions[S.view].animals[0]; if (!a) return null; const [x, y] = animalScreen(a), r = view.getBoundingClientRect(); return [r.left + x, r.top + y - 8]; };
+start();
+</script>
+</body>
+</html>

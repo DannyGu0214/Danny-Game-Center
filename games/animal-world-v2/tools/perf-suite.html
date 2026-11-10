@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animal World v2 측정 모음</title>
+<!-- M0·M1 측정(2026-11-10): 같은 장면을 렌더러·배율을 바꿔 차례로 재고 표로 모은다.
+     노트북에서 창을 최대로 키우고 이 탭을 앞에 둔 채 기다린다(뒤로 가면 브라우저가 프레임을 줄여 값이 틀린다).
+     주소 옵션: ?region=seaside&n=44&dur=20&zooms=1,2,4&time=day -->
+<style>
+  :root { color-scheme: light; --ink: #3b2f22; --muted: #7d6c57; --panel: #fffaf0; --line: #e4d5b7; --accent: #ec8a2c; }
+  html, body { margin: 0; height: 100%; background: var(--panel); color: var(--ink); font: 14px/1.5 system-ui, sans-serif; }
+  header { height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); box-sizing: border-box; }
+  header b { white-space: nowrap; }
+  #bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  #bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  #now { color: var(--muted); white-space: nowrap; }
+  button { font: inherit; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  iframe { display: block; width: 100%; height: calc(100% - 44px); border: 0; }
+  #out { display: none; padding: 16px; }
+  #out.on { display: block; }
+  table { border-collapse: collapse; margin: 12px 0; }
+  th, td { border: 1px solid var(--line); padding: 4px 10px; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  textarea { width: 100%; height: 180px; font: 12px ui-monospace, Menlo, monospace; }
+</style>
+<header><b>Animal World v2 측정</b><div id="bar"><i></i></div><span id="now">준비 중</span><button id="go">시작</button></header>
+<iframe id="f" title="측정 화면"></iframe>
+<section id="out">
+  <h2>결과</h2>
+  <p id="env"></p>
+  <table id="tbl"></table>
+  <p>아래 글을 복사해 Claude에게 붙여 주세요.</p>
+  <textarea id="md" readonly></textarea>
+  <p><button id="copy">복사</button> <button id="again">다시 재기</button></p>
+</section>
+<script>
+const Q = Object.fromEntries(new URLSearchParams(location.search));
+const region = Q.region || 'seaside', n = Q.n || 44, dur = Number(Q.dur) || 20, time = Q.time || 'day';
+const zooms = (Q.zooms || '1,2,4').split(',').map(Number);
+// 2d = v1과 같은 그리기 · pixi = PixiJS + 외곽선 셰이더 · pixi-2d외곽선 = PixiJS + v1 방식 외곽선을 올리기
+const RUNS = [];
+for (const z of zooms) {
+  RUNS.push({ name: `2d ${z}×`, q: `renderer=2d&zoom=${z}` });
+  RUNS.push({ name: `pixi ${z}×`, q: `renderer=pixi&zoom=${z}` });
+}
+RUNS.push({ name: `pixi ${zooms[zooms.length - 1]}× 2D외곽선`, q: `renderer=pixi&outline=2d&zoom=${zooms[zooms.length - 1]}` });
+const f = document.getElementById('f'), bar = document.querySelector('#bar i'), now = document.getElementById('now');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function runOne(r) {
+  f.src = `../index.html?perf=1&region=${region}&n=${n}&dur=${dur}&time=${time}&${r.q}`;
+  const t0 = Date.now();
+  while (Date.now() - t0 < (dur + 30) * 1000) {
+    await sleep(500);
+    try { const res = f.contentWindow.__perf; if (res) return res; } catch { /* 아직 로딩 중 */ }
+  }
+  return { error: '시간 초과' };
+}
+async function run() {
+  document.getElementById('out').classList.remove('on'); f.style.display = 'block';
+  const rows = [];
+  for (let i = 0; i < RUNS.length; i++) {
+    now.textContent = `${i + 1}/${RUNS.length} ${RUNS[i].name}`;
+    bar.style.width = `${(i / RUNS.length) * 100}%`;
+    rows.push({ name: RUNS[i].name, ...(await runOne(RUNS[i])) });
+  }
+  bar.style.width = '100%'; now.textContent = '끝'; f.src = 'about:blank'; f.style.display = 'none';
+  show(rows);
+}
+function show(rows) {
+  const keys = ['sky', 'scene', 'rig', 'upload', 'render'];
+  const head = ['구성', '평균 fps', '1% 최저', '20ms 넘음 %', ...keys.map((k) => `${k} ms`), '아틀라스', '올림 KB/프레임'];
+  const body = rows.map((r) => r.error ? [r.name, r.error] : [r.name, r.fps, r.low1, r.long, ...keys.map((k) => r.ms?.[k] ?? '-'), r.atlas, r.uploadKB ?? '-']);
+  document.getElementById('tbl').innerHTML = `<tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr>` + body.map((b) => `<tr>${b.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('');
+  const s = rows.find((r) => !r.error) || {};
+  const env = `${navigator.userAgent} · 화면 ${s.screen ?? '?'} · 배율(DPR) ${s.dpr ?? '?'} · ${region} ${n}마리 · ${dur}초씩 · ${time}`;
+  document.getElementById('env').textContent = env;
+  document.getElementById('md').value = [`환경: ${env}`, '', `| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`, ...body.map((b) => `| ${b.join(' | ')} |`)].join('\n');
+  document.getElementById('out').classList.add('on');
+}
+document.getElementById('go').onclick = run;
+document.getElementById('again').onclick = run;
+document.getElementById('copy').onclick = () => { const t = document.getElementById('md'); t.select(); navigator.clipboard?.writeText(t.value).catch(() => document.execCommand('copy')); };
+now.textContent = `${RUNS.length}가지 × 약 ${dur + 5}초 — [시작]을 누르세요`;
+</script>
+</html>
