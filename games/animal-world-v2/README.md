@@ -10,7 +10,6 @@ Animal World의 렌더러를 PixiJS(WebGL 2D 렌더링 라이브러리)로 바�
 ```bash
 git clone https://github.com/DannyGu0214/Danny-Game-Center.git
 cd Danny-Game-Center
-git checkout claude/stoic-ramanujan-csbrar   # 이 자리가 기본 브랜치에 합쳐지기 전까지
 python3 -m http.server 8793                  # 저장소 맨 위에서 실행해요(v2가 ../animal-world/ 파일을 읽어서)
 ```
 
