@@ -1,0 +1,33 @@
+# Animal World v2 (개발 중)
+
+Animal World의 렌더러를 PixiJS(WebGL 2D 렌더링 라이브러리)로 바꾸고, 노트북 가로 화면과 바닷속·땅속 단면을 더하는 버전이에요. 계획은 [PLAN.md](PLAN.md)에 있어요.
+
+- 상태: **자리만 만들어 둔 상태**(2026-11-10). 개발은 대니님 맥북13에서 해요.
+- 완성되면 v1(`games/animal-world/`)과 합쳐요. 그때까지 v1은 그대로 두고, 게임센터 첫 화면에도 올리지 않아요.
+
+## 맥북13에서 시작하기
+
+```bash
+git clone https://github.com/DannyGu0214/Danny-Game-Center.git
+cd Danny-Game-Center
+git checkout claude/stoic-ramanujan-csbrar   # 이 자리가 기본 브랜치에 합쳐지기 전까지
+python3 -m http.server 8793                  # 저장소 맨 위에서 실행해요(v2가 ../animal-world/ 파일을 읽어서)
+```
+
+브라우저에서 `http://localhost:8793/games/animal-world-v2/`를 열어요.
+
+## 개발 규칙
+
+| 규칙 | 이유 |
+|---|---|
+| v1 파일은 고치지 않고 `../animal-world/`에서 `import`해요. 바꿔야 하는 파일만 이 폴더로 복사해요 | 규칙·리그 코드가 두 벌이 되는 것을 줄이고, 합칠 때 차이를 보기 쉽게 |
+| 복사한 파일은 아래 표에 원본과 복사 시점(커밋)을 적어요 | 합칠 때 v1에서 그 뒤에 바뀐 내용을 놓치지 않으려고 |
+| 저장 키는 v1과 다르게 써요(예: `SAVE_KEY + '.v2'`). 처음 실행할 때 v1 세이브를 복사해 와요 | 같은 주소(github.io)라 브라우저 저장소를 같이 써서, v2가 v1 세이브를 망가뜨릴 수 있어요 |
+| 서비스 워커는 v2 폴더 안 `sw.js`를 따로 써요 | v1 오프라인 캐시와 섞이지 않게 |
+| PixiJS는 `vendor/`에 버전을 고정해 넣어요(CDN 안 씀) | 오프라인 실행, 버전 고정 |
+
+## 복사해 온 파일
+
+| 파일 | 원본 | 복사 시점 | 바꾼 이유 |
+|---|---|---|---|
+| (아직 없음) | | | |
