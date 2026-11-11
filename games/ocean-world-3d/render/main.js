@@ -11,6 +11,7 @@
 //   ?shadow=0 ?fog=0 ?caustics=0 ?snow=0 ?shafts=0 ?deform=0   기능 끄기(비교용)
 //   ?ext=1                   T8 확장 영역까지 넓힌 블록(지형 함수 확인용)
 //   ?size=1280x800 ?dpr=1    녹화 모드 캔버스 크기, 픽셀 비율
+//   ?title=0|1               타이틀 화면. 기본은 켬, ?capture·?perf=1에서는 끔(검증 자동화용). title=1이면 그때도 켬
 import * as THREE from 'three';
 import * as TER from '../eco/atoll/terrain.js';
 import { ENV, WATER, TERRAIN_COLORS, STRATA, STRATA_BOTTOM } from '../eco/atoll/profile.js';
@@ -34,6 +35,7 @@ import { SPECIES, speciesMaterial, scaleCounts } from './proto/species.js';
 import { propGeometries } from './proto/props.js';
 import { Wander } from './proto/wander.js';
 import { rng } from './proto/geo.js';
+import { createTitle } from '../ui/title.js';
 
 // ---------- 옵션 ----------
 const q = new URLSearchParams(location.search);
@@ -50,6 +52,7 @@ const opt = {
   lineup: q.get('lineup') === '1',   // 종마다 한 마리씩 앞 옆면 가까이 줄 세우기(변형 확인용)
   size: (q.get('size') || '1280x800').split('x').map(Number),
   dpr: q.has('dpr') ? parseFloat(q.get('dpr')) : null,
+  title: q.has('title') ? q.get('title') !== '0' : !(q.has('capture') || q.get('perf') === '1'),
   sigma: q.has('sigma') ? Math.max(0.05, parseFloat(q.get('sigma')) || 1) : 1,  // 물 흡수 배율(탁도)
 };
 if (opt.water === 'transmission') opt.fog = q.has('fog') ? opt.fog : false; // 투과 방식은 기본으로 물속 안개를 끈다(사례와 같게)
@@ -274,6 +277,7 @@ const presets = {
   under: { polar: 93, azimuth: 14, target: [0, -6, 0], distance: fit },
   near: { polar: 82, azimuth: 16, target: pW.toArray(), distance: 11 },
   bungalow: { polar: 60, azimuth: 32, target: bW.toArray(), distance: 17 },
+  title: { polar: 64, azimuth: 30, target: [0, -2.5, 0], distance: (c) => fit(c) * 1.04, orbitSpeed: 5 },
   lineup: { polar: 77, azimuth: 0, target: W(20, 3.0 + 2.4 * 24 / 48, -5.4).toArray(), distance: 29 },
 };
 const keepOut = new THREE.Box3(new THREE.Vector3(-hx - 1, BOTTOM - 1, -hz - 1), new THREE.Vector3(hx + 1, 7.5, hz + 1));
@@ -289,6 +293,8 @@ function resize() {
 resize();
 window.addEventListener('resize', () => { if (!opt.capture) resize(); });
 rig.setView(presets[opt.view] ? opt.view : 'default', 0);
+
+const ui = opt.capture ? null : document.getElementById('ui');
 
 // ---------- 루프 ----------
 const app = new App({ renderer, scene, camera, rig, world, jelly, capture: opt.capture, perf: opt.perf,
@@ -339,7 +345,27 @@ const input = new BlockInput({
   onDrag: (p) => { const g = gridOf(p); hf.disturb(g.x, g.y, 0.9, -0.35); },
 });
 
+// ---------- 타이틀 ----------
+// 타이틀 동안: 카메라는 블록 둘레를 천천히 돌고(조작 잠금), 생물·물은 계속 움직인다.
+// 시작(누르기): 블록이 한 번 출렁 → 카메라가 기본 시점으로 넘어감 → 조작 풀림.
+let title = null;
+/** 게임 시작 동작. P2에서 저장 유무·프롤로그가 이 앞뒤에 붙는다. */
+function startGame() {
+  jelly.poke(-0.9, 0.25, 0.15);
+  hf.disturb(20, 20, 2.2, -2.8);
+  rig.stopOrbit();
+  rig.controls.enabled = false;
+  rig.setView('default', 1.8);
+  setTimeout(() => { rig.controls.enabled = true; input.enabled = !ui || ui.querySelector('[data-k=drag]').checked; }, opt.capture ? 0 : 1850);
+}
+if (opt.title) {
+  input.enabled = false;
+  rig.startOrbit('title');
+  title = createTitle({ title: 'Ocean World 3D', prompt: '눌러서 바다로 들어가요!', onStart: startGame });
+}
+
 app.installCapture({
+  title: { start: () => { if (title) title.start(); app.step(0); }, active: () => !!title && !title.started },
   info: () => ({ opt, total, counts: Object.fromEntries(SPECIES.map((s, i) => [s.id, counts[i]])), placed, patch: patchStats(),
     terrain: TER.summary(tOpts), polar: rig.polarDeg }),
   poke: (amt = -0.8, sx = 0.4, sz = 0.2) => { jelly.poke(amt, sx, sz); hf.disturb(20, 20, 2, -2.5); },
@@ -354,8 +380,8 @@ window.__ow = { app, opt, jelly, rig, hf, species, batch, placed, fog, input, hi
 app.start();
 
 // ---------- 작은 UI ----------
-const ui = document.getElementById('ui');
-if (ui && !opt.capture) {
+
+if (ui) {
   const link = (over) => { const p = new URLSearchParams(location.search); for (const [k, v] of Object.entries(over)) { if (v === null) p.delete(k); else p.set(k, v); } return '?' + p.toString(); };
   ui.querySelector('[data-k=water]').innerHTML =
     `<a class="${opt.water === 'box' ? 'on' : ''}" href="${link({ water: null })}">투과 없음(제안)</a>` +

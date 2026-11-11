@@ -28,6 +28,7 @@ const jpeg = args.jpeg ? +args.jpeg : 0;
 const extra = args.extra ? '&' + args.extra : '';
 const strip = +(args.strip || 1);   // 한 시점에서 frames 간격으로 여러 장(움직임 확인용)
 const poke = !!args.poke;           // 첫 장 전에 젤리 블록을 한 번 출렁임
+const pageShot = !!args.page;       // 캔버스 대신 페이지 전체를 찍음(타이틀 같은 DOM 덮개 포함). 예: --page --extra title=1
 fs.mkdirSync(out, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.png': 'image/png' };
@@ -56,14 +57,18 @@ try {
     stats[water] = { url, info, views: {}, logs };
     for (const v of views) {
       const t0 = Date.now();
-      await page.evaluate(([v]) => window.__cap.setView(v), [v]);
+      if (v !== 'title') await page.evaluate(([v]) => window.__cap.setView(v), [v]);   // 'title'은 타이틀 궤도 그대로
       if (poke) await page.evaluate(() => window.__cap.poke());
       for (let k = 0; k < strip; k++) {
         await page.evaluate(([n, dt]) => window.__cap.step(dt, n), [frames, dt]);
         const dump = await page.evaluate(() => window.__cap.dump());
-        const data = await page.evaluate(([j]) => window.__cap.snapshot(j ? 'image/jpeg' : 'image/png', j || 0.9), [jpeg]);
         const file = path.join(out, `${water}-${v}${strip > 1 ? '-' + k : ''}.${jpeg ? 'jpg' : 'png'}`);
-        fs.writeFileSync(file, Buffer.from(data.split(',')[1], 'base64'));
+        if (pageShot) {
+          await page.screenshot({ path: file, type: jpeg ? 'jpeg' : 'png', ...(jpeg ? { quality: Math.round(jpeg * 100) } : {}), timeout: 120000 });
+        } else {
+          const data = await page.evaluate(([j]) => window.__cap.snapshot(j ? 'image/jpeg' : 'image/png', j || 0.9), [jpeg]);
+          fs.writeFileSync(file, Buffer.from(data.split(',')[1], 'base64'));
+        }
         stats[water].views[v + (strip > 1 ? '-' + k : '')] = { ...dump, t: await page.evaluate(() => window.__cap.time()), ms: Date.now() - t0, file: path.basename(file) };
         console.log(water, v, k, `calls=${dump.calls} tris=${dump.triangles}`, JSON.stringify(dump.glPasses), `${Date.now() - t0}ms`);
       }

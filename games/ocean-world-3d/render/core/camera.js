@@ -34,7 +34,23 @@ export class CameraRig {
     this.tween = null;
     this.current = 'default';
     this._dir = new THREE.Vector3();
+    this.orbit = null;   // 타이틀 같은 자동 궤도: { polar, az, radius, target, speed(rad/s) }
   }
+
+  /** 프리셋을 기준으로 블록 둘레를 천천히 돈다. 도는 동안 사용자 조작은 잠근다. */
+  startOrbit(name) {
+    const p = this.presets[name];
+    if (!p) return false;
+    this.setView(name, 0);
+    this.current = name;
+    this.orbit = { polar: THREE.MathUtils.degToRad(p.polar), az: THREE.MathUtils.degToRad(p.azimuth),
+      radius: typeof p.distance === 'function' ? p.distance(this.camera) : p.distance,
+      target: new THREE.Vector3(...(p.target || this.home.toArray())), speed: THREE.MathUtils.degToRad(p.orbitSpeed ?? 6) };
+    this.controls.enabled = false;
+    return true;
+  }
+  /** 자동 궤도를 멈추고 조작을 푼다(다음 시점으로 옮기는 것은 setView로). */
+  stopOrbit() { this.orbit = null; this.controls.enabled = true; }
 
   /** 시점 프리셋으로 옮긴다. dur 0이면 즉시. */
   setView(name, dur = 0.9) {
@@ -62,6 +78,15 @@ export class CameraRig {
   }
 
   update(dt) {
+    if (this.orbit) {
+      const o = this.orbit;
+      o.az += o.speed * dt;
+      this.controls.target.copy(o.target);
+      this.camera.position.setFromSphericalCoords(o.radius, o.polar, o.az).add(o.target);
+      this.camera.lookAt(o.target);
+      this._keepOutside();
+      return;
+    }
     if (this.tween) {
       const tw = this.tween;
       tw.t = Math.min(1, tw.t + dt / tw.dur);
