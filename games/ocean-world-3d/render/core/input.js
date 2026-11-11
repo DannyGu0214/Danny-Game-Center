@@ -1,10 +1,12 @@
 // 입력 분기: 블록을 누르면 젤리 출렁임(끌기 = 기울이기, 탭 = 꾹 누르기), 빈 곳이면 카메라(OrbitControls).
 // 젤리 행렬로 일그러진 블록도 three의 레이캐스트가 월드 행렬을 따라가므로 그대로 맞힌다.
+// 짧은 탭(6px 안)은 먼저 onPick(e, 블록 점|null)에 묻고(생물·물건 고르기, 놓기 자리 — P2), true를 돌려주면 출렁이지 않는다.
+// onPick은 젤리 끌기가 꺼져 있어도(enabled = false) 불린다.
 import * as THREE from 'three';
 
 export class BlockInput {
   /**
-   * @param {object} o { dom, camera, rig, jelly, hitMesh, onTap(pointBlock), onDrag(pointBlock) }
+   * @param {object} o { dom, camera, rig, jelly, hitMesh, onTap(pointBlock), onDrag(pointBlock), onPick(event, pointBlock|null) → bool }
    *   hitMesh: 블록을 감싸는 보이지 않는 상자(world 그룹 안)
    */
   constructor(o) {
@@ -31,11 +33,14 @@ export class BlockInput {
   }
   _down(e) {
     this.pointers.add(e.pointerId);
+    if (this.pointers.size > 1) this.tap = null;
     if (this.active && this.pointers.size > 1) { // 두 손가락이면 젤리를 놓고 카메라로
       this.jelly.release(); this.active = null; this.rig.controls.enabled = true; return;
     }
-    if (!this.enabled || e.button !== 0 || this.jelly.strength <= 0 || e.shiftKey) return;
+    if (e.button !== 0) return;
     const p = this._hit(e);
+    if (this.pointers.size === 1) this.tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, p };
+    if (!this.enabled || this.jelly.strength <= 0 || e.shiftKey) return;
     if (!p) return;
     e.stopImmediatePropagation();
     this.dom.setPointerCapture?.(e.pointerId);
@@ -43,6 +48,8 @@ export class BlockInput {
     this.active = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, p };
   }
   _move(e) {
+    const tp = this.tap;
+    if (tp && e.pointerId === tp.id) tp.moved = Math.max(tp.moved, Math.hypot(e.clientX - tp.x, e.clientY - tp.y));
     const a = this.active;
     if (!a || e.pointerId !== a.id) return;
     e.stopImmediatePropagation();
@@ -60,12 +67,16 @@ export class BlockInput {
   }
   _up(e) {
     this.pointers.delete(e.pointerId);
+    const tp = this.tap;
+    const isTap = !!tp && tp.id === e.pointerId && tp.moved < 6;
+    if (tp && tp.id === e.pointerId) this.tap = null;
+    const picked = isTap && this.onPick ? !!this.onPick(e, tp.p) : false;
     const a = this.active;
     if (!a || e.pointerId !== a.id) return;
     e.stopImmediatePropagation();
     this.active = null;
     this.rig.controls.enabled = true;
-    if (a.moved < 6) { this.jelly.poke(-0.7); if (this.onTap) this.onTap(a.p); }
+    if (a.moved < 6 && !picked) { this.jelly.poke(-0.7); if (this.onTap) this.onTap(a.p); }
     this.jelly.release();
   }
 }

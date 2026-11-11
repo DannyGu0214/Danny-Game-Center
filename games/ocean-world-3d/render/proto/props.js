@@ -1,5 +1,5 @@
 // 시제품용 물건: 육지·해저·수중 세 구역에 단순한 모양 몇 개씩. 전부 BatchedMesh 하나로 그린다.
-// P3에서 eco/atoll/props/ 생성기로 옮긴다. 배치 위치는 화면 확인용 가안이다.
+// P3에서 eco/atoll/props/ 생성기로 옮긴다. P2부터 배치는 규칙 상태가 정하고, 규칙 물건 → 모양 조합은 render/proto/propview.js에 있다.
 // aAux(vec2): x = 흔들림 정도(0 = 고정, 1 = 끝), y = 자체발광 세기.
 import * as THREE from 'three';
 import { part, merge, tube, hex, mix, rng } from './geo.js';
@@ -188,6 +188,25 @@ function pillar() {
   return merge([P(g, (p) => mix(0x7a5a3a, 0x9b7a52, p.y))]);
 }
 
+// P2에서 더함: 규칙 물건 목록(eco/atoll/data.js ITEMS) 중 시제품에 모양이 없던 것의 임시 모양. P3 생성기로 바뀐다
+function basket() {
+  const g = new THREE.CylinderGeometry(0.5, 0.38, 0.45, 12, 1, true); g.translate(0, 0.23, 0);
+  const bottom = new THREE.CylinderGeometry(0.38, 0.38, 0.04, 12); bottom.translate(0, 0.02, 0);
+  const food = new THREE.SphereGeometry(0.42, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2); food.scale(1, 0.35, 1); food.translate(0, 0.4, 0);
+  return merge([P(g, (p) => mix(0x9b6b3a, 0xc8955a, 0.5 + 0.5 * Math.sin(p.y * 40))), P(bottom, 0x8a5c30), P(food, 0xf2c27a, [0, 0.05])]);
+}
+function sandPatch() {
+  const g = new THREE.CylinderGeometry(0.95, 1.0, 0.12, 16); g.translate(0, 0.06, 0);
+  const r = rng(12), parts = [P(g, (p) => mix(0xe8dcb6, 0xf6eed6, 0.5 + 0.5 * Math.sin(p.x * 9 + p.z * 7)))];
+  for (let i = 0; i < 5; i++) { const s = new THREE.ConeGeometry(0.07, 0.12, 6); s.rotateZ(1.3); s.translate((r() - 0.5) * 1.4, 0.15, (r() - 0.5) * 1.4); parts.push(P(s, 0xf3c9b0)); }
+  return merge(parts);
+}
+function deck() {
+  const g = new THREE.BoxGeometry(3.6, 0.2, 3.6);
+  const rail = new THREE.BoxGeometry(3.6, 0.5, 0.08); rail.translate(0, 0.35, 1.76);
+  return merge([P(g, (p) => mix(0x9a6f44, 0xb88a58, 0.5 + 0.5 * Math.sin(p.x * 8))), P(rail, 0x8a6038)]);
+}
+
 /** 물건 지오메트리 목록(BatchedMesh에 넣는 순서) */
 export function propGeometries() {
   const list = {
@@ -195,6 +214,7 @@ export function propGeometries() {
     coralPink: branchCoral(7, 0xe46f9a), coralPurple: branchCoral(8, 0x9a6fe0), coralOrange: branchCoral(9, 0xf09a4a),
     clam: clam(), boulderA: boulder(1), boulderB: boulder(2), dome: dome(), reef: reefBlocks(), grassA: seagrass(3), grassB: seagrass(4),
     buoy: buoy(), rope: rope(), anchor: anchor(), nursery: nursery(), plankton: planktonLamp(), bungalow: bungalow(), pillar: pillar(),
+    basket: basket(), sandPatch: sandPatch(), deck: deck(),
   };
   const names = Object.keys(list);
   return { names, geometries: names.map((n) => list[n]), index: Object.fromEntries(names.map((n, i) => [n, i])) };

@@ -200,35 +200,32 @@ function manta() {
   return merge(parts);
 }
 
-/**
- * 크기 등급별 화면 배율(게임적 허용, 대니님 방향 2026-11-11: "작은 건 조금 커지게, 큰 건 조금 작게").
- * L(아래 표)에 곱한다. 등급 순서 S < M < L < XL은 유지된다. 주소 옵션 ?sizes=1.35,1.1,0.95,0.85 로 바꿔 볼 수 있다(?sizes=1 = 끔).
- * P2에서는 규칙 세션의 생태계 데이터(eco/atoll/data.js)에 같은 값이 들어가므로 그 값을 읽도록 바꾸면 된다.
- */
-export const SIZE_SCALE = { S: 1.35, M: 1.1, L: 0.95, XL: 0.85 };
-/** '1.35,1.1,0.95,0.85' 또는 '1' → { S, M, L, XL } */
+/** '1.35,1.1,0.95,0.85' 또는 '1' → { S, M, L, XL } 덮어쓰기(주소 옵션 ?sizes=). 없으면 null(데이터 값 그대로).
+ *  크기 배율의 원본은 eco/atoll/data.js SIZES[등급].draw 한 곳이다(P2, 2026-11-12). */
 export function parseSizeScale(str) {
-  if (!str) return { ...SIZE_SCALE };
+  if (!str) return null;
   const v = str.split(',').map(Number).filter((n) => n > 0);
+  if (!v.length) return null;
   if (v.length === 1) return { S: v[0], M: v[0], L: v[0], XL: v[0] };
   const [S = 1, M = 1, L = 1, XL = 1] = v;
   return { S, M, L, XL };
 }
 
 /**
- * 종 목록. L: 게임 크기(칸, DESIGN 12.2절 가안), count: 기본 개체 수(합 44), life: 화면 확인용 임시 움직임 종류.
- * patches: 변형 조각. mat: 재질 옵션.
+ * 종 모양 목록(화면 전용). id는 eco/atoll/data.js SPECIES의 id와 같다.
+ * 몸 길이·크기 등급·속도·생활형은 여기 두지 않는다 — data.js 한 곳(P2). count는 견본 장면(타이틀·녹화 모드)의 기본 개체 수(합 44).
+ * patches: 변형 조각. mat: 재질 옵션. walk: 걷는 박자 값(aParams.y)을 움직일 때 쓰는 종.
  */
 export const SPECIES = [
-  { id: 'seacucumber', name: '해삼', size: 'S', L: 1.0, count: 5, life: 'crawl', build: cucumber, patches: [PERISTALSIS], speed: 0.55 },
-  { id: 'hermitcrab', name: '소라게', size: 'S', L: 0.75, count: 6, life: 'walk', build: crab, patches: [GAIT], speed: 1.15 },
-  { id: 'anemone', name: '말미잘', size: 'M', L: 2.0, count: 5, life: 'fixed', build: anemone, patches: [BEND], speed: 0 },
-  { id: 'clownfish', name: '몰디브흰동가리', size: 'S', L: 0.75, count: 10, life: 'swim', build: clownfish, patches: [FISH], speed: 1.9 },
-  { id: 'octopus', name: '문어', size: 'M', L: 2.0, count: 4, life: 'swim', build: octopus, patches: [OCTOPUS], speed: 1.0 },
-  { id: 'moonjelly', name: '보름달물해파리', size: 'M', L: 1.5, count: 7, life: 'drift', build: moonjelly, patches: [JELLY], speed: 0.36,
+  { id: 'seacucumber', build: cucumber, patches: [PERISTALSIS], count: 5 },
+  { id: 'hermitcrab', build: crab, patches: [GAIT], count: 6, walk: true },
+  { id: 'anemone', build: anemone, patches: [BEND], count: 5 },
+  { id: 'clownfish', build: clownfish, patches: [FISH], count: 10 },
+  { id: 'octopus', build: octopus, patches: [OCTOPUS], count: 4 },
+  { id: 'moonjelly', build: moonjelly, patches: [JELLY], count: 7,
     mat: { transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide, roughness: 0.15 }, jellyAlpha: true },
-  { id: 'turtle', name: '푸른바다거북', size: 'L', L: 2.5, count: 4, life: 'swim', build: turtle, patches: [TURTLE], speed: 1.45 },
-  { id: 'manta', name: '쥐가오리', size: 'XL', L: 4.0, count: 3, life: 'swim', build: manta, patches: [RAY], speed: 1.75, mat: { side: THREE.DoubleSide } },
+  { id: 'greenturtle', build: turtle, patches: [TURTLE], count: 4 },
+  { id: 'manta', build: manta, patches: [RAY], count: 3, mat: { side: THREE.DoubleSide } },
 ];
 
 /** 반투명 해파리: 가장자리는 진하고 가운데는 비치는 프레넬 불투명도 */

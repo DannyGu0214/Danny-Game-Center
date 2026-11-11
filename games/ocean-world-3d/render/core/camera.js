@@ -43,7 +43,7 @@ export class CameraRig {
     if (!p) return false;
     this.setView(name, 0);
     this.current = name;
-    this.orbit = { polar: THREE.MathUtils.degToRad(p.polar), az: THREE.MathUtils.degToRad(p.azimuth),
+    this.orbit = { name, polar: THREE.MathUtils.degToRad(p.polar), az: THREE.MathUtils.degToRad(p.azimuth),
       radius: typeof p.distance === 'function' ? p.distance(this.camera) : p.distance,
       target: new THREE.Vector3(...(p.target || this.home.toArray())), speed: THREE.MathUtils.degToRad(p.orbitSpeed ?? 6) };
     this.controls.enabled = false;
@@ -77,9 +77,24 @@ export class CameraRig {
     return true;
   }
 
+  /** 지금 거리·기울기는 두고 바라보는 점과 방위각만 그 점 쪽으로 옮긴다(화면 밖 ✨ 화살표를 눌렀을 때, P2). target은 Three 좌표 */
+  focus(target, dur = 0.8) {
+    const s0 = new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target));
+    const tg = target.clone();
+    tg.y = THREE.MathUtils.clamp(tg.y, this.box.min.y + 2, this.box.max.y);
+    // 방위각: 카메라가 그 점의 바깥쪽(블록 가운데에서 그 점으로 가는 방향)에서 보게
+    const out = new THREE.Vector3(tg.x - this.home.x, 0, tg.z - this.home.z);
+    const az = out.lengthSq() > 1 ? Math.atan2(out.x, out.z) : s0.theta;
+    let dAz = az - s0.theta; dAz = Math.atan2(Math.sin(dAz), Math.cos(dAz));
+    this.tween = { t: 0, dur, from: { target: this.controls.target.clone(), r: s0.radius, polar: s0.phi, az: s0.theta },
+      to: { target: tg, r: s0.radius, polar: s0.phi, az: s0.theta + dAz } };
+  }
+
   update(dt) {
     if (this.orbit) {
       const o = this.orbit;
+      // 창 크기가 0일 때 시작하면(숨은 창) 거리가 NaN이 된다. 그럴 때는 프리셋으로 다시 잰다
+      if (!Number.isFinite(o.radius)) { const p = this.presets[o.name]; o.radius = typeof p.distance === 'function' ? p.distance(this.camera) : p.distance; if (!Number.isFinite(o.radius)) return; }
       o.az += o.speed * dt;
       this.controls.target.copy(o.target);
       this.camera.position.setFromSphericalCoords(o.radius, o.polar, o.az).add(o.target);

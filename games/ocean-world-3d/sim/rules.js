@@ -211,10 +211,19 @@ export function createSim(eco) {
   }
 
   // ---------- 물건 놓기·치우기 ----------
+  // 물건 개수 상한(eco.limits[구역], null이면 없음). 지금 데이터는 모두 꺼 둠(대니님 결정 대기, docs/p2-report.md)
+  const zoneCount = (S, z) => cached(S, 'zc', () => { const c = {}; for (const it of S.items) { const k = ITEMS[it.id].zone; c[k] = (c[k] || 0) + 1; } return c; })[z] || 0;
+  const limitOf = (z) => eco.limits?.[z] ?? null;
+  function limitWhy(S, id) {
+    const z = ITEMS[id].zone, lim = limitOf(z);
+    return lim != null && zoneCount(S, z) >= lim ? `${eco.zones?.[z]?.name ?? z} 물건은 ${lim}개까지예요` : null;
+  }
   function canPlace(S, id, x, y, layer = null) {
     const d = ITEMS[id];
     if (!d) return no('없는 물건이에요');
     if (S.tier < d.tier) return no(`T${d.tier}에서 해금`);
+    const lw = limitWhy(S, id);
+    if (lw) return no(lw);
     const why = sp.placeWhy(S, id, x, y, d.zone === 'water' ? layer ?? sp.layersOf(d)[0] : null);
     if (why) return no(why);
     if (S.pop < priceOfItem(id)) return no('인기점수가 모자라요');
@@ -245,7 +254,7 @@ export function createSim(eco) {
     S.events.push({ type: 'remove', uid, id: it.id, refund });
     return { ok: true, refund };
   }
-  const freeSpot = (S, id, opt) => sp.freeSpot(S, id, opt);
+  const freeSpot = (S, id, opt) => (limitWhy(S, id) ? null : sp.freeSpot(S, id, opt)); // 상한에 걸리면 자리가 없는 것으로
 
   // ---------- 순간 포착 [AW] ----------
   function endChance(S) { S.chance = null; S.chanceIn = range(S, E.chanceEvery[0], E.chanceEvery[1]); }
@@ -310,7 +319,7 @@ export function createSim(eco) {
     }
     if (st.species >= 1 && st.species < st.caps.species && room > 0 && speciesIds.some((s) => !st.counts[s] && canHave(s))) out.species.push({ kind: 'species', n: st.species + 1, minutes: 2 });
     const open = itemIds.filter((id) => ITEMS[id].tier <= S.tier);
-    const needs = supplyKeys.filter((k) => open.some((id) => ITEMS[id].give[k] && sp.freeSpot(S, id)));
+    const needs = supplyKeys.filter((k) => open.some((id) => ITEMS[id].give[k] && freeSpot(S, id)));
     if (needs.length) {
       const drop = needs.length > 2 ? pick(S, needs) : null, ks = needs.filter((k) => k !== drop), need = {};
       for (const k of ks) need[k] = needCount(st, k) + 1;
@@ -318,8 +327,8 @@ export function createSim(eco) {
     }
     for (const id of open) {
       const d = ITEMS[id];
-      if (d.zone === 'water') { for (const L of sp.layersOf(d)) if (sp.freeSpot(S, id, { layer: L })) out.terrain.push({ kind: 'terrain', item: id, layer: L, n: countLayer(S, id, L) + 1, minutes: 2 }); }
-      else for (const k of d.on) if (eco.kinds[k]?.place && sp.freeSpot(S, id, { on: k })) out.terrain.push({ kind: 'terrain', item: id, on: k, n: countOn(S, id, k) + 1, minutes: 2 });
+      if (d.zone === 'water') { for (const L of sp.layersOf(d)) if (freeSpot(S, id, { layer: L })) out.terrain.push({ kind: 'terrain', item: id, layer: L, n: countLayer(S, id, L) + 1, minutes: 2 }); }
+      else for (const k of d.on) if (eco.kinds[k]?.place && freeSpot(S, id, { on: k })) out.terrain.push({ kind: 'terrain', item: id, on: k, n: countOn(S, id, k) + 1, minutes: 2 });
     }
     if (st.animals >= 2) { const pct = Math.ceil((Math.round(st.H * 100) + 5) / 5) * 5; if (pct <= 100) out.happy.push({ kind: 'happy', pct, minutes: 3 }); }
     return out;
@@ -481,13 +490,16 @@ export function createSim(eco) {
   }
 
   // ---------- 화면에 넘길 상태(docs/p1-sim-report.md 2절) ----------
+  // creatures·props는 따로도 부를 수 있다(화면은 매 단계 생물만 읽고, 물건은 바뀔 때만 읽는다 — P2)
+  const creaturesOf = (S) => S.animals.map((a) => ({ uid: a.uid, sp: a.sp, x: a.x, y: a.y, z: a.z, face: a.face, pitch: a.pitch, st: a.st, ph: a.ph, on: mv.whereOf(a) }));
+  const propsOf = (S) => S.items.map((it) => ({ uid: it.uid, id: it.id, x: it.x, y: it.y, w: ITEMS[it.id].w, h: ITEMS[it.id].h, zone: ITEMS[it.id].zone, layer: it.layer, z: sp.itemZ(it), rot: it.rot || 0 }));
   function view(S) {
     return {
       time: S.time, tier: S.tier, pop: S.pop, clock: clock(S),
       ext: { open: extOpen(S), rect: sp.ext },
       chance: S.chance ? { uid: S.chance.uid, t: S.chance.t } : null,
-      creatures: S.animals.map((a) => ({ uid: a.uid, sp: a.sp, x: a.x, y: a.y, z: a.z, face: a.face, pitch: a.pitch, st: a.st, ph: a.ph, on: mv.whereOf(a) })),
-      props: S.items.map((it) => ({ uid: it.uid, id: it.id, x: it.x, y: it.y, w: ITEMS[it.id].w, h: ITEMS[it.id].h, zone: ITEMS[it.id].zone, layer: it.layer, z: sp.itemZ(it), rot: it.rot || 0 })),
+      creatures: creaturesOf(S),
+      props: propsOf(S),
     };
   }
   function drainEvents(S) { const e = S.events; S.events = []; return e; }
@@ -497,11 +509,11 @@ export function createSim(eco) {
     speciesIds, itemIds, supplyKeys,
     newGame, stats, incomePerMin, popOf: (S) => S.pop, caps: capsOf, extOpen,
     animalValue, itemPoints, priceOfAnimal, priceOfItem, poolOfSpecies, poolOfItem, bodyLen,
-    canAdopt, adopt, canRelease, release, canPlace, placeItem, removeItem, freeSpot,
+    canAdopt, adopt, canRelease, release, canPlace, placeItem, removeItem, freeSpot, limitWhy, zoneCount,
     freeSessileSpot: (S, s) => sp.freeSessileSpot(S, s),
     capture, requestsOf: (S) => S.requests, requestProgress, requestDone, claim, swapRequest,
     extProgress, extReady, extMaster, visitExt, claimExt, extReward,
     clock, tick, advance, settleOffline,
-    serialize: serializeState, deserialize, fitTerrain, view, drainEvents,
+    serialize: serializeState, deserialize, fitTerrain, view, creatures: creaturesOf, props: propsOf, drainEvents,
   };
 }

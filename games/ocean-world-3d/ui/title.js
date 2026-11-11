@@ -1,6 +1,7 @@
 // 타이틀 화면: 실제 게임 장면(젤리 블록 디오라마) 위에 얹는 얇은 덮개(Sailing Master 타이틀과 같은 방식).
 // 따로 그린 그림·외부 글꼴 없이 DOM + CSS만 쓴다. 3D 쪽(카메라 궤도·출렁임)은 onStart를 받은 쪽이 한다.
-// P2에서 저장 유무 문구·첫 실행 프롤로그가 이어 붙을 자리: setPrompt(), 그리고 onStart 콜백.
+// P2(2026-11-12): 저장 유무에 따른 문구(prompt)와 [새로 시작] 단추(저장이 있을 때만, 두 번 눌러 확인 — 4초 안에 다시 안 누르면 돌아감).
+// 프롤로그는 부르는 쪽(render/main.js)이 onStart·onNew 뒤에 띄운다.
 
 const CSS = /* css */`
 #title { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center;
@@ -22,6 +23,9 @@ const CSS = /* css */`
 #title .go { position: absolute; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; font-size: 17px; font-weight: 700;
   color: #ffe08a; text-shadow: 0 1px 3px rgba(0,24,40,.85), 0 0 14px rgba(0,24,40,.6); animation: owBlink 1.8s infinite; }
 @keyframes owBlink { 50% { opacity: .35; } }
+#title .new { position: absolute; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); font: 600 13px system-ui, sans-serif; color: #e8f6ff;
+  background: rgba(4,36,58,.45); border: 1px solid rgba(232,246,255,.45); border-radius: 18px; padding: 5px 14px; cursor: pointer; }
+#title .new.arm { background: #c8553a; border-color: #ffb09a; color: #fff; }
 #title .tag { position: absolute; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; align-items: center; gap: 7px; }
 #title .logoMark { width: 54px; height: 54px; display: block; filter: drop-shadow(0 3px 8px rgba(0,0,0,.45)); }
 #title .logoWord { display: flex; align-items: center; gap: 10px; }
@@ -48,8 +52,9 @@ const LOGO = `
 <div class="logoWord"><i></i><b>DANNY SOFT</b><i></i></div>`;
 
 /**
- * @param {{ title?: string, prompt?: string, onStart: () => void }} o
+ * @param {{ title?: string, prompt?: string, onStart: () => void, onNew?: () => void }} o
  *   onStart: 화면을 처음 누를 때 한 번 불린다(3D 쪽 시작 동작). 덮개 숨기기는 이 모듈이 한다.
+ *   onNew: 주면 [새로 시작] 단추가 보인다(저장이 있을 때만 주기). 두 번 눌러 확인하면 onStart 대신 불린다.
  */
 export function createTitle(o) {
   if (!document.getElementById('ow-title-css')) {
@@ -61,19 +66,35 @@ export function createTitle(o) {
     ch === ' ' ? '<span class="sp"> </span>' : `<span style="animation-delay:${(i * 0.07).toFixed(2)}s">${ch}</span>`).join('');
   el.innerHTML = `<h1 aria-label="${o.title || 'Ocean World 3D'}">${letters}</h1>
     <div class="go">${o.prompt || '눌러서 바다로 들어가요!'}</div>
+    ${o.onNew ? '<button class="new" type="button">새로 시작</button>' : ''}
     <div class="tag" aria-label="Danny Soft">${LOGO}</div>`;
   document.body.appendChild(el);
   document.body.classList.add('intro');
   let started = false;
-  const start = (e) => {
+  const start = (e, fn = o.onStart) => {
     if (started) return;
     started = true;
     if (e) { e.preventDefault(); e.stopPropagation(); }
     el.classList.add('out');
     document.body.classList.remove('intro');
     setTimeout(() => el.remove(), 800);
-    o.onStart();
+    fn();
   };
+  const nb = el.querySelector('.new');
+  if (nb) {
+    let armed = null;
+    nb.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!armed) {
+        nb.classList.add('arm'); nb.textContent = '한 번 더 누르면 처음부터예요';
+        armed = setTimeout(() => { armed = null; nb.classList.remove('arm'); nb.textContent = '새로 시작'; }, 4000);
+        return;
+      }
+      clearTimeout(armed);
+      window.removeEventListener('keydown', onKey);
+      start(null, o.onNew);
+    });
+  }
   el.addEventListener('pointerdown', start);
   const onKey = (e) => { if (e.key === 'Enter' || e.key === ' ') { window.removeEventListener('keydown', onKey); start(e); } };
   window.addEventListener('keydown', onKey);
@@ -81,6 +102,7 @@ export function createTitle(o) {
     el,
     get started() { return started; },
     start: () => start(null),
+    startNew: () => start(null, o.onNew || o.onStart),
     setPrompt(text) { el.querySelector('.go').textContent = text; },
   };
 }
