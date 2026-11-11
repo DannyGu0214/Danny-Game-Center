@@ -57,3 +57,20 @@ test('경제 수치는 AW와 같고, 포착 시간만 7초(가안)', () => {
   assert.deepEqual([eco.ext.tier, eco.ext.animals], [8, 12]);
   for (const s of Object.values(eco.species)) assert.ok(LIFE[s.life]);
 });
+
+test('화면 크기 배율(게임적 허용): S ×1.35 · M ×1.1 · L ×0.95 · XL ×0.85, 등급 순서는 그대로, 소비량은 크기 등급 기준 그대로', () => {
+  assert.deepEqual(['S', 'M', 'L', 'XL'].map((k) => eco.sizes[k].draw), [1.35, 1.1, 0.95, 0.85]);
+  assert.deepEqual(['S', 'M', 'L', 'XL'].map((k) => eco.sizes[k].use), [1, 1, 2, 3]);
+  const order = ['S', 'M', 'L', 'XL'], maxOf = (k) => Math.max(...Object.keys(eco.species).filter((s) => eco.species[s].size === k).map((s) => G.bodyLen(s)));
+  const minOf = (k) => Math.min(...Object.keys(eco.species).filter((s) => eco.species[s].size === k).map((s) => G.bodyLen(s)));
+  for (let i = 0; i < 3; i++) assert.ok(maxOf(order[i]) < minOf(order[i + 1]), `${order[i]} < ${order[i + 1]}`);
+  assert.ok(Math.abs(G.bodyLen('manta') - 3.4) < 1e-9);
+  assert.ok(Math.abs(G.bodyLen('seacucumber') - 1.35) < 1e-9);
+  for (const [id, s] of Object.entries(eco.species)) assert.ok(s.len > 0, `${id}.len`);
+});
+
+test('흰동가리는 짝 둘레에 묶이지 않는다(home 없음, visit만)', () => {
+  assert.equal(eco.species.clownfish.home, undefined);
+  assert.ok(eco.species.clownfish.visit > 0 && eco.species.clownfish.visit < 0.5);
+  assert.deepEqual(eco.species.clownfish.partner, { sp: 'anemone', per: 2 });
+});

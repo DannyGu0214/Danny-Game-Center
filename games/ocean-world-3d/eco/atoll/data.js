@@ -36,34 +36,37 @@ export const NEEDS = {
   partner: { name: '공생', icon: '🤝' },
 };
 
-// 크기: 소비량은 [AW] SIZE.use 그대로. 속도는 종마다 따로(species.speed)
+// 크기: 소비량은 [AW] SIZE.use 그대로(경제는 크기 등급 기준). 속도는 종마다 따로(species.speed)
+// draw = 화면에 그리는 크기 배율(게임적 허용 — 작은 건 조금 크게, 큰 건 조금 작게, 등급 순서는 유지) [가안, 대니님 방향 2026-11-11, 시제품 세션과 같은 출발값]
 export const SIZES = {
-  S: { use: 1, name: '작음' },
-  M: { use: 1, name: '중간' },
-  L: { use: 2, name: '큼' },
-  XL: { use: 3, name: '아주 큼' },
+  S: { use: 1, name: '작음', draw: 1.35 },
+  M: { use: 1, name: '중간', draw: 1.1 },
+  L: { use: 2, name: '큼', draw: 0.95 },
+  XL: { use: 3, name: '아주 큼', draw: 0.85 },
 };
 
 // 생활형(life): walker 육지형 · crawler 바닥형 · sessile 고착형 · swimmer 유영형 · drifter 표류형 · surfacer 수면형 (sim/move.js)
-// speed 칸/초 · roam 다니는 반경(칸) — DESIGN 12.2 [가안]. layers 생략 = 모든 수위층(PLAN 0절). kinds 생략 = 모든 지형
+// len = 몸 길이·폭(칸, DESIGN 12.2 게임 크기). 화면 크기 = len × SIZES[size].draw(bodyLen) [가안]
+// speed 칸/초 · roam 둘레 목표를 고르는 반경(칸, 헤엄 생물은 절반쯤 블록 물 전체에서 고름) [가안]. layers 생략 = 모든 수위층(PLAN 0절). kinds 생략 = 모든 지형
+// 게임적 허용(대니님 방향 2026-11-11): 작은 생물도 깊은 바다를 다니고, 실제 생태에 맞춘 움직임 제한은 두지 않는다
 export const SPECIES = {
-  seacucumber: { name: '해삼', tier: 1, size: 'S', life: 'crawler', needs: ['food', 'shelter'], speed: 0.4, roam: 6, special: '몸을 쭉 늘였다 동그랗게 오므리기' },
-  hermitcrab: { name: '소라게', tier: 2, size: 'S', life: 'walker', needs: ['food', 'shelter', 'herd'], speed: 1.5, roam: 8, special: '여럿이 줄지어 더 큰 소라껍데기로 이사하기' },
-  anemone: { name: '말미잘', tier: 3, size: 'M', life: 'sessile', needs: ['food', 'water'], foot: 2, on: ['reefflat', 'lagoon'], special: '촉수를 확 오므렸다 꽃처럼 활짝 피기' },
+  seacucumber: { name: '해삼', tier: 1, size: 'S', len: 1, life: 'crawler', needs: ['food', 'shelter'], speed: 0.6, roam: 8, special: '몸을 쭉 늘였다 동그랗게 오므리기' }, // 속도 0.4 → 0.6(생동감) [가안]
+  hermitcrab: { name: '소라게', tier: 2, size: 'S', len: 0.75, life: 'walker', needs: ['food', 'shelter', 'herd'], speed: 1.5, roam: 8, special: '여럿이 줄지어 더 큰 소라껍데기로 이사하기' },
+  anemone: { name: '말미잘', tier: 3, size: 'M', len: 2, life: 'sessile', needs: ['food', 'water'], foot: 2, on: ['reefflat', 'lagoon'], special: '촉수를 확 오므렸다 꽃처럼 활짝 피기' },
   clownfish: {
-    name: '몰디브흰동가리', tier: 4, size: 'S', life: 'swimmer', needs: ['partner', 'food'], speed: 1.2, roam: 2,
-    partner: { sp: 'anemone', per: 2 }, // 말미잘 1개체가 흰동가리 2마리를 받아 준다 [가안]
-    home: { r: 2, h: 3 }, // 짝 말미잘 둘레 가로 2칸·위로 3칸 안에서 지낸다 [가안]
+    name: '몰디브흰동가리', tier: 4, size: 'S', len: 0.75, life: 'swimmer', needs: ['partner', 'food'], speed: 1.2, roam: 10,
+    partner: { sp: 'anemone', per: 2 }, // 말미잘 1개체가 흰동가리 2마리를 받아 준다(공생 필요 = 행복도) [가안]
+    visit: 0.1, // 목표점을 고를 때 이 비율로 짝 말미잘 곁에 잠깐 들른다(연출). 나머지는 블록 전체를 다닌다 [가안]
     special: '말미잘 촉수 속을 파고들어 몸 비비기',
   },
-  octopus: { name: '문어', tier: 5, size: 'M', life: 'swimmer', needs: ['food', 'shelter'], speed: 1.0, roam: 8, special: '몸 색을 바꿔 바위 흉내 내다 먹물 뿜고 쏙' },
-  moonjelly: { name: '보름달물해파리', tier: 6, size: 'M', life: 'drifter', needs: ['food', 'herd'], speed: 0.3, special: '빛을 받으며 크게 박동해 위로 떠오르기' },
+  octopus: { name: '문어', tier: 5, size: 'M', len: 2, life: 'swimmer', needs: ['food', 'shelter'], speed: 1.2, roam: 10, special: '몸 색을 바꿔 바위 흉내 내다 먹물 뿜고 쏙' }, // 속도 1.0 → 1.2 [가안]
+  moonjelly: { name: '보름달물해파리', tier: 6, size: 'M', len: 1.5, life: 'drifter', needs: ['food', 'herd'], speed: 0.45, special: '빛을 받으며 크게 박동해 위로 떠오르기' }, // 속도 0.3 → 0.45 [가안]
   greenturtle: {
-    name: '바다거북', tier: 7, size: 'L', life: 'surfacer', needs: ['food', 'shelter'], speed: 1.5, roam: 16,
+    name: '바다거북', tier: 7, size: 'L', len: 2.5, life: 'surfacer', needs: ['food', 'shelter'], speed: 1.5, roam: 16,
     breath: [30, 60], bask: ['beach'], baskMax: 2, // 30~60초마다 숨 쉬러 수면, 해변에서 볕 쬐기(동시에 최대 2마리) [가안]
     special: '수면으로 고개 내밀어 "푸" 하고 숨 쉬기',
   },
-  manta: { name: '쥐가오리', tier: 8, size: 'XL', life: 'swimmer', needs: ['food', 'water'], speed: 1.8, roam: 20, special: '제자리에서 공중제비 돌며 플랑크톤 먹기' },
+  manta: { name: '쥐가오리', tier: 8, size: 'XL', len: 4, life: 'swimmer', needs: ['food', 'water'], speed: 1.8, roam: 20, special: '제자리에서 공중제비 돌며 플랑크톤 먹기' },
 };
 
 // 물건. kind: nature(자연 지형물)·made(인공물). zone: land 육지 · bed 해저 · water 수중. w×h칸.

@@ -48,6 +48,8 @@ export function createSim(eco) {
   const itemPoints = (t) => E.itemPointsBase + E.itemPointsStep * t;
   const priceOfAnimal = (s) => round5(E.animalBase * E.growth ** (SPECIES[s].tier - 1));
   const priceOfItem = (id) => round5(E.itemBase * E.growth ** (ITEMS[id].tier - 1));
+  // 화면에 그리는 몸 크기(칸) = 종의 len × 크기 등급의 draw 배율. 규칙 판정에는 쓰지 않는다(생물은 점 하나로 판정)
+  const bodyLen = (s) => (SPECIES[s].len ?? 1) * (eco.sizes[SPECIES[s].size].draw ?? 1);
   const extOpen = (S) => !!X && sp.extOpen(S);
   const capsOf = (S) => ({ species: S.tier, animals: E.perTier * S.tier + (extOpen(S) ? X.animals : 0) });
   const poolOfItem = (id) => (ITEMS[id].zone === 'land' ? 'land' : 'water');
@@ -494,7 +496,7 @@ export function createSim(eco) {
     eco, space: sp, mover: mv, STEP, MAX_TIER, TIERS, EXT_GOALS, PHASES, DAY_SEC,
     speciesIds, itemIds, supplyKeys,
     newGame, stats, incomePerMin, popOf: (S) => S.pop, caps: capsOf, extOpen,
-    animalValue, itemPoints, priceOfAnimal, priceOfItem, poolOfSpecies, poolOfItem,
+    animalValue, itemPoints, priceOfAnimal, priceOfItem, poolOfSpecies, poolOfItem, bodyLen,
     canAdopt, adopt, canRelease, release, canPlace, placeItem, removeItem, freeSpot,
     freeSessileSpot: (S, s) => sp.freeSessileSpot(S, s),
     capture, requestsOf: (S) => S.requests, requestProgress, requestDone, claim, swapRequest,

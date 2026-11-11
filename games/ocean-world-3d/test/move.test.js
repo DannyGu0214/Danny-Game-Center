@@ -1,4 +1,4 @@
-// 생활형별 이동: 다니는 곳, 모든 수위층, 수면형 숨쉬기·볕 쬐기, 공생 집, 확장 영역 잠금, 물건이 놓이면 비켜 서기
+// 생활형별 이동: 다니는 곳, 모든 수위층, 수면형 숨쉬기·볕 쬐기, 흰동가리, 확장 영역 잠금, 물건이 놓이면 비켜 서기
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { G, eco, rich, setTier, place, run, findCell } from './helpers.js';
@@ -92,21 +92,29 @@ test('수면형(바다거북): 숨 쉬러 수면에 오르고, 해변에 올라 
   assert.ok(seen.bask > 0, '볕 쬐기');
 });
 
-test('공생 집: 흰동가리는 짝 말미잘 둘레(가로 2칸 + 몸 반폭, 위로 3칸) 안에서 지낸다', () => {
+test('흰동가리(게임적 허용, 2026-11-11): 짝 말미잘 곁에 매이지 않고 깊은 곳까지 블록 전체를 다니며, 가끔 말미잘 곁에 들른다', () => {
   const S = rich(6);
-  setTier(S, 4);
+  setTier(S, 8);
   place(S, 'feedbasket');
   const h = G.adopt(S, 'anemone').animal;
-  for (let i = 0; i < 2; i++) G.adopt(S, 'clownfish');
-  run(S, 5);
-  const [hx, hy] = [h.fx + 1, h.fy + 1], hz = sp.bottomZ(sp.cellAt(hx, hy));
-  watch(S, 180, () => {
+  for (let i = 0; i < 4; i++) G.adopt(S, 'clownfish');
+  const [hx, hy] = [h.fx + 1, h.fy + 1];
+  let n = 0, near = 0, far = 0, deep = 0;
+  watch(S, 900, (S2, t) => {
+    if (t % 30) return;
     for (const a of S.animals.filter((b) => b.sp === 'clownfish')) {
-      if (a.st !== 'move') continue;
-      assert.ok(Math.max(Math.abs(a.x - hx), Math.abs(a.y - hy)) <= 3.6, `가로 ${a.x.toFixed(1)},${a.y.toFixed(1)}`);
-      assert.ok(a.z <= hz + 3.01, `높이 ${a.z.toFixed(2)}`);
+      n++;
+      const d = Math.hypot(a.x - hx, a.y - hy);
+      if (d <= 3) near++;
+      if (d > 12) far++;
+      if (a.z < -6) deep++;
     }
   });
+  assert.ok(near / n < 0.5, `말미잘 3칸 안 ${(near / n).toFixed(2)} — 대부분은 블록 전체`);
+  assert.ok(near > 0, '가끔은 말미잘 곁에 들른다');
+  assert.ok(far / n > 0.3, `말미잘에서 12칸 넘게 떨어진 때 ${(far / n).toFixed(2)}`);
+  assert.ok(deep > 0, '깊은 곳(수심 6칸 아래)까지 간다');
+  assert.equal(G.stats(S).needMet.clownfish.partner, 0.5, '공생은 행복도 필요로만(말미잘 1개체 = 2마리분)');
 });
 
 test('표류형(해파리)은 길찾기 없이 떠다니며, 막히면 방향을 돌려 물기둥을 벗어나지 않는다', () => {

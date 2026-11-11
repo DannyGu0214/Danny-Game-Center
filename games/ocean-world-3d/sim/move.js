@@ -4,7 +4,9 @@
 //   swimmer 유영형 · surfacer 수면형: 물기둥 3차원. 곧은 길이 비면 곧장, 막히면 거친 3D 격자(칸 × 1칸 높이) BFS로 돌아감
 //   drifter 표류형: 길찾기 없이 천천히 떠다니며 막히면 방향을 돌림
 //   surfacer 수면형: 정해진 간격으로 수면에 올라 숨 쉬고, 가끔 정해진 지형의 뭍에 올라 쉼
-// 생태계 이름·지형 이름은 모른다. eco.species의 life·speed·roam·home·breath·bask와 space가 주는 판정만 쓴다.
+// 균형감(대니님 방향 2026-11-11 "게임적 허용"): 헤엄치는 생물의 목표점은 절반쯤 블록 물 전체에서 부피에 비례해 고르고(깊은 칸두·중층까지 고르게),
+// 바닥형도 가끔 해저 아무 칸이나 목표로 삼아 깊은 바닥까지 간다. 실제 생태처럼 사는 깊이·자리를 묶지 않는다.
+// 생태계 이름·지형 이름은 모른다. eco.species의 life·speed·roam·visit·breath·bask와 space가 주는 판정만 쓴다.
 import { rnd, range, pick, clamp } from './util.js';
 
 export const LIFE = {
@@ -16,6 +18,9 @@ export const LIFE = {
   surfacer: { pool: 'both', swim: true, breathe: true },
 };
 const DUR = { eat: 3.5, drink: 3, rest: 6 }; // [AW logic.js `arrive`]
+const FAR = 0.1; // 헤엄치는 생물이 목표점을 블록 물 전체(부피 비례)에서 고르는 비율. 나머지는 둘레에서 물기둥 높이에 비례해 고른다(13.2절 측정으로 정함) [가안]
+const SWIM_NEED = 0.2; // 헤엄치는 생물이 그 자리에서 먹기·쉬기를 하는 비율 [가안]
+const FAR_BED = 0.35; // 바닥형이 해저 아무 칸이나 목표로 고르는 비율 [가안]
 // 길 점: [x, y, z, 방식] 방식 0 헤엄 · 1 뭍 걷기 · 2 바닥 걷기 · 3 수면까지 헤엄
 const SWIM = 0, LAND = 1, BED = 2, SURF = 3;
 
@@ -96,7 +101,7 @@ export function createMover(eco, sp) {
   }
   const seen3 = new Uint32Array(N * LV), par3 = new Int32Array(N * LV), q3 = new Int32Array(N * LV);
   let stamp3 = 0;
-  const LIMIT3 = 9000; // 한 번에 살펴보는 3D 칸 수 상한(넘으면 포기하고 다음에 다시 고른다)
+  const LIMIT3 = N * LV; // 한 번에 살펴보는 3D 칸 수 상한(블록 전체 — 먼 목표·깊은 칸두까지 길을 찾게)
   function nodeOk(S, s, i, k, surf) { return sp.freePoint(S, i, zOf(k), s, surf); }
   function nearK(S, s, i, z, surf) {
     const k0 = kOf(z);
@@ -159,14 +164,42 @@ export function createMover(eco, sp) {
   const hostOf = (S, a) => (a.host ? S.animals.find((b) => b.uid === a.host) : null);
   const mateOf = (S, a) => { const m = S.animals.filter((b) => b !== a && b.sp === a.sp); return m.length ? pick(S, m) : null; };
   const hostCenter = (h) => { const f = SPECIES[h.sp].foot || 1; return [h.fx + f / 2, h.fy + f / 2]; };
+  // 블록 물 전체에서 부피에 비례해 고른 빈 점: 칸을 '쓸 수 있는 물기둥 높이'에 비례해 뽑고, 높이는 그 기둥에서 고르게
+  const usable = (i) => Math.max(0, sp.depth[i] - 0.75);
+  function volumeTable(S) {
+    return cachedOn(S, 'vol', () => {
+      const cells = [], cum = [];
+      let tot = 0;
+      for (let i = 0; i < N; i++) if (sp.wet[i] && sp.swimK[i] && !sp.lockedCell(S, i) && usable(i) > 0) { tot += usable(i); cells.push(i); cum.push(tot); }
+      return { cells, cum, tot };
+    });
+  }
+  function volumePoint(S, a, s) {
+    const V = volumeTable(S);
+    if (!V.cells.length) return null;
+    for (let tries = 0; tries < 8; tries++) {
+      const u = rnd(S) * V.tot;
+      let lo = 0, hi = V.cum.length - 1;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (V.cum[m] < u) lo = m + 1; else hi = m; }
+      const i = V.cells[lo], p = waterPoint(S, a, s, sp.cx(i) + range(S, 0.05, 0.95), sp.cy(i) + range(S, 0.05, 0.95));
+      if (p) return p;
+    }
+    return null;
+  }
 
   // ---------- 판단 ----------
   function decideGround(S, a, s, mode) {
     const from = sp.cellAt(a.x, a.y), r = rnd(S), needs = supplyNeeds(s);
     if (r < 0.38 && needs.length) {
-      const k = pick(S, needs), set = servesAt(S, mode, k);
-      const path = bfs2(S, from, (i) => set[i] === 1, mode);
+      // 둘레(roam) 안의 물건까지만 간다(먼 물건이 해저 생물을 한쪽으로 끌어모으지 않게 — 균형감). 탐색 칸 수를 둘레 넓이로 제한
+      const k = pick(S, needs), set = servesAt(S, mode, k), rad = s.roam ?? 10;
+      const path = bfs2(S, from, (i) => set[i] === 1, mode, (2 * rad + 1) ** 2);
       if (path) return go(a, toPts(a, path, mode), act(k));
+    }
+    if (r < 0.8 && rnd(S) < FAR_BED) { // 해저(또는 뭍) 아무 칸으로 멀리
+      const list = cachedOn(S, 'walk:' + mode, () => { const out = []; for (let i = 0; i < N; i++) if (sp.canWalk(S, i, mode)) out.push(i); return out; });
+      const t = list.length ? pick(S, list) : -1;
+      if (t >= 0 && t !== from) { const path = bfs2(S, from, (i) => i === t, mode); if (path && path.length) return go(a, toPts(a, path, mode), null); }
     }
     if (r < 0.8) {
       let c = from, rad = s.roam ?? 10;
@@ -193,29 +226,26 @@ export function createMover(eco, sp) {
     const z = range(S, lo, hi);
     return sp.freePoint(S, i, z, s) ? [x, y, z] : null;
   }
+  // 헤엄치는 생물의 다음 목표점: 가끔 짝 곁(visit) · 무리 곁 · 절반쯤 블록 물 전체(부피 비례) · 나머지는 둘레(roam) 안에서 물기둥이 깊은 칸일수록 자주
   function wanderPoint(S, a, s) {
-    const h = s.home ? hostOf(S, a) : null;
-    for (let tries = 0; tries < 6; tries++) {
-      let c = [a.x, a.y], rad = s.roam ?? 10, zhi = Infinity;
-      if (h) { c = hostCenter(h); rad = s.home.r + (SPECIES[h.sp].foot || 1) / 2; zhi = sp.bottomZ(sp.cellAt(c[0], c[1])) + s.home.h; }
-      else if (s.needs.includes('herd') && rnd(S) < 0.6) { const m = mateOf(S, a); if (m) { c = [m.x, m.y]; rad = 4; } }
-      const p = waterPoint(S, a, s, c[0] + range(S, -rad, rad), c[1] + range(S, -rad, rad), -Infinity, zhi);
-      if (p) return p;
+    const h = s.visit && rnd(S) < s.visit ? hostOf(S, a) : null;
+    if (h) { // 짝(말미잘) 곁으로 잠깐 돌아오기
+      const c = hostCenter(h), r = 1 + (SPECIES[h.sp].foot || 1) / 2, zb = sp.bottomZ(sp.cellAt(c[0], c[1]));
+      for (let tries = 0; tries < 6; tries++) { const p = waterPoint(S, a, s, c[0] + range(S, -r, r), c[1] + range(S, -r, r), -Infinity, zb + 2); if (p) return p; }
     }
-    return null;
+    if (s.needs.includes('herd') && rnd(S) < 0.4) {
+      const m = mateOf(S, a);
+      if (m) for (let tries = 0; tries < 4; tries++) { const p = waterPoint(S, a, s, m.x + range(S, -4, 4), m.y + range(S, -4, 4)); if (p) return p; }
+    }
+    if (rnd(S) < FAR) return volumePoint(S, a, s);
+    // 둘레 목표: 한 번만 뽑고, 물 밖·블록 밖이거나 받아들이지 않으면 이번에는 제자리(다시 뽑지 않는다 — 다시 뽑으면 가장자리를 피하게 되어 치우침).
+    // 받아들일 확률 = 그 칸의 물기둥 높이 ÷ 가장 깊은 물기둥 → 오래 돌면 물 부피에 고르게 퍼진다(메트로폴리스 방식)
+    const rad = s.roam ?? 10, top = Math.max(1, sp.maxDepth - 0.75);
+    const x = a.x + range(S, -rad, rad), y = a.y + range(S, -rad, rad), i = sp.cellAt(x, y);
+    if (i < 0 || !sp.wet[i] || rnd(S) * top > usable(i)) return null;
+    return waterPoint(S, a, s, x, y);
   }
   // 필요 k를 주는 물속 물건 둘레의 점
-  function needPoint(S, a, s, k) {
-    const list = S.items.filter((it) => ITEMS[it.id].give[k] && ITEMS[it.id].zone !== 'land');
-    if (!list.length) return null;
-    const it = pick(S, list), d = ITEMS[it.id], z0 = sp.itemZ(it);
-    for (let tries = 0; tries < 6; tries++) {
-      const x = it.x + range(S, -1, d.w + 1), y = it.y + range(S, -1, d.h + 1);
-      const p = d.zone === 'water' ? waterPoint(S, a, s, x, y, z0 - 1, z0 + 1) : waterPoint(S, a, s, x, y, -Infinity, z0 + 2.5);
-      if (p) return p;
-    }
-    return null;
-  }
   function goBreathe(S, a, s) {
     const p = path3(S, a, s, [a.x, a.y, sp.seaZ - 0.1], true);
     if (p) go(a, p, 'breathe'); else a.breath = 5;
@@ -248,9 +278,9 @@ export function createMover(eco, sp) {
     if (L.breathe && onLand(a)) return goSea(S, a, s);
     if (L.breathe && s.bask && rnd(S) < 0.12 && goBask(S, a, s)) return;
     const r = rnd(S), needs = supplyNeeds(s);
-    if (r < 0.3 && needs.length) {
-      const k = pick(S, needs), t = s.home ? wanderPoint(S, a, s) : needPoint(S, a, s, k); // 집이 있는 생물은 집 둘레에서 먹고 쉰다
-      if (t) { const p = path3(S, a, s, t); if (p) return go(a, p, act(k)); }
+    if (r < SWIM_NEED && needs.length) { // 헤엄치는 생물은 물건 쪽으로 가지 않고 그 자리에서 먹고 쉰다(물건 둘레에 몰리지 않게 — 균형감)
+      const k = pick(S, needs);
+      return arrive(S, a, s, act(k));
     }
     if (r < 0.85) {
       const t = wanderPoint(S, a, s);
@@ -263,7 +293,11 @@ export function createMover(eco, sp) {
     a.st = 'move'; a.t = range(S, 4, 9); a.path = null; a.goal = null;
     const i = sp.cellAt(a.x, a.y), lo = sp.bottomZ(i) + 0.5, hi = sp.seaZ - 0.4;
     a.tz = lo < hi ? range(S, lo, hi) : a.z;
-    if (s.needs.includes('herd') && rnd(S) < 0.5) { const m = mateOf(S, a); if (m && Math.hypot(m.x - a.x, m.y - a.y) > 4) a.hd = Math.atan2(m.y - a.y, m.x - a.x); }
+    if (s.needs.includes('herd') && rnd(S) < 0.4) { const m = mateOf(S, a); if (m && Math.hypot(m.x - a.x, m.y - a.y) > 4) { a.hd = Math.atan2(m.y - a.y, m.x - a.x); return; } }
+    if (rnd(S) < FAR) { // 블록 물 전체에서 고른 점 쪽으로 흘러가기(높이도 그 점으로)
+      const t = volumePoint(S, a, s);
+      if (t) { a.hd = Math.atan2(t[1] - a.y, t[0] - a.x); a.tz = t[2]; }
+    }
   }
   function decide(S, a) {
     const s = SPECIES[a.sp], L = LIFE[s.life];
@@ -341,10 +375,8 @@ export function createMover(eco, sp) {
       a.x = x + a.jx; a.y = y + a.jy; a.z = sp.bottomZ(i);
       return true;
     }
-    const h = s.home ? hostOf(S, a) : null;
-    if (h) { // 집이 있는 생물은 집 둘레에서 나온다
-      for (let tries = 0; tries < 40; tries++) { const p = wanderPoint(S, a, s); if (p) { [a.x, a.y, a.z] = p; return true; } }
-    }
+    const v = volumePoint(S, a, s); // 물 부피에 비례한 자리에서 나온다(균형감)
+    if (v) { [a.x, a.y, a.z] = v; if (L.drift) { a.hd = range(S, -Math.PI, Math.PI); a.tz = a.z; } return true; }
     const list = cellsWhere(S, (i) => sp.wet[i] && sp.swimK[i] && !sp.lockedCell(S, i));
     for (let tries = 0; tries < 40 && list.length; tries++) {
       const i = pick(S, list), [x, y] = ctr(i), p = waterPoint(S, a, s, x + a.jx, y + a.jy);
