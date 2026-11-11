@@ -4,22 +4,27 @@ import assert from 'node:assert/strict';
 import { eco, G } from './helpers.js';
 import { LIFE } from '../sim/move.js';
 
-test('생물 8종이 티어 1~8에 하나씩, 물건은 티어마다 자연물 하나·인공물 하나', () => {
+test('생물 8종이 티어 1~8에 하나씩, 물건은 티어마다 자연물 하나·인공물 하나(확장 영역 테마 물건 2개는 따로 T8)', () => {
   const sp = Object.values(eco.species);
   assert.equal(sp.length, 8);
   assert.deepEqual(sp.map((s) => s.tier).sort(), [1, 2, 3, 4, 5, 6, 7, 8]);
+  const theme = Object.entries(eco.items).filter(([, d]) => d.theme);
+  assert.deepEqual(theme.map(([id]) => id).sort(), ['boardwalk', 'mangrove']);
+  assert.deepEqual(theme.map(([, d]) => d.kind).sort(), ['made', 'nature']);
+  for (const [, d] of theme) assert.equal(d.tier, eco.ext.tier);
   for (let t = 1; t <= 8; t++) {
-    const its = Object.values(eco.items).filter((d) => d.tier === t);
+    const its = Object.values(eco.items).filter((d) => d.tier === t && !d.theme);
     assert.deepEqual(its.map((d) => d.kind).sort(), ['made', 'nature'], `T${t}`);
   }
 });
 
 test('인공물은 해저 3 · 수중 3 · 육지 2(DESIGN 3.4), 난파선은 물건 목록·확장 테마에 없다', () => {
-  const made = Object.values(eco.items).filter((d) => d.kind === 'made'), n = {};
+  const made = Object.values(eco.items).filter((d) => d.kind === 'made' && !d.theme), n = {};
   for (const d of made) n[d.zone] = (n[d.zone] || 0) + 1;
   assert.deepEqual(n, { bed: 3, water: 3, land: 2 });
   for (const [id, d] of Object.entries(eco.items)) assert.ok(!/wreck|난파|침몰/.test(id + d.name), id);
-  for (const id of eco.ext.theme) assert.ok(eco.items[id], `테마 물건 ${id}`);
+  assert.deepEqual([...eco.ext.theme].sort(), ['boardwalk', 'mangrove']);
+  for (const id of eco.ext.theme) { const d = eco.items[id]; assert.ok(d && d.theme, `테마 물건 ${id}`); assert.notEqual(d.zone, 'land', '확장 영역에 육지가 없어도 놓인다'); }
 });
 
 test('모든 수위층(PLAN 0절): 종마다 다니는 층 기본값은 전부(layers 없음)', () => {

@@ -151,3 +151,36 @@ test('공간 모듈은 지형 약속만 읽는다: 다른 크기·다른 옆면�
   assert.equal(s2.area[s2.cellOf(-1, 0)], 2);
   assert.equal(s2.area[s2.cellOf(0, 0)], 1);
 });
+
+test('확장 영역 테마 물건(맹그로브 덤불·수상 데크): 얕은 해저(수심 3칸까지)에 뿌리·기둥을 내리고 수면 위로 솟아, 그 위 물기둥의 모든 층을 막는다', () => {
+  const S = rich();
+  setTier(S, 8);
+  const kandu = findCell((i) => sp.kind[i] === 'kandu' && sp.area[i] === 1);
+  assert.match(G.canPlace(S, 'mangrove', kandu[0], kandu[1]).why, /에 놓아요/);
+  const at = G.freeSpot(S, 'mangrove', { ext: true });
+  const r = G.placeItem(S, 'mangrove', at.x, at.y);
+  assert.ok(r.ok, r.why);
+  for (const L of ['top', 'mid', 'low']) if (sp.layerOk[L][sp.cellOf(at.x, at.y)]) assert.match(G.canPlace(S, 'nursery', at.x, at.y, L).why ?? '', L === 'top' ? /층에는 못 놓아요|솟은/ : /솟은/);
+  assert.match(G.canPlace(S, 'buoy', at.x, at.y, 'top').why, /솟은 물건/);
+  const i = sp.cellOf(at.x + 1, at.y + 1);
+  for (let z = sp.bottomZ(i); z <= 0; z += 0.1) assert.equal(sp.freePoint(S, i, z, eco.species.manta, true), false, `z ${z.toFixed(1)}`);
+  // 반대로: 물기둥에 물건이 있는 자리에는 솟는 물건을 못 놓는다
+  const b = G.freeSpot(S, 'boardwalk');
+  assert.ok(G.placeItem(S, 'buoy', b.x + 1, b.y + 1, 'top').ok);
+  assert.match(G.canPlace(S, 'boardwalk', b.x, b.y).why, /물기둥에 물건이 있어/);
+  // 확장 영역 테마 물건은 확장 영역 꾸미기에서 센다
+  const d = G.freeSpot(S, 'boardwalk', { ext: true });
+  assert.ok(G.placeItem(S, 'boardwalk', d.x, d.y).ok);
+  assert.ok(G.space.inExt(eco.items.mangrove, at.x, at.y) && G.space.inExt(eco.items.boardwalk, d.x, d.y), '둘 다 확장 영역 안');
+  assert.deepEqual(G.extProgress(S, 'theme'), [2, 2]);
+});
+
+test('테마 물건은 육지가 없는 확장 영역에도 놓이고, 수심 3칸보다 깊은 곳에는 못 놓는다', () => {
+  const T = { GRID: { w: 12, h: 12 }, EXT: { side: '+y', depth: 8 }, SEA_LEVEL: 0, MAX_DEPTH: 6,
+    kindAt: (x, y) => (y >= 12 ? 'lagoon' : 'kandu'), cellHeight: (x, y) => (y >= 12 ? (x < 6 ? -9 : -12) : -18), heightAt: () => -3 };
+  const s2 = createSpace({ ...eco, terrain: T });
+  const S = { tier: 8, items: [], animals: [], rev: 1 };
+  assert.equal(s2.placeWhy(S, 'mangrove', 1, 13), null, '수심 3칸 석호(육지 없음)');
+  assert.match(s2.placeWhy(S, 'mangrove', 7, 13), /물이 깊어요/);
+  assert.ok(s2.freeSpot(S, 'boardwalk', { ext: true }));
+});

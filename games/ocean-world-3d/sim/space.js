@@ -86,6 +86,7 @@ export function createSpace(eco) {
         if (!layerOk[layer] || !layerOk[layer][i]) { why = wet[i] && swimK[i] ? 'layer' : 'terrain'; return false; }
         if (!onOk) { why = 'terrain'; return false; }
       } else if ((def.zone === 'land') === !!wet[i] || !placeK[i] || !onOk) { why = 'terrain'; return false; }
+      else if (def.maxDepth != null && depth[i] > def.maxDepth) { why = 'deep'; return false; }
       lo = Math.min(lo, hgt[i]); hi = Math.max(hi, hgt[i]);
     });
     if (why) return why;
@@ -103,6 +104,8 @@ export function createSpace(eco) {
     });
   }
   const isTall = (o) => !!o && !o.sp && !!ITEMS[o.id].tall;
+  // emerge = 해저에서 수면 위로 솟는 물건(기둥·뿌리): 그 위 물기둥의 모든 층을 막는다
+  const isEmerge = (o) => !!o && !o.sp && !!ITEMS[o.id].emerge;
   const isWalkItem = (o) => !!o && !o.sp && !!ITEMS[o.id].walk;
   function dynamicWhy(S, def, x, y, layer) {
     const o = occ(S);
@@ -111,10 +114,12 @@ export function createSpace(eco) {
       if (lockedCell(S, i)) { why = 'locked'; return false; }
       if (def.zone === 'water') {
         if (o.w[layer][i]) { why = 'occupied'; return false; }
+        if (isEmerge(o.g[i])) { why = 'emerge'; return false; }
         if (layer === lowL && isTall(o.g[i])) { why = 'tall'; return false; }
       } else {
         if (o.g[i]) { why = 'occupied'; return false; }
         if (def.tall && lowL && o.w[lowL][i]) { why = 'under'; return false; }
+        if (def.emerge && layerIds.some((L) => o.w[L][i])) { why = 'underAny'; return false; }
       }
     });
     return why;
@@ -127,6 +132,9 @@ export function createSpace(eco) {
     locked: () => `T${eco.ext.tier}에 열리는 확장 영역이에요`,
     occupied: () => '이미 다른 것이 있어요',
     tall: () => '키 큰 물건 위라 저층이 막혀 있어요',
+    emerge: () => '수면 위로 솟은 물건이 있어 물기둥이 막혀 있어요',
+    underAny: () => '이 자리 물기둥에 물건이 있어 수면 위로 솟는 물건을 못 놓아요',
+    deep: (def) => `물이 깊어요(수심 ${def.maxDepth}칸까지)`,
     under: () => '이 자리 저층에 물건이 있어 키 큰 물건을 못 놓아요',
   };
   // 물건 놓기 판정: null이면 됨, 아니면 안내 문장
@@ -196,7 +204,7 @@ export function createSpace(eco) {
     if (z < bottomZ(i) + (g && !isWalkItem(g) ? ITEM_CLEAR : CLEAR) + pad) return false;
     if (z > seaZ - (surf ? 0 : 0.25)) return false; // surf: 수면까지(숨쉬기·뭍에 오르기)
     const b = bandOf(i, z), L = layerIds[b];
-    if (o.w[L][i] || (L === lowL && isTall(g))) return false;
+    if (o.w[L][i] || (L === lowL && isTall(g)) || isEmerge(g)) return false;
     return !(s && s.layers && !s.layers.includes(L));
   }
   // 수면형이 뭍에 오르는 자리: 그 지형의 육지 칸과 맞닿은 물 칸
@@ -235,7 +243,7 @@ export function createSpace(eco) {
     kind, hgt, depth, area, wet, walkK, swimK, layerOk,
     cellOf, cellAt, cx, cy, bottomZ, bandOf, kindName,
     extOpen, lockedCell, isExtCell,
-    sessileDef, layersOf, foot, occ, isTall, placeWhy, sessileWhy, freeSpot, freeSessileSpot, covers,
+    sessileDef, layersOf, foot, occ, isTall, isEmerge, placeWhy, sessileWhy, freeSpot, freeSessileSpot, covers,
     terrainOk: (id, x, y, layer = null) => !staticWhy(ITEMS[id], x, y, layer),
     sessileTerrainOk: (s, x, y) => !staticWhy(sessileDef(s), x, y, null),
     inExt: (def, x, y) => !foot(def, x, y, (i) => i < 0 || area[i] !== 2),

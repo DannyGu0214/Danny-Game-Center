@@ -69,7 +69,7 @@ test('확장 영역 꾸미기: 열려야 시작, 채운 항목은 기록해 두�
   setTier(S, 8);
   assert.ok(G.visitExt(S));
   assert.equal(G.claimExt(S, 'item').why, '아직 덜 됐어요');
-  for (const id of ['feedbasket', 'lagoonsand', 'branchcoral', 'cleaning', 'dome', 'nursery']) assert.ok(place(S, id, { ext: true }).ok, id);
+  for (const id of ['feedbasket', 'lagoonsand', 'branchcoral', 'mangrove', 'boardwalk', 'nursery']) assert.ok(place(S, id, { ext: true }).ok, id);
   for (let i = 0; i < 4; i++) G.adopt(S, 'seacucumber');
   for (const a of S.animals) { a.y = Math.max(a.y, 0); }
   run(S, 1.1);

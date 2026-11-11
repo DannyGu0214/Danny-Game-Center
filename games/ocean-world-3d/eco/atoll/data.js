@@ -68,7 +68,8 @@ export const SPECIES = {
 
 // 물건. kind: nature(자연 지형물)·made(인공물). zone: land 육지 · bed 해저 · water 수중. w×h칸.
 // on = 놓을 수 있는 지형(앞일수록 먼저 권함) · layers = 수중 물건이 놓일 수 있는 층(앞이 권하는 층) · walk = 생물이 그 위를 다님
-// tall = 키 큰 해저 물건(그 위 칸의 저층을 못 씀) · float = 수면에 떠 있음(화면용) · give = 공급량 [가안]
+// tall = 키 큰 해저 물건(그 위 칸의 저층을 못 씀) · emerge = 해저에서 수면 위로 솟음(그 위 물기둥의 모든 층을 막음)
+// maxDepth = 놓을 수 있는 가장 깊은 수심(칸) · float = 수면에 떠 있음(화면용) · theme = 확장 영역 테마 물건 · give = 공급량 [가안]
 const SHALLOW = ['reefflat', 'lagoon'];
 const WET = ['lagoon', 'reefflat', 'thila', 'kandu', 'slope'];
 export const ITEMS = {
@@ -88,6 +89,9 @@ export const ITEMS = {
   hut: { name: '그늘 오두막', tier: 7, kind: 'made', zone: 'land', w: 2, h: 2, on: ['island', 'beach'], give: { shelter: 5 } },
   cleaning: { name: '청소 정거장', tier: 8, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['thila'], give: { water: 8 } },
   dome: { name: '수중 관측 돔', tier: 8, kind: 'made', zone: 'bed', w: 4, h: 4, on: ['kandu', 'thila'], tall: true, give: {} },
+  // 확장 영역 테마 물건(대니님 승인 2026-11-11, 수치 모두 [가안]). 육지가 없어도 놓이게 얕은 해저에 뿌리·기둥을 내리고 수면 위로 솟는다
+  mangrove: { name: '맹그로브 덤불', tier: 8, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['lagoon', 'reefflat'], maxDepth: 3, emerge: true, theme: true, give: { shelter: 4, water: 3 } },
+  boardwalk: { name: '수상 데크', tier: 8, kind: 'made', zone: 'bed', w: 4, h: 4, on: ['lagoon', 'reefflat'], maxDepth: 3, emerge: true, theme: true, give: { shelter: 3 } },
 };
 
 // 티어 기준 발전도 [AW TIERS]
@@ -119,8 +123,8 @@ export const ECON = {
 export const PHASES = ['아침', '낮', '저녁', '밤'];
 
 // T8 확장 영역(PLAN 0절: 다리 없이 본 블록 옆면에 붙어 열림). 크기는 지형 쪽 EXT, 여기서는 규칙 값만
-// theme = 확장 영역 꾸미기의 테마 물건 [가안, 결정 필요]: 난파선 제외로 초안 후보(침몰선·수상 데크·맹그로브)가 물건 목록에 없어 T8 물건 둘로 임시로 둠
-export const EXT_RULES = { tier: 8, animals: 12, theme: ['cleaning', 'dome'], residents: 6 };
+// theme = 확장 영역 꾸미기의 테마 물건: 맹그로브 덤불·수상 데크(대니님 승인 2026-11-11, 난파선은 제외)
+export const EXT_RULES = { tier: 8, animals: 12, theme: ['mangrove', 'boardwalk'], residents: 6 };
 
 // sim/rules.js의 createSim(eco)에 넘길 생태계 객체를 만든다. terrain = 지형 약속(GRID·EXT·SEA_LEVEL·MAX_DEPTH·heightAt·kindAt·cellHeight)
 export function makeEco(terrain) {
