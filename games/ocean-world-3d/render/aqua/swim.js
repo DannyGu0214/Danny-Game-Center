@@ -4,14 +4,14 @@
 
 /** 해파리 박동 곡선: 빠르게 오므리고 천천히 풀린다. CPU(추진)와 GPU(변형)가 같은 식을 쓴다. */
 export function jellyPulse(time, speed, phase) {
-  let p = (time * 0.45 * speed + phase / (Math.PI * 2)) % 1;
+  let p = (time * 0.52 * speed + phase / (Math.PI * 2)) % 1;
   if (p < 0) p += 1;
   const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   return p < 0.28 ? ss(0, 0.28, p) : 1 - ss(0.28, 1, p);
 }
 const PULSE_GLSL = /* glsl */`
 float owPulse(float t, float sp, float ph) {
-  float p = fract(t * 0.45 * sp + ph / 6.2831853);
+  float p = fract(t * 0.52 * sp + ph / 6.2831853);
   return p < 0.28 ? smoothstep(0.0, 0.28, p) : 1.0 - smoothstep(0.28, 1.0, p);
 }`;
 
@@ -85,7 +85,7 @@ export const RAY = {
 const TURTLE_FLIP = /* glsl */`
   bool front = aDef.z < 1.5;
   vec3 piv = front ? vec3(aDef.w * 0.26, 0.0, 0.18) : vec3(aDef.w * 0.2, -0.02, -0.3);
-  float ph = uTime * 2.1 * aSpeed + aPhase + (front ? 0.0 : 1.3);
+  float ph = uTime * 2.4 * aSpeed + aPhase + (front ? 0.0 : 1.3);
   float a = (front ? 0.55 : 0.22) * sin(ph) * uDeformGain * aDef.w;
   float sw = (front ? 0.38 : 0.18) * cos(ph) * uDeformGain * aDef.w;`;
 export const TURTLE = {
@@ -102,7 +102,7 @@ if (aDef.z > 0.5) {${TURTLE_FLIP}
   q.xz = owRot(q.xz, sw);
   transformed = piv + q;
 } else if (aDef.y > 0.5) {
-  float ph = uTime * 2.1 * aSpeed + aPhase;
+  float ph = uTime * 2.4 * aSpeed + aPhase;
   transformed.y += 0.012 * sin(ph * 2.0) * aDef.y * uDeformGain;
 }`,
 };
@@ -113,7 +113,7 @@ export const OCTOPUS = {
   vertexPars: PULSE_GLSL,
   vertexDeform: /* glsl */`
 {
-  float k = owPulse(uTime * 0.8, aSpeed, aPhase) * uDeformGain;
+  float k = owPulse(uTime * 0.95, aSpeed, aPhase) * uDeformGain;
   if (aDef.z > 0.5) {
     float s = aDef.x;
     float ph = uTime * 2.4 * aSpeed + aPhase + aDef.w * 0.785;

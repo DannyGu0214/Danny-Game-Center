@@ -11,6 +11,7 @@
 //   ?shadow=0 ?fog=0 ?caustics=0 ?snow=0 ?shafts=0 ?deform=0   기능 끄기(비교용)
 //   ?ext=1                   T8 확장 영역까지 넓힌 블록(지형 함수 확인용)
 //   ?size=1280x800 ?dpr=1    녹화 모드 캔버스 크기, 픽셀 비율
+//   ?sizes=1.35,1.1,0.95,0.85  크기 등급(S,M,L,XL)별 화면 배율. ?sizes=1 이면 배율 없음(원래 크기)
 //   ?title=0|1               타이틀 화면. 기본은 켬, ?capture·?perf=1에서는 끔(검증 자동화용). title=1이면 그때도 켬
 import * as THREE from 'three';
 import * as TER from '../eco/atoll/terrain.js';
@@ -31,7 +32,7 @@ import { Heightfield } from './aqua/heightfield.js';
 import { WaterBody } from './aqua/surface.js';
 import { createMarineSnow, createLightShafts } from './aqua/particles.js';
 import { floatOn } from './aqua/buoyancy.js';
-import { SPECIES, speciesMaterial, scaleCounts } from './proto/species.js';
+import { SPECIES, speciesMaterial, scaleCounts, parseSizeScale } from './proto/species.js';
 import { propGeometries } from './proto/props.js';
 import { Wander } from './proto/wander.js';
 import { rng } from './proto/geo.js';
@@ -53,6 +54,7 @@ const opt = {
   size: (q.get('size') || '1280x800').split('x').map(Number),
   dpr: q.has('dpr') ? parseFloat(q.get('dpr')) : null,
   title: q.has('title') ? q.get('title') !== '0' : !(q.has('capture') || q.get('perf') === '1'),
+  sizes: parseSizeScale(q.get('sizes')),
   sigma: q.has('sigma') ? Math.max(0.05, parseFloat(q.get('sigma')) || 1) : 1,  // 물 흡수 배율(탁도)
 };
 if (opt.water === 'transmission') opt.fog = q.has('fog') ? opt.fog : false; // 투과 방식은 기본으로 물속 안개를 끈다(사례와 같게)
@@ -212,8 +214,8 @@ put('bungalow', bung, { z: deckZ + 0.12, zone: 'cross', yaw: 0 });
 // 줄 세우기: 크기만큼 간격을 두고 칸두를 따라, 수심 5.6칸에 띄움(움직이지 않음)
 const LINE_X = (() => { let x = 0; const xs = SPECIES.map((sp) => { const c = x + sp.L / 2; x += sp.L + 1.1; return c; }); const off = 20 - x / 2; return xs.map((v) => v + off); })();
 const lineY = (x) => 3.0 + (2.4 * (x + 4)) / 48;
-function lineUp(c, si) { c.x = LINE_X[si]; c.y = lineY(c.x); c.z = -5.6; c.yaw = 0; c.pitch = 0; c.roll = 0; c.life = 'fixed'; c.walk = 1; c.L = c.sp.L; }
-const wander = new Wander({ bounds, heightAt, seed: 9 });
+function lineUp(c, si) { c.x = LINE_X[si]; c.y = lineY(c.x); c.z = -5.6; c.yaw = 0; c.pitch = 0; c.roll = 0; c.life = 'fixed'; c.walk = 1; c.L = c.sp.L * (opt.sizes[c.sp.size] ?? 1); }
+const wander = new Wander({ bounds, heightAt, seed: 9, sizeScale: opt.sizes });
 const counts = opt.lineup ? SPECIES.map(() => 1) : scaleCounts(opt.n);
 const species = [];
 let total = 0;
@@ -376,7 +378,7 @@ app.installCapture({
     rig.setView('_custom', 0); app.step(0);
   },
 });
-window.__ow = { app, opt, jelly, rig, hf, species, batch, placed, fog, input, hitMesh };
+window.__ow = { app, opt, jelly, rig, hf, species, batch, placed, fog, input, hitMesh, heightAt };
 app.start();
 
 // ---------- 작은 UI ----------
