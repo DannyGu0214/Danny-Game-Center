@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ocean World 3D — P1 시제품</title>
+<style>
+  :root { --ink: #1d3340; --panel: rgba(255, 255, 255, 0.82); --line: rgba(29, 51, 64, 0.14); --accent: #1f8fb0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #eaf3f4; color: var(--ink);
+    font: 13px/1.4 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  canvas#view { display: block; width: 100vw; height: 100vh; touch-action: none; }
+  body.capture canvas#view { width: auto; height: auto; }
+  body.capture #ui, body.capture #perf { display: none; }
+  #ui { position: fixed; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(6px); max-width: min(440px, calc(100vw - 24px)); }
+  #ui h1 { margin: 0 0 2px; font-size: 14px; }
+  #ui .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  #ui .lab { min-width: 44px; opacity: 0.7; }
+  #ui a, #ui button, #ui select { font: inherit; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; text-decoration: none; cursor: pointer; }
+  #ui a.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #ui input[type=range] { width: 120px; }
+  #ui .hint { opacity: 0.65; font-size: 12px; }
+  #perf { position: fixed; left: 12px; top: 12px; padding: 8px 10px; background: rgba(10, 25, 35, 0.78); color: #e8f6ff; border-radius: 10px;
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-width: calc(100vw - 24px); }
+  #perf .perf-lines { white-space: pre; }
+  #perf button { font: inherit; margin: 6px 4px 0 0; padding: 2px 8px; border-radius: 6px; border: 0; cursor: pointer; }
+  #perf pre { margin: 6px 0 0; white-space: pre-wrap; max-height: 40vh; overflow: auto; }
+  #perf pre:empty { display: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three-0.187.0/build/three.module.js",
+  "three/addons/": "./vendor/three-0.187.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="ui">
+  <h1>Ocean World 3D · P1 기술 시제품</h1>
+  <div class="row"><span class="lab">물</span><span data-k="water" class="row"></span></div>
+  <div class="row"><span class="lab">시점</span><span data-k="views" class="row"></span></div>
+  <div class="row"><span class="lab">물 탁도</span><input data-k="sigma" type="range" min="0.3" max="2.5" step="0.05"><span data-k="sigmav"></span><span class="hint">(흡수 σ 배율, 낮을수록 맑음)</span></div>
+  <div class="row"><span class="lab">젤리</span><input data-k="jelly" type="range" min="0" max="2" step="0.1"><span data-k="jellyv"></span>
+    <button data-k="poke">출렁!</button><label><input data-k="drag" type="checkbox" checked> 블록 끌기 = 출렁</label></div>
+  <div class="row"><span class="lab">생물</span><select data-k="n"><option>0</option><option>22</option><option>44</option><option>88</option><option>200</option></select>
+    <a data-k="perf" href="?perf=1">성능 표시</a></div>
+  <div class="hint">빈 곳 끌기 = 돌리기 · 휠/두 손가락 = 확대 · 오른쪽 끌기 = 옮겨 보기 · Shift+끌기 = 블록 위에서도 돌리기</div>
+</div>
+<script type="module" src="./render/main.js"></script>
+</body>
+</html>
