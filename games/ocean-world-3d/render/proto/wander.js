@@ -9,8 +9,9 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const angDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 export class Wander {
-  constructor({ bounds, heightAt, seed = 1 }) {
+  constructor({ bounds, heightAt, seed = 1, sizeScale = null }) {
     this.b = bounds; this.H = heightAt; this.r = rng(seed);
+    this.sizeScale = sizeScale || {};   // 크기 등급별 화면 배율(S·M·L·XL)
     this.list = [];
     this.current = { x: 0, y: 0, z: 0 };   // 블록 흔들림 → 해류(격자 방향)
   }
@@ -29,20 +30,36 @@ export class Wander {
     return null;
   }
 
+  /** 물 부피에 비례해 헤엄칠 점을 고른다: 물기둥이 깊은 칸일수록 자주 뽑히고, 높이는 물기둥 안에서 고르게.
+   *  그래서 얕은 석호보다 칸두·중층에도 고르게 퍼진다(대니님 방향 2026-11-11: 생동감과 균형감). */
+  _findWater(half, tries = 600) {
+    const need = half * 2 + 0.5, maxCol = 12;
+    for (let k = 0; k < tries; k++) {
+      const p = this._find((g) => g < -need, 1);
+      if (!p) continue;
+      const col = -p.g - need;                       // 몸이 들어갈 수 있는 물기둥 높이
+      if (this.r() * maxCol > col) continue;         // 깊이에 비례한 거절 표본
+      const lo = p.g + half + 0.25, hi = -half - 0.15;
+      p.z = lo + this.r() * Math.max(0, hi - lo);
+      return p;
+    }
+    return this._find((g) => g < -need);
+  }
+
   add(sp, place) {
-    const c = { sp, life: sp.life, L: sp.L * (0.88 + this.r() * 0.24), x: 0, y: 0, z: 0, yaw: this.r() * TAU, pitch: 0, roll: 0,
+    const c = { sp, life: sp.life, L: sp.L * (this.sizeScale[sp.size] ?? 1) * (0.88 + this.r() * 0.24), x: 0, y: 0, z: 0, yaw: this.r() * TAU, pitch: 0, roll: 0,
       vx: 0, vy: 0, vz: 0, speed: sp.speed * (0.8 + this.r() * 0.4), phase: this.r() * TAU, tgt: null, walk: 0 };
     const half = this._half(c);
     let p = null;
     if (place) p = { ...place, g: this.H(place.x, place.y) };
     else if (c.life === 'walk') p = this._find((g) => g > 0.25);
-    else if (c.life === 'crawl') p = this._find((g) => g < -0.8 && g > -9);
+    else if (c.life === 'crawl') p = this._find((g) => g < -0.8);
     else if (c.life === 'fixed') p = this._find((g) => g < -0.6 && g > -2.5);
-    else p = this._find((g) => g < -(half * 2 + 0.6));
+    else p = this._findWater(half);
     if (!p) p = { x: (this.b.x0 + this.b.x1) / 2, y: (this.b.y0 + this.b.y1) / 2, g: this.H(20, 20) };
     c.x = p.x; c.y = p.y;
     c.home = { x: p.x, y: p.y };
-    if (c.life === 'swim' || c.life === 'drift') c.z = p.g + half + 0.3 + this.r() * Math.max(0, -p.g - 2 * half - 0.6);
+    if (c.life === 'swim' || c.life === 'drift') c.z = p.z ?? (p.g + half + 0.3 + this.r() * Math.max(0, -p.g - 2 * half - 0.6));
     else c.z = p.g;
     this.list.push(c);
     return c;
@@ -54,16 +71,14 @@ export class Wander {
   _newTarget(c) {
     const half = this._half(c);
     if (c.life === 'walk') c.tgt = this._find((g) => g > 0.25, 200, c.home, 7) || c.home;
-    else if (c.life === 'crawl') c.tgt = this._find((g) => g < -0.8 && g > -11, 200, c, 6) || c.home;
+    else if (c.life === 'crawl') c.tgt = this._find((g) => g < -0.8, 200, c, 22) || c.home;   // 깊은 해저까지(수심 제한 없음, 블록 대부분이 범위)
     else {
-      const p = this._find((g) => g < -(half * 2 + 0.5));
+      // 모든 수위층, 물 부피에 비례: 바닥 위 ~ 수면 아래 사이 아무 높이
+      const p = this._findWater(half);
       if (!p) { c.tgt = { x: c.x, y: c.y, z: c.z }; return; }
-      // 모든 수위층: 바닥 위 ~ 수면 아래 사이 아무 높이
-      const lo = p.g + half + 0.25, hi = -half - 0.15;
-      p.z = lo + this.r() * Math.max(0, hi - lo);
       c.tgt = p;
     }
-    c.wait = c.life === 'walk' || c.life === 'crawl' ? this.r() * 2 : 0;
+    c.wait = c.life === 'walk' || c.life === 'crawl' ? this.r() * 1.2 : 0;
   }
 
   update(dt, t) {
@@ -84,7 +99,7 @@ export class Wander {
       if (c.life === 'drift') {
         // 해파리: 박동할 때 위로 밀리고 천천히 가라앉음
         const k = jellyPulse(t, 1, c.phase);
-        c.vz = (k * 0.9 - 0.25) * 0.5 + clamp(dz, -1, 1) * 0.15;
+        c.vz = (k * 0.9 - 0.34) * 0.5 + clamp(dz, -1, 1) * 0.2;   // 뜨는 힘과 가라앉는 힘을 거의 같게(아래층까지)
         sp *= 0.4 + k;
       } else if (c.life === 'swim') {
         c.vz += (clamp(dz / Math.max(dist, 1e-3), -0.6, 0.6) * c.speed - c.vz) * Math.min(1, dt * 1.5);

@@ -6,7 +6,7 @@ const CSS = /* css */`
 #title { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center;
   padding-top: calc(8vh + env(safe-area-inset-top, 0px)); text-align: center; color: #f3fbff; cursor: pointer;
   user-select: none; -webkit-user-select: none; touch-action: none;
-  background: linear-gradient(to bottom, rgba(6,48,72,.74), rgba(6,48,72,0) 32%, rgba(6,48,72,0) 70%, rgba(4,36,58,.78));
+  background: linear-gradient(to bottom, rgba(6,48,72,.74), rgba(6,48,72,0) 32%, rgba(6,48,72,0) 62%, rgba(4,36,58,.84));
   transition: opacity .7s ease; }
 #title.out { opacity: 0; pointer-events: none; }
 #title h1 { margin: 0; font-size: clamp(34px, 6.4vw, 64px); font-weight: 800; letter-spacing: .01em; white-space: nowrap;
@@ -20,7 +20,7 @@ const CSS = /* css */`
   86% { transform: translateY(-.015em) scale(.98, 1.02); }
 }
 #title .go { position: absolute; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; font-size: 17px; font-weight: 700;
-  color: #ffe08a; text-shadow: 0 1px 7px rgba(0,0,0,.6); animation: owBlink 1.8s infinite; }
+  color: #ffe08a; text-shadow: 0 1px 3px rgba(0,24,40,.85), 0 0 14px rgba(0,24,40,.6); animation: owBlink 1.8s infinite; }
 @keyframes owBlink { 50% { opacity: .35; } }
 #title .tag { position: absolute; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; align-items: center; gap: 7px; }
 #title .logoMark { width: 54px; height: 54px; display: block; filter: drop-shadow(0 3px 8px rgba(0,0,0,.45)); }
