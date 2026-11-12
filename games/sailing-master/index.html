@@ -966,7 +966,7 @@ function showDisaster(cause) {
 // 이번 단계의 엔딩(M2a): 앞바다의 큰 바다 경계를 4등급 배로 넘을 때. 강 끝은 이제 앞바다로 이어져요
 function showEnding() {
   closeSheet();
-  overlay(`<h3>🌊 큰 바다 앞에서</h3><p>${S.ship.name}이(가) 작은 호수에서 강을 따라 앞바다 끝까지 왔다!</p><p>저 안개 너머 큰 바다는 다음 항해에서 만나자고, 친구! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 바다에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
+  overlay(`<h3>🌊 큰 바다 앞에서</h3><p>${S.ship.name}이(가) 작은 호수의 뗏목에서 시작해 강을 따라 앞바다 끝까지 왔다! 이제 돛대 둘 ${HULLS[S.ship.hull].name}다!</p><p>저 안개 너머 큰 바다는 다음 항해에서 만나자고, 친구! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 바다에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
 }
 
 // ── 시트 ──
@@ -1842,6 +1842,7 @@ function render() {
     }
   }
   if (!shipDone) SA.drawShip(ctx, sprite, st, cam.zoom, bx, by);
+  creatures.draw(ctx, cam, W, H, DPR, (c) => !!c.bow); // 뱃머리 타는 돌고래는 배 위에(M2b)
   A.drawWeather(ctx, S.docked ? {} : S.weather, W, H, t, DPR, weatherView(bx, by));
 }
 // 날씨 그림에 넘길 것: 배 자리, 안개 속 보이는 거리(화면 px), 항구 불빛, 번개, 바람 방향

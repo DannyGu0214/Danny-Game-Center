@@ -46,7 +46,8 @@ test('지도: 수역마다 항구·수문·발견지가 물 위에 있고 서로
       const [ax, ay] = w.nearestWater(f.x, f.y), gap = Math.hypot(f.x - ax, f.y - ay), d = w.dist(f.x, f.y);
       assert.ok(w.findPath(p0.x, p0.y, ax, ay), `${id} 길 ${f.id}`);
       if (f.where === 'water') assert.ok(d > 5, `${f.id} 물 위`);
-      else if (f.where === 'shore' || f.where === 'beach') { assert.ok(d < 0 && d > -7, `${f.id} 물가 ${d}`); assert.ok(gap < 24, `${f.id} 맨눈 ${gap}`); } else { assert.ok(d < -12, `${f.id} 내륙 ${d}`); assert.ok(gap < 66, `${f.id} 망원경 ${gap}`); }
+      else if (f.where === 'beach') assert.ok(d > 0 && d < 6, `${f.id} 조간대 ${d}`);
+      else if (f.where === 'shore') { assert.ok(d < 0 && d > -7, `${f.id} 물가 ${d}`); assert.ok(gap < 24, `${f.id} 맨눈 ${gap}`); } else { assert.ok(d < -12, `${f.id} 내륙 ${d}`); assert.ok(gap < 66, `${f.id} 망원경 ${gap}`); }
     }
     assert.ok(w.finds.some((f) => f.where === 'inland'), `${id} 내륙 발견지`);
     assert.ok(w.finds.some((f) => f.where === 'shore'), `${id} 물가 발견지`);

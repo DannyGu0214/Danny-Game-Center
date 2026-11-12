@@ -88,10 +88,12 @@ export function createCreatures(world) {
       }
     },
     // 땅 위 짐승과 물 위 생물을 함께 그린다
-    draw(g, cam, W, H, dpr) {
+    // only: 고를 것(M2b: 뱃머리를 타는 돌고래는 배를 그린 뒤에 한 번 더 그려 돛에 가리지 않게)
+    draw(g, cam, W, H, dpr, only = null) {
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       const z = cam.zoom, k = VIEW.tiltY;
       for (const c of list) {
+        if (only ? !only(c) : c.bow) continue;
         const sx = W / 2 + (c.x - cam.x) * z, sy = cam.cy + (c.y - cam.y) * z * k;
         if (sx < -40 || sx > W + 40 || sy < -60 || sy > H + 40) continue;
         const fade = Math.min(1, c.age, (c.life - c.age));
@@ -242,7 +244,7 @@ const DRAW = {
       g.fillStyle = 'rgba(20,60,80,.45)'; g.beginPath(); g.ellipse(0, 0, L * 0.5, L * 0.13, 0, 0, TAU); g.fill();
       g.beginPath(); g.moveTo(-L * 0.42, 0); g.lineTo(-L * 0.62, L * 0.16); g.lineTo(-L * 0.58, 0); g.lineTo(-L * 0.62, -L * 0.16); g.closePath(); g.fill();
       g.restore();
-      if (Math.sin(c.ph * 2.2) > 0) { g.fillStyle = def.color; g.beginPath(); g.moveTo(x - f * L * 0.1, y); g.quadraticCurveTo(x - f * L * 0.02, y - L * 0.2, x + f * L * 0.08, y - L * 0.22); g.quadraticCurveTo(x + f * L * 0.03, y - L * 0.08, x + f * L * 0.12, y); g.closePath(); g.fill(); }
+      if (Math.sin(c.ph * 2.2) > 0 || c.bow) { g.fillStyle = def.color; g.beginPath(); g.moveTo(x - f * L * 0.1, y); g.quadraticCurveTo(x - f * L * 0.02, y - L * 0.2, x + f * L * 0.08, y - L * 0.22); g.quadraticCurveTo(x + f * L * 0.03, y - L * 0.08, x + f * L * 0.12, y); g.closePath(); g.fill(); }
       ripple(g, x, y, L * 0.3, 0.45);
       if (c.bow) { g.strokeStyle = 'rgba(255,240,170,.7)'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x, y, L * 0.6, L * 0.6 * VIEW.tiltY, 0, 0, TAU); g.stroke(); }
       return;

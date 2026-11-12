@@ -25,7 +25,8 @@ function coastShip(hull = 'sloop', mods = [{ id: 'mast_m', col: 1, row: 2, rot: 
   return S;
 }
 const atSea = (S, x, y) => { G.undock(S); S.boat.x = x; S.boat.y = y; drain(S); return S; };
-const SCH = [{ id: 'mast_m', col: 2, row: 2, rot: 0 }, { id: 'mast_d', col: 2, row: 7, rot: 0 }, { id: 'oar', col: 0, row: 5, rot: 0 }, { id: 'wheel', col: 2, row: 12, rot: 0 }];
+const SCH = [{ id: 'mast_m', col: 2, row: 2, rot: 0 }, { id: 'mast_d', col: 2, row: 7, rot: 0 }, { id: 'oar', col: 0, row: 10, rot: 0 }, { id: 'wheel', col: 2, row: 12, rot: 0 }];
+const fits = (hull, mods) => mods.every((m, i) => SH.canPlace({ hull, mods: mods.slice(0, i) }, m));
 const crewOf = (n) => Array.from({ length: n }, (_, i) => ({ id: 80 + i, role: 'deckhand', name: `x${i}`, wage: 0, baseWage: 0, lv: 1, xp: 0, fatigue: 0, morale: 0.9, trait: 'diligent' }));
 // 화면 없이 그림 함수를 돌려 보는 가짜 캔버스(무엇을 부르든 받아 줘요)
 const fakeCtx = () => new Proxy({}, { get: (o, k) => (k in o ? o[k] : (k === 'createLinearGradient' || k === 'createRadialGradient' ? () => ({ addColorStop() {} }) : () => {})), set: (o, k, v) => { o[k] = v; return true; } });
@@ -40,7 +41,7 @@ test('M2b 발견지: 앞바다 10곳, 새 그림 5종, 자리 규칙(where)이 �
   for (let seed = 1; seed <= 8; seed++) {
     const list = G.findsOf(G.newGame(seed), 'coast'), by = Object.fromEntries(list.map((f) => [f.id, f]));
     assert.equal(by.estuaryBuoy.where, 'water'); assert.ok(w.dist(by.estuaryBuoy.x, by.estuaryBuoy.y) > 10, `시드 ${seed} 부표 물 위`);
-    assert.equal(by.tidepool.where, 'beach'); { const d = w.landDist(by.tidepool.x, by.tidepool.y); assert.ok(d < 0 && d > -6, `시드 ${seed} 웅덩이 물가 바로 위 ${d}`); }
+    assert.equal(by.tidepool.where, 'beach'); { const d = w.landDist(by.tidepool.x, by.tidepool.y); assert.ok(d > 0 && d < 6, `시드 ${seed} 웅덩이는 물가 바로 앞 조간대 ${d}`); }
     assert.equal(by.seaCave.where, 'shore'); assert.ok(w.landDist(by.seaCave.x, by.seaCave.y) < 0);
     for (const f of list) assert.ok(w.edgeDist(f.x, f.y) > 60, `시드 ${seed} ${f.id}`);
   }
@@ -142,7 +143,7 @@ test('M2b 스쿠너 짓기: 슬루프 ★2 이상 + 조선 항구(조선소 4등
 });
 
 test('M2b 스쿠너 그림: 선체마다 배율을 낮춰 굽고(14~16px/m), 64방향 모두 칸 256px 안에 들어가요', () => {
-  const tall = [{ id: 'crowsnest', col: 1, row: 3, rot: 0 }, { id: 'desal', col: 3, row: 6, rot: 0 }];
+  const tall = [{ id: 'crowsnest', col: 1, row: 4, rot: 0 }, { id: 'desal', col: 3, row: 6, rot: 0 }];
   for (const id of ['sloop', 'sloop3', 'schooner', 'schooner2', 'schooner3']) {
     const b = atlasBounds({ hull: id, mods: tall.filter(() => HULLS[id].grade >= 4) });
     assert.ok(b.x0 >= 0 && b.y0 >= 0 && b.x1 <= b.cell && b.y1 <= b.cell, `${id} ${JSON.stringify(b)}`);
@@ -155,6 +156,7 @@ test('M2b 스쿠너 그림: 선체마다 배율을 낮춰 굽고(14~16px/m), 64�
 });
 
 test('M2b 돛대 둘: 스쿠너는 돛대를 둘(3.6m 넘게 떨어져)까지 세우고, 둘이면 바람을 더 받아 빠르다', () => {
+  assert.ok(fits('schooner', SCH), '시험 배치가 칸 규칙에 맞아요');
   const one = SH.statsOf({ hull: 'schooner', mods: [SCH[1], SCH[2]] }), two = SH.statsOf({ hull: 'schooner', mods: SCH });
   assert.equal(two.masts.length, 2); assert.equal(two.mastId, 'mast_d', '큰 돛대가 주돛대');
   assert.ok(Math.abs(two.sailArea - (MODULES.mast_d.sail + MODULES.mast_m.sail * 0.85)) < 1e-9);
@@ -162,7 +164,7 @@ test('M2b 돛대 둘: 스쿠너는 돛대를 둘(3.6m 넘게 떨어져)까지 �
   assert.equal(SH.mastProblem({ hull: 'schooner', mods: [SCH[1]] }, { id: 'mast_m', col: 2, row: 5, rot: 0 }), 'near');
   assert.equal(SH.mastProblem({ hull: 'sloop', mods: [{ id: 'mast_m', col: 1, row: 2, rot: 0 }] }, { id: 'mast_m', col: 1, row: 6, rot: 0 }), 'one', '슬루프는 그대로 하나');
   // 옆바람 돛 속도: 둘이 하나보다 빨라요(선원 셋이 있어 다 펴요)
-  const speed = (mods) => { const S = coastShip('schooner', mods); S.crew = crewOf(3); S.ship.mods.push({ id: 'hammock', col: 0, row: 3, rot: 0 }, { id: 'hammock', col: 4, row: 3, rot: 0 }, { id: 'hammock', col: 0, row: 9, rot: 0 }); S.rev++; atSea(S, 0, -150); S.clock = calmDay(1) * CAL.day + 5; S.boat.sailLevel = 2; run(S, 25, (T) => { T.boat.x = 0; T.boat.y = -150; T.boat.h = T.wind.from + 0.95; T.boat.rudder = 0; }); return S.boat.spd; }; // 맞바람 쪽 55°(배 속도 상한에 안 닿게)
+  const speed = (mods) => { const S = coastShip('schooner', mods); S.crew = crewOf(3); S.ship.mods.push({ id: 'hammock', col: 1, row: 4, rot: 0 }, { id: 'hammock', col: 3, row: 4, rot: 0 }, { id: 'hammock', col: 1, row: 9, rot: 0 }); S.rev++; atSea(S, 0, -150); S.clock = calmDay(1) * CAL.day + 5; S.boat.sailLevel = 2; run(S, 25, (T) => { T.boat.x = 0; T.boat.y = -150; T.boat.h = T.wind.from + 0.95; T.boat.rudder = 0; }); return S.boat.spd; }; // 맞바람 쪽 55°(배 속도 상한에 안 닿게)
   const v1 = speed([SCH[1], SCH[2]]), v2 = speed(SCH);
   assert.ok(v2 > v1 * 1.08, `${v2} > ${v1}`);
   // 일손이 모자라면 줄인 만큼만 펴요
@@ -208,7 +210,7 @@ test('M2b 너울 방향은 그 바다에 늘 부는 바람을 따르고, 구명�
   assert.equal(G.swellFrom('coast'), REGIONS.coast.wind.from);
   const from = REGIONS.coast.wind.from;
   assert.ok(Math.abs(G.swellBeamK(from, from) - 0.5) < 1e-9 && Math.abs(G.swellBeamK(from + Math.PI / 2, from) - 1.5) < 1e-9);
-  const S = coastShip('schooner', [...SCH, { id: 'lifeboat', col: 4, row: 8, rot: 0 }]); atSea(S, 0, -200);
+  const S = coastShip('schooner', [...SCH, { id: 'lifeboat', col: 4, row: 10, rot: 0 }]); atSea(S, 0, -200);
   S.hold = { oak: 10, canvas: 5 }; S.hull = 0; G.step(S, G.FIXED_DT); assert.ok(S.disaster);
   const r = G.rescue(S); assert.deepEqual(S.hold, { oak: 5, canvas: 2 }); assert.deepEqual(r.lost, { oak: 5, canvas: 3 });
   const T = coastShip(); atSea(T, 0, -200); T.hold = { oak: 10 }; T.hull = 0; G.step(T, G.FIXED_DT); G.rescue(T); assert.deepEqual(T.hold, {});

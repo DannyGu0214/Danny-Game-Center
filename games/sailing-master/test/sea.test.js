@@ -49,6 +49,7 @@ test('M2a 지도: 앞바다는 남쪽이 뭍·북쪽이 바다, 거리 격자 5m
     for (const f of list) {
       assert.ok(w.edgeDist(f.x, f.y) > 60, `시드 ${seed} ${f.id} 경계 가까이`);
       if (f.where === 'water') assert.ok(w.dist(f.x, f.y) > 10);
+      else if (f.where === 'beach') assert.ok(w.landDist(f.x, f.y) > 0 && w.landDist(f.x, f.y) < 6, `시드 ${seed} ${f.id} 조간대`); // M2b 조수 웅덩이
       else { assert.ok(w.landDist(f.x, f.y) < 0, `시드 ${seed} ${f.id} 뭍`); const [ax, ay] = w.nearestWater(f.x, f.y); assert.ok(w.findPath(p0.x, p0.y, ax, ay), `시드 ${seed} ${f.id} 길`); }
     }
   }

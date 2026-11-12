@@ -251,9 +251,9 @@ export function createWorld(def) {
     for (let i = 0; i < 300 && dist(px, py) > -depth; i++) { const [gx, gy] = gradient(px, py); px -= gx * 2; py -= gy * 2; }
     return [px, py];
   }
-  // 발견지 자리(M2b where 칸): water 물 위 · shore 물가 뭍(3m, depth로 바꿔요) · beach 물가 바로 위(1m, 썰물 웅덩이) · inland가 있으면 그만큼 내륙
+  // 발견지 자리(M2b where 칸): water 물 위 · shore 물가 뭍(3m, depth로 바꿔요) · beach 물가에서 물 쪽으로 3m(썰물에 드러나는 조간대, 조수 웅덩이) · inland가 있으면 그만큼 내륙
   const whereOf = (f) => (f.where === 'water' ? 'water' : f.inland ? 'inland' : f.where === 'beach' ? 'beach' : 'shore');
-  const depthOf = (f) => f.inland || f.depth || (f.where === 'beach' ? 1 : 3);
+  const depthOf = (f) => f.inland || f.depth || (f.where === 'beach' ? -3 : 3); // 음수면 물 쪽
   const finds = def.finds.map((f) => {
     const w = snap(f);
     if (whereOf(f) === 'water') return { ...w, where: 'water' };
