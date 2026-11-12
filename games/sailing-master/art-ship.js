@@ -324,6 +324,24 @@ function jibMesh(P, rig, hull, boom, now, luff, t, flapAmp) {
   }
   return mesh;
 }
+// 찢어진 돛(S5): 돛 가운데를 지그재그로 가르는 틈과 펄럭이는 천 조각
+function drawRip(g, mesh, t, s) {
+  const at = (j, i) => mesh[Math.min(mesh.length - 1, j)][Math.min(mesh[0].length - 1, i)];
+  const mid = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+  const path = [mid(at(5, 1), at(5, 2), 0.3), mid(at(4, 2), at(4, 3), 0.1), mid(at(3, 1), at(3, 2), 0.8), mid(at(2, 2), at(2, 3), 0.5), mid(at(1, 2), at(1, 3), 0.2)];
+  const w = 1.4 * s;
+  g.fillStyle = 'rgba(28,38,44,.6)';
+  g.beginPath();
+  path.forEach((q, i) => g.lineTo(q[0] - w * (i % 2 ? 1 : 0.4), q[1]));
+  for (let i = path.length - 1; i >= 0; i--) g.lineTo(path[i][0] + w * (i % 2 ? 0.4 : 1), path[i][1]);
+  g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(90,70,50,.7)'; g.lineWidth = Math.max(0.7, 0.45 * s);
+  g.beginPath(); path.forEach((q) => g.lineTo(q[0], q[1])); g.stroke();
+  // 바람에 날리는 조각
+  const p = path[2], f = Math.sin(t * 13) * 2.2 * s;
+  g.fillStyle = 'rgba(236,226,200,.92)';
+  g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0] + 5 * s + f, p[1] + 2 * s); g.lineTo(p[0] + 3.5 * s + f * 0.6, p[1] + 5 * s); g.closePath(); g.fill();
+}
 function drawMesh(g, mesh, color, dim = 1) {
   const rows = mesh.length - 1;
   for (let j = 0; j < rows; j++) {
@@ -480,7 +498,7 @@ export function drawShip(g, sprite, st, zoom, sx, sy) {
     } });
     if (sailNow >= 0.05) {
       const main = mainMesh(P, rig, boom, sailNow, luff, t, flapAmp);
-      items.push({ d: main[3][2][2] - 0.01, draw() { drawMesh(g, main, sprite.sail); } });
+      items.push({ d: main[3][2][2] - 0.01, draw() { drawMesh(g, main, sprite.sail); if (st.torn) drawRip(g, main, t, s); } });
       const jib = jibMesh(P, rig, hull, boom, sailNow, luff, t, flapAmp);
       if (jib) items.push({ d: jib[2][2][2], draw() { drawMesh(g, jib, sprite.sail, 0.97); } });
     } else items.push({ d: base[2] + 0.01, draw() { line(g, P, [MX, 0, rig.boomZ + 0.14], [boomEnd[0], boomEnd[1], rig.boomZ + 0.14], '#efe6cf', (rig.big ? 3.2 : 2.3) * s); } });

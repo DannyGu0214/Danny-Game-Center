@@ -399,12 +399,14 @@ function bakeLand(sc, cam, W, H, dpr, dry) {
   const z = cam.zoom, k = VIEW.tiltY;
   // 이 그림의 왼쪽 위가 세상 어디인지 기억한다
   const ox = bw / 2, oy = cam.cy + H * m;
-  // 여울: 얕은 곳이 밝게 비친다. 가뭄이면 모래가 드러난다
+  // 여울: 얕은 곳이 밝게 비친다. 가뭄이면 모래가 드러나고, 홍수(S5)면 물에 잠겨 흐려진다. dry: true·'dry' 가뭄, 'flood' 홍수
+  const flood = dry === 'flood';
+  dry = dry === true || dry === 'dry';
   for (const q of sc.shoals) {
     const sx = ox + (q.x - cam.x) * z, sy = oy + (q.y - cam.y) * z * k, r = q.r * z;
     g.setTransform(dpr, 0, 0, dpr * k, sx * dpr, sy * dpr);
     const gr = g.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
-    gr.addColorStop(0, dry ? 'rgba(232,214,160,.72)' : 'rgba(190,226,206,.38)'); gr.addColorStop(0.7, dry ? 'rgba(220,214,170,.42)' : 'rgba(170,220,206,.2)'); gr.addColorStop(1, 'rgba(170,220,206,0)');
+    gr.addColorStop(0, dry ? 'rgba(232,214,160,.72)' : flood ? 'rgba(196,206,170,.16)' : 'rgba(190,226,206,.38)'); gr.addColorStop(0.7, dry ? 'rgba(220,214,170,.42)' : flood ? 'rgba(190,200,170,.08)' : 'rgba(170,220,206,.2)'); gr.addColorStop(1, 'rgba(170,220,206,0)');
     g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
   }
   // 이 그림에 들어오는 구간만 그린다(구간 영역으로 잘라서)
@@ -444,14 +446,15 @@ function bakeLand(sc, cam, W, H, dpr, dry) {
     }
   }
   sc.bakedAt = { x: cam.x, y: cam.y, zoom: z, ox, oy, W, H, m };
-  sc.bakedDry = dry;
+  sc.bakedDry = flood ? 'flood' : dry ? 'dry' : false;
 }
 
 export function drawLand(g, sc, cam, W, H, dpr, zooming, dry = false) {
   const b = sc.bakedAt;
   const moved = b && (Math.abs(cam.x - b.x) * cam.zoom > W * b.m * 0.8 || Math.abs(cam.y - b.y) * cam.zoom * VIEW.tiltY > H * b.m * 0.8);
   const rezoom = b && Math.abs(cam.zoom / b.zoom - 1) > (zooming ? 0.3 : 0.001);
-  if (!b || moved || rezoom || b.W !== W || b.H !== H || sc.bakedDry !== dry) bakeLand(sc, cam, W, H, dpr, dry);
+  const lvl = dry === true || dry === 'dry' ? 'dry' : dry === 'flood' ? 'flood' : false; // 물높이가 바뀌면 다시 굽는다
+  if (!b || moved || rezoom || b.W !== W || b.H !== H || sc.bakedDry !== lvl) bakeLand(sc, cam, W, H, dpr, lvl);
   const q = sc.bakedAt, [c] = sc.buf, s = cam.zoom / q.zoom;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   // 구운 그림 위의 세상 점 (cam.x, cam.y)가 화면 (W/2, cam.cy)에 오게 찍는다
@@ -1386,13 +1389,38 @@ export function drawFlotsam(g, sc, list, cam, W, H, t, dpr) {
 }
 
 // 날씨 덧칠: 돌풍 전조·비, 무더위
-export function drawWeather(g, weather, W, H, t, dpr, seedDrops) {
+// 홍수(S5): 물만 흙빛으로(땅을 그리기 전에 부른다)
+export function drawFloodTint(g, W, H, dpr) {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = 'rgba(132,104,58,.2)'; g.fillRect(0, 0, W, H);
+}
+// 날씨 그림. v: 배의 화면 자리(x·y), 안개 속 보이는 거리(clear, px), 항구 불빛(lights), 랜턴, 번개(flash 0~1), 바람이 오는 쪽(wind), 땅 기울임(tiltY)
+export function drawWeather(g, weather, W, H, t, dpr, v = {}) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (weather.heat) { g.fillStyle = 'rgba(255,186,90,.11)'; g.fillRect(0, 0, W, H); }
-  if (weather.gustSoon || weather.gustOn) {
-    g.fillStyle = weather.gustOn ? 'rgba(20,40,62,.3)' : 'rgba(20,40,62,.14)'; g.fillRect(0, 0, W, H);
+  // 하늘이 어두워진다: 폭풍 > 돌풍 > 소나기, 예고 때는 반쯤
+  const dark = weather.stormOn ? 0.42 : weather.stormSoon ? 0.2 : weather.gustOn ? 0.3 : weather.gustSoon ? 0.14 : weather.squallOn ? 0.18 : weather.squallSoon ? 0.08 : 0;
+  if (dark) { g.fillStyle = `rgba(20,40,62,${dark})`; g.fillRect(0, 0, W, H); }
+  // 비: 바람 부는 쪽으로 비스듬히. 폭풍은 굵고 많이
+  if (weather.squallOn || weather.stormOn) {
+    const storm = weather.stormOn, n = storm ? 260 : 120, to = (v.wind ?? -Math.PI / 2) + Math.PI, dx = Math.cos(to) * (storm ? 9 : 5), len = storm ? 19 : 13;
+    g.strokeStyle = storm ? 'rgba(200,220,232,.42)' : 'rgba(205,225,236,.34)'; g.lineWidth = storm ? 1.1 : 0.9; g.lineCap = 'round';
+    g.beginPath();
+    for (let i = 0; i < n; i++) {
+      const sp = 520 + hash(i, 7) * 260, x = ((hash(i, 5) * W * 1.4 + t * dx * 22) % (W * 1.4) + W * 1.4) % (W * 1.4) - W * 0.2, y = (hash(9, i) * H + t * sp) % H;
+      g.moveTo(x, y); g.lineTo(x + dx, y + len);
+    }
+    g.stroke();
+    // 물 위에 튀는 빗방울 고리
+    g.strokeStyle = 'rgba(220,236,244,.28)'; g.lineWidth = 0.8;
+    g.beginPath();
+    for (let i = 0; i < (storm ? 40 : 22); i++) {
+      const ph = (t * 1.7 + hash(i, 11)) % 1, x = hash(i, 13) * W, y = hash(17, i) * H + Math.floor(t * 1.7 + hash(i, 11)) * 37 % H, r = 1 + ph * 4;
+      g.moveTo(x + r, y % H); g.ellipse(x, y % H, r, r * 0.45, 0, 0, Math.PI * 2);
+    }
+    g.stroke();
   }
-  if (weather.gustOn) {
+  if (weather.gustOn || weather.stormOn) {
     g.strokeStyle = 'rgba(214,232,240,.42)'; g.lineWidth = 1; g.lineCap = 'round';
     g.beginPath();
     for (let i = 0; i < 70; i++) {
@@ -1401,5 +1429,24 @@ export function drawWeather(g, weather, W, H, t, dpr, seedDrops) {
     }
     g.stroke();
   }
-  void seedDrops;
+  // 안개(S5): 배 둘레 보이는 거리만 트이고 바깥은 뿌옇다. 땅 기울임만큼 납작한 타원. 항구 불빛·랜턴은 안개 속에서도 번진다
+  if (weather.fog > 0 && v.clear) {
+    const a = 0.86 * Math.min(1, weather.fog), k = v.tiltY || 0.62, r = Math.max(30, v.clear);
+    g.save(); g.translate(v.x, v.y); g.scale(1, k);
+    const gr = g.createRadialGradient(0, 0, r * 0.3, 0, 0, r * 1.25);
+    gr.addColorStop(0, 'rgba(214,224,228,0)'); gr.addColorStop(0.55, `rgba(214,224,228,${a * 0.55})`); gr.addColorStop(1, `rgba(214,224,228,${a})`);
+    g.fillStyle = gr; g.fillRect(-W * 2, -H * 3, W * 4, H * 6);
+    g.restore();
+    // 흐르는 안개 띠
+    g.fillStyle = `rgba(232,238,240,${0.12 * weather.fog})`;
+    for (let i = 0; i < 5; i++) { const y = (hash(i, 3) * H + t * 6 * (i % 2 ? 1 : -0.7)) % H; g.beginPath(); g.ellipse((hash(i, 4) * W + t * 9) % (W * 1.4) - W * 0.2, y, W * 0.5, 22, 0, 0, Math.PI * 2); g.fill(); }
+    for (const [x, y] of v.lights || []) {
+      const lg = g.createRadialGradient(x, y - 14, 1, x, y - 14, 30);
+      lg.addColorStop(0, `rgba(255,170,70,${0.55 * weather.fog})`); lg.addColorStop(0.35, `rgba(255,170,80,${0.2 * weather.fog})`); lg.addColorStop(1, 'rgba(255,190,110,0)');
+      g.fillStyle = lg; g.fillRect(x - 32, y - 46, 64, 64);
+    }
+    if (v.lantern) { const lg = g.createRadialGradient(v.x, v.y - 14, 2, v.x, v.y - 14, 34); lg.addColorStop(0, 'rgba(255,190,100,.4)'); lg.addColorStop(1, 'rgba(255,190,100,0)'); g.fillStyle = lg; g.fillRect(v.x - 40, v.y - 54, 80, 80); }
+  }
+  // 번개: 화면이 잠깐 하얘진다
+  if (v.flash > 0) { g.fillStyle = `rgba(235,240,255,${0.32 * v.flash})`; g.fillRect(0, 0, W, H); }
 }

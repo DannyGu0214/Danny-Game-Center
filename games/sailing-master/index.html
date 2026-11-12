@@ -214,6 +214,13 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .days .ic { display: block; margin: 2px 0 1px; font-size: 19px; line-height: 1.2; }
 .days b { display: block; color: var(--text); font-size: 13px; font-weight: 600; }
 .days .bad b { color: #ffc27a; }
+.days .mild b { color: #e8dca0; }
+.days .storm { border-color: rgba(255,120,95,.55); background: rgba(120,40,30,.28); }
+.days .storm b { color: #ff9a80; }
+.seg.torn .lab { color: #ff9a80; }
+.seg.torn .lab::after { content: '!'; margin-left: 1px; font-weight: 800; }
+#context button.mend { background: #f0d9a8; }
+#context button.mend[disabled] { opacity: .85; }
 /* 항구 */
 .portBanner { margin-bottom: 4px; padding: 9px 12px; border-radius: 12px; font-size: 14px; line-height: 1.5; font-weight: 600; background: rgba(95,192,138,.14); border: 1px solid rgba(143,220,154,.34); color: var(--ok); }
 .portBanner.warn { background: rgba(242,193,78,.1); border-color: rgba(242,193,78,.38); color: #f6d27a; }
@@ -557,7 +564,7 @@ import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound, readAudioPrefs, writeAudioPrefs, audible as heard } from './sound.js';
 import { createMusic, moodOf, TRACKS } from './music.js';
 import { worldOf } from './world.js';
-import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP, SEATS, TRAITS } from './data.js';
+import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP, SEATS, TRAITS, WX, SAILCLOTH } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view'), ctx = view.getContext('2d', { alpha: false });
@@ -738,6 +745,7 @@ const overlayOpen = () => $('overlay').classList.contains('on');
 function syncButtons() {
   const st = G.stats(S), lv = S.cap.then && S.cap.then.type === 'sail' ? S.cap.then.level : S.boat.sailLevel;
   for (const b of $('sailSeg').querySelectorAll('button')) { b.classList.toggle('on', Number(b.dataset.lv) === lv); b.disabled = !st.sailArea; }
+  $('sailSeg').classList.toggle('torn', !!S.boat.torn); $('sailSeg').title = S.boat.torn ? '돛이 찢어졌어! 반쯤밖에 안 펴져' : '';
   $('oar').classList.toggle('on', S.boat.row || !!(S.cap.then && S.cap.then.type === 'row'));
   $('oar').disabled = !st.oars;
 }
@@ -884,6 +892,21 @@ function drainEvents() {
       case 'gustOff': showHint(ev.hurt > 0.005 ? `돌풍이 지나갔어. 선체 -${Math.round(ev.hurt * 100)}%, 손 좀 봐야겠는걸!` : '으하하! 돌풍쯤이야 거뜬하지!', 3); break;
       case 'heatOn': showHint(ev.shade ? '푹푹 찌는군! 그래도 그늘막이 있잖아!' : '푹푹 찐다! 기력이 빠져. 그늘막이 필요해!', 4, !ev.shade); break;
       case 'droughtOn': snd.play('warn'); showHint('가뭄이다! 여울이 얕아지니 조심해!', 4, true); break;
+      // S5 날씨
+      case 'stormSoon': snd.play('warn'); showHint(ev.sail === 2 ? '폭풍이 몰려온다! 돛 줄이고 항구 쪽으로 붙어!' : '폭풍이 몰려온다! 단단히 묶어 둬!', 5, true); break;
+      case 'stormOn': snd.play('gust'); snd.play('thunder', 0.2); showHint('폭풍이다! 돛 다 펴면 찢어진다, 줄여!', 3, true); break;
+      case 'stormOff': showHint(ev.hurt > 0.005 ? `폭풍이 지나갔어. 선체 -${Math.round(ev.hurt * 100)}%, 성한 데가 없구먼!` : '으하하! 폭풍도 뚫었다! 이 배 제법인걸!', 3.5); break;
+      case 'squallSoon': showHint(ev.shade ? '소나기 온다! 식량은 그늘막 밑으로!' : '소나기 온다! 그늘막이 없으니 식량이 젖겠어!', 3.5, !ev.shade); break;
+      case 'rainOn': if (!ev.shade && !ev.storm) toast('🌧 비다! 식량 덮을 데가 없어!'); break;
+      case 'foodWet': snd.play('warn'); toast(`💧 ${Object.keys(ev.got).map((k) => SUPPLY[k].name).join('·')}이(가) 젖었다! 상하기 전에 먹어 치우자고`); break;
+      case 'fogOn': showHint('짙은 안개다! 코앞도 안 보여. 천천히 가자고!', 4); break;
+      case 'fogOff': toast('🌤 안개가 걷혔다!'); break;
+      case 'floodOn': snd.play('warn'); showHint('강물이 불었다! 물살이 세니 물가 조심해. 떠내려오는 것도 많겠는걸!', 4.5, true); break;
+      case 'sailStrain': snd.play('creak'); showHint('돛폭이 비명을 지른다! 줄여, 찢어지겠어!', 3, true); break;
+      case 'sailTorn': snd.play('tear'); showHint('찌이익! 돛이 찢어졌어! 마포로 꿰매야 해!', 4, true); syncButtons(); break;
+      case 'mendStart': toast(`🧵 ${ev.name}: 돛은 내가 꿰매지!`); break;
+      case 'sailMended': snd.play('place'); toast('🧵 돛을 다 꿰맸다! 다시 바람 받자고!'); syncButtons(); break;
+      case 'mendNoCloth': toast('🧵 마포가 모자라서 못 꿰맸어!'); break;
       case 'shoal': snd.play('ground'); showHint('여울에 걸렸어! 짐을 덜면 뜨기 쉽다고!', 3.5, true); break;
       case 'shoalRisk': showHint('여울을 피할 길이 없어! 그냥 밀고 간다!', 3, true); break;
       case 'foodLow': snd.play('warn'); showHint('식량이 곧 바닥나, 선장! 굶고 항해할 순 없지!', 3, true); break;
@@ -1007,6 +1030,7 @@ function portFoot() {
     const r = G.undock(S);
     if (!r.ok) { showHint(r.why, 3, true); return; }
     closeSheet(); syncButtons(); snd.play('sail');
+    if (r.spare) toast(`🧵 수선용 마포 ${r.spare}장 화물칸에 실었다`);
     if (chartPick) { const p = chartPick; chartPick = null; G.setDest(S, p.x, p.y, p.target); }
     if (S.stats.taughtTap) showHint('물을 탭해, 거기로 갈 테니!', 3);
     else { S.stats.taughtTap = 1; showHint('✨ 반짝이는 건 건지고, 동물은 탭해서 기록하라고!', 6); }
@@ -1018,12 +1042,14 @@ function openPort(ev) {
   if (ev?.got && Object.values(ev.got).some((v) => v)) toast(`창고로: ${fmt(ev.got)}`);
   if (ev?.gift) toast('마을 사람들이 하루치 식량을 나눠 줬어. 인심 좋네!');
   if (ev?.patched) toast('부두 사람들이 구멍 난 데를 대충 때워 줬어! 다음엔 금화나 잡목을 챙기라고!');
+  if (ev?.sewn) toast('돛장이가 외상으로 돛을 꿰매 줬어! 다음엔 마포를 챙기라고!');
 }
-const weatherIcon = (d) => ((d.gust !== null ? '💨' : '') + (d.heat && REGIONS[S.region].heat ? '🥵' : '') + (d.drought && S.region === 'river' ? '🏜' : '')) || '☀️';
-const weatherWord = (d) => (d.gust !== null ? '돌풍' : d.heat && REGIONS[S.region].heat ? '무더위' : d.drought && S.region === 'river' ? '가뭄' : '맑음');
+// 예보 칸(S5): 그날 오는 날씨 아이콘(심한 것 둘까지)과 가장 심한 것의 이름. 안개는 내일까지만 보여요
+const weatherIcon = (d) => d.ids.slice(0, 2).map((id) => WX[id].icon).join('') || '☀️';
+const weatherWord = (d) => (d.worst ? WX[d.worst].short || WX[d.worst].name : '맑음');
 function forecastTiles(fc) {
   const days = el('div', 'days');
-  fc.forEach((d, i) => { const w = weatherWord(d); days.append(el('div', w === '맑음' ? '' : 'bad', `${i === 0 ? '오늘' : `+${i}일`}<span class="ic">${weatherIcon(d)}</span><b>${w}</b>`)); });
+  fc.forEach((d, i) => days.append(el('div', d.sev >= 3 ? 'bad storm' : d.sev >= 2 ? 'bad' : d.sev ? 'mild' : '', `${i === 0 ? '오늘' : `+${i}일`}<span class="ic">${weatherIcon(d)}</span><b>${weatherWord(d)}</b>`)));
   return days;
 }
 function portCard(icon, name, value, pct, sub, label, fn, off, low) {
@@ -1049,6 +1075,11 @@ function renderPort(body) {
   // 금화가 모자라면 잡목으로 손수 고친다
   const byWood = cost > 0 && S.res.coin < cost && (S.res.wood || 0) >= cost;
   sup.append(portCard('hull', '내구도', `${Math.ceil(S.hull * st.hull.hp)} / ${st.hull.hp}`, S.hull, cost > 0 ? (byWood ? '금화가 없으면 잡목으로 손수!' : '상한 곳을 고치자고') : '어디 하나 멀쩡해!', cost > 0 ? (byWood ? `수리 ${icon('wood')}${cost}` : `수리 ${coin(cost)}`) : '수리할 곳 없음', () => { if (byWood ? G.repairWithWood(S) : G.repair(S)) again(); }, cost <= 0 || (!byWood && S.res.coin < cost), S.hull < 0.5));
+  // 찢어진 돛(S5): 창고 마포 2장(없으면 범포 1장), 그것도 없으면 돛장이 금화
+  if (S.boat.torn) {
+    const cl = (S.res.cloth || 0) >= SAILCLOTH.cloth ? 'cloth' : (S.res.canvas || 0) >= 1 ? 'canvas' : null, fee = G.sailFee(S);
+    sup.append(portCard('<i class="emo">🧵</i>', '돛', '찢어짐', null, cl ? '창고 천으로 꿰매자고' : '천이 없으면 돛장이한테 맡겨', cl ? `꿰매기 ${icon(cl)}${cl === 'cloth' ? SAILCLOTH.cloth : 1}` : `돛장이 ${coin(fee)}`, () => { const r = G.mendSail(S); if (r.ok) { snd.play('place'); again(); } else showHint(r.why, 2.5); }, !cl && S.res.coin < fee, true));
+  }
   body.append(sup);
   // 교역품: 이 공간이 찾는 품목은 1.5배
   body.append(el('div', 'dexSec', '교역품<span>★ 이 물이 찾는 건 1.5배</span>'));
@@ -1077,7 +1108,7 @@ function renderPort(body) {
     if (I.buy) { const bb = el('button', `pBtn${S.res.coin >= I.buy ? '' : ' off'}`, `사기 ${coin(I.buy)}`); bb.addEventListener('click', () => { if (G.buyMat(S, k, 1)) again(); }); r.append(bb); }
     body.append(r);
   }
-  body.append(el('div', 'dexSec', '날씨'), forecastTiles(G.forecast(S)));
+  body.append(el('div', 'dexSec', '날씨'), forecastTiles(G.outlook(S)));
   const wait = el('div', 'waitRow', '<div class="grow"><b>하루 묵기</b>보수 챙겨 주고 하루 쉬는 거야</div>');
   const w = el('button', 'pBtn', '기다리기'); w.addEventListener('click', () => { G.waitDay(S); drainEvents(); renderSheet(); }); wait.append(w);
   body.append(wait);
@@ -1347,7 +1378,7 @@ function crewPlanUI() {
   sv.addEventListener('click', () => { G.savePlan(S, plan); toast(`${G.PLANS[plan]} 편성 저장!`); renderSheet(); });
   plans.append(sv); out.push(plans);
   const rules = el('div', 'rules'), R = G.rulesOf(S);
-  for (const [k, label] of [['reef', '돌풍엔 갑판원이 돛 줄이기'], ['repair', '선체 50% 밑이면 목수가 수리'], ['storm', '돌풍엔 폭풍 편성으로']]) {
+  for (const [k, label] of [['reef', '돌풍·폭풍엔 갑판원이 돛 줄이기'], ['mend', '돛이 찢어지면 갑판원이 꿰매기'], ['repair', '선체 50% 밑이면 목수가 수리'], ['storm', '돌풍·폭풍 예고엔 폭풍 편성으로']]) {
     const b = el('button', R[k] ? 'on' : '', `${R[k] ? '✓' : '○'} ${label}`);
     b.addEventListener('click', () => { G.setRule(S, k, !R[k]); renderSheet(); });
     rules.append(b);
@@ -1479,7 +1510,7 @@ function renderChart(body) {
   body.append(info);
   const updateInfo = () => {
     info.innerHTML = '';
-    const st = G.stats(S), fc = G.forecast(S);
+    const st = G.stats(S), fc = G.outlook(S);
     const allFinds = G.findsOf(S), found = allFinds.filter((f) => S.found[f.id]).length, gate = w.gates[0];
     const rest = el('div');
     rest.append(el('div', 'chartSum', `<div><b>${found} / ${allFinds.length}</b>찾은 발견지</div><div><b>${w.ports.length}곳</b>항구</div><div><b>${gate.name}</b>${gate.to ? `${REGIONS[gate.to].name}로` : '이 수역의 끝'}</div>`));
@@ -1487,7 +1518,7 @@ function renderChart(body) {
     rest.append(el('div', 'dexSec', `날씨<span>${st.forecast}일 예보${st.forecast < 3 ? ' · 기압계로 늘어나!' : ''}</span>`), forecastTiles(fc));
     if (!chartPick) { info.append(rest); return; }
     const dist = Math.hypot(chartPick.x - S.boat.x, chartPick.y - S.boat.y), spd = Math.max(1.2, st.sailArea ? st.maxSpeed * 0.55 : st.rowSpeed * 0.9), sec = dist / spd, persons = 1 + S.crew.length, needFood = persons * sec / CAL.day;
-    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div><div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어!</div>' : ''}${fc.some((d) => d.gust !== null) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보다! 돛 줄일 준비 해!</div>' : ''}${fc.some((d) => d.heat && REGIONS[S.region].heat) && !st.awning ? '<div class="warn">⚠ 무더위 예보인데 그늘막이 없잖아!</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
+    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div><div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어!</div>' : ''}${fc.some((d) => d.ids.includes('storm')) ? '<div class="warn">⚠ 폭풍 예보다! 대피할 항구를 봐 둬!</div>' : ''}${fc.some((d) => d.ids.includes('gust')) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보다! 돛 줄일 준비 해!</div>' : ''}${fc.some((d) => d.ids.includes('heat')) && !st.awning ? '<div class="warn">⚠ 무더위 예보인데 그늘막이 없잖아!</div>' : ''}${fc.some((d) => d.ids.includes('storm') || d.ids.includes('squall')) && !st.awning ? '<div class="warn">⚠ 비 예보다! 그늘막이 없으면 식량이 젖어</div>' : ''}${S.boat.torn ? '<div class="warn">⚠ 돛이 찢어졌어! 꿰매고 가!</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
     const plan = el('div', 'planCard', '<div class="l">항해 계획</div>'); plan.append(chk);
     const go = el('button', 'big', S.docked ? '이 항로로 출항!' : '이 항로로 가자!');
     go.addEventListener('click', () => {
@@ -1615,7 +1646,9 @@ const SEASON_COLOR = { spring: '#9ee07a', summer: '#ffd257', autumn: '#f0955a', 
 $('ticks').innerHTML = Array.from({ length: 12 }, (_, i) => `<line x1="25" y1="${i % 3 ? 5.5 : 5}" x2="25" y2="${i % 3 ? 8 : 10}" transform="rotate(${i * 30} 25 25)"/>`).join('');
 function syncTop() {
   const st = G.stats(S), persons = 1 + S.crew.length, c = G.clock(S);
-  const color = SEASON_COLOR[c.season.id], alert = S.weather.gustOn ? '돌풍' : S.weather.heat ? '무더위' : '';
+  // 지금 날씨 중 가장 심한 것. 없으면 다가오는 돌풍·폭풍을 예고로
+  const wx = S.weather, now = !S.docked && wx.worst ? WX[wx.worst] : null, soon = !S.docked && wx.soon?.find((id) => WX[id].rough);
+  const color = SEASON_COLOR[c.season.id], alert = soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : ''; // 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저
   $('dateNum').innerHTML = `<i style="background:${color};color:${color}"></i>${c.season.name} ${c.dayOfSeason + 1}일`;
   $('regionName').textContent = `${REGIONS[S.region].name}${alert ? ` · ${alert}` : ''}`;
   $('regionName').classList.toggle('warn', !!alert);
@@ -1645,15 +1678,23 @@ function updateHud(dt) {
   if (!S.route && !b.row && b.luff && b.spd < 2.2 && S.t - lastLuffHint > 9 && !S.docked) { lastLuffHint = S.t; showHint('맞바람이야! 옆으로 틀어!', 3); }
   if (b.stamina <= 0 && b.row && hintT <= 0) showHint('팔이 떨어지겠어! 노가 느려진다!', 3);
   if (rudderPtr !== null && !b.row && b.sailNow < 0.05 && !S.cap.then && b.spd < 0.5 && hintT <= 0) showHint(G.stats(S).sailArea ? '돛을 올리든 노를 젓든 해야 움직이지!' : '노를 저어야 움직이지!', 2.5);
-  snd.ambient(S.docked ? w.speed * 0.6 : w.speed, S.docked ? 0 : b.spd);
-  music.setMood(moodOf({ docked: !!S.docked, gustOn: S.weather.gustOn, gustSoon: S.weather.gustSoon })); // S5 날씨가 생기면 storm 신호를 더해요
+  snd.ambient(S.docked ? w.speed * 0.6 : w.speed, S.docked ? 0 : b.spd, S.docked ? 0 : S.weather.stormOn ? 1 : S.weather.rain ? 0.55 : 0);
+  music.setMood(moodOf({ docked: !!S.docked, gustOn: S.weather.gustOn, gustSoon: S.weather.gustSoon, storm: !!(S.weather.stormOn || S.weather.stormSoon) })); // S5: 폭풍은 예고부터 폭풍 곡
   syncButtons();
   // 상황 단추
   const ctxBox = $('context');
   const near = !S.docked && !S.disaster ? G.nearPort(S) : null, gate = !S.docked && !S.disaster ? G.nearGate(S) : null;
-  const key = `${near ? near.id : ''}|${gate ? gate.id : ''}`;
+  const torn = !S.docked && !S.disaster && S.boat.torn, mendPct = S.mend ? Math.floor(S.mend.t * 10) * 10 : -1;
+  const key = `${near ? near.id : ''}|${gate ? gate.id : ''}|${torn ? mendPct : ''}`;
   if (ctxBox.dataset.key !== key) {
     ctxBox.dataset.key = key; ctxBox.innerHTML = '';
+    // 찢어진 돛: 화물칸 마포로 꿰매기(갑판원이 있으면 갑판원이, 없으면 선장이 돛대로 가서)
+    if (torn) {
+      const x = el('button', 'mend', S.mend ? `🧵 꿰매는 중 ${mendPct}%` : `🧵 돛 꿰매기`);
+      if (S.mend) x.disabled = true;
+      else x.addEventListener('click', () => { const r = G.mendSail(S); if (!r.ok) showHint(r.why, 3); else if (r.by === 'cap') showHint('선장이 돛대로 간다! 그동안 키는 놓는다고', 3); ctxBox.dataset.key = ''; });
+      ctxBox.append(x);
+    }
     if (near) { const x = el('button', '', '⚓ 입항'); x.addEventListener('click', () => { G.dockHere(S, near); drainEvents(); }); ctxBox.append(x); }
     if (gate) { const x = el('button', '', `🚪 ${gate.name}`); x.addEventListener('click', () => openGate(gate)); ctxBox.append(x); }
   }
@@ -1685,12 +1726,13 @@ function shipState(x, y, h, t, heelV, zoom, still = false) {
   const bob = still ? 0 : Math.sin(t * 1.25) * 0.09 * swell + Math.sin(t * 0.73 + 1) * 0.05 * swell;
   const pitch = still ? 0 : Math.sin(t * 1.1 + 0.6) * 0.022 * swell + Math.min(0.03, b.spd * 0.004);
   const heel = heelV + (still ? 0 : Math.sin(t * 0.93) * 0.015 * swell);
-  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: G.crewOnDeck(S), rower: !!G.workerAt(S, 'oar'), capLook: CAPTAINS[S.captain?.id] || null };
+  return { P: SA.makeProjector(x, y, h, heel, pitch, zoom, bob), h, heel, pitch, bob, sailNow: b.sailNow, boom: b.boom, luff: b.luff, t, row: b.row, rowPhase: b.rowPhase, flagFrom: S.wind.from, rudder: b.rudder, capX: S.cap.x, crew: G.crewOnDeck(S), rower: !!G.workerAt(S, 'oar'), capLook: CAPTAINS[S.captain?.id] || null, torn: !!b.torn };
 }
 function render() {
   const b = S.boat, t = S.t;
   A.drawWater(ctx, sc, cam, W, H, t, S.wind, DPR);
-  A.drawLand(ctx, sc, cam, W, H, DPR, performance.now() < zoomingUntil, S.region === 'river' && S.weather.drought);
+  if (S.weather.flood && !S.docked) A.drawFloodTint(ctx, W, H, DPR); // 홍수: 흙탕물(땅보다 먼저)
+  A.drawLand(ctx, sc, cam, W, H, DPR, performance.now() < zoomingUntil, S.weather.drought ? 'dry' : S.weather.flood ? 'flood' : false);
   A.drawShoreFoam(ctx, sc, cam, W, H, t, DPR);
   A.drawFlotsam(ctx, sc, G.flotsamOf(S), cam, W, H, t, DPR);
 
@@ -1737,7 +1779,17 @@ function render() {
     }
   }
   if (!shipDone) SA.drawShip(ctx, sprite, st, cam.zoom, bx, by);
-  A.drawWeather(ctx, S.docked ? {} : S.weather, W, H, t, DPR);
+  A.drawWeather(ctx, S.docked ? {} : S.weather, W, H, t, DPR, weatherView(bx, by));
+}
+// 날씨 그림에 넘길 것: 배 자리, 안개 속 보이는 거리(화면 px), 항구 불빛, 번개, 바람 방향
+function weatherView(bx, by) {
+  const wx = S.weather, v = { x: bx, y: by, wind: S.wind.from, flash: flashA, tiltY: VIEW.tiltY };
+  if (wx.fog > 0 && !S.docked) {
+    v.clear = G.sightRange(S) * cam.zoom;
+    v.lights = worldOf(S.region).ports.map((p) => [W / 2 + (p.x - cam.x) * cam.zoom, cam.cy + (p.y - cam.y) * cam.zoom * VIEW.tiltY]).filter(([x, y]) => x > -80 && x < W + 80 && y > -80 && y < H + 80);
+    if (S.ship.decor.includes('lantern')) v.lantern = true;
+  }
+  return v;
 }
 // 타이틀: 지금 수역의 섬과 바다에 가장 높은 등급의 배. 연출 전용이라 실제 배 자리와 상태를 건드리지 않는다
 let titleShip = null, titleTrees = null;
@@ -1778,8 +1830,14 @@ function renderPreview(t) {
   SA.drawShipOnWater(g, sprite, st, z, x, y);
   SA.drawShip(g, sprite, st, z, x, y);
 }
+let flashA = 0, boltT = 4, bellT = 3;
 function fxTimers(dt) {
   const b = S.boat;
+  // 폭풍: 가끔 번개가 번쩍하고 조금 뒤에 천둥
+  flashA = Math.max(0, flashA - dt * 5);
+  if (S.weather.stormOn && !S.docked) { boltT -= dt; if (boltT <= 0) { flashA = 1; snd.play('thunder', 0.4 + Math.random() * 0.8); boltT = 6 + Math.random() * 8; } }
+  // 안개: 가까운 항구(150m)에서 종소리가 방향을 알려 줘요
+  if (S.weather.fog > 0.4 && !S.docked) { bellT -= dt; if (bellT <= 0) { bellT = 8 + Math.random() * 3; if (G.nearPort(S, 150)) snd.play('bell'); } }
   flapT -= dt;
   if (b.luff && flapT <= 0 && !S.docked) { snd.play('flap'); flapT = 1.3 + Math.random() * 1.6; }
   creakT -= dt;
@@ -1817,7 +1875,7 @@ function frame(now) {
     creatures.update(raw, cam, W, H, S.boat, G.stats(S).telescope);
     saveT += raw;
     if (saveT > 5) { saveT = 0; save(); }
-  } else { S.t += raw * 0.6; S.wind = G.windAt(S); if (S.weather.gustOn) S.wind.speed *= REGIONS[S.region].gustK; } // 시트가 떠 있어도 물은 흐른다
+  } else { S.t += raw * 0.6; S.wind = G.windNow(S); } // 시트가 떠 있어도 물은 흐른다
   portTimers(raw);
   if (!started) renderTitle(now / 1000);
   else { camera(raw); render(); }
