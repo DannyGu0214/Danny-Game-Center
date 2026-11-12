@@ -3,18 +3,19 @@
 // 그리는 법: 가로 약 200칸짜리 낮은 해상도 화면에 한 칸(픽셀)씩 그리고, 실제 화면에는 정수 배로 키워 또렷한 픽셀로 보인다.
 //   모양은 스캔라인으로 채워 가장자리가 흐려지지 않고, 반투명(빛·안개·노을)은 4×4 바이어 디더링으로 낸다.
 //   움직이지 않는 풍경은 한 번 그려 두고, 매 프레임 그 위에 움직이는 것(빛·불·연기·사람·좀비·안개·재)만 덧그린다.
+//   픽셀 버퍼·팔레트·글꼴·쿼터뷰 도구는 본부 레벨업 컷씬(cutscene.js)도 같은 화풍으로 쓰도록 내보낸다.
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-const dith = (x, y, a) => BAYER[(y & 3) * 4 + (x & 3)] < a * 16;
-const hash = (a, b = 0, c = 0) => { const v = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return v - Math.floor(v); };
+export const dith = (x, y, a) => BAYER[(y & 3) * 4 + (x & 3)] < a * 16;
+export const hash = (a, b = 0, c = 0) => { const v = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return v - Math.floor(v); };
 const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-const pack = ([r, g, b]) => (0xff000000 | (b << 16) | (g << 8) | r) >>> 0;
-const C = (hex) => pack(rgb(hex));
-const unpack = (c) => [c & 255, (c >> 8) & 255, (c >> 16) & 255];
-const lerpC = (a, b, t) => { const x = unpack(a), y = unpack(b); return pack([0, 1, 2].map((i) => Math.round(x[i] + (y[i] - x[i]) * t))); };
+export const pack = ([r, g, b]) => (0xff000000 | (b << 16) | (g << 8) | r) >>> 0;
+export const C = (hex) => pack(rgb(hex));
+export const unpack = (c) => [c & 255, (c >> 8) & 255, (c >> 16) & 255];
+export const lerpC = (a, b, t) => { const x = unpack(a), y = unpack(b); return pack([0, 1, 2].map((i) => Math.round(x[i] + (y[i] - x[i]) * t))); };
 
 // 팔레트: 한밤 남색 · 불씨 주황 · 좀비 초록
-const P = {
+export const P = {
   void: C('#05060a'), sky0: C('#070a14'), sky1: C('#10152b'), sky2: C('#1d1a35'), sky3: C('#3a2236'), sky4: C('#6e2f28'), glow: C('#b5502a'),
   star: C('#cfd6ff'), starD: C('#7d86b8'), moon: C('#ece4cc'), moonD: C('#bdb39a'), moonE: C('#968d78'),
   city0: C('#0a0c14'), city1: C('#11141e'), cityE: C('#1a1d2a'), cityLit: C('#f2a93b'), cityLit2: C('#c86a2a'),
@@ -37,7 +38,7 @@ const P = {
 };
 
 // ---------- 낮은 해상도 픽셀 버퍼 ----------
-class Px {
+export class Px {
   constructor(w, h) { this.w = w; this.h = h; this.img = new ImageData(w, h); this.u = new Uint32Array(this.img.data.buffer); }
   set(x, y, c) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.u[y * this.w + x] = c; }
   get(x, y) { return this.u[y * this.w + x]; }
@@ -101,9 +102,9 @@ const FONT = {
   '.': ['.....', '.....', '.....', '.....', '.....', '.##..', '.##..'], '(': ['..#..', '.#...', '#....', '#....', '#....', '.#...', '..#..'],
   ')': ['..#..', '...#.', '....#', '....#', '....#', '...#.', '..#..'], '!': ['..#..', '..#..', '..#..', '..#..', '..#..', '.....', '..#..'],
 };
-const textW = (s, sc, gap) => s.length * 5 * sc + (s.length - 1) * gap;
+export const textW = (s, sc, gap) => s.length * 5 * sc + (s.length - 1) * gap;
 // 글자: 줄마다 색(fill(줄 0~6, 글자 번호)), 외곽선, 아래쪽 두께(depth)
-function text(px, s, x, y, sc, fill, { gap = sc, line = null, depth = 0, depthC = 0 } = {}) {
+export function text(px, s, x, y, sc, fill, { gap = sc, line = null, depth = 0, depthC = 0 } = {}) {
   const cells = [];
   [...s.toUpperCase()].forEach((ch, k) => {
     const g = FONT[ch] ?? FONT[' '], ox = x + k * (5 * sc + gap);
@@ -116,9 +117,9 @@ function text(px, s, x, y, sc, fill, { gap = sc, line = null, depth = 0, depthC 
 
 // ---------- 쿼터뷰 ----------
 // 타일 16×8칸(2:1). 전진기지 가운데가 (0, 0)이다.
-function makeIso(OX, OY) { return (gx, gy, gz = 0) => [OX + (gx - gy) * 8, OY + (gx + gy) * 4 - gz]; }
+export function makeIso(OX, OY) { return (gx, gy, gz = 0) => [OX + (gx - gy) * 8, OY + (gx + gy) * 4 - gz]; }
 
-function isoBox(px, I, gx, gy, gz, sx, sy, sz, top, left, right, edge = null) {
+export function isoBox(px, I, gx, gy, gz, sx, sy, sz, top, left, right, edge = null) {
   const a = I(gx, gy + sy, gz), b = I(gx + sx, gy + sy, gz), c = I(gx + sx, gy, gz);
   const a2 = I(gx, gy + sy, gz + sz), b2 = I(gx + sx, gy + sy, gz + sz), c2 = I(gx + sx, gy, gz + sz), d2 = I(gx, gy, gz + sz);
   px.poly([a, b, b2, a2], left);
@@ -340,16 +341,16 @@ function buildScene(w, h) {
 }
 
 // ---------- 작은 사람·좀비 그림(픽셀) ----------
-const SURV = [
+export const SURV = [
   ['..hh..', '.hhhh.', '.ssss.', '.s.s..', '..ss..', 'jjjjjj', 'jjJjjj', 'jjJjjj', '.jjjj.', '.pp.p.', '.p..p.', '.k..k.'],
   ['..hh..', '.hhhh.', '.ssss.', '.s.s..', '..ss..', 'jjjjjj', 'jjJjjj', 'jjJjjj', '.jjjj.', '.p.pp.', '.p..p.', '.k..k.'],
 ];
-const ZOMB = [
+export const ZOMB = [
   ['..gg..', '.zzzz.', '.zeze.', '.zzzz.', 'zcccz.', '.ccccz', '.cccc.', '.cccc.', '.p..p.', '.p..p.', 'p...p.', 'k...k.'],
   ['..gg..', '.zzzz.', '.zeze.', '.zzzz.', '.cccz.', 'zcccc.', '.cccz.', '.cccc.', '.p.p..', '.p.p..', '.p..p.', '.k..k.'],
 ];
 const MAP_S = { h: P.hair, s: P.skin, j: P.jacket, J: P.jacketD, p: P.pants, k: P.ink };
-const mapZ = (shirt) => ({ g: C('#2e2a22'), z: P.zskin, e: P.zeye, c: shirt, p: C('#2e3328'), k: P.ink });
+export const mapZ = (shirt) => ({ g: C('#2e2a22'), z: P.zskin, e: P.zeye, c: shirt, p: C('#2e3328'), k: P.ink });
 
 // ---------- 화면 ----------
 export function runTitle(canvas, { onLayout, onPhase } = {}) {
