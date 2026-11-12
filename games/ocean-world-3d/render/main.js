@@ -3,7 +3,8 @@
 // 생물·물건의 자리와 상태는 규칙이 1/30초 고정 단계로 정하고, 화면은 두 단계 사이를 보간해 그리기만 한다(PLAN 3절).
 //
 // 흐름: 타이틀(저장 있음: 내 바다 / 없음: 견본 장면) → 누르기 → [새 게임이면 프롤로그] → 게임. 5초마다·떠날 때 저장(localStorage 'ow3d').
-//       T8에 확장 영역이 열리면 저장하고 다시 불러와 넓어진 블록으로 이어 간다(지형·물·카메라를 한 번에 다시 만드는 가장 단순한 방법).
+//       T8에 확장 영역이 열리면 그 자리에서 지형·물·안개 상자·카메라 범위를 다시 만들고, 확장 영역이 옆면에서 젤리처럼 늘어난다(growExt).
+//       저장된 게임이 T8이면 처음부터 열린 지형으로 시작한다.
 //
 // 주소 옵션
 //   ?water=box|transmission  물 방식(기본 box = 투과 없음, transmission = 참고 사례 방식)
@@ -19,6 +20,8 @@
 //   ?title=0|1               타이틀 화면. 기본은 켬, ?capture·?perf=1·?demo에서는 끔. title=1이면 그때도 켬
 //   ?prologue=0              새 게임에서 프롤로그 건너뛰기
 //   ?lineup=1                종마다 한 마리 줄 세우기(변형 확인용, 규칙 없이 고정)
+//   ?schools=0 ?school=lowpoly  장식 물고기 떼 끄기 / 로우폴리풍(기본 젤리풍)
+//   ?t8soon=1                개발용: T8 바로 앞 새 게임(타이틀 없이, 물건 하나 더 놓으면 T8 → 확장 연출). 저장을 덮어써요
 import * as THREE from 'three';
 import * as TER from '../eco/atoll/terrain.js';
 import { ENV, WATER, TERRAIN_COLORS, STRATA, STRATA_BOTTOM } from '../eco/atoll/profile.js';
@@ -28,7 +31,7 @@ import { createStage } from './core/stage.js';
 import { makeCoords } from './core/coords.js';
 import { JellyBlock } from './core/jelly.js';
 import { CameraRig } from './core/camera.js';
-import { buildTerrain } from './core/terrain.js';
+import { buildTerrain, buildTerrainAsync } from './core/terrain.js';
 import { PropBatch } from './core/batched.js';
 import { patchMaterial, patchStats } from './core/materials/shaderPatches.js';
 import { deformUniforms } from './core/deform.js';
@@ -40,6 +43,8 @@ import { Heightfield } from './aqua/heightfield.js';
 import { WaterBody } from './aqua/surface.js';
 import { createMarineSnow, createLightShafts } from './aqua/particles.js';
 import { floatOn } from './aqua/buoyancy.js';
+import { createSchool } from './aqua/school.js';
+import * as chromis from '../eco/atoll/species/chromis.js';
 import { SPECIES as SHAPES, scaleCounts, parseSizeScale } from './proto/species.js';
 import { propGeometries } from './proto/props.js';
 import { CreatureView } from './proto/creatures.js';
@@ -69,9 +74,11 @@ const opt = {
   sigma: q.has('sigma') ? Math.max(0.05, parseFloat(q.get('sigma')) || 1) : 1,
   hud: q.get('hud') === '1',
   prologue: q.get('prologue') !== '0',
+  schools: flag('schools'),
+  t8soon: q.get('t8soon') === '1',
 };
 opt.demo = opt.capture || opt.lineup || q.has('demo') || q.has('n');
-opt.title = q.has('title') ? q.get('title') !== '0' : !(opt.demo || opt.perf);
+opt.title = q.has('title') ? q.get('title') !== '0' : !(opt.demo || opt.perf || opt.t8soon);
 if (opt.water === 'transmission') opt.fog = q.has('fog') ? opt.fog : false; // 투과 방식은 기본으로 물속 안개를 끈다(사례와 같게)
 document.body.classList.toggle('capture', opt.capture);
 document.body.classList.toggle('hud', opt.hud);
@@ -84,24 +91,29 @@ const store = {
 };
 const wantNew = !opt.demo && store.get(NEW_FLAG, sessionStorage) === '1';
 if (wantNew) store.del(NEW_FLAG, sessionStorage);
-const raw = opt.demo || wantNew ? null : store.get(SAVE_KEY);
+const raw = opt.demo || wantNew || opt.t8soon ? null : store.get(SAVE_KEY);
 let savedTier = 0;
 try { savedTier = raw ? JSON.parse(raw).tier || 0 : 0; } catch { savedTier = 0; }
 opt.ext = q.get('ext') === '1' || savedTier >= 8;
 
-// ---------- 규칙 ----------
-const TERRAIN = atollTerrain(TER, opt.ext);   // 규칙과 화면이 같은 지형 함수를 읽는다
-const eco = makeEco(TERRAIN);
-const G = createSim(eco);
+// ---------- 지형·좌표·규칙 ----------
+// 확장 영역이 열리면 그 자리에서 열린 지형으로 바꾼다(growExt, 대니님 결정 2026-11-12). 그래서 지형·좌표는 let이고,
+// 규칙 G는 같은 객체에 새 규칙을 덮어쓴다(HUD 등이 G를 붙잡고 있어서). 규칙 상태 S는 지형과 무관한 순수 데이터라 그대로 이어진다.
+function terrainState(ext) {
+  const TERRAIN = atollTerrain(TER, ext);   // 규칙과 화면이 같은 지형 함수를 읽는다
+  const bounds = TER.bounds({ ext }), coords = makeCoords(bounds);
+  return { ext, TERRAIN, heightAt: TERRAIN.heightAt, bounds, coords, hx: coords.half.x, hz: coords.half.z };
+}
+let TERRAIN, heightAt, bounds, coords, hx, hz, tOpts;
+function applyTerrain(st) {
+  opt.ext = st.ext; tOpts = { ext: st.ext };
+  ({ TERRAIN, heightAt, bounds, coords, hx, hz } = st);
+}
+applyTerrain(terrainState(opt.ext));
+const G = Object.assign({}, createSim(makeEco(TERRAIN)));
+const eco = G.eco;   // 생물·물건·층 이름은 지형이 바뀌어도 같은 객체
 const IT = eco.items, SP = eco.species;
-
-// ---------- 지형·좌표 ----------
-const tOpts = { ext: opt.ext };
-const heightAt = TERRAIN.heightAt;
-const bounds = TER.bounds(tOpts);
-const coords = makeCoords(bounds);
 const BOTTOM = TER.BOTTOM;
-const hx = coords.half.x, hz = coords.half.z;
 
 // ---------- 무대 ----------
 const canvas = document.getElementById('view');
@@ -110,9 +122,10 @@ const stage = createStage(canvas, ENV, { capture: opt.capture, shadows: opt.shad
 const { renderer, scene, world } = stage;
 stage.fitShadow(hx, hz, BOTTOM, 6);
 
-// 물속 안개는 재질을 만들기 전에 'medium' 슬롯에 등록한다
-const waterBox = new THREE.Box3(new THREE.Vector3(-hx, BOTTOM, -hz), new THREE.Vector3(hx, TER.SEA_LEVEL, hz));
-const fog = createWaterFog(WATER, waterBox);
+// 물속 안개는 재질을 만들기 전에 'medium' 슬롯에 등록한다. 상자는 확장 영역이 열리면 그 자리에서 넓힌다(setWaterBox)
+const waterBoxOf = (h) => new THREE.Box3(new THREE.Vector3(-h.x, BOTTOM, -h.z), new THREE.Vector3(h.x, TER.SEA_LEVEL, h.z));
+const fog = createWaterFog(WATER, waterBoxOf(coords.half));
+const setWaterBox = (box) => { fog.uniforms.uWaterMin.value.copy(box.min); fog.uniforms.uWaterMax.value.copy(box.max); };
 fog.setFog(opt.fog); fog.setCaustics(opt.caustics);
 const SIGMA0 = new THREE.Vector3(...WATER.absorption);
 const setSigma = (k) => { opt.sigma = k; fog.uniforms.uSigma.value.copy(SIGMA0).multiplyScalar(k); };
@@ -122,10 +135,11 @@ setSigma(opt.sigma);
 const TC = Object.fromEntries(Object.entries(TERRAIN_COLORS).map(([k, v]) => [k, new THREE.Color(v)]));
 const LM = TER.LANDMARKS;
 const _c = new THREE.Color(), _c2 = new THREE.Color();
-function colorAt(x, y, h, out) {
+/** 꼭짓점 색. hAt·b = 그 지형의 높이 함수와 블록 범위(확장 영역이 열리기 전·후) */
+const colorFor = (hAt, b) => function colorAt(x, y, h, out) {
   const n = TER.fbm(x * 0.6, y * 0.6), n2 = TER.fbm(x * 1.9 + 5, y * 1.9 - 3);
   const e = 0.35;
-  const g = Math.hypot(heightAt(x + e, y) - heightAt(x - e, y), heightAt(x, y + e) - heightAt(x, y - e)) / (2 * e);
+  const g = Math.hypot(hAt(x + e, y) - hAt(x - e, y), hAt(x, y + e) - hAt(x, y - e)) / (2 * e);
   const vegLine = 1.15 + (n2 - 0.5) * 0.5;
   if (h > vegLine) _c.copy(TC.veg).lerp(TC.vegDark, n);
   else if (h > vegLine - 0.12) _c.copy(TC.drySand).lerp(TC.veg, (h - vegLine + 0.12) / 0.12);
@@ -139,18 +153,23 @@ function colorAt(x, y, h, out) {
   const dTh = Math.hypot(x - LM.thila.x, y - LM.thila.y);
   if (dTh < 5.5 && h > -10) { _c2.copy(TC.thilaRock).lerp(TC.thilaCoral, n2 > 0.55 ? 0.8 : 0.1); _c.lerp(_c2, Math.min(1, (5.5 - dTh) / 2)); }
   if (g > 0.9 && h < -0.4) _c.lerp(TC.slope, Math.min(0.7, (g - 0.9) * 0.6));
-  const edge = Math.min(x - bounds.x0, bounds.x1 - x, y - bounds.y0, bounds.y1 - y);
+  const edge = Math.min(x - b.x0, b.x1 - x, y - b.y0, b.y1 - y);
   if (edge < 2.2 && h < -3.5) _c.lerp(TC.dropoff, 0.45);
   out[0] = _c.r; out[1] = _c.g; out[2] = _c.b;
-}
-const terrain = buildTerrain({
-  heightAt, colorAt, coords, step: 0.25, bottom: BOTTOM, strata: STRATA, strataBottom: STRATA_BOTTOM, slots: ['medium'],
+};
+/** 지형 한 조각. part = 그릴 범위(좌표 c는 블록 전체 기준, 범위만 좁힘) */
+const pieceOpts = (st, part) => ({
+  heightAt: st.heightAt, colorAt: colorFor(st.heightAt, st.bounds), coords: Object.assign({}, st.coords, { bounds: part }),
+  step: 0.25, bottom: BOTTOM, strata: STRATA, strataBottom: STRATA_BOTTOM, slots: ['medium'],
 });
-world.add(terrain.mesh, terrain.sides);
+const terrainPiece = (st, part = st.bounds) => buildTerrain(pieceOpts(st, part));
+const terrainPieceAsync = (st, part = st.bounds) => buildTerrainAsync(pieceOpts(st, part), 6);   // 여러 프레임에 나눠 만듦(확장 연출)
+let terrains = [terrainPiece({ heightAt, bounds, coords })];   // 확장 연출 뒤에는 본 블록·확장 영역 두 조각
+for (const t of terrains) world.add(t.mesh, t.sides);
 
 // ---------- 물 ----------
-const hf = new Heightfield(bounds, heightAt, 0.5);
-const water = new WaterBody({ hf, coords, heightAt, water: WATER, mode: opt.water });
+let hf = new Heightfield(bounds, heightAt, 0.5);
+let water = new WaterBody({ hf, coords, heightAt, water: WATER, mode: opt.water });
 for (const m of water.meshes) world.add(m);
 
 // ---------- 물건(BatchedMesh 하나, 규칙 상태에서) ----------
@@ -178,7 +197,7 @@ const PROP_PATCH = {
   fragmentEmissive: /* glsl */`totalEmissiveRadiance += diffuseColor.rgb * vEmit;`,
 };
 patchMaterial(propMat, [PROP_PATCH], { slots: ['medium'], defines: { OW_CAUSTICS: true } });
-// 물건 수 상한이 없어 봇 240분에 800개 안팎(조각 3~4천). 넉넉히 잡는다(BatchedMesh는 그리는 수만큼만 그린다)
+// 물건 수 상한(해저 120+40 · 수중 60+20 · 육지 자리 30)이 있어 많아야 270개 안팎(조각 1~2천). 넉넉히 잡는다(BatchedMesh는 그리는 수만큼만 그린다)
 const batch = new PropBatch(propMat, props.geometries, 6000);
 batch.mesh.castShadow = true; batch.mesh.receiveShadow = true;
 world.add(batch.mesh);
@@ -188,25 +207,57 @@ const propView = new PropView({ batch, index: props.index, coords, heightAt, eco
 const creatures = new CreatureView({ world, coords, heightAt, eco, bodyLen: G.bodyLen, cap: 48, sizeOverride: opt.sizes, fixedZ: opt.lineup });
 
 // ---------- 입자·빛줄기 ----------
-if (opt.snow) world.add(createMarineSnow(new THREE.Box3(new THREE.Vector3(-hx + 0.3, BOTTOM + 1.5, -hz + 0.3), new THREE.Vector3(hx - 0.3, -0.15, hz - 0.3)), 1400));
-if (opt.shafts) {
+const makeSnow = () => createMarineSnow(new THREE.Box3(new THREE.Vector3(-hx + 0.3, BOTTOM + 1.5, -hz + 0.3), new THREE.Vector3(hx - 0.3, -0.15, hz - 0.3)), Math.round(1400 * (bounds.w * bounds.h) / 1600));
+function makeShafts() {
   const sr = rng(5), pts = [];
   // 빛은 태양 반대쪽(격자 −x, −y)으로 내려가므로, 끝이 블록 밖으로 나가지 않게 시작점을 +x·+y 쪽으로 둔다
   const sd = new THREE.Vector3(...ENV.sunDir).normalize(), LEN = 9;
   const mx = Math.abs(sd.x / sd.y) * LEN * 1.15 + 1.5, my = Math.abs(sd.z / sd.y) * LEN * 1.15 + 1.5;
-  for (let i = 0; i < WATER.shaftCount; i++) pts.push(W(bounds.x0 + mx + sr() * (bounds.x1 - bounds.x0 - mx - 2), bounds.y0 + my + sr() * (bounds.y1 - bounds.y0 - my - 4), -0.05));
-  world.add(createLightShafts(pts, sd, LEN).mesh);
+  const n = Math.round(WATER.shaftCount * (bounds.w * bounds.h) / 1600);
+  for (let i = 0; i < n; i++) pts.push(W(bounds.x0 + mx + sr() * (bounds.x1 - bounds.x0 - mx - 2), bounds.y0 + my + sr() * (bounds.y1 - bounds.y0 - my - 4), -0.05));
+  return createLightShafts(pts, sd, LEN).mesh;
 }
+let snow = opt.snow ? makeSnow() : null, shafts = opt.shafts ? makeShafts() : null;
+if (snow) world.add(snow);
+if (shafts) world.add(shafts);
+
+// ---------- 장식 물고기 떼(규칙·점수와 무관한 렌더 연출, render/aqua/school.js) ----------
+// 본 블록에 두 떼, 확장 영역이 열리면 그쪽에 한 떼 더(growExt). 떼마다 궤도 중심은 칸두·석호처럼 깊은 열린 물 위
+const SCHOOL_KIT = opt.schools ? chromis.build(THREE, { variant: q.get('school') === 'lowpoly' ? 'lowpoly' : 'jelly', detail: 0.6 }) : null;
+const schools = [];
+function addSchool(list, parent = world) {
+  const c = coords, hAt = heightAt;   // 이 떼를 만든 때의 좌표(나중에 좌표가 바뀌면 떼 메시를 같은 만큼 옮긴다)
+  const box = waterBoxOf(c.half).expandByScalar(-0.4);
+  // 지오메트리는 떼마다 복사(SpeciesMesh가 인스턴스 속성을 지오메트리에 붙여서, 같이 쓰면 앞 떼의 속성이 덮여 WebGL 오류가 남)
+  const sc = createSchool(Object.assign({}, SCHOOL_KIT, { geometry: SCHOOL_KIT.geometry.clone() }), {
+    schools: list.map((k) => ({ count: k.count, center: c.toWorld(k.x, k.y, k.z, new THREE.Vector3()).toArray(), radius: k.r, speed: k.speed, spread: k.spread ?? 1.15, size: k.size ?? 0.42 })),
+    bounds: box, seed: 17 + schools.length,
+    floor: (X, Z) => { const g = c.toGrid(X, 0, Z, {}); return hAt(g.x, g.y); },
+  });
+  sc.box = box;
+  parent.add(sc.mesh);
+  schools.push(sc);
+  return sc;
+}
+if (SCHOOL_KIT && !opt.lineup) {
+  addSchool([
+    { count: 42, x: LM.kandu.x + 3, y: LM.kandu.y + 6, z: -5.5, r: [6, 1.2, 4], speed: 1.6 },
+    { count: 34, x: LM.lagoon.x + 4, y: LM.lagoon.y + 8, z: -3.2, r: [5, 0.8, 4], speed: 1.3 },
+  ]);
+  if (opt.ext) addSchool(EXT_SCHOOL());
+}
+function EXT_SCHOOL() { const e = G.space.ext; return [{ count: 36, x: (e.x0 + e.x1) / 2, y: (e.y0 + e.y1) / 2, z: -4.5, r: [Math.max(3, (e.x1 - e.x0) / 2 - 4), 1, Math.max(3, (e.y1 - e.y0) / 2 - 6)], speed: 1.4 }]; }
 
 // ---------- 판정용 상자, 젤리, 카메라 ----------
-const hitMesh = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, 3 - BOTTOM, hz * 2).translate(0, (3 + BOTTOM) / 2, 0), new THREE.MeshBasicMaterial());
+const hitGeo = () => new THREE.BoxGeometry(hx * 2, 3 - BOTTOM, hz * 2).translate(0, (3 + BOTTOM) / 2, 0);
+const hitMesh = new THREE.Mesh(hitGeo(), new THREE.MeshBasicMaterial());
 hitMesh.visible = false; hitMesh.name = 'hit';
 world.add(hitMesh);
 const jelly = new JellyBlock(world, { bottomY: BOTTOM, height: 3 - BOTTOM });
 jelly.setStrength(opt.jelly);
 
 const camera = new THREE.PerspectiveCamera(30, 16 / 10, 0.5, 600);
-const R = Math.hypot(hx, hz, 7);
+let R = Math.hypot(hx, hz, 7);
 const fit = (cam) => {
   const v = THREE.MathUtils.degToRad(cam.fov);
   const h = 2 * Math.atan(Math.tan(v / 2) * cam.aspect);
@@ -221,8 +272,8 @@ const presets = {
   title: { polar: 64, azimuth: 30, target: [0, -2.5, 0], distance: (c) => fit(c) * 1.04, orbitSpeed: 5 },
   lineup: { polar: 77, azimuth: 0, target: W(20, 3.0 + 2.4 * 24 / 48, -5.4).toArray(), distance: 29 },
 };
-const keepOut = new THREE.Box3(new THREE.Vector3(-hx - 1, BOTTOM - 1, -hz - 1), new THREE.Vector3(hx + 1, 7.5, hz + 1));
-const rig = new CameraRig(camera, canvas, { box: keepOut, target: new THREE.Vector3(0, -3, 0), presets });
+const keepBox = () => new THREE.Box3(new THREE.Vector3(-hx - 1, BOTTOM - 1, -hz - 1), new THREE.Vector3(hx + 1, 7.5, hz + 1));
+const rig = new CameraRig(camera, canvas, { box: keepBox(), target: new THREE.Vector3(0, -3, 0), presets });
 
 let hud = null;
 function resize() {
@@ -270,6 +321,23 @@ function demoState(n = 44, seed = 9) {
   for (let i = 0; i < 30 * 4; i++) G.tick(D);
   G.drainEvents(D);
   D.pop = 400;
+  return D;
+}
+
+/** 개발용(?t8soon=1): T8 바로 앞. 생물은 T7 한도까지, 발전도는 T8 기준(870)보다 조금 아래. 물건 하나 더 놓으면 T8이 되며 확장 영역이 열린다 */
+function nearT8State() {
+  const D = G.newGame((Date.now() % 2147483646) + 1, Date.now());
+  D.pop = 1e9; D.tier = 7; D.rev++;
+  const dev = () => G.stats(D).dev;
+  for (let round = 0; round < 4; round++) for (const s of G.speciesIds) if (SP[s].tier <= 7 && dev() < 760) G.adopt(D, s);
+  for (let i = 0; i < 30 * 3; i++) G.tick(D);   // 생물이 흩어지게(발전도는 행복도에 따라 조금 움직인다)
+  for (let k = 0; k < 3 && dev() < 830; k++) for (const id of G.itemIds) {
+    if (IT[id].tier > 7 || dev() >= 830) continue;
+    const at = G.freeSpot(D, id);
+    if (at) G.placeItem(D, id, at.x, at.y, at.layer, k);
+  }
+  G.drainEvents(D);
+  D.pop = 5000;
   return D;
 }
 
@@ -402,7 +470,7 @@ function handleEvents(evs) {
     if (e.type === 'place' || e.type === 'remove' || e.type === 'terrain') dirty = true;
     if (!live) continue;
     if (e.type === 'tier') { hud.toast(`🎉 T${e.tier} 달성! 새 생물과 물건이 열렸어요`, true, 4200); jelly.poke(-0.9, 0.25, 0.15); hf.disturb(20, 20, 2.2, -2.4); }
-    else if (e.type === 'ext' && !opt.ext) extOpened();
+    else if (e.type === 'ext' && !opt.ext) growExt();
     else if (e.type === 'chance') hud.toast(`✨ ${SP[e.sp].name}이 특별한 행동을 해요! 7초 안에 눌러요`);
     else if (e.type === 'claim') hud.toast(`요청 완료 ⭐+${e.reward}`);
     else if (e.type === 'extGoal' && e.key !== 'visit') hud.toast('확장 영역 꾸미기 하나 달성! 요청 탭에서 받아요');
@@ -411,12 +479,151 @@ function handleEvents(evs) {
   }
   if (dirty) propView.sync(G.props(S));
 }
-function extOpened() {
-  save();
-  hud.modal('<h3>🌊 확장 영역이 열렸어요!</h3><p>블록 오른쪽에 바다가 20칸 더 붙고, 생물을 12마리 더 들일 수 있어요.</p>', [
-    { label: '지금 넓히기', onClick: () => { save(); location.reload(); } },
-    { label: '나중에', onClick: () => hud.toast('다음에 게임을 열면 넓어져 있어요') },
-  ]);
+// ---------- 확장 영역: 그 자리에서 넓히기(대니님 결정 2026-11-12) ----------
+// 다시 불러오지 않고 지형·물·안개 상자·카메라 범위를 그 자리에서 다시 만든다. 지형 정의(eco/atoll/terrain.js)는 그대로 쓴다.
+//  1) 새 지형·좌표를 몇 프레임에 나눠 만든다(한 프레임에 몰리지 않게). 블록 가운데가 옮겨 가므로, 아직 쓰는 옛 물·입자·떼와 카메라를
+//     같은 만큼 옮겨 화면이 그대로 이어지게 한다. 본 블록 지형은 열린 지형으로 바꾼다(+x 가장자리 띠가 바깥 비탈 → 이어진 바다).
+//  2) 확장 영역 지형·물은 '판' 하나에 담아 붙는 옆면에서 0 → 1로 늘린다(넘쳤다 돌아오는 젤리 곡선 + 블록 출렁임). 안개 상자도 함께 넓힌다.
+//  3) 다 늘어나면 물(높이장)을 블록 전체 하나로 바꾸고(물결은 옮겨 담음), 규칙을 열린 지형으로 바꾼다(상태 S는 그대로, 생물은 그때부터 확장 영역에 들어감).
+const GROW_SEC = 1.7;
+let grow = null;
+const nextTick = () => new Promise((r) => setTimeout(r, 0));
+// 늘어나는 곡선: 천천히 출발(smoothstep) → 약 8% 넘쳤다 → 1로 돌아옴(easeOutBack). 젤리 출렁임은 블록 poke가 더한다
+const growCurve = (u) => { if (u >= 1) return 1; const v = u * u * (3 - 2 * u), c = 1.6, w = v - 1; return 1 + (c + 1) * w * w * w + c * w * w; };
+function reuseMaterials(from, to) { to.forEach((m, i) => { if (from[i] && m.material !== from[i].material) { m.material.dispose(); m.material = from[i].material; } }); }
+async function growExt() {
+  if (opt.ext || grow) return;
+  grow = { t: -1, cost: {} };
+  const ms = () => performance.now();
+  hud?.toast('🌊 확장 영역이 열려요!', true, 3000);
+  // 1) 새 것 만들기(아직 화면에 붙이지 않음)
+  await nextTick();
+  let t0 = ms();
+  const st = terrainState(true), sp0 = G.space, er = sp0.ext;
+  const extB = { x0: er.x0, x1: er.x1, y0: er.y0, y1: er.y1, w: er.x1 - er.x0, h: er.y1 - er.y0 };
+  const mainT = await terrainPieceAsync(st, bounds);   // 본 블록(열린 지형). 프레임마다 6ms씩
+  grow.cost.main = ms() - t0; await nextTick(); t0 = ms();
+  const extT = await terrainPieceAsync(st, extB);      // 확장 영역
+  const subC = Object.assign({}, st.coords, { bounds: extB });
+  const extHf = new Heightfield(extB, st.heightAt, 0.5);
+  const extW = new WaterBody({ hf: extHf, coords: subC, heightAt: st.heightAt, water: WATER, mode: opt.water });
+  grow.cost.ext = ms() - t0;
+  reuseMaterials([terrains[0].mesh, terrains[0].sides], [mainT.mesh, mainT.sides]);
+  reuseMaterials([terrains[0].mesh, terrains[0].sides], [extT.mesh, extT.sides]);
+  reuseMaterials(water.meshes, extW.meshes);
+  await nextTick(); t0 = ms();
+  // 다 늘어난 뒤 쓸 것도 미리: 열린 지형의 규칙, 블록 전체 물(물결은 마무리 때 옮겨 담음)
+  const G2 = createSim(makeEco(st.TERRAIN));
+  await nextTick();
+  const H2 = new Heightfield(st.bounds, st.heightAt, 0.5);
+  const W2 = new WaterBody({ hf: H2, coords: st.coords, heightAt: st.heightAt, water: WATER, mode: opt.water });
+  reuseMaterials(water.meshes, W2.meshes);
+  grow.cost.pre = ms() - t0;
+  await nextTick(); t0 = ms();
+  // 2) 같은 프레임에 바꿔 끼우기
+  const oldC = coords, mainBox = waterBoxOf(oldC.half);
+  applyTerrain(st);
+  const shift = coords.toWorld(0, 0, 0, new THREE.Vector3()).sub(oldC.toWorld(0, 0, 0, new THREE.Vector3()));
+  for (const m of water.meshes) m.position.add(shift);
+  for (const o of [snow, shafts, ...schools.map((x) => x.mesh)]) if (o) o.position.add(shift);
+  for (const sc of schools) sc.box.max.x += extB.w;   // 떼가 다닐 수 있는 범위도 넓힘(떼를 만든 때의 좌표 기준, +x 확장)
+  mainBox.translate(shift);
+  for (const t of terrains) { world.remove(t.mesh, t.sides); t.mesh.geometry.dispose(); t.sides.geometry.dispose(); }
+  terrains = [mainT];
+  world.add(mainT.mesh, mainT.sides);
+  const side = TER.EXT.side, axis = side.includes('x') ? 'x' : 'z';
+  const edge = side === '+x' ? [er.x0, 0] : side === '-x' ? [er.x1, 0] : side === '+y' ? [0, er.y0] : [0, er.y1];
+  const anchor = coords.toWorld(edge[0], edge[1], 0, new THREE.Vector3());
+  const slab = new THREE.Group(); slab.name = 'ext-slab';
+  slab.position[axis] = anchor[axis];
+  const kids = [extT.mesh, extT.sides, ...extW.meshes];
+  if (SCHOOL_KIT) kids.push(addSchool(EXT_SCHOOL(), slab).mesh);
+  for (const m of kids) { m.position[axis] -= anchor[axis]; slab.add(m); }
+  slab.scale[axis] = 0.001;
+  world.add(slab);
+  // 카메라: 같은 만큼 옮긴 뒤 넓어진 블록이 다 보이게 천천히 물러남
+  rig.controls.target.add(shift); camera.position.add(shift);
+  if (rig.tween) { rig.tween.from.target.add(shift); rig.tween.to.target.add(shift); }
+  R = Math.hypot(hx, hz, 7);
+  presets.near.target = W(9, 3.2, 0.2).toArray();
+  rig.box.copy(keepBox());
+  stage.fitShadow(hx, hz, BOTTOM, 6);
+  hitMesh.geometry.dispose(); hitMesh.geometry = hitGeo();
+  creatures.coords = coords; creatures.heightAt = heightAt;
+  propView.coords = coords; propView.heightAt = heightAt; propView.sync([]); propView.sync(G.props(S));
+  drawGhost();
+  if (rig.current === 'default' || rig.current === 'title' || rig.current === '_custom') rig.setView('default', GROW_SEC + 0.6);
+  const sgn = side[0] === '-' ? -1 : 1;
+  jelly.poke(-0.55, axis === 'x' ? 0.45 * sgn : 0, axis === 'z' ? -0.45 * sgn : 0);
+  grow.cost.swap = ms() - t0;
+  Object.assign(grow, { t: 0, slab, extT, extHf, extW, axis, mainBox, fullBox: waterBoxOf(coords.half), box: new THREE.Box3(), G2, H2, W2,
+    wallN: side === '+x' ? [1, 0] : side === '-x' ? [-1, 0] : side === '+y' ? [0, 1] : [0, -1] });
+}
+/** 물 덩어리의 한 옆면 물 벽을 높이 0으로 접는다(늘어나는 동안 붙는 면에 물 벽 두 장이 유리벽처럼 보이지 않게). n = 그 옆면의 바깥 법선(격자) */
+function foldWall(wb, nX, nY) {
+  const P = wb.geometry.attributes.position.array;
+  for (let e = 0; e < wb.edge.length; e++) {
+    if (wb.edge[e][2] !== nX || wb.edge[e][3] !== nY) continue;
+    const t = (wb.nTop + e * 2) * 3;
+    P[t] = P[t + 3]; P[t + 1] = P[t + 4]; P[t + 2] = P[t + 5];
+  }
+}
+function growStep(dt) {
+  const g = grow;
+  g.t += dt;
+  const u = Math.min(1, g.t / GROW_SEC), k = growCurve(u);
+  g.slab.scale[g.axis] = Math.max(0.001, k);
+  g.box.min.lerpVectors(g.mainBox.min, g.fullBox.min, k); g.box.max.lerpVectors(g.mainBox.max, g.fullBox.max, k);
+  setWaterBox(g.box);
+  g.extHf.step(dt); g.extW.update();
+  const n = g.wallN;   // 확장 영역 쪽 법선(격자). 본 블록 물은 그쪽 벽을, 판의 물은 반대쪽 벽을 접는다
+  foldWall(water, n[0], n[1]); foldWall(g.extW, -n[0], -n[1]);
+  if (u >= 1) finishGrow();
+}
+function finishGrow() {
+  const g = grow, t0 = performance.now();
+  setWaterBox(g.fullBox);
+  // 확장 영역 지형은 그대로 두고(블록 좌표로 옮김), 물은 블록 전체 하나로
+  for (const m of [...g.slab.children]) { g.slab.remove(m); m.position[g.axis] += g.slab.position[g.axis]; }
+  world.remove(g.slab);
+  world.add(g.extT.mesh, g.extT.sides);
+  terrains.push(g.extT);
+  const { H2, W2 } = g;
+  for (const src of [hf, g.extHf]) {   // 물결 옮겨 담기
+    for (let j = 0; j < src.ny; j++) for (let i = 0; i < src.nx; i++) {
+      const k = j * src.nx + i, ni = Math.round((src.b.x0 + i * src.dx - bounds.x0) / H2.dx), nj = Math.round((src.b.y0 + j * src.dx - bounds.y0) / H2.dx);
+      if (ni < 0 || nj < 0 || ni >= H2.nx || nj >= H2.ny) continue;
+      const nk = nj * H2.nx + ni;
+      if (!H2.wall[nk] && !src.wall[k]) { H2.h[nk] = src.h[k]; H2.v[nk] = src.v[k]; }
+    }
+  }
+  W2.update();
+  for (const m of [...water.meshes, ...g.extW.meshes]) { world.remove(m); m.geometry.dispose(); }
+  g.extW.meshes.forEach((m) => m.parent?.remove(m));
+  hf = H2; water = W2;
+  for (const m of water.meshes) world.add(m);
+  for (const sc of schools) if (sc.mesh.parent !== world) world.add(sc.mesh);
+  setTimeout(() => {   // 부유 입자·빛줄기는 다음 프레임에 넓은 블록으로 다시(마무리 프레임을 가볍게)
+    if (snow) { world.remove(snow); snow.geometry.dispose(); snow.material.dispose(); snow = makeSnow(); world.add(snow); }
+    if (shafts) { world.remove(shafts); shafts.geometry.dispose(); shafts.material.dispose(); shafts = makeShafts(); world.add(shafts); }
+  }, 100);
+  // 규칙: 열린 지형으로(상태 S는 그대로 이어짐, docs/p2-report.md 3절)
+  g.cost.finishWater = performance.now() - t0;
+  Object.assign(G, g.G2);
+  S.rev++;
+  G.fitTerrain(S);
+  handleEvents(G.drainEvents(S));
+  G.visitExt(S);
+  propView.sync(G.props(S));
+  const e = G.space.ext;
+  hf.disturb((e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2, 3, -2.2);
+  jelly.poke(-0.3, 0, 0.12);
+  g.cost.finish = performance.now() - t0;
+  window.__ow.growCost = g.cost;
+  grow = null;
+  setTimeout(save, 400);   // 저장·안내 창은 다음 프레임들로(마무리 프레임을 가볍게)
+  setTimeout(() => hud?.refresh(), 200);
+  setTimeout(() => hud?.modal('<h3>🌊 확장 영역이 열렸어요!</h3><p>블록 옆에 바다가 20칸 더 붙었어요. 생물을 12마리 더 들일 수 있고, 요청 탭에 확장 영역 꾸미기가 생겼어요.</p>', [{ label: '좋아요' }]), 700);
 }
 
 // ---------- 동작(HUD가 부름) ----------
@@ -449,6 +656,9 @@ const game = {
     if (!r.ok) { hud.toast(r.why); evalPlace(); return; }
     handleEvents(G.drainEvents(S));
     hf.disturb(p.x + IT[p.id].w / 2, p.y + IT[p.id].h / 2, 1.4, -1.2); jelly.poke(-0.25);
+    // 모이는 연출(화면만): 물속 물건이면 가까운 헤엄 생물 몇 마리가 잠깐 다가갔다 돌아감
+    const d = IT[p.id], cx = p.x + d.w / 2, cy = p.y + d.h / 2;
+    if (d.zone !== 'land') creatures.lure(cx, cy, d.zone === 'water' ? (d.float ? -0.9 : G.space.itemZ(r.item)) : heightAt(cx, cy) + 1.2);
     hud.toast(`${IT[p.id].icon ?? ''} ${IT[p.id].name} 놓았어요`);
     endPlace();
     save();
@@ -492,6 +702,8 @@ app.onUpdate((dt, t) => {
     if (evs.length) handleEvents(evs);
     creatures.update(prevC, curC, Math.min(1, acc / STEP), dt);
   }
+  if (grow && grow.slab) growStep(dt);
+  for (const sc of schools) sc.update(dt, t);
   propView.update((x, y, st) => floatOn(hf, x, y, st, Math.min(1, dt * 6)));
   if (hud && mode === 'play') {
     chanceMarker();
@@ -562,9 +774,13 @@ else if (opt.demo) { setState(demoState(opt.n), false); mode = hud ? 'play' : 'd
 else {
   const real = raw ? G.deserialize(raw) : null;
   if (raw && !real) console.warn('저장을 읽지 못했어요(형식이 다름). 새로 시작해요');
-  const bg = real ? G.deserialize(raw) : demoState(20, 4);
-  setState(bg, false);
-  if (opt.title) {
+  const bg = opt.t8soon ? null : real ? G.deserialize(raw) : demoState(20, 4);
+  if (bg) setState(bg, false);
+  if (opt.t8soon) {
+    const s = nearT8State();
+    cameraIn(); enterPlay(s);
+    hud.toast(`개발용 T8 바로 앞(발전도 ${G.stats(s).dev}/870). 물건을 하나 놓아 보세요`, true, 6000);
+  } else if (opt.title) {
     mode = 'title';
     input.enabled = false;
     title = createTitle({
@@ -595,7 +811,7 @@ app.installCapture({
   },
   game,
 });
-window.__ow = { app, opt, jelly, rig, hf, creatures, propView, batch, fog, input, hitMesh, heightAt, G, game, get S() { return S; }, get mode() { return mode; }, get placing() { return placing; }, ghost, save };
+window.__ow = { app, opt, jelly, rig, creatures, propView, batch, fog, input, hitMesh, G, game, schools, growExt, get hf() { return hf; }, get heightAt() { return heightAt; }, get coords() { return coords; }, get terrains() { return terrains; }, get grow() { return grow; }, get S() { return S; }, get mode() { return mode; }, get placing() { return placing; }, ghost, save };
 app.start();
 
 // ---------- 설정·확인용 작은 창(⚙) ----------

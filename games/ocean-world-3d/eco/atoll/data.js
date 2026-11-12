@@ -131,9 +131,11 @@ export const PHASES = ['아침', '낮', '저녁', '밤'];
 // theme = 확장 영역 꾸미기의 테마 물건: 맹그로브 덤불·수상 데크(대니님 승인 2026-11-11, 난파선은 제외)
 export const EXT_RULES = { tier: 8, animals: 12, theme: ['mangrove', 'boardwalk'], residents: 6 };
 
-// 물건 개수 상한(구역별, 확장 영역 포함 전체). null = 상한 없음. 대니님이 시제품 평가 때 정하기로 해서 지금은 모두 꺼 둔다(2026-11-11).
-// 켜면 규칙(sim/rules.js canPlace·freeSpot)이 그 구역 물건 수를 보고 막는다. 후보값별 봇 결과는 docs/p2-report.md
-export const LIMITS = { land: null, bed: null, water: null };
+// 물건 개수 상한(구역별). null = 상한 없음. 대니님 결정(2026-11-12): 해저 120 · 수중 60 + 확장 영역 몫 따로, 육지는 자리가 30개뿐이라 없음.
+// 240분 발전도가 Animal World 약 1,800과 비슷한 줄(docs/p2-report.md 6.2절). ext = 확장 영역 몫(본 블록과 따로 셈, sim/rules.js limitWhy).
+// 확장 영역 몫 40·20: 봇(tools/sim.js --limit-table)에서 5·3부터 60·30까지 꾸미기 달성이 상한 없을 때와 같은 4/6이라 값으로 갈리지 않았다.
+// 넓이(800칸, 본 블록의 절반)에 비해 본 블록보다 조금 성기게, 꾸미기 여섯 항목에 필요한 물건(해저 약 4 · 수중 1)의 열 배쯤으로 잡았다 [가안, docs/p2b-report.md]
+export const LIMITS = { land: null, bed: 120, water: 60, ext: { land: null, bed: 40, water: 20 } };
 
 // 실제 지형 모듈(eco/atoll/terrain.js)을 규칙의 지형 약속으로 바꾼다. 지형 함수는 확장 영역이 열렸는지(opts.ext)에 따라
 // 본 블록 옆면 가장자리(바깥 비탈 띠)가 달라지므로, 열리기 전·후 지형을 따로 만들어 화면과 같은 모양을 규칙에 준다.
@@ -157,6 +159,6 @@ export function makeEco(terrain, { limits = {} } = {}) {
     tiers: TIERS, maxTier: MAX_TIER, econ: ECON, phases: PHASES,
     ext: EXT_RULES,
     place: { maxStep: 1 }, // 땅·해저 물건이 덮는 칸의 높이 차 허용(1/3칸 단위)
-    limits: { ...LIMITS, ...limits }, // 물건 개수 상한(구역별). 지금은 모두 null(끔)
+    limits: { ...LIMITS, ...limits }, // 물건 개수 상한(구역별 + 확장 영역 몫). limits로 덮어쓰기(봇·시험). ext: null이면 몫 하나로 셈
   };
 }

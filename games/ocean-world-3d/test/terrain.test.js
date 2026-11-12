@@ -71,20 +71,70 @@ test('실제 지형: 열리기 전 지형에서는 확장 영역 칸에 물건�
   for (const a of S.animals) assert.ok(a.x < 40, `${a.sp} x=${a.x.toFixed(1)}`);
 });
 
-test('물건 개수 상한: 데이터에는 슬롯만 있고 꺼져 있다. 켜면 그 구역만 막고 freeSpot도 null이 된다', () => {
-  assert.deepEqual(LIMITS, { land: null, bed: null, water: null });
-  const G = createSim(makeEco(atollTerrain(TER, true), { limits: { water: 2 } }));
+test('물건 개수 상한: 데이터는 해저 120 · 수중 60 + 확장 영역 40 · 20(대니님 결정 2026-11-12), 육지는 없음', () => {
+  assert.deepEqual(LIMITS, { land: null, bed: 120, water: 60, ext: { land: null, bed: 40, water: 20 } });
+  assert.equal(POST.eco.limits.bed, 120);
+  assert.equal(POST.eco.limits.ext.water, 20);
+});
+
+test('물건 개수 상한(몫 하나, ext: null): 켜면 그 구역만 막고 freeSpot도 null이 된다', () => {
+  const G = createSim(makeEco(atollTerrain(TER, true), { limits: { water: 2, ext: null } }));
   const S = rich(G); setTier(S, 8);
   assert.ok(place(G, S, 'buoy').ok);
   assert.ok(place(G, S, 'nursery').ok);
   const r = place(G, S, 'planktonlamp');
   assert.equal(r.ok, false);
   assert.equal(G.freeSpot(S, 'planktonlamp'), null);
-  const at = POST.freeSpot(S, 'planktonlamp');
+  const at = createSim(makeEco(atollTerrain(TER, true), { limits: { bed: null, water: null, ext: null } })).freeSpot(S, 'planktonlamp');
   const c = G.canPlace(S, 'planktonlamp', at.x, at.y, at.layer);
   assert.match(c.why, /수중 물건은 2개까지/);
   assert.ok(place(G, S, 'feedbasket').ok, '다른 구역은 그대로');
   assert.equal(G.zoneCount(S, 'water'), 2);
+});
+
+test('물건 개수 상한(본 블록·확장 영역 따로): 본 블록이 차면 확장 영역 자리를 권하고, 둘 다 차면 막는다', () => {
+  const lim = { bed: null, water: 2, ext: { bed: null, water: 1 } };
+  const G = createSim(makeEco(atollTerrain(TER, true), { limits: lim }));
+  const S = rich(G); setTier(S, 8);
+  assert.ok(place(G, S, 'buoy').ok);
+  assert.ok(place(G, S, 'nursery').ok);
+  assert.equal(G.zoneCount(S, 'water', 'main'), 2);
+  // 본 블록 자리는 막히고 안내에 확장 영역을 권한다
+  const free = createSim(makeEco(atollTerrain(TER, true), { limits: { bed: null, water: null, ext: null } }));
+  const mainAt = free.freeSpot(S, 'planktonlamp', { area: 'main' });
+  assert.ok(mainAt && !G.space.inExt(G.eco.items.planktonlamp, mainAt.x, mainAt.y));
+  assert.match(G.canPlace(S, 'planktonlamp', mainAt.x, mainAt.y, mainAt.layer).why, /본 블록 수중 물건은 2개까지예요\. 확장 영역에 놓아 보세요/);
+  assert.equal(G.limitWhy(S, 'planktonlamp'), null, '확장 영역 몫이 남아 있으면 패널 단추는 막지 않는다');
+  // freeSpot은 확장 영역 자리를 준다
+  const at = G.freeSpot(S, 'planktonlamp');
+  assert.ok(at && G.space.inExt(G.eco.items.planktonlamp, at.x, at.y), '확장 영역 자리');
+  assert.ok(G.placeItem(S, 'planktonlamp', at.x, at.y, at.layer).ok);
+  assert.equal(G.zoneCount(S, 'water', 'ext'), 1);
+  assert.equal(G.zoneCount(S, 'water'), 3);
+  // 둘 다 참
+  assert.equal(G.freeSpot(S, 'buoy'), null);
+  assert.match(G.limitWhy(S, 'buoy'), /본 블록 2개 · 확장 영역 1개까지/);
+  const info = G.limitInfo(S, 'buoy');
+  assert.deepEqual([info.main.n, info.main.lim, info.ext.n, info.ext.lim], [2, 2, 1, 1]);
+  assert.ok(place(G, S, 'feedbasket').ok, '해저는 그대로');
+});
+
+test('물건 개수 상한: 확장 영역이 열리기 전에 본 블록이 차면 T8을 안내하고, 저장·불러오기 뒤에도 센 값이 같다', () => {
+  const lim = { bed: 2, water: null, ext: { bed: 1, water: null } };
+  const G = createSim(makeEco(atollTerrain(TER, false), { limits: lim }));
+  const S = rich(G); setTier(S, 7);
+  assert.ok(place(G, S, 'feedbasket').ok);
+  assert.ok(place(G, S, 'lagoonsand').ok);
+  assert.equal(G.freeSpot(S, 'giantclam'), null);
+  assert.match(G.limitWhy(S, 'giantclam'), /T8 확장 영역에 더 놓을 수 있어요/);
+  assert.equal(G.limitInfo(S, 'giantclam').ext, undefined, '열리기 전에는 확장 영역 몫을 보여 주지 않는다');
+  const G2 = createSim(makeEco(atollTerrain(TER, true), { limits: lim }));
+  const S2 = G2.deserialize(G.serialize(S, 0));
+  setTier(S2, 8);
+  assert.equal(G2.zoneCount(S2, 'bed', 'main'), 2);
+  assert.equal(G2.limitWhy(S2, 'giantclam'), null);
+  const at = G2.freeSpot(S2, 'giantclam');
+  assert.ok(at && G2.space.inExt(G2.eco.items.giantclam, at.x, at.y));
 });
 
 test('화면 크기·속도는 data.js 한 곳: bodyLen = len × draw, 속도는 시제품 생동감 값(해삼만 예외)', () => {
