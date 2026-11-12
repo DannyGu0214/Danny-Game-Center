@@ -1,4 +1,4 @@
-// 시제품용 도형 도우미: 기본 도형에 꼭짓점 색과 변형 속성(aDef 또는 aAux)을 붙여 하나로 합친다.
+// 도형 도우미: 기본 도형에 꼭짓점 색과 변형 속성(aDef 또는 aAux)을 붙여 하나로 합친다. P3부터 생물·물건 모양은 eco/atoll/species·props 생성기가 만들고, 이 파일은 render/main.js가 쓰는 rng와 확인용 도우미만 남는다.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
