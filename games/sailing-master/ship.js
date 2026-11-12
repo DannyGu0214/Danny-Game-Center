@@ -82,6 +82,9 @@ export function statsOf(design, cargo = 0, food = 0) {
     holdCap: H.holdBase + 20 * (cnt.hold || 0) + 34 * (cnt.hold2 || 0),
     foodCap: H.foodBase + 6 * (cnt.food || 0) + 12 * (cnt.food2 || 0),
     crewCap: Math.min(H.crew, (cnt.hammock || 0) + (cnt.cabin || 0)),
+    // M2a: 식수 칸(선체 기본 + 물통 4통씩), 내항성(너울을 견디는 높이 m: 등급 × 0.45 + 별마다 0.1 + 바닥짐 0.1)
+    waterCap: (H.waterBase || 0) + 4 * (cnt.water || 0),
+    sea: H.sea ?? H.grade * 0.45 + 0.1 * ((H.star || 1) - 1) + (cnt.ballast ? 0.1 : 0),
     awning: !!cnt.awning, bulkhead: !!cnt.bulkhead, net: !!cnt.net, telescope: !!cnt.telescope, forecast: 1 + (cnt.barometer ? 2 : 0),
     canMove: oars > 0 || sailArea > 0,
     overload: load >= 1,

@@ -56,7 +56,7 @@ test('S5 계절: 안개는 봄에 잦고, 폭풍은 여름·가을에만, 홍수
   const d = { day: 9, storm: 50, gust: 40, squall: 60, fog: true, heat: true, flood: true, drought: true };
   assert.deepEqual(G.kindsOf('pond', d), ['gust', 'squall', 'fog']);
   assert.deepEqual(G.kindsOf('lake', d), ['storm', 'gust', 'squall', 'fog', 'heat']);
-  assert.deepEqual(G.kindsOf('river', d), WX_ORDER);
+  assert.deepEqual(G.kindsOf('river', d), WX_ORDER.filter((id) => id !== 'bigswell' && id !== 'seafog'));
 });
 
 test('S5 예보: 날씨 칸은 심한 것부터, 안개는 내일까지만 보이고 기압계로 폭풍을 더 멀리 본다', () => {
@@ -247,7 +247,9 @@ test('S5 너울·방수 격벽(앞바다용 자리): 너울이 내항성을 넘�
   const st = SH.statsOf({ hull: 'sloop', mods: [] }), sb = { ...st, bulkhead: true };
   assert.equal(G.swellHurt(st, 0.5), 0);
   assert.ok(G.swellHurt(st, 2.5) > 0); assert.equal(G.swellHurt(sb, 2.5), G.swellHurt(st, 2.5) / 2);
-  for (const id of WX_ORDER) assert.ok(!WX[id].fx.swell && !WX[id].fx.spray, `${id}: 담수 날씨엔 너울·물보라가 없다`);
+  // 담수 수역엔 너울이 없어요(너울 날씨는 앞바다 목록에만, M2a)
+  for (const r of ['pond', 'lake', 'river']) { assert.ok(!REGIONS[r].weather.includes('bigswell')); for (let d = 0; d < 60; d++) assert.equal(G.weatherAt(r, 1, d * CAL.day + 70).fx.swell, 0, r); }
+  for (const id of WX_ORDER) assert.ok(!WX[id].fx.spray, `${id}: 물보라는 날씨가 아니라 그 자리 너울이 정해요`);
 });
 
 test('저장 v4 → v5: 돛은 멀쩡, 꿰매기 규칙은 켬, 옛 날씨 칸은 효과 값을 채우고 그대로 이어서 돈다', () => {
@@ -255,11 +257,11 @@ test('저장 v4 → v5: 돛은 멀쩡, 꿰매기 규칙은 켬, 옛 날씨 칸�
   o.v = 4; delete o.boat.torn; delete o.boat.strain; delete o.mend; delete o.rules?.mend; o.rules = { reef: true, repair: true, storm: false };
   o.weather = { heat: false, drought: false, gustOn: true, gustSoon: false };
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 5); assert.equal(T.boat.torn, false); assert.equal(T.boat.strain, 0); assert.equal(T.rules.mend, true);
+  assert.equal(T.v, 6); assert.equal(T.boat.torn, false); assert.equal(T.boat.strain, 0); assert.equal(T.rules.mend, true);
   assert.ok(T.weather.fx); assert.equal(T.weather.gustOn, true, '돌풍이 끝나는 것도 알아챈다');
   run(T, 2);
   assert.ok(T.weather.fx && Array.isArray(T.weather.on));
-  assert.equal(G.newGame(1).v, 5);
+  assert.equal(G.newGame(1).v, 6);
 });
 
 test('여울: 가뭄에 여울을 기어가도 여울 피해만으로는 가라앉지 않는다(내구도 25%에서 멈춤)', () => {

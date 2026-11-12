@@ -217,6 +217,12 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .days .mild b { color: #e8dca0; }
 .days .storm { border-color: rgba(255,120,95,.55); background: rgba(120,40,30,.28); }
 .days .storm b { color: #ff9a80; }
+.days small { display: block; font-size: 11px; color: #9fd2d8; margin-top: 1px; }
+.days small.hi { color: #ffb27a; font-weight: 700; }
+/* 물때(M2a) */
+.tideRow { margin-top: 8px; padding: 8px 11px; border-radius: 13px; background: var(--card); border: 1px solid rgba(190,226,232,.1); font-size: 13px; color: var(--muted); line-height: 1.45; }
+.tideRow b { color: var(--text); font-weight: 600; margin-right: 4px; }
+.tideRow span { display: block; font-size: 12px; }
 .seg.torn .lab { color: #ff9a80; }
 .seg.torn .lab::after { content: '!'; margin-left: 1px; font-weight: 800; }
 #context button.mend { background: #f0d9a8; }
@@ -564,7 +570,7 @@ import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound, readAudioPrefs, writeAudioPrefs, audible as heard } from './sound.js';
 import { createMusic, moodOf, TRACKS } from './music.js';
 import { worldOf } from './world.js';
-import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP, SEATS, TRAITS, WX, SAILCLOTH } from './data.js';
+import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP, SEATS, TRAITS, WX, SAILCLOTH, WATER } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view'), ctx = view.getContext('2d', { alpha: false });
@@ -600,7 +606,9 @@ applyAudio();
 const saveAudio = () => { try { localStorage.setItem(AUDIO_KEY, JSON.stringify(writeAudioPrefs(AP))); } catch { /* 무시 */ } };
 
 let W = 0, H = 0, DPR = 1;
-const cam = { x: S.boat.x, y: S.boat.y, zoom: Number(query.get('zoom')) || VIEW.zoomDefault, cy: 0 };
+// 기본 확대: 수역 표에 zoom이 있으면 그 값(앞바다는 한 단계 멀리, M2a)
+const zoomOf = (r) => REGIONS[r].zoom || VIEW.zoomDefault;
+const cam = { x: S.boat.x, y: S.boat.y, zoom: Number(query.get('zoom')) || zoomOf(S.region), cy: 0 };
 const pan = { x: 0, y: 0, idle: 99 };
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
@@ -863,8 +871,11 @@ function changeRegionArt() {
   sc = A.createScene(S.region, G.findsOf(S)); creatures = createCreatures(worldOf(S.region)); resize();
   wake.pts.length = 0; wake.rings.length = 0;
   music.setRegion(S.region);
+  if (zoomOf(S.region) !== zoomOf(artRegion)) cam.zoom = zoomOf(S.region); // 수역이 바뀌면 그 수역 기본 확대로
+  artRegion = S.region;
   cam.x = S.boat.x; cam.y = S.boat.y; pan.x = pan.y = 0;
 }
+let artRegion = S.region;
 function drainEvents() {
   const list = S.events.slice();
   S.events.length = 0;
@@ -899,7 +910,7 @@ function drainEvents() {
       case 'squallSoon': showHint(ev.shade ? '소나기 온다! 식량은 그늘막 밑으로!' : '소나기 온다! 그늘막이 없으니 식량이 젖겠어!', 3.5, !ev.shade); break;
       case 'rainOn': if (!ev.shade && !ev.storm) toast('🌧 비다! 식량 덮을 데가 없어!'); break;
       case 'foodWet': snd.play('warn'); toast(`💧 ${Object.keys(ev.got).map((k) => SUPPLY[k].name).join('·')}이(가) 젖었다! 상하기 전에 먹어 치우자고`); break;
-      case 'fogOn': showHint('짙은 안개다! 코앞도 안 보여. 천천히 가자고!', 4); break;
+      case 'fogOn': showHint(S.weather.on.includes('seafog') ? '해무다! 바다가 하얗게 덮였어. 등대 불빛이랑 종소리를 따라가자고!' : S.weather.on.includes('fog') ? '짙은 안개다! 코앞도 안 보여. 천천히 가자고!' : '큰 바다 쪽 안개가 짙어진다!', 4); break;
       case 'fogOff': toast('🌤 안개가 걷혔다!'); break;
       case 'floodOn': snd.play('warn'); showHint('강물이 불었다! 물살이 세니 물가 조심해. 떠내려오는 것도 많겠는걸!', 4.5, true); break;
       case 'sailStrain': snd.play('creak'); showHint('돛폭이 비명을 지른다! 줄여, 찢어지겠어!', 3, true); break;
@@ -907,7 +918,16 @@ function drainEvents() {
       case 'mendStart': toast(`🧵 ${ev.name}: 돛은 내가 꿰매지!`); break;
       case 'sailMended': snd.play('place'); toast('🧵 돛을 다 꿰맸다! 다시 바람 받자고!'); syncButtons(); break;
       case 'mendNoCloth': toast('🧵 마포가 모자라서 못 꿰맸어!'); break;
-      case 'shoal': snd.play('ground'); showHint('여울에 걸렸어! 짐을 덜면 뜨기 쉽다고!', 3.5, true); break;
+      case 'shoal': snd.play('ground'); showHint(REGIONS[S.region].tide ? '모래톱에 얹혔어! 물이 들면 뜬다고!' : '여울에 걸렸어! 짐을 덜면 뜨기 쉽다고!', 3.5, true); break;
+      // M2a 바다
+      case 'swellWarn': snd.play('creak'); showHint(`너울이 높아진다(${ev.swell.toFixed(1)}m)! 이 배는 ${ev.sea.toFixed(1)}m까지야. 만 안쪽으로 붙자고!`, 4, true); break;
+      case 'swellHit': snd.play('warn'); showHint(ev.beam ? '너울이 옆구리를 때린다! 뱃머리를 너울에 맞대거나 만으로 피해!' : '너울이 배를 때린다! 선체가 버티질 못해!', 4, true); break;
+      case 'swellOff': if (ev.hurt > 0.005) toast(`〰️ 너울을 벗어났다. 선체 -${Math.round(ev.hurt * 100)}%`); break;
+      case 'cargoLost': toast(`🌊 너울에 ${ITEMS[ev.k]?.name || '짐'} 하나가 쓸려 갔어!`); break;
+      case 'waterLow': snd.play('warn'); showHint('식수가 곧 바닥나! 항구로 가자고!', 3.5, true); break;
+      case 'waterOut': snd.play('warn'); showHint('식수가 바닥났다! 목이 타서 기력이 쭉쭉 빠진다!', 4.5, true); break;
+      case 'pickWater': snd.play('pick'); wake.ring(ev.x, ev.y, 1); toast(`🛢 떠다니는 물통! 식수 +${Math.round(ev.n * 10) / 10}`); break;
+      case 'edge': showHint(ev.ok ? '큰 바다 경계다! 이 배라면 넘어갈 수 있어!' : '큰 바다 경계다! 짙은 안개 너머는 4등급 배로나 가지. 돌아가자고!', 4.5, !ev.ok); break;
       case 'shoalRisk': showHint('여울을 피할 길이 없어! 그냥 밀고 간다!', 3, true); break;
       case 'foodLow': snd.play('warn'); showHint('식량이 곧 바닥나, 선장! 굶고 항해할 순 없지!', 3, true); break;
       case 'heel': snd.play('creak'); showHint('뒤집어지겠어! 돛 줄여!', 2.5, true); break;
@@ -938,9 +958,10 @@ function showDisaster(cause) {
     overlay(`<h3>살았다!</h3><p>잃은 화물: ${lost}</p>${r.broke.length ? `<p>부서진 모듈: ${r.broke.map((m) => MODULES[m].name).join(', ')}</p>` : ''}${r.left ? `<p>${r.left}이(가) 배에서 내렸어.</p>` : ''}<p>구조 비용 🪙${r.fee} · 선체 35%</p>`, '항구로', () => openPort());
   });
 }
+// 이번 단계의 엔딩(M2a): 앞바다의 큰 바다 경계를 4등급 배로 넘을 때. 강 끝은 이제 앞바다로 이어져요
 function showEnding() {
   closeSheet();
-  overlay(`<h3>🏞 강이 끝나는 곳</h3><p>${S.ship.name}이(가) 작은 호수에서 강 끝까지 왔다!</p><p>저 너머 큰 강과 바다는 다음 항해에서 만나자고, 친구! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 강에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
+  overlay(`<h3>🌊 큰 바다 앞에서</h3><p>${S.ship.name}이(가) 작은 호수에서 강을 따라 앞바다 끝까지 왔다!</p><p>저 안개 너머 큰 바다는 다음 항해에서 만나자고, 친구! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 바다에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
 }
 
 // ── 시트 ──
@@ -1043,14 +1064,23 @@ function openPort(ev) {
   if (ev?.gift) toast('마을 사람들이 하루치 식량을 나눠 줬어. 인심 좋네!');
   if (ev?.patched) toast('부두 사람들이 구멍 난 데를 대충 때워 줬어! 다음엔 금화나 잡목을 챙기라고!');
   if (ev?.sewn) toast('돛장이가 외상으로 돛을 꿰매 줬어! 다음엔 마포를 챙기라고!');
+  if (ev?.waterGift) toast('💧 마을 사람들이 물 한 통씩 나눠 줬어. 다음엔 금화를 챙기라고!');
+  if (ev?.scoop) toast(`💧 민물을 퍼 담았다! 물통 가득(+${Math.round(ev.scoop * 10) / 10})`);
 }
 // 예보 칸(S5): 그날 오는 날씨 아이콘(심한 것 둘까지)과 가장 심한 것의 이름. 안개는 내일까지만 보여요
 const weatherIcon = (d) => d.ids.slice(0, 2).map((id) => WX[id].icon).join('') || '☀️';
 const weatherWord = (d) => (d.worst ? WX[d.worst].short || WX[d.worst].name : '맑음');
 function forecastTiles(fc) {
   const days = el('div', 'days');
-  fc.forEach((d, i) => days.append(el('div', d.sev >= 3 ? 'bad storm' : d.sev >= 2 ? 'bad' : d.sev ? 'mild' : '', `${i === 0 ? '오늘' : `+${i}일`}<span class="ic">${weatherIcon(d)}</span><b>${weatherWord(d)}</b>`)));
+  fc.forEach((d, i) => days.append(el('div', d.sev >= 3 ? 'bad storm' : d.sev >= 2 ? 'bad' : d.sev ? 'mild' : '', `${i === 0 ? '오늘' : `+${i}일`}<span class="ic">${weatherIcon(d)}</span><b>${weatherWord(d)}</b>${d.swell ? `<small class="${d.swell > G.stats(S).sea ? 'hi' : ''}">〰${d.swell.toFixed(1)}m</small>` : ''}`)));
   return days;
+}
+// 물때(M2a): 지금 물높이와 다음 썰물·밀물. 썰물엔 모래톱이 드러나요
+function tideLine() {
+  const ti = G.tideInfo(S);
+  if (!ti) return null;
+  const sec = (v) => (v < 60 ? `${Math.round(v)}초` : `${Math.floor(v / 60)}분 ${Math.round(v % 60)}초`);
+  return el('div', 'tideRow', `<b>🌊 물때 · ${ti.name}</b> ${ti.h >= 0 ? '+' : ''}${ti.h.toFixed(1)}m<span>썰물까지 ${sec(ti.toLow)} · 밀물까지 ${sec(ti.toHigh)}</span>`);
 }
 function portCard(icon, name, value, pct, sub, label, fn, off, low) {
   const card = el('div', 'pCard', `<div class="t">${icon.startsWith('<') ? icon : `<svg><use href="#i-${icon}"/></svg>`}${name}<b class="${low ? 'low' : ''}">${value}</b></div>${pct != null ? `<div class="m"><b class="${low ? 'low' : ''}" style="width:${Math.min(100, pct * 100)}%"></b></div>` : ''}<div class="d">${sub}</div><div class="btnGap"></div>`);
@@ -1069,6 +1099,12 @@ function renderPort(body) {
   const mix = Object.entries(pan).filter(([, o]) => o.n > 0.05).map(([k, o]) => `${SUPPLY[k].icon}${Math.round(o.n * 10) / 10}${o.left != null ? `(${Math.max(0, o.left)}일)` : ''}`).join(' ');
   const bread = Math.min(room, Math.floor(S.res.coin / SUPPLY.bread.price)), fish = Math.min(room, 2, Math.floor(S.res.coin / SUPPLY.dfish.price));
   sup.append(portCard('food', '식량', `${S.food.toFixed(1)} / ${st.foodCap}`, S.food / st.foodCap, `하루 ${eat}개 · ${mix || '텅 비었어'}`, bread > 0 ? `🍞 빵 채우기 ${coin(bread * SUPPLY.bread.price)}` : room <= 0 ? '가득' : '금화 부족', () => { if (G.buyFood(S, bread, 'bread')) again(); }, bread <= 0, S.food < eat));
+  // 식수(M2a): 짠물 바다에서만 사요. 민물 항구는 공짜로 퍼 담아요
+  if (REGIONS[S.region].salt || st.waterCap > 0) {
+    const salt = REGIONS[S.region].salt, P = G.waterPrice(S), wroom = Math.floor(st.waterCap - S.water + 1e-9), wq = Math.min(wroom, Math.floor(S.res.coin / P)), per = G.drinkPerDay(S, null) || (1 + S.crew.length);
+    const sub = salt ? `하루 ${per}통${S.weather.heat ? '(무더위 2배)' : ''} · ${Math.floor(G.waterDays(S) * 10) / 10}일치 · 1통 ${P}닢${P > WATER.price ? '(비싸!)' : ''}` : '민물이라 공짜로 퍼 담았어. 바다에선 못 마셔!';
+    sup.append(portCard('<i class="emo">💧</i>', '식수', `${S.water.toFixed(1)} / ${st.waterCap}`, st.waterCap ? S.water / st.waterCap : 0, sub, !salt ? '가득' : wq > 0 ? `💧 채우기 ${coin(wq * P)}` : wroom <= 0 ? (st.waterCap ? '가득' : '물통이 없어') : '금화 부족', () => { if (G.buyWater(S, wq)) { snd.play('place'); again(); } }, !salt || wq <= 0, salt && G.waterDays(S) < 1));
+  }
   sup.append(portCard('<i class="emo">🐟</i>', '건어', `${Math.round((pan.dfish?.n || 0) * 10) / 10}`, null, SUPPLY.dfish.desc, fish > 0 ? `2개 사기 ${coin(fish * SUPPLY.dfish.price)}` : room <= 0 ? '창고 가득' : '금화 부족', () => { if (G.buyFood(S, fish, 'dfish')) again(); }, fish <= 0));
   const herbRoom = HERB.cap - (S.herb || 0), herbOk = herbRoom > 0 && S.res.coin >= HERB.price;
   sup.append(portCard('<i class="emo">🌿</i>', '약초', `${S.herb || 0} / ${HERB.cap}`, null, HERB.desc, herbRoom <= 0 ? '가득' : `1개 사기 ${coin(HERB.price)}`, () => { if (G.buyHerb(S, 1)) again(); }, !herbOk));
@@ -1109,6 +1145,7 @@ function renderPort(body) {
     body.append(r);
   }
   body.append(el('div', 'dexSec', '날씨'), forecastTiles(G.outlook(S)));
+  const tl = tideLine(); if (tl) body.append(tl);
   const wait = el('div', 'waitRow', '<div class="grow"><b>하루 묵기</b>보수 챙겨 주고 하루 쉬는 거야</div>');
   const w = el('button', 'pBtn', '기다리기'); w.addEventListener('click', () => { G.waitDay(S); drainEvents(); renderSheet(); }); wait.append(w);
   body.append(wait);
@@ -1464,7 +1501,19 @@ function renderChart(body) {
     g.beginPath(); for (const p of polys) { g.moveTo(toX(p[0][0]), toY(p[0][1])); for (const q of p) g.lineTo(toX(q[0]), toY(q[1])); g.closePath(); }
     g.strokeStyle = 'rgba(205,240,244,.55)'; g.lineWidth = 3.5; g.stroke(); g.strokeStyle = '#8a7344'; g.lineWidth = 1.1; g.stroke();
     g.restore();
-    for (const q of w.def.shoals || []) { g.fillStyle = 'rgba(230,214,160,.5)'; g.beginPath(); g.arc(toX(q.x), toY(q.y), q.r * k, 0, Math.PI * 2); g.fill(); }
+    const tide = G.tideAt(S.region, S.clock);
+    for (const q of w.def.shoals || []) {
+      g.fillStyle = 'rgba(230,214,160,.5)'; g.beginPath(); g.arc(toX(q.x), toY(q.y), q.r * k, 0, Math.PI * 2); g.fill();
+      const rr = q.r * Math.sqrt(Math.max(0, (0.05 - q.depth - tide) / 0.7)); // 썰물에 드러난 모래톱
+      if (rr > 1) { g.fillStyle = '#e6d39a'; g.beginPath(); g.arc(toX(q.x), toY(q.y), rr * k, 0, Math.PI * 2); g.fill(); }
+    }
+    // 큰 바다 경계(M2a): 지도 끝 짙은 안개 띠는 빗금, 그 바깥은 못 가는 바다
+    if (w.coast) {
+      const [ex0, ex1, ey0] = [w.def.shape.x0, w.def.shape.x1, w.def.shape.y0], band = REGIONS[S.region].edgeFog || 0;
+      g.save(); g.beginPath(); g.rect(ox, 0, wide * k, ch); g.rect(toX(ex1), toY(ey0), toX(ex0) - toX(ex1), toY(y1) - toY(ey0)); g.fillStyle = 'rgba(12,36,48,.55)'; g.fill('evenodd');
+      g.beginPath(); g.rect(toX(ex0), toY(ey0), toX(ex1) - toX(ex0), toY(y1) - toY(ey0)); g.rect(toX(ex1 - band), toY(ey0 + band), toX(ex0 + band) - toX(ex1 - band), toY(y1) - toY(ey0 + band)); g.clip('evenodd');
+      g.strokeStyle = 'rgba(226,238,240,.22)'; g.lineWidth = 1; g.beginPath(); for (let d = -ch; d < cw + ch; d += 7) { g.moveTo(d, 0); g.lineTo(d + ch, ch); } g.stroke(); g.restore();
+    }
     // 안개
     paintFog(); g.imageSmoothingEnabled = true;
     g.drawImage(fogCv, toX(fg.x0), toY(fg.y0), fg.cols * fg.cell * k, fg.rows * fg.cell * k);
@@ -1511,14 +1560,15 @@ function renderChart(body) {
   const updateInfo = () => {
     info.innerHTML = '';
     const st = G.stats(S), fc = G.outlook(S);
-    const allFinds = G.findsOf(S), found = allFinds.filter((f) => S.found[f.id]).length, gate = w.gates[0];
+    const allFinds = G.findsOf(S), found = allFinds.filter((f) => S.found[f.id]).length, gate = w.gates.find((q) => q.id === 'toSea' || q.id === 'toOcean') || w.gates[0]; // 앞으로 가는 관문
     const rest = el('div');
-    rest.append(el('div', 'chartSum', `<div><b>${found} / ${allFinds.length}</b>찾은 발견지</div><div><b>${w.ports.length}곳</b>항구</div><div><b>${gate.name}</b>${gate.to ? `${REGIONS[gate.to].name}로` : '이 수역의 끝'}</div>`));
+    rest.append(el('div', 'chartSum', `<div><b>${found} / ${allFinds.length}</b>찾은 발견지</div><div><b>${w.ports.length}곳</b>항구</div><div><b>${gate.name}</b>${gate.to ? `${REGIONS[gate.to].name}로` : '큰 바다로'}</div>`));
     if (!chartPick) rest.append(el('div', 'chartTip', '남은 발견지는 안개 속이나 뭍 어딘가에 있다고!<br>지도를 탭하면 항해 계획이 나오지.'));
     rest.append(el('div', 'dexSec', `날씨<span>${st.forecast}일 예보${st.forecast < 3 ? ' · 기압계로 늘어나!' : ''}</span>`), forecastTiles(fc));
+    const tl = tideLine(); if (tl) rest.append(tl);
     if (!chartPick) { info.append(rest); return; }
     const dist = Math.hypot(chartPick.x - S.boat.x, chartPick.y - S.boat.y), spd = Math.max(1.2, st.sailArea ? st.maxSpeed * 0.55 : st.rowSpeed * 0.9), sec = dist / spd, persons = 1 + S.crew.length, needFood = persons * sec / CAL.day;
-    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div><div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어!</div>' : ''}${fc.some((d) => d.ids.includes('storm')) ? '<div class="warn">⚠ 폭풍 예보다! 대피할 항구를 봐 둬!</div>' : ''}${fc.some((d) => d.ids.includes('gust')) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보다! 돛 줄일 준비 해!</div>' : ''}${fc.some((d) => d.ids.includes('heat')) && !st.awning ? '<div class="warn">⚠ 무더위 예보인데 그늘막이 없잖아!</div>' : ''}${fc.some((d) => d.ids.includes('storm') || d.ids.includes('squall')) && !st.awning ? '<div class="warn">⚠ 비 예보다! 그늘막이 없으면 식량이 젖어</div>' : ''}${S.boat.torn ? '<div class="warn">⚠ 돛이 찢어졌어! 꿰매고 가!</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
+    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div><div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${REGIONS[S.region].salt ? (() => { const nw = G.drinkPerDay(S, null) * sec / CAL.day, ok = S.water >= nw * 1.2; return `<div class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'} 식수 ${nw.toFixed(1)}통 필요(${S.water.toFixed(1)})</div>`; })() : ''}${(() => { const sw = Math.max(0, ...fc.map((d) => d.swell || 0)) * worldOf(S.region).swellAt(chartPick.x, chartPick.y); return sw > st.sea ? `<div class="warn">⚠ 목적지 너울 ${sw.toFixed(1)}m: 이 배(${st.sea.toFixed(1)}m)엔 버거워!</div>` : ''; })()}${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어!</div>' : ''}${fc.some((d) => d.ids.includes('storm')) ? '<div class="warn">⚠ 폭풍 예보다! 대피할 항구를 봐 둬!</div>' : ''}${fc.some((d) => d.ids.includes('gust')) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보다! 돛 줄일 준비 해!</div>' : ''}${fc.some((d) => d.ids.includes('heat')) && !st.awning ? '<div class="warn">⚠ 무더위 예보인데 그늘막이 없잖아!</div>' : ''}${fc.some((d) => d.ids.includes('storm') || d.ids.includes('squall')) && !st.awning ? '<div class="warn">⚠ 비 예보다! 그늘막이 없으면 식량이 젖어</div>' : ''}${S.boat.torn ? '<div class="warn">⚠ 돛이 찢어졌어! 꿰매고 가!</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
     const plan = el('div', 'planCard', '<div class="l">항해 계획</div>'); plan.append(chk);
     const go = el('button', 'big', S.docked ? '이 항로로 출항!' : '이 항로로 가자!');
     go.addEventListener('click', () => {
@@ -1548,7 +1598,7 @@ const dexCanvas = () => { const cv = el('canvas'), dpr = Math.min(2.5, devicePix
 function renderSpecies(body) {
   const seen = Object.keys(S.seen).length, all = Object.keys(SPECIES).length;
   const coin = (id) => ACHIEVEMENTS.find((a) => a.id === id).coin;
-  const ms = [['5종', 'species5'], ['10종', 'species10'], ['전체', 'speciesAll']].map(([n, id]) => `<span class="${S.ach[id] ? 'on' : ''}">${n}<em class="cost"><svg><use href="#i-coin"/></svg>${coin(id)}</em></span>`).join('');
+  const ms = [['5종', 'species5'], ['10종', 'species10'], ['민물 전체', 'speciesAll']].map(([n, id]) => `<span class="${S.ach[id] ? 'on' : ''}">${n}<em class="cost"><svg><use href="#i-coin"/></svg>${coin(id)}</em></span>`).join('');
   body.append(dexHead('만난 생물', seen, all, `<div class="tip"><div>지나가는 놈들을 탭하면 적어 둔다!</div><div>사슴·곰 같은 뭍짐승은 망원경이 있어야 보여.</div></div><div class="ms">${ms}</div>`));
   for (const r of REGION_ORDER) {
     const ids = Object.keys(SPECIES).filter((id) => SPECIES[id].region === r);
@@ -1613,10 +1663,10 @@ function renderAch(body) {
 
 // ── 수문·수역 ──
 function openGate(gate) {
-  const st = G.gateStatus(S, gate), name = gate.to ? REGIONS[gate.to].name : '강 끝';
+  const st = G.gateStatus(S, gate), name = gate.to ? REGIONS[gate.to].name : '큰 바다';
   sheet = null;
   openSheet(`${gate.name}: ${name}`, [{ id: 'g', name: '', render(body) {
-    body.append(el('p', 'note', gate.to ? `이 물길을 지나면 ${name}(으)로 간다! 그쪽 항구에 닿을 거야.` : '여기서 강이 넓어지며 끝난다. 담수 항해의 마지막이야!'));
+    body.append(el('p', 'note', gate.to === 'coast' ? '강이 넓어지며 짠내가 난다! 이 너머는 앞바다야. 바닷물은 못 마시니 식수를 챙기라고!' : gate.to ? `이 물길을 지나면 ${name}(으)로 간다! 그쪽 항구에 닿을 거야.` : '짙은 안개 너머가 큰 바다다! 4등급 배(스쿠너)라야 넘어간다고.'));
     body.append(el('div', 'check', st.list.length ? st.list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : '<div class="ok">✓ 어떤 배든 지나갈 수 있어</div>'));
     if (!st.ok) body.append(el('p', 'note', '<br>배가 작아서 못 들어가! 항구 조선소에서 키워 오라고.'));
   } }], 'g', () => {
@@ -1628,7 +1678,7 @@ function openGate(gate) {
 function openRegion(ev) {
   snd.play('found');
   const R = REGIONS[ev.to];
-  const tips = { lake: '나룻배부터는 돛을 달 수 있다! 항구 설계에서 작은 돛대를 올려 봐. 돌풍이 오면 돛을 줄이고, 여름 무더위엔 그늘막을 챙기라고!', river: '물살이 북쪽 하류로 흐른다! 밝은 곳은 여울이니 조심해. 슬루프 설계도는 이 강 어딘가에 있어!' };
+  const tips = { lake: '나룻배부터는 돛을 달 수 있다! 항구 설계에서 작은 돛대를 올려 봐. 돌풍이 오면 돛을 줄이고, 여름 무더위엔 그늘막을 챙기라고!', river: '물살이 북쪽 하류로 흐른다! 밝은 곳은 여울이니 조심해. 슬루프 설계도는 이 강 어딘가에 있어!', coast: '바다다! 짠물은 못 마시니 항구에서 식수를 사고 물통을 달아. 곶 밖 바깥 바다는 너울이 높고, 썰물엔 모래톱이 드러난다고. 새벽 해무엔 등대 불빛을 찾아!' };
   overlay(`<h3>🌊 ${R.name}</h3><p>${ev.first ? tips[ev.to] || '' : '돌아왔구먼! 여긴 아직 건질 게 남았을걸?'}</p>`, '입항', () => openPort());
 }
 
@@ -1648,17 +1698,20 @@ function syncTop() {
   const st = G.stats(S), persons = 1 + S.crew.length, c = G.clock(S);
   // 지금 날씨 중 가장 심한 것. 없으면 다가오는 돌풍·폭풍을 예고로
   const wx = S.weather, now = !S.docked && wx.worst ? WX[wx.worst] : null, soon = !S.docked && wx.soon?.find((id) => WX[id].rough);
-  const color = SEASON_COLOR[c.season.id], alert = soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : ''; // 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저
+  const sw = S.docked ? 0 : G.swellHere(S), swellAlert = sw > st.sea * 0.92 ? `너울 ${sw.toFixed(1)}m` : ''; // M2a: 내항성에 가까운 너울이 가장 먼저
+  const color = SEASON_COLOR[c.season.id], alert = swellAlert || (soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : ''); // 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저
   $('dateNum').innerHTML = `<i style="background:${color};color:${color}"></i>${c.season.name} ${c.dayOfSeason + 1}일`;
   $('regionName').textContent = `${REGIONS[S.region].name}${alert ? ` · ${alert}` : ''}`;
   $('regionName').classList.toggle('warn', !!alert);
   // 윗줄은 아이템, 배 상태는 조종부 위 게이지
   const item = (icon, text, cls = '') => `<span class="${cls}"><svg><use href="#i-${icon}"/></svg>${text}</span>`;
   // 금화 + 많이 가진 재료 3가지(나머지는 항구 창고에서 봐요) + 교역품 수
-  const mats = MAT_IDS.filter((k) => S.res[k]).sort((a, b) => S.res[b] - S.res[a]).slice(0, 3);
+  const salt = REGIONS[S.region].salt, ti = G.tideInfo(S);
+  const mats = MAT_IDS.filter((k) => S.res[k]).sort((a, b) => S.res[b] - S.res[a]).slice(0, salt ? 1 : 3); // 바다에선 식수·물때 칸 자리를 비워요
   const trade = TRADE_IDS.reduce((a, k) => a + (S.res[k] || 0) + (S.hold[k] || 0), 0);
   $('chips').innerHTML = item('coin', S.res.coin || 0) + mats.map((k) => `<span>${icon(k)}${S.res[k]}</span>`).join('') + (trade ? `<span><i class="emo">✨</i>${trade}</span>` : '')
-    + item('hold', `${G.holdUsed(S)}/${st.holdCap}`, 'gap') + item('food', S.food.toFixed(0), S.food < persons ? 'low' : '');
+    + item('hold', `${G.holdUsed(S)}/${st.holdCap}`, 'gap') + item('food', S.food.toFixed(0), S.food < persons ? 'low' : '')
+    + (salt ? `<span class="${G.waterDays(S) < 0.5 ? 'low' : ''}"><i class="emo">💧</i>${S.water.toFixed(1)}</span>` : '') + (ti ? `<span class="tide"><i class="emo">🌊</i>${ti.name}${ti.rising ? '↑' : '↓'}</span>` : '');
   setGauge('hull', S.hull); setGauge('vigor', S.vigor);
 }
 function updateHud(dt) {
@@ -1722,7 +1775,7 @@ function camera(dt) {
 
 // ── 그리기 ──
 function shipState(x, y, h, t, heelV, zoom, still = false) {
-  const b = S.boat, swell = 0.6 + S.wind.speed / 16;
+  const b = S.boat, swell = 0.6 + S.wind.speed / 16 + (still || S.docked ? 0 : G.swellHere(S) * 1.1); // 너울(M2a)이면 크게 흔들려요
   const bob = still ? 0 : Math.sin(t * 1.25) * 0.09 * swell + Math.sin(t * 0.73 + 1) * 0.05 * swell;
   const pitch = still ? 0 : Math.sin(t * 1.1 + 0.6) * 0.022 * swell + Math.min(0.03, b.spd * 0.004);
   const heel = heelV + (still ? 0 : Math.sin(t * 0.93) * 0.015 * swell);
@@ -1732,6 +1785,10 @@ function render() {
   const b = S.boat, t = S.t;
   A.drawWater(ctx, sc, cam, W, H, t, S.wind, DPR);
   if (S.weather.flood && !S.docked) A.drawFloodTint(ctx, W, H, DPR); // 홍수: 흙탕물(땅보다 먼저)
+  // M2a 바다: 화면 가운데 너울 무늬, 물때에 따라 드러나는 모래톱(땅보다 먼저)
+  const swellNow = G.swellHere(S, cam.x, cam.y);
+  A.drawSwell(ctx, sc, cam, W, H, t, swellNow, DPR);
+  if (sc.tidal) A.drawShoals(ctx, sc, cam, W, H, DPR, G.tideAt(S.region, S.clock), t);
   A.drawLand(ctx, sc, cam, W, H, DPR, performance.now() < zoomingUntil, S.weather.drought ? 'dry' : S.weather.flood ? 'flood' : false);
   A.drawShoreFoam(ctx, sc, cam, W, H, t, DPR);
   A.drawFlotsam(ctx, sc, G.flotsamOf(S), cam, W, H, t, DPR);
@@ -1762,7 +1819,7 @@ function render() {
 
   const bx = sx(b.x), by = sy(b.y), st = shipState(bx, by, b.h, t, b.heel, cam.zoom);
   SA.drawShipOnWater(ctx, sprite, st, cam.zoom, bx, by);
-  if (!S.docked) A.drawBowFoam(ctx, cam, W, DPR, b, Math.min(1, b.spd / 6), t, sprite.hull.len);
+  if (!S.docked) A.drawBowFoam(ctx, cam, W, DPR, b, Math.min(1.6, b.spd / 6 + G.swellHere(S) * 0.3), t, sprite.hull.len); // 너울엔 물보라가 커요
   creatures.draw(ctx, cam, W, H, DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
@@ -1786,7 +1843,8 @@ function weatherView(bx, by) {
   const wx = S.weather, v = { x: bx, y: by, wind: S.wind.from, flash: flashA, tiltY: VIEW.tiltY };
   if (wx.fog > 0 && !S.docked) {
     v.clear = G.sightRange(S) * cam.zoom;
-    v.lights = worldOf(S.region).ports.map((p) => [W / 2 + (p.x - cam.x) * cam.zoom, cam.cy + (p.y - cam.y) * cam.zoom * VIEW.tiltY]).filter(([x, y]) => x > -80 && x < W + 80 && y > -80 && y < H + 80);
+    const at = (p, big) => [W / 2 + (p.x - cam.x) * cam.zoom, cam.cy + (p.y - cam.y) * cam.zoom * VIEW.tiltY, big];
+    v.lights = [...worldOf(S.region).ports.map((p) => at(p, 1)), ...(REGIONS[S.region].lights || []).map((L) => at(L, 3.2))].filter(([x, y, k]) => x > -80 * k && x < W + 80 * k && y > -80 * k && y < H + 80 * k); // 등대(M2a)는 크게 번져요
     if (S.ship.decor.includes('lantern')) v.lantern = true;
   }
   return v;

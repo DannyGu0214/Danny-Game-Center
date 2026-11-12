@@ -163,7 +163,7 @@ export function moodOf({ docked = false, gustOn = false, gustSoon = false, storm
 // 평소 항해 곡 고르기. 수역마다 선술집 두 곡(자기 곡 + 이웃 수역 곡)을 번갈아 틀어요.
 // 한 차례는 평소 항해 시간으로 TURN_S초(mp3 한 바퀴쯤), 생동감 곡은 LIVELY_S초.
 // 선술집 곡이 2차례 이상 지나면 다음 차례마다 35% 확률로 생동감 곡, 4차례가 지나면 반드시 생동감 곡. 생동감 곡은 연달아 나오지 않아요.
-export const SAIL_SETS = { pond: ['pond', 'lake'], lake: ['lake', 'pond'], river: ['river', 'lake'], sea: ['sea', 'river'], ocean: ['sea', 'river'] };
+export const SAIL_SETS = { pond: ['pond', 'lake'], lake: ['lake', 'pond'], river: ['river', 'lake'], coast: ['sea', 'river'], sea: ['sea', 'river'], ocean: ['sea', 'river'] };
 export const TURN_S = 150, LIVELY_S = 90, LIVELY = { after: 2, chance: 0.35, must: 4 };
 export function startSail(region) { const set = SAIL_SETS[region] || SAIL_SETS.river; return { region, track: set[0], k: 0, since: 0, left: TURN_S }; }
 export function nextSail(d, rand = Math.random) {
@@ -184,7 +184,7 @@ export const levelOf = (v) => (v > 0 ? Math.min(1, v) ** 2 : 0);
 const INTRO_BARS = 2;
 
 
-// 곡마다 mp3. 파일이 없거나(READY 밖, 2026-11-12 기준 lively·port·storm) 못 읽는 곡은 합성곡으로 틀어요. 바다·대양 곡(sea)은 그 수역이 생기면 써요
+// 곡마다 mp3. 파일이 없거나(READY 밖, 2026-11-12 기준 lively·port·storm) 못 읽는 곡은 합성곡으로 틀어요. 바다·대양 곡(sea)은 앞바다(M2a, SAIL_SETS.coast)부터 써요
 export const FILES = { pond: 'pond', lake: 'lake', river: 'river', sea: 'sea', lively: 'lively', port: 'port', storm: 'storm' };
 // 저장소에 실제로 있는 mp3. 여기 없는 곡은 찾지 않고 바로 합성곡으로 틀어요(없는 파일을 찾다 콘솔에 404가 쌓이지 않게). 새 mp3가 오면 여기에 더해요
 export const READY = new Set(['pond', 'lake', 'river', 'sea']);

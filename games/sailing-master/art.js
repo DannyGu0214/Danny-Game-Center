@@ -181,7 +181,7 @@ function sharedArt() {
       pebbles: [pebblesSprite(0.3), pebblesSprite(0.8)], boulder: [boulderSprite(0.2), boulderSprite(0.7)], windmill: windmillSprite(), thatch: [thatchSprite(0.2), thatchSprite(0.7)], haystack: haystackSprite(), bridge: bridgeSprite(),
       pier: pierSprite(), hut: hutSprite(), sign: signSprite(), stone: stoneSprite(), stump: stumpSprite(), wreck: wreckSprite(), tower: towerSprite(), cabin: cabinSprite(), mill: millSprite(), shrine: shrineSprite(), camp: campSprite(), logpile: logpileSprite(), beacon: beaconSprite(), shelter: shelterSprite(), beached: beachedSprite(),
     },
-    flot: Object.fromEntries(['wood', 'oak', 'cloth', 'canvas', 'hemp', 'tar', 'nail', 'shiny', 'bottle', 'coin'].map((k) => [k, flotSprite(k)])),
+    flot: Object.fromEntries(['wood', 'oak', 'cloth', 'canvas', 'hemp', 'tar', 'nail', 'shiny', 'bottle', 'coin', 'water', 'net'].map((k) => [k, flotSprite(k)])),
   };
   return shared;
 }
@@ -201,7 +201,8 @@ export function sceneLayout(regionId, finds = worldOf(regionId).finds) {
   for (const p of w.ports) { const [x, y, gx, gy] = shore(p); const side = gy > 0 ? -1 : 1; // 집은 부두 옆 뭍으로 비켜 세운다(집 오른쪽 옆벽이 부두 머리를 가리지 않게 왼쪽으로)
     marks.push({ kind: theme.hut, x: x - gx * 3.5 + gy * side * 3.6, y: y - gy * 3.5 - gx * side * 3.6, size: 1, name: p.name, port: p }); const d = w.dist(p.x, p.y) + 0.4, len = Math.max(5, Math.min(PIER_MAX, d - 4.5)), x0 = p.x - gx * d, y0 = p.y - gy * d;
     marks.push({ kind: 'pier', x: x0 + gx * len / 2, y: y0 + gy * len / 2, x0, y0, len, size: 1, ang: Math.atan2(gy, gx) }); }
-  for (const g of w.gates) { const [x, y] = shore(g); marks.push({ kind: 'sign', x, y, size: 1, name: g.name, gate: g }); }
+  for (const g of w.gates) { const [x, y] = g.open ? [g.x, g.y] : shore(g); marks.push({ kind: 'sign', x, y, size: 1, name: g.name, gate: g }); } // 바다 관문(M2a)은 물 위 그 자리에 표지를 세워요
+  for (const L of w.def.lights || []) marks.push({ kind: 'tower', x: L.x, y: L.y, size: 1.25, v: 0, lamp: L }); // 등대(M2a): 해무 때 불빛이 멀리 보여요
   for (const f of finds) marks.push({ kind: f.art, x: f.x, y: f.y, size: 1, find: f });
   const { props: land, decals, zones } = dressLand(w, theme, marks);
   return { world: w, theme, marks, decals, zones, props: [...land, ...marks].sort((a, b) => a.y - b.y) };
@@ -214,7 +215,8 @@ export function createScene(regionId, finds = worldOf(regionId).finds) {
   const clips = zones.clips && zones.clips.map((q) => { const p = new Path2D(); q.pts.forEach(([x, y], i) => (i ? p.lineTo(x, y) : p.moveTo(x, y))); p.closePath(); return { path: p, u0: q.u0, u1: q.u1 }; });
   const foam = w.outlines(-0.7, 420);
   const paws = Array.from({ length: 9 }, (_, i) => ({ s: i * 0.7, rx: hash(i, 3), ry: hash(5, i), size: 0.6 + hash(i, 8) * 0.9 }));
-  return { id: regionId, world: w, ...art, theme, zones, clips, decals, layers, props, shore: foam, paws, buf: null, patterns: null, shoals: w.def.shoals || [], bakedAt: null, bakedDry: false };
+  // tidal: 조수가 있는 바다(M2a)는 여울을 굽지 않고 프레임마다 물때에 맞춰 그려요(drawShoals)
+  return { id: regionId, world: w, ...art, theme, zones, clips, decals, layers, props, shore: foam, paws, buf: null, patterns: null, shoals: w.def.shoals || [], tidal: !!w.def.tide, bakedAt: null, bakedDry: false };
 }
 
 // 물 무늬 패턴은 캔버스 문맥마다 만들어 둔다
@@ -402,7 +404,7 @@ function bakeLand(sc, cam, W, H, dpr, dry) {
   // 여울: 얕은 곳이 밝게 비친다. 가뭄이면 모래가 드러나고, 홍수(S5)면 물에 잠겨 흐려진다. dry: true·'dry' 가뭄, 'flood' 홍수
   const flood = dry === 'flood';
   dry = dry === true || dry === 'dry';
-  for (const q of sc.shoals) {
+  for (const q of sc.tidal ? [] : sc.shoals) {
     const sx = ox + (q.x - cam.x) * z, sy = oy + (q.y - cam.y) * z * k, r = q.r * z;
     g.setTransform(dpr, 0, 0, dpr * k, sx * dpr, sy * dpr);
     const gr = g.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
@@ -460,6 +462,61 @@ export function drawLand(g, sc, cam, W, H, dpr, zooming, dry = false) {
   // 구운 그림 위의 세상 점 (cam.x, cam.y)가 화면 (W/2, cam.cy)에 오게 찍는다
   const bx = q.ox + (cam.x - q.x) * q.zoom, by = q.oy + (cam.y - q.y) * q.zoom * VIEW.tiltY;
   g.drawImage(c, W / 2 - bx * s, cam.cy - by * s, c.width / dpr * s, c.height / dpr * s);
+}
+
+// 물때 여울(M2a 앞바다): 얕을수록 밝게 비치고, 물이 빠져 수심이 0 밑이면 젖은 모래톱이 드러나요. 둘레에 부서지는 흰 물결
+export function drawShoals(g, sc, cam, W, H, dpr, tide, t) {
+  const z = cam.zoom, k = VIEW.tiltY;
+  for (const q of sc.shoals) {
+    const sx = W / 2 + (q.x - cam.x) * z, sy = cam.cy + (q.y - cam.y) * z * k, r = q.r * z;
+    if (sx < -r || sx > W + r || sy < -r * k - 20 || sy > H + r * k + 20) continue;
+    g.setTransform(dpr, 0, 0, dpr * k, sx * dpr, sy * dpr);
+    const top = q.depth + tide, sh = Math.max(0, Math.min(1, (1.3 - top) / 1.3)); // 가운데 수심 → 밝기
+    const gr = g.createRadialGradient(0, 0, r * 0.15, 0, 0, r);
+    gr.addColorStop(0, `rgba(200,230,206,${0.2 + 0.35 * sh})`); gr.addColorStop(0.7, `rgba(180,224,206,${0.1 + 0.18 * sh})`); gr.addColorStop(1, 'rgba(170,220,206,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+    // 드러난 모래: 수심 depth + (q/r)² × 0.7 + tide < 0.05인 반지름
+    const rr = r * Math.sqrt(Math.max(0, (0.05 - top) / 0.7));
+    if (rr > 1) {
+      g.fillStyle = 'rgba(196,178,126,.85)'; wavy(g, { x: 0, y: 0 }, rr * 1.08, rr * 1.08, q.x, 14, 0.12); g.fill();
+      g.fillStyle = '#d9c690'; wavy(g, { x: 0, y: 0 }, rr, rr, q.x, 14, 0.12); g.fill();
+      g.fillStyle = 'rgba(240,228,184,.7)'; wavy(g, { x: -rr * 0.18, y: -rr * 0.16 }, rr * 0.6, rr * 0.5, q.y, 11, 0.2); g.fill();
+      g.strokeStyle = `rgba(250,252,248,${0.5 + 0.2 * Math.sin(t * 1.3 + q.x)})`; g.lineWidth = Math.max(1, 0.3 * z) / k;
+      g.beginPath(); g.arc(0, 0, rr * 1.15 + Math.sin(t * 0.9 + q.y) * 0.25 * z, 0, TAU); g.stroke();
+    }
+  }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+// 너울(M2a): 북쪽 큰 바다에서 밀려오는 긴 물마루. 자리 너울 높이(m)만큼 진해지고 1.2m를 넘으면 흰 물머리가 부서져요
+export function drawSwell(g, sc, cam, W, H, t, swell, dpr) {
+  if (!(swell > 0.08)) return;
+  const z = cam.zoom, k = VIEW.tiltY, a = Math.min(0.5, swell * 0.24), L = 11 + swell * 3, sp = 1.6 + swell * 0.6;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // 긴 물마루 띠: 세상 y를 따라 사인 띠를 화면 세로 그라데이션 하나로
+  const wy0 = cam.y - cam.cy / (z * k), wy1 = cam.y + (H - cam.cy) / (z * k), gr = g.createLinearGradient(0, 0, 0, H), n = 48;
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, wy = wy0 + (wy1 - wy0) * f, v = Math.sin((wy - t * sp) / L * TAU / 6 + Math.sin(wy * 0.013) * 0.6);
+    gr.addColorStop(f, v > 0 ? `rgba(225,248,248,${(a * 0.45 * v).toFixed(3)})` : `rgba(6,40,58,${(-a * 0.7 * v).toFixed(3)})`);
+  }
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  // 굵은 물결 무늬 한 겹을 크게 키워 남쪽으로 민다
+  const pat = patternsOf(sc, g), m = new DOMMatrix().translate(W / 2, cam.cy).scale(z, z * k).translate(-cam.x, -cam.y + t * sp).scale(0.32 + swell * 0.06);
+  pat.b.setTransform(m); g.globalAlpha = Math.min(0.75, swell * 0.35); g.fillStyle = pat.b; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+  // 흰 물머리
+  if (swell > 1.2 && z > 2.4) {
+    const cell = 9, x0 = Math.floor((cam.x - W / 2 / z) / cell), x1 = Math.ceil((cam.x + W / 2 / z) / cell), y0 = Math.floor(wy0 / cell), y1 = Math.ceil(wy1 / cell), p = Math.min(0.5, (swell - 1.2) * 0.35);
+    g.fillStyle = '#f4fbfa';
+    for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) {
+      const r = hash(i * 1.3, j * 0.7), life = (t * (0.25 + r * 0.3) + r * 9) % 1;
+      if (hash(j, i) > p || life > 0.45) continue;
+      const wx = (i + hash(j, i * 2)) * cell, wyy = (j + hash(i, j * 3)) * cell + life * 3;
+      if (sc.world.dist(wx, wyy) < 4) continue;
+      const gx = W / 2 + (wx - cam.x) * z, gy = cam.cy + (wyy - cam.y) * z * k, w2 = (0.8 + r * 1.4) * z * (1 - life * 1.6);
+      g.globalAlpha = 0.75 * Math.sin(life / 0.45 * PI);
+      g.beginPath(); g.ellipse(gx, gy, Math.max(1, w2), Math.max(0.6, w2 * 0.22), 0, 0, TAU); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
 }
 
 // 물가에 찰랑이는 흰 선: 보이는 구간만 그린다
@@ -1339,6 +1396,21 @@ function flotSprite(k) {
     const gr = g.createRadialGradient(cx, cy - 6, 2, cx, cy - 6, 40); gr.addColorStop(0, 'rgba(255,236,160,.95)'); gr.addColorStop(0.4, 'rgba(255,214,110,.45)'); gr.addColorStop(1, 'rgba(255,214,110,0)');
     g.fillStyle = gr; g.beginPath(); g.ellipse(cx, cy - 6, 40, 24, 0, 0, TAU); g.fill();
     g.fillStyle = 'rgba(120,80,30,.55)'; g.beginPath(); g.roundRect(cx - 14, cy - 12, 28, 14, 4); g.fill();
+  } else if (k === 'water') {
+    // 떠다니는 물통(M2a): 쇠테 두른 나무통, 파란 마개
+    g.save(); g.translate(cx, cy - 8); g.rotate(-0.2);
+    g.fillStyle = '#8a5f34'; g.beginPath(); g.ellipse(0, 0, 32, 19, 0, 0, TAU); g.fill();
+    g.fillStyle = '#a5743f'; g.beginPath(); g.ellipse(-3, -4, 27, 13, 0, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(60,40,20,.45)'; g.lineWidth = 1.2; for (const y of [-9, -2, 5]) { g.beginPath(); g.moveTo(-28, y); g.quadraticCurveTo(0, y + 3, 28, y); g.stroke(); }
+    g.strokeStyle = '#4a4a4c'; g.lineWidth = 3.5; for (const x of [-17, 17]) { g.beginPath(); g.ellipse(x, 0, 4, 18, 0, 0, TAU); g.stroke(); }
+    g.fillStyle = '#3f7f9c'; g.beginPath(); g.ellipse(0, -14, 6, 3.4, 0, 0, TAU); g.fill();
+    g.restore();
+  } else if (k === 'net') {
+    // 그물 뭉치(M2a): 초록 그물 덩이와 코르크 찌
+    g.fillStyle = '#5f8a74'; g.beginPath(); g.ellipse(cx, cy - 6, 36, 19, 0, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(210,236,214,.55)'; g.lineWidth = 1.1;
+    for (let i = -4; i <= 4; i++) { g.beginPath(); g.moveTo(cx + i * 8 - 10, cy - 22); g.lineTo(cx + i * 8 + 10, cy + 10); g.moveTo(cx + i * 8 + 10, cy - 22); g.lineTo(cx + i * 8 - 10, cy + 10); g.stroke(); }
+    for (const [x, y] of [[-26, -10], [-6, -20], [16, -16], [30, -4]]) { g.fillStyle = '#d89a4a'; g.beginPath(); g.ellipse(cx + x, cy + y, 5.5, 4, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,230,180,.5)'; g.beginPath(); g.ellipse(cx + x - 1.5, cy + y - 1.4, 2.2, 1.4, 0, 0, TAU); g.fill(); }
   } else if (k === 'bottle') {
     g.save(); g.translate(cx, cy - 8); g.rotate(-0.35);
     g.fillStyle = 'rgba(120,190,170,.85)'; g.beginPath(); g.roundRect(-26, -10, 40, 20, 9); g.fill(); g.fillRect(12, -5, 14, 10);
@@ -1440,10 +1512,12 @@ export function drawWeather(g, weather, W, H, t, dpr, v = {}) {
     // 흐르는 안개 띠
     g.fillStyle = `rgba(232,238,240,${0.12 * weather.fog})`;
     for (let i = 0; i < 5; i++) { const y = (hash(i, 3) * H + t * 6 * (i % 2 ? 1 : -0.7)) % H; g.beginPath(); g.ellipse((hash(i, 4) * W + t * 9) % (W * 1.4) - W * 0.2, y, W * 0.5, 22, 0, 0, Math.PI * 2); g.fill(); }
-    for (const [x, y] of v.lights || []) {
-      const lg = g.createRadialGradient(x, y - 14, 1, x, y - 14, 30);
-      lg.addColorStop(0, `rgba(255,170,70,${0.55 * weather.fog})`); lg.addColorStop(0.35, `rgba(255,170,80,${0.2 * weather.fog})`); lg.addColorStop(1, 'rgba(255,190,110,0)');
-      g.fillStyle = lg; g.fillRect(x - 32, y - 46, 64, 64);
+    // 불빛: [x, y, 크기]. 등대(M2a)는 크게 번지고 천천히 도는 빛줄기가 있어요
+    for (const [x, y, big = 1] of v.lights || []) {
+      const R = 30 * big, cy = y - 14 * Math.min(big, 2.2), lg = g.createRadialGradient(x, cy, 1, x, cy, R);
+      lg.addColorStop(0, `rgba(255,${big > 1 ? 214 : 170},${big > 1 ? 120 : 70},${0.55 * weather.fog})`); lg.addColorStop(0.35, `rgba(255,180,90,${0.2 * weather.fog})`); lg.addColorStop(1, 'rgba(255,190,110,0)');
+      g.fillStyle = lg; g.fillRect(x - R - 2, cy - R - 2, R * 2 + 4, R * 2 + 4);
+      if (big > 1) { const a = t * 0.9; g.save(); g.translate(x, cy); g.scale(1, k); g.rotate(a); const bm = g.createLinearGradient(0, 0, R * 3.2, 0); bm.addColorStop(0, `rgba(255,236,170,${0.42 * weather.fog})`); bm.addColorStop(1, 'rgba(255,236,170,0)'); g.fillStyle = bm; g.beginPath(); g.moveTo(0, 0); g.lineTo(R * 3.2, -R * 0.45); g.lineTo(R * 3.2, R * 0.45); g.closePath(); g.fill(); g.restore(); }
     }
     if (v.lantern) { const lg = g.createRadialGradient(v.x, v.y - 14, 2, v.x, v.y - 14, 34); lg.addColorStop(0, 'rgba(255,190,100,.4)'); lg.addColorStop(1, 'rgba(255,190,100,0)'); g.fillStyle = lg; g.fillRect(v.x - 40, v.y - 54, 80, 80); }
   }
