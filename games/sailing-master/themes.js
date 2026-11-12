@@ -52,6 +52,25 @@ export const THEMES = {
       },
     ],
   },
+  // 3등급 앞바다(M2a 임시, C5에서 다듬어요): 청록 바닷물, 만 안쪽은 모래 해변·해송, 곶 끝과 섬은 바위 해안.
+  // 구간은 남(만 해변) → 북(곶 끝·바깥 섬) 순서예요(zonesOf는 shape.pts가 없으면 지도 남쪽 끝에서 북쪽 끝으로 나눠요)
+  coast: {
+    name: '앞바다', water: ['#1d7b86', '#22909a'], hut: 'hut', seed: 31,
+    layers: layers(['rgba(110,210,196,.15)', 'rgba(132,220,200,.2)', 'rgba(176,230,206,.3)', 'rgba(226,228,186,.66)']),
+    wet: '#cbb98a', shore: { tile: 'sand', base: '#eadcae' }, bank: '#9a8256', ground: { tile: 'grass', base: '#8aa95a', specks: ['rgba(90,120,60,.35)', 'rgba(176,196,120,.4)', 'rgba(236,222,170,.55)'] }, lift: 1.3,
+    sections: [
+      {
+        id: 'beach', name: '모래 해변', to: 0.43, water: ['#1f8290', '#26989f'],
+        wet: '#cdbb8c', shore: { tile: 'sand', base: '#efe2b6' }, bank: '#b79c66', ground: { tile: 'grass', base: '#93ae5e', specks: ['rgba(90,120,60,.35)', 'rgba(176,196,120,.4)', 'rgba(236,222,170,.6)'] }, lift: 1.1,
+        mix: [[7, [['pebbles', 0.12], [null, 1]]], [16, [['reed', 0.25], ['bush', 0.5], [null, 1]]], [Infinity, [['pine', 0.55], ['bush', 0.75], ['rock', 0.85], [null, 1]]]],
+      },
+      {
+        id: 'rocks', name: '바위 해안', to: 1, water: ['#1a6f7f', '#1f8290'],
+        wet: '#8c897c', shore: { tile: 'gravel', base: '#9c968a' }, bank: { tile: 'cliff', base: '#6d685e' }, ground: { tile: 'rocky', base: '#6f8650' }, lift: 2.4,
+        mix: [[6, [['pebbles', 0.35], ['rock', 0.75], ['boulder', 1]]], [Infinity, [['pine', 0.5], ['boulder', 0.66], ['rock', 0.8], ['bush', 1]]]],
+      },
+    ],
+  },
 };
 // 지역 → 테마. 표에 없으면 호수 테마예요
 export const themeOf = (def) => THEMES[def.theme] || THEMES.lake;
@@ -117,7 +136,7 @@ export function dressLand(w, theme, marks) {
     for (const [depth, list] of bands) if (-d < depth) { for (const [k, c] of list) if (r < c) return k; return null; }
     return null;
   };
-  const near = (m, t) => (m.port || m.find || m.gate) && Math.hypot(m.x - t.x, m.y - t.y) < 9;
+  const near = (m, t) => (m.port || m.find || m.gate || m.lamp) && Math.hypot(m.x - t.x, m.y - t.y) < 9;
   if (!theme.strict) {
     // 호수: M1 규칙 그대로(9m 안의 나무만 뺌)
     const trees = w.scatter(11, pick).filter((t) => !marks.some((m) => near(m, t)));
@@ -129,7 +148,7 @@ export function dressLand(w, theme, marks) {
   const clearMarks = (x, y, r) => marks.every((m) => Math.hypot(m.x - x, m.y - y) > r + 7);
   const clearDecals = (x, y, r) => decals.every((q) => q.kind === 'creek' || q.kind === 'path' ? q.pts.every(([px, py]) => Math.hypot(px - x, py - y) > r + 2.5) : Math.hypot(q.x - x, q.y - y) > (r + q.r) * (q.kind === 'field' ? 0.8 : 1));
   const clearBox = (b) => mb.every((q) => !hit(b, q)) && pb.every((q) => !hit(b, q));
-  const land = (x, y, lo, hi) => { const d = w.dist(x, y); return d > -199 && -d >= lo && -d <= hi; };
+  const land = (x, y, lo, hi) => { const d = (w.landDist || w.dist)(x, y); return d > -199 && -d >= lo && -d <= hi; }; // 바다 끝 너머는 땅이 아니에요
   const sample = (si, depth, ok, tries = 400) => {
     for (let t = 0; t < tries; t++) {
       const x = bx0 + rnd() * (bx1 - bx0), y = by0 + rnd() * (by1 - by0);
