@@ -184,15 +184,17 @@ export const levelOf = (v) => (v > 0 ? Math.min(1, v) ** 2 : 0);
 const INTRO_BARS = 2;
 
 
-// 곡마다 mp3. 파일이 없거나 못 읽는 곡(2026-11-12 기준 lively·port·storm)은 합성곡으로 틀어요. 바다·대양 곡(sea)은 그 수역이 생기면 써요
+// 곡마다 mp3. 파일이 없거나(READY 밖, 2026-11-12 기준 lively·port·storm) 못 읽는 곡은 합성곡으로 틀어요. 바다·대양 곡(sea)은 그 수역이 생기면 써요
 export const FILES = { pond: 'pond', lake: 'lake', river: 'river', sea: 'sea', lively: 'lively', port: 'port', storm: 'storm' };
+// 저장소에 실제로 있는 mp3. 여기 없는 곡은 찾지 않고 바로 합성곡으로 틀어요(없는 파일을 찾다 콘솔에 404가 쌓이지 않게). 새 mp3가 오면 여기에 더해요
+export const READY = new Set(['pond', 'lake', 'river', 'sea']);
 // mp3는 평균 -17.5dB(RMS 약 0.13)라 합성곡(RMS 약 0.035)과 크기를 맞추려고 줄인다
 const FILE_GAIN = 0.42;
 export function createMusic({ volume = 0.65, rand = Math.random, base = 'assets/music/' } = {}) { // 파도 소리(RMS 약 0.06)에 묻히지 않을 크기
   let ac = null, bus = null, verb = null, timer = null, on = true, paused = false, cur = null, lastT = 0;
   let user = 1, mood = 'sail', dir = startSail('pond'); // user = 음악 슬라이더(0~1), dir = 평소 항해 곡 순서
   // 파일 곡: 곡마다 audio 하나를 만들어 두고 이음새 없이 반복한다. 실패한 곡은 failed에 넣고 합성곡으로 간다
-  const files = {}, failed = new Set();
+  const files = {}, failed = new Set(Object.values(FILES).filter((n) => !READY.has(n)));
   let fileCur = null;
   const wanted = () => trackFor(mood, dir);
   const audible = () => on && !paused && user > 0;
@@ -214,7 +216,7 @@ export function createMusic({ volume = 0.65, rand = Math.random, base = 'assets/
   }
   function probe() {
     if (typeof fetch !== 'function') return;
-    for (const name of new Set(Object.values(FILES))) fetch(`${base}${name}.mp3`, { method: 'HEAD', cache: 'no-cache' }).then((r) => { if (!r.ok) miss(name); }, () => miss(name));
+    for (const name of new Set(Object.values(FILES))) if (!failed.has(name)) fetch(`${base}${name}.mp3`, { method: 'HEAD', cache: 'no-cache' }).then((r) => { if (!r.ok) miss(name); }, () => miss(name));
   }
   function fade(g, to, s) { const t = ac.currentTime; g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.exponentialRampToValueAtTime(Math.max(0.0001, to), t + s); }
   function playFile(f) { const p = f.el.play(); if (p && p.catch) p.catch(() => { /* 자동 재생이 막히면 다음 탭에서 다시 */ }); }
