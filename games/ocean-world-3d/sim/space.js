@@ -169,14 +169,18 @@ export function createSpace(eco) {
     spotCache.set(k, out);
     return out;
   }
+  // 덮는 칸 중 하나라도 확장 영역이면 true(확장 영역 꾸미기·물건 개수 상한이 함께 쓰는 기준)
+  const inExt = (def, x, y) => !foot(def, x, y, (i) => i < 0 || area[i] !== 2);
   const covers = (def, x, y, on) => !foot(def, x, y, (i) => kind[i] !== on);
   // opt.layer: 그 층만 · opt.on: 그 지형 칸에 걸치는 자리만 · opt.ext: true면 확장 영역 칸이 있는 자리만
+  // opt.area: 'ext'면 확장 영역 칸에 걸치는 자리만, 'main'이면 본 블록 안에만 있는 자리만(물건 개수 상한의 몫, rules.js. inExt 기준)
   function freeSpot(S, id, opt = {}) {
     const d = ITEMS[id];
     for (const L of opt.layer ? [opt.layer] : layersOf(d)) {
       for (const [x, y] of spots(id, d, L)) {
         if (opt.on && !covers(d, x, y, opt.on)) continue;
         if (opt.ext && foot(d, x, y, (i) => area[i] !== 2)) continue;
+        if (opt.area && (opt.area === 'ext') !== inExt(d, x, y)) continue;
         if (!dynamicWhy(S, d, x, y, L)) return { x, y, layer: L };
       }
     }
@@ -246,7 +250,7 @@ export function createSpace(eco) {
     sessileDef, layersOf, foot, occ, isTall, isEmerge, placeWhy, sessileWhy, freeSpot, freeSessileSpot, covers,
     terrainOk: (id, x, y, layer = null) => !staticWhy(ITEMS[id], x, y, layer),
     sessileTerrainOk: (s, x, y) => !staticWhy(sessileDef(s), x, y, null),
-    inExt: (def, x, y) => !foot(def, x, y, (i) => i < 0 || area[i] !== 2),
+    inExt,
     canWalk, freePoint, shores, itemZ,
   };
 }

@@ -151,8 +151,17 @@ export function createHud(game) {
     }
     return h;
   }
+  // 물건 개수 상한 줄(대니님 결정 2026-11-12): "해저 87/120 · 확장 영역 3/40". 상한이 없는 구역(육지)은 줄 없음
+  function limitCap(S) {
+    const id = G.itemIds.find((k) => IT[k].zone === zone);
+    const info = id && G.limitInfo ? G.limitInfo(S, id) : null;
+    if (!info || info.main.lim == null) return '';
+    const part = (o, nm) => `<b${o.n >= o.lim ? ' style="color:#b0513a"' : ''}>${nm} ${o.n}/${o.lim}</b>`;
+    const z = eco.zones[zone].name;
+    return `<div class="cap">놓을 수 있는 ${z} 물건 ${part(info.main, info.split ? '본 블록' : '')}${info.ext && info.ext.lim != null ? ' · ' + part(info.ext, '확장 영역') : ''}</div>`;
+  }
   function itemsHtml(S) {
-    let h = '';
+    let h = limitCap(S);
     for (const id of G.itemIds) {
       const d = IT[id];
       if (d.zone !== zone) continue;
@@ -166,7 +175,7 @@ export function createHud(game) {
         <span class="ds">${giveText(d.give)} · 📍${where}</span>
         ${why ? `<span class="why">${why}</span>` : ''}</div>`;
     }
-    return h || '<div class="cap">이 구역 물건이 없어요</div>';
+    return h.includes('hud-card') ? h : h + '<div class="cap">이 구역 물건이 없어요</div>';
   }
   function reqText(S, q) {
     const nm = (s) => `${SP[s].icon ?? ''}${SP[s].name}`;

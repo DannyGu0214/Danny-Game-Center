@@ -211,18 +211,58 @@ export function createSim(eco) {
   }
 
   // ---------- 물건 놓기·치우기 ----------
-  // 물건 개수 상한(eco.limits[구역], null이면 없음). 지금 데이터는 모두 꺼 둠(대니님 결정 대기, docs/p2-report.md)
-  const zoneCount = (S, z) => cached(S, 'zc', () => { const c = {}; for (const it of S.items) { const k = ITEMS[it.id].zone; c[k] = (c[k] || 0) + 1; } return c; })[z] || 0;
-  const limitOf = (z) => eco.limits?.[z] ?? null;
-  function limitWhy(S, id) {
-    const z = ITEMS[id].zone, lim = limitOf(z);
-    return lim != null && zoneCount(S, z) >= lim ? `${eco.zones?.[z]?.name ?? z} 물건은 ${lim}개까지예요` : null;
+  // 물건 개수 상한. eco.limits = { land, bed, water, ext?: { land, bed, water } } (null = 없음, 대니님 결정 2026-11-12: 해저 120 · 수중 60 + 확장 영역 몫 따로).
+  // ext가 있으면 본 블록(main)과 확장 영역(ext)을 따로 센다. 물건이 확장 영역인지는 확장 영역 꾸미기와 같은 기준(덮는 칸이 하나라도 확장 영역이면, sp.inExt).
+  // ext가 없으면 블록 전체(all)를 한 몫으로 센다.
+  const LIM = eco.limits || {};
+  const split = !!LIM.ext;
+  const areaOfPlace = (id, x, y) => (!split ? 'all' : sp.inExt(ITEMS[id], x, y) ? 'ext' : 'main');
+  const zoneCounts = (S) => cached(S, 'zc', () => {
+    const c = { all: {}, main: {}, ext: {} };
+    for (const it of S.items) {
+      const z = ITEMS[it.id].zone, a = sp.inExt(ITEMS[it.id], it.x, it.y) ? 'ext' : 'main';
+      c.all[z] = (c.all[z] || 0) + 1; c[a][z] = (c[a][z] || 0) + 1;
+    }
+    return c;
+  });
+  /** 그 구역 물건 수. area: 'all'(기본) | 'main' | 'ext' */
+  const zoneCount = (S, z, area = 'all') => zoneCounts(S)[area][z] || 0;
+  const limitOf = (z, area) => (area === 'ext' ? LIM.ext?.[z] : LIM[z]) ?? null;
+  const fullIn = (S, z, area) => { const lim = limitOf(z, area); return lim != null && zoneCount(S, z, area) >= lim; };
+  /** 상한 상태(화면 안내용): 구역마다 { n, lim } 몫. ext 몫은 확장 영역이 열렸을 때만 */
+  function limitInfo(S, id) {
+    const z = ITEMS[id].zone, out = { zone: z, split };
+    out.main = { n: zoneCount(S, z, split ? 'main' : 'all'), lim: limitOf(z, split ? 'main' : 'all') };
+    if (split && extOpen(S)) out.ext = { n: zoneCount(S, z, 'ext'), lim: limitOf(z, 'ext') };
+    return out;
+  }
+  // 놓을 곳이 남은 몫: 'main' | 'ext' | 'all' | null(모두 참)
+  function roomArea(S, id) {
+    const z = ITEMS[id].zone;
+    if (!split) return fullIn(S, z, 'all') ? null : 'all';
+    const m = !fullIn(S, z, 'main'), e = extOpen(S) && !fullIn(S, z, 'ext');
+    return m && e ? 'all' : m ? 'main' : e ? 'ext' : null;
+  }
+  /** 상한에 걸리면 안내 문장, 아니면 null. x, y를 주면 그 자리의 몫(본 블록·확장 영역)을, 안 주면 남은 몫이 하나라도 있는지 본다 */
+  function limitWhy(S, id, x = null, y = null) {
+    const z = ITEMS[id].zone, zn = eco.zones?.[z]?.name ?? z;
+    if (x != null) {
+      const a = areaOfPlace(id, x, y);
+      if (!fullIn(S, z, a)) return null;
+      const lim = limitOf(z, a);
+      if (a === 'all') return `${zn} 물건은 ${lim}개까지예요`;
+      if (a === 'ext') return `확장 영역 ${zn} 물건은 ${lim}개까지예요`;
+      return extOpen(S) && !fullIn(S, z, 'ext') ? `본 블록 ${zn} 물건은 ${lim}개까지예요. 확장 영역에 놓아 보세요` : `본 블록 ${zn} 물건은 ${lim}개까지예요`;
+    }
+    if (roomArea(S, id)) return null;
+    if (!split) return `${zn} 물건은 ${limitOf(z, 'all')}개까지예요`;
+    return extOpen(S) ? `${zn} 물건은 본 블록 ${limitOf(z, 'main')}개 · 확장 영역 ${limitOf(z, 'ext')}개까지예요` : `${zn} 물건은 ${limitOf(z, 'main')}개까지예요(T8 확장 영역에 더 놓을 수 있어요)`;
   }
   function canPlace(S, id, x, y, layer = null) {
     const d = ITEMS[id];
     if (!d) return no('없는 물건이에요');
     if (S.tier < d.tier) return no(`T${d.tier}에서 해금`);
-    const lw = limitWhy(S, id);
+    const lw = limitWhy(S, id, x, y);
     if (lw) return no(lw);
     const why = sp.placeWhy(S, id, x, y, d.zone === 'water' ? layer ?? sp.layersOf(d)[0] : null);
     if (why) return no(why);
@@ -254,7 +294,12 @@ export function createSim(eco) {
     S.events.push({ type: 'remove', uid, id: it.id, refund });
     return { ok: true, refund };
   }
-  const freeSpot = (S, id, opt) => (limitWhy(S, id) ? null : sp.freeSpot(S, id, opt)); // 상한에 걸리면 자리가 없는 것으로
+  // 상한에 걸린 몫(본 블록·확장 영역)의 자리는 건너뛴다. 둘 다 차면 자리가 없는 것으로
+  function freeSpot(S, id, opt = {}) {
+    const a = roomArea(S, id);
+    if (!a) return null;
+    return sp.freeSpot(S, id, a === 'all' ? opt : { ...opt, area: a });
+  }
 
   // ---------- 순간 포착 [AW] ----------
   function endChance(S) { S.chance = null; S.chanceIn = range(S, E.chanceEvery[0], E.chanceEvery[1]); }
@@ -509,7 +554,7 @@ export function createSim(eco) {
     speciesIds, itemIds, supplyKeys,
     newGame, stats, incomePerMin, popOf: (S) => S.pop, caps: capsOf, extOpen,
     animalValue, itemPoints, priceOfAnimal, priceOfItem, poolOfSpecies, poolOfItem, bodyLen,
-    canAdopt, adopt, canRelease, release, canPlace, placeItem, removeItem, freeSpot, limitWhy, zoneCount,
+    canAdopt, adopt, canRelease, release, canPlace, placeItem, removeItem, freeSpot, limitWhy, limitInfo, zoneCount,
     freeSessileSpot: (S, s) => sp.freeSessileSpot(S, s),
     capture, requestsOf: (S) => S.requests, requestProgress, requestDone, claim, swapRequest,
     extProgress, extReady, extMaster, visitExt, claimExt, extReward,

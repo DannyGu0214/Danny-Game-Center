@@ -14,6 +14,29 @@ import { patchMaterial } from './materials/shaderPatches.js';
  * @param {string[]} o.slots 지형 재질이 받을 장면 슬롯(예: ['medium'])
  */
 export function buildTerrain(o) {
+  const it = terrainSteps(o);
+  let r = it.next();
+  while (!r.done) r = it.next();
+  return r.value;
+}
+
+/**
+ * buildTerrain과 같은 결과를 여러 프레임에 나눠 만든다(한 번에 수십 ms가 걸려 화면이 멈추지 않게, 확장 영역 열림 연출용).
+ * @param {object} o buildTerrain과 같음
+ * @param {number} [budgetMs=6] 한 번에 쓰는 시간(ms). 넘으면 다음 차례(setTimeout 0)로 넘긴다
+ */
+export async function buildTerrainAsync(o, budgetMs = 6) {
+  const it = terrainSteps(o);
+  let t0 = performance.now(), r = it.next();
+  while (!r.done) {
+    if (performance.now() - t0 > budgetMs) { await new Promise((res) => setTimeout(res, 0)); t0 = performance.now(); }
+    r = it.next();
+  }
+  return r.value;
+}
+
+// 꼭짓점 줄마다 한 번씩 멈출 수 있는 만들기(generator). 다 만들면 { mesh, sides }를 돌려준다
+function* terrainSteps(o) {
   const { bounds: b } = o.coords;
   const step = o.step || 0.25;
   const nx = Math.round((b.x1 - b.x0) / step), ny = Math.round((b.y1 - b.y0) / step);
@@ -28,6 +51,7 @@ export function buildTerrain(o) {
     pos[k] = v.x; pos[k + 1] = v.y; pos[k + 2] = v.z;
     o.colorAt(x, y, h, c);
     col[k] = c[0]; col[k + 1] = c[1]; col[k + 2] = c[2];
+    if (i === vx - 1) yield;
   }
   const idx = new Uint32Array(nx * ny * 6);
   let t = 0;
@@ -41,8 +65,10 @@ export function buildTerrain(o) {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.setIndex(new THREE.BufferAttribute(idx, 1));
+  yield;
   g.computeVertexNormals();
   g.computeBoundingSphere();
+  yield;
 
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 });
   mat.name = 'terrain';

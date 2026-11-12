@@ -5,7 +5,7 @@
 //   포착률: 순간 포착 기회 중 탭하는 비율(0이면 방치형) · 요청: 1이면 다 된 요청을 받는다 · 탭지연: 기회가 뜬 뒤 탭까지 걸리는 초
 //   지형: 기본은 test/fixtures/atoll-grid.js(임시 격자). --terrain=<경로>로 다른 지형 모듈(예: eco/atoll/terrain.js)을 쓴다.
 //         실제 지형(bounds를 내보내는 모듈)이면 화면과 같이 T8 전에는 닫힌 지형, T8에 열린 지형으로 바꿔 이어 간다(eco/atoll/data.js atollTerrain).
-//   --limits=육지,해저,수중  물건 개수 상한(구역별, '-'는 없음). 예: --limits=-,-,60
+//   --limits=육지,해저,수중[/확장 육지,확장 해저,확장 수중]  물건 개수 상한(구역별, '-'는 없음). '/' 뒤를 주면 확장 영역 몫을 따로 센다. 예: --limits=-,120,60/-,40,20
 //   --limit-table [시드 수=3] [분=240]  상한 후보값별로 활동 플레이를 돌려 표를 찍는다(docs/p2-report.md)
 import { createSim } from '../sim/rules.js';
 import { makeEco, atollTerrain } from '../eco/atoll/data.js';
@@ -90,10 +90,12 @@ function buy(G, S, w) {
   return at && G.placeItem(S, w.id, at.x, at.y, at.layer);
 }
 
+// '육지,해저,수중' 또는 '육지,해저,수중/확장 육지,확장 해저,확장 수중'('/' 뒤가 있으면 본 블록·확장 영역을 따로 센다)
 export function parseLimits(str) {
   if (!str) return {};
-  const [land, bed, water] = str.split(',').map((v) => (v === '-' || v === '' || v == null ? null : +v));
-  return { land: land ?? null, bed: bed ?? null, water: water ?? null };
+  const one = (t) => { const [land, bed, water] = t.split(',').map((v) => (v === '-' || v === '' || v == null ? null : +v)); return { land: land ?? null, bed: bed ?? null, water: water ?? null }; };
+  const [main, ext] = str.split('/');
+  return { ...one(main), ext: ext ? one(ext) : null };   // '/' 없으면 몫 하나(데이터의 확장 영역 몫도 끔)
 }
 export async function loadSim(argv = process.argv.slice(2), limits = null) {
   const t = argv.find((a) => a.startsWith('--terrain='));
@@ -114,20 +116,23 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const argv = process.argv.slice(2), G = await loadSim(argv), nums = argv.filter((a) => !a.startsWith('--')).map(Number);
   if (argv.includes('--limit-table')) {
     const [seeds = 3, MIN = 240] = nums;
-    const cands = [['없음(지금)', '-,-,-'], ['수중 40', '-,-,40'], ['수중 60', '-,-,60'], ['수중 90', '-,-,90'], ['해저 120 · 수중 60', '-,120,60'], ['육지 40 · 해저 120 · 수중 60', '40,120,60'], ['육지 30 · 해저 80 · 수중 40', '30,80,40']];
-    console.log(`| 상한(육지·해저·수중) | T8 도달(분) | ${MIN}분 끝 물건 수(육지/해저/수중) | 발전도 | 행복도 | 확장 영역 꾸미기 |\n|---|---|---|---|---|---|`);
+    const cands = [['없음', '-,-,-'], ['해저 120 · 수중 60(몫 하나)', '-,120,60'],
+      ['본 120·60 + 확장 30·15', '-,120,60/-,30,15'], ['본 120·60 + 확장 40·20', '-,120,60/-,40,20'], ['본 120·60 + 확장 60·30', '-,120,60/-,60,30']];
+    console.log(`| 상한 | T8 도달(분) | ${MIN}분 끝 물건 수(육지/해저/수중) | 그중 확장 영역(해저/수중) | 발전도 | 행복도 | 확장 영역 꾸미기 | 못 한 항목 |\n|---|---|---|---|---|---|---|---|`);
     for (const [name, str] of cands) {
       const Gc = await loadSim(argv.filter((a) => !a.startsWith('--limits=')), parseLimits(str));
       const rows = [];
       for (let s = 1; s <= seeds; s++) rows.push(run(Gc, { minutes: MIN, seed: s, captureRate: 0.6, requests: 1, untilMax: false }));
       const Gpost = Gc.post || Gc;
-      const zc = (S, z) => S.items.filter((it) => Gc.eco.items[it.id].zone === z).length;
+      const zc = (S, z, a = 'all') => Gpost.zoneCount(S, z, a);
       const r = (f) => range(rows.map(f));
       const t8 = r((x) => x.tierAt[8]);
       const items = `${r((x) => x.S.items.length)} (${r((x) => zc(x.S, 'land'))}/${r((x) => zc(x.S, 'bed'))}/${r((x) => zc(x.S, 'water'))})`;
+      const extN = `${r((x) => zc(x.S, 'bed', 'ext'))}/${r((x) => zc(x.S, 'water', 'ext'))}`;
       const dev = r((x) => Gpost.stats(x.S).dev), H = r((x) => Gpost.stats(x.S).H * 100);
       const ext = r((x) => x.S.ext.done.length);
-      console.log(`| ${name} | ${t8} | ${items} | ${dev} | ${H}% | ${ext}/${Gpost.EXT_GOALS.length} |`);
+      const miss = [...new Set(rows.flatMap((x) => Gpost.EXT_GOALS.map((g) => g.key).filter((k) => !x.S.ext.done.includes(k))))].join(', ') || '-';
+      console.log(`| ${name} | ${t8} | ${items} | ${extN} | ${dev} | ${H}% | ${ext}/${Gpost.EXT_GOALS.length} | ${miss} |`);
     }
   } else if (argv.includes('--table')) {
     const [seeds = 5, tapDelay = 1.5] = nums;
