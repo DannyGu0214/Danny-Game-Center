@@ -1,8 +1,9 @@
-// 규칙(sim/)이 준 물건 목록을 BatchedMesh 하나(PropBatch)에 그린다(P2). 물건 하나 = 시제품 모양 몇 개의 조합.
-// 모양 조합(RECIPES)은 P3 생성기(eco/atoll/props/)가 들어오면 바뀌는 임시 표다. 좌표는 모두 격자(칸), 변환은 coords 한 곳.
+// 규칙(sim/)이 준 물건 목록을 BatchedMesh 하나(PropBatch)에 그린다(P2). 물건 하나 = 생성기 조각 몇 개의 조합.
+// 조각 배치(RECIPES)는 P3 생성기(eco/atoll/props/<id>.js의 recipe)가 정한다. 좌표는 모두 격자(칸), 변환은 coords 한 곳.
 //   at: 'ground' 그 자리 지형 높이(화면 heightAt) · 'item' 규칙이 준 물건 높이(수중 층 띠 가운데) · 'sea' 수면(떠 있는 물건)
 //   dx, dy: 물건 발자국 가운데에서 떨어진 칸(물건 방향 rot을 따라 돈다) · s: 크기 · up: 세로 줄(밧줄·기둥)을 지형에서 그 높이까지 늘림
 import * as THREE from 'three';
+import { propRecipes } from './props.js';
 
 const hash = (n, k = 0) => {
   let h = (n * 374761393 + k * 668265263) | 0;
@@ -12,32 +13,8 @@ const hash = (n, k = 0) => {
 };
 const C = (h) => new THREE.Color(h);
 
-const RECIPES = {
-  lagoonsand: [{ g: 'sandPatch', s: 1.0 }],
-  feedbasket: [{ g: 'basket', s: 1.3 }],
-  palm: [{ g: ['palmA', 'palmB', 'palmC'], s: 0.8 }],
-  shellbox: [{ g: 'shellBox', s: 1.7 }],
-  branchcoral: [{ g: ['coralPink', 'coralPurple', 'coralOrange'], s: 1.5 }],
-  buoy: [{ g: 'anchor' }, { g: 'rope', up: 'sea' }, { g: 'buoy', at: 'sea', float: true }],
-  seagrass: [{ g: 'grassA', dx: -1, dy: -1 }, { g: 'grassB', dx: 1, dy: -1 }, { g: 'grassB', dx: -1, dy: 1 }, { g: 'grassA', dx: 1, dy: 1 }, { g: 'grassA', s: 0.8 }],
-  nursery: [{ g: 'anchor' }, { g: 'rope', up: 'item' }, { g: 'nursery', at: 'item', s: 0.6 }],
-  boulder: [{ g: ['boulderA', 'boulderB'], s: 1.7 }],
-  reefblock: [{ g: 'reef', s: 1.0 }],
-  giantclam: [{ g: 'clam', s: 1.6 }],
-  planktonlamp: [{ g: 'anchor' }, { g: 'rope', up: 'item' }, { g: 'plankton', at: 'item', s: 1.5 }],
-  beachscrub: [{ g: 'bushA', dx: -0.9, dy: -0.6, s: 1.3 }, { g: 'bushB', dx: 0.9, dy: -0.4, s: 1.2 }, { g: 'bushA', dx: 0, dy: 0.9, s: 1.4 }],
-  hut: [{ g: 'hut', s: 0.8 }],
-  cleaning: [{ g: 'boulderB', s: 1.2 }, { g: 'clam', dx: 1.2, dy: 1.1, s: 0.8 }, { g: 'coralOrange', dx: -1.2, dy: 1.0, s: 1.0 }, { g: 'coralPurple', dx: 1.1, dy: -1.2, s: 0.9 }],
-  dome: [{ g: 'dome', s: 0.85 }],
-  mangrove: [
-    ...[[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]].map(([dx, dy]) => ({ g: 'pillar', dx: dx * 0.9, dy: dy * 0.9, up: 0.5, w: 0.6, color: 0x6b4a2c })),
-    { g: 'bushA', z: 0.5, s: 1.7, color: 0x4f9a46 }, { g: 'bushB', z: 0.7, dx: 0.7, dy: 0.5, s: 1.3, color: 0x5fae52 },
-  ],
-  boardwalk: [
-    ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([dx, dy]) => ({ g: 'pillar', dx: dx * 1.5, dy: dy * 1.5, up: 1.2 })),
-    { g: 'deck', z: 1.3 },
-  ],
-};
+// 물건 id → 조각 배치 표. P3부터 eco/atoll/props/ 생성기가 정한다(render/proto/props.js가 모음)
+const RECIPES = propRecipes();
 
 export class PropView {
   /**
@@ -72,7 +49,7 @@ export class PropView {
   }
 
   _add(p) {
-    const recipe = RECIPES[p.id] || [{ g: 'reef' }];
+    const recipe = RECIPES[p.id] || [];
     const def = this.eco.items[p.id];
     const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
     const yaw = p.rot * Math.PI / 2 + (def.kind === 'nature' ? (hash(p.uid, 7) - 0.5) * 0.8 : 0);
