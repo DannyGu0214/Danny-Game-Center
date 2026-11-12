@@ -45,28 +45,30 @@ export const SIZES = {
   XL: { use: 3, name: '아주 큼', draw: 0.85 },
 };
 
+// icon = 화면 목록에 쓰는 그림 글자(화면 전용, 규칙은 쓰지 않음, P2)
 // 생활형(life): walker 육지형 · crawler 바닥형 · sessile 고착형 · swimmer 유영형 · drifter 표류형 · surfacer 수면형 (sim/move.js)
 // len = 몸 길이·폭(칸, DESIGN 12.2 게임 크기). 화면 크기 = len × SIZES[size].draw(bodyLen) [가안]
-// speed 칸/초 · roam 둘레 목표를 고르는 반경(칸, 헤엄 생물은 절반쯤 블록 물 전체에서 고름) [가안]. layers 생략 = 모든 수위층(PLAN 0절). kinds 생략 = 모든 지형
+// speed 칸/초 — P2(2026-11-12)에 시제품(render/proto/species.js)과 두 곳이던 값을 여기 한 곳으로 모으며 시제품 쪽 생동감 값을 골랐다(docs/p2-report.md) [가안]
+// roam 둘레 목표를 고르는 반경(칸, 헤엄 생물은 절반쯤 블록 물 전체에서 고름) [가안]. layers 생략 = 모든 수위층(PLAN 0절). kinds 생략 = 모든 지형
 // 게임적 허용(대니님 방향 2026-11-11): 작은 생물도 깊은 바다를 다니고, 실제 생태에 맞춘 움직임 제한은 두지 않는다
 export const SPECIES = {
-  seacucumber: { name: '해삼', tier: 1, size: 'S', len: 1, life: 'crawler', needs: ['food', 'shelter'], speed: 0.6, roam: 8, special: '몸을 쭉 늘였다 동그랗게 오므리기' }, // 속도 0.4 → 0.6(생동감) [가안]
-  hermitcrab: { name: '소라게', tier: 2, size: 'S', len: 0.75, life: 'walker', needs: ['food', 'shelter', 'herd'], speed: 1.5, roam: 8, special: '여럿이 줄지어 더 큰 소라껍데기로 이사하기' },
-  anemone: { name: '말미잘', tier: 3, size: 'M', len: 2, life: 'sessile', needs: ['food', 'water'], foot: 2, on: ['reefflat', 'lagoon'], special: '촉수를 확 오므렸다 꽃처럼 활짝 피기' },
+  seacucumber: { icon: '🥒', name: '해삼', tier: 1, size: 'S', len: 1, life: 'crawler', needs: ['food', 'shelter'], speed: 0.6, roam: 8, special: '몸을 쭉 늘였다 동그랗게 오므리기' }, // 속도: 규칙 0.6 · 시제품 0.55 → 0.6(예외: 0.55면 칸두 바닥 몫이 균형감 기준 밑, test/balance.test.js) [가안]
+  hermitcrab: { icon: '🦀', name: '소라게', tier: 2, size: 'S', len: 0.75, life: 'walker', needs: ['food', 'shelter', 'herd'], speed: 1.15, roam: 8, special: '여럿이 줄지어 더 큰 소라껍데기로 이사하기' }, // 속도: 규칙 1.5 · 시제품 1.15 → 1.15
+  anemone: { icon: '🌺', name: '말미잘', tier: 3, size: 'M', len: 2, life: 'sessile', needs: ['food', 'water'], foot: 2, on: ['reefflat', 'lagoon'], special: '촉수를 확 오므렸다 꽃처럼 활짝 피기' },
   clownfish: {
-    name: '몰디브흰동가리', tier: 4, size: 'S', len: 0.75, life: 'swimmer', needs: ['partner', 'food'], speed: 1.2, roam: 10,
+    icon: '🐠', name: '몰디브흰동가리', tier: 4, size: 'S', len: 0.75, life: 'swimmer', needs: ['partner', 'food'], speed: 1.9, roam: 10, // 속도: 규칙 1.2 · 시제품 1.9 → 1.9
     partner: { sp: 'anemone', per: 2 }, // 말미잘 1개체가 흰동가리 2마리를 받아 준다(공생 필요 = 행복도) [가안]
     visit: 0.1, // 목표점을 고를 때 이 비율로 짝 말미잘 곁에 잠깐 들른다(연출). 나머지는 블록 전체를 다닌다 [가안]
     special: '말미잘 촉수 속을 파고들어 몸 비비기',
   },
-  octopus: { name: '문어', tier: 5, size: 'M', len: 2, life: 'swimmer', needs: ['food', 'shelter'], speed: 1.2, roam: 10, special: '몸 색을 바꿔 바위 흉내 내다 먹물 뿜고 쏙' }, // 속도 1.0 → 1.2 [가안]
-  moonjelly: { name: '보름달물해파리', tier: 6, size: 'M', len: 1.5, life: 'drifter', needs: ['food', 'herd'], speed: 0.45, special: '빛을 받으며 크게 박동해 위로 떠오르기' }, // 속도 0.3 → 0.45 [가안]
+  octopus: { icon: '🐙', name: '문어', tier: 5, size: 'M', len: 2, life: 'swimmer', needs: ['food', 'shelter'], speed: 1.0, roam: 10, special: '몸 색을 바꿔 바위 흉내 내다 먹물 뿜고 쏙' }, // 속도: 규칙 1.2 · 시제품 1.0 → 1.0
+  moonjelly: { icon: '🪼', name: '보름달물해파리', tier: 6, size: 'M', len: 1.5, life: 'drifter', needs: ['food', 'herd'], speed: 0.36, special: '빛을 받으며 크게 박동해 위로 떠오르기' }, // 속도: 규칙 0.45 · 시제품 0.36 → 0.36
   greenturtle: {
-    name: '바다거북', tier: 7, size: 'L', len: 2.5, life: 'surfacer', needs: ['food', 'shelter'], speed: 1.5, roam: 16,
+    icon: '🐢', name: '바다거북', tier: 7, size: 'L', len: 2.5, life: 'surfacer', needs: ['food', 'shelter'], speed: 1.45, roam: 16, // 속도: 규칙 1.5 · 시제품 1.45 → 1.45
     breath: [30, 60], bask: ['beach'], baskMax: 2, // 30~60초마다 숨 쉬러 수면, 해변에서 볕 쬐기(동시에 최대 2마리) [가안]
     special: '수면으로 고개 내밀어 "푸" 하고 숨 쉬기',
   },
-  manta: { name: '쥐가오리', tier: 8, size: 'XL', len: 4, life: 'swimmer', needs: ['food', 'water'], speed: 1.8, roam: 20, special: '제자리에서 공중제비 돌며 플랑크톤 먹기' },
+  manta: { icon: '🐋', name: '쥐가오리', tier: 8, size: 'XL', len: 4, life: 'swimmer', needs: ['food', 'water'], speed: 1.75, roam: 20, special: '제자리에서 공중제비 돌며 플랑크톤 먹기' }, // 속도: 규칙 1.8 · 시제품 1.75 → 1.75
 };
 
 // 물건. kind: nature(자연 지형물)·made(인공물). zone: land 육지 · bed 해저 · water 수중. w×h칸.
@@ -76,25 +78,25 @@ export const SPECIES = {
 const SHALLOW = ['reefflat', 'lagoon'];
 const WET = ['lagoon', 'reefflat', 'thila', 'kandu', 'slope'];
 export const ITEMS = {
-  lagoonsand: { name: '석호 모래밭', tier: 1, kind: 'nature', zone: 'bed', w: 2, h: 2, on: ['lagoon', 'reefflat'], walk: true, give: { shelter: 2 } }, // [P1 수정] 먹이 2 → 쉼터 2
-  feedbasket: { name: '먹이 바구니', tier: 1, kind: 'made', zone: 'bed', w: 2, h: 2, on: ['lagoon', 'reefflat', 'thila'], give: { food: 3 } },
-  palm: { name: '야자수', tier: 2, kind: 'nature', zone: 'land', w: 2, h: 2, on: ['island', 'beach'], give: { food: 2, shelter: 2 } },
-  shellbox: { name: '소라껍데기 상자', tier: 2, kind: 'made', zone: 'land', w: 2, h: 2, on: ['beach', 'island'], give: { shelter: 3 } },
-  branchcoral: { name: '가지산호 군락', tier: 3, kind: 'nature', zone: 'bed', w: 2, h: 2, on: SHALLOW, give: { shelter: 2, water: 2 } }, // [P1 수정] 쉼터 3 → 쉼터 2·맑은 물 2
-  buoy: { name: '계류 부표', tier: 3, kind: 'made', zone: 'water', w: 2, h: 2, on: WET, layers: ['top'], float: true, give: {} },
-  seagrass: { name: '해초밭', tier: 4, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['lagoon'], walk: true, give: { food: 3, water: 3 } },
-  nursery: { name: '산호 묘목 줄', tier: 4, kind: 'made', zone: 'water', w: 2, h: 2, on: WET, layers: ['mid', 'low'], give: { shelter: 2, water: 2 } },
-  boulder: { name: '덩어리산호 바위', tier: 5, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['thila', 'lagoon'], tall: true, give: { shelter: 5 } },
-  reefblock: { name: '인공 어초', tier: 5, kind: 'made', zone: 'bed', w: 2, h: 2, on: ['thila', 'lagoon', 'kandu'], give: { shelter: 4 } },
-  giantclam: { name: '대왕조개', tier: 6, kind: 'nature', zone: 'bed', w: 2, h: 2, on: SHALLOW, give: { water: 4 } },
-  planktonlamp: { name: '플랑크톤 등', tier: 6, kind: 'made', zone: 'water', w: 2, h: 2, on: WET, layers: ['mid', 'low', 'top'], give: { food: 6 } },
-  beachscrub: { name: '해안 덤불', tier: 7, kind: 'nature', zone: 'land', w: 4, h: 4, on: ['beach', 'island'], give: { shelter: 5 } },
-  hut: { name: '그늘 오두막', tier: 7, kind: 'made', zone: 'land', w: 2, h: 2, on: ['island', 'beach'], give: { shelter: 5 } },
-  cleaning: { name: '청소 정거장', tier: 8, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['thila'], give: { water: 8 } },
-  dome: { name: '수중 관측 돔', tier: 8, kind: 'made', zone: 'bed', w: 4, h: 4, on: ['kandu', 'thila'], tall: true, give: {} },
+  lagoonsand: { icon: '🏖️', name: '석호 모래밭', tier: 1, kind: 'nature', zone: 'bed', w: 2, h: 2, on: ['lagoon', 'reefflat'], walk: true, give: { shelter: 2 } }, // [P1 수정] 먹이 2 → 쉼터 2
+  feedbasket: { icon: '🧺', name: '먹이 바구니', tier: 1, kind: 'made', zone: 'bed', w: 2, h: 2, on: ['lagoon', 'reefflat', 'thila'], give: { food: 3 } },
+  palm: { icon: '🌴', name: '야자수', tier: 2, kind: 'nature', zone: 'land', w: 2, h: 2, on: ['island', 'beach'], give: { food: 2, shelter: 2 } },
+  shellbox: { icon: '🐚', name: '소라껍데기 상자', tier: 2, kind: 'made', zone: 'land', w: 2, h: 2, on: ['beach', 'island'], give: { shelter: 3 } },
+  branchcoral: { icon: '🪸', name: '가지산호 군락', tier: 3, kind: 'nature', zone: 'bed', w: 2, h: 2, on: SHALLOW, give: { shelter: 2, water: 2 } }, // [P1 수정] 쉼터 3 → 쉼터 2·맑은 물 2
+  buoy: { icon: '🛟', name: '계류 부표', tier: 3, kind: 'made', zone: 'water', w: 2, h: 2, on: WET, layers: ['top'], float: true, give: {} },
+  seagrass: { icon: '🌿', name: '해초밭', tier: 4, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['lagoon'], walk: true, give: { food: 3, water: 3 } },
+  nursery: { icon: '🪢', name: '산호 묘목 줄', tier: 4, kind: 'made', zone: 'water', w: 2, h: 2, on: WET, layers: ['mid', 'low'], give: { shelter: 2, water: 2 } },
+  boulder: { icon: '🪨', name: '덩어리산호 바위', tier: 5, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['thila', 'lagoon'], tall: true, give: { shelter: 5 } },
+  reefblock: { icon: '🧱', name: '인공 어초', tier: 5, kind: 'made', zone: 'bed', w: 2, h: 2, on: ['thila', 'lagoon', 'kandu'], give: { shelter: 4 } },
+  giantclam: { icon: '🦪', name: '대왕조개', tier: 6, kind: 'nature', zone: 'bed', w: 2, h: 2, on: SHALLOW, give: { water: 4 } },
+  planktonlamp: { icon: '💡', name: '플랑크톤 등', tier: 6, kind: 'made', zone: 'water', w: 2, h: 2, on: WET, layers: ['mid', 'low', 'top'], give: { food: 6 } },
+  beachscrub: { icon: '🌳', name: '해안 덤불', tier: 7, kind: 'nature', zone: 'land', w: 4, h: 4, on: ['beach', 'island'], give: { shelter: 5 } },
+  hut: { icon: '🛖', name: '그늘 오두막', tier: 7, kind: 'made', zone: 'land', w: 2, h: 2, on: ['island', 'beach'], give: { shelter: 5 } },
+  cleaning: { icon: '🫧', name: '청소 정거장', tier: 8, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['thila'], give: { water: 8 } },
+  dome: { icon: '🔭', name: '수중 관측 돔', tier: 8, kind: 'made', zone: 'bed', w: 4, h: 4, on: ['kandu', 'thila'], tall: true, give: {} },
   // 확장 영역 테마 물건(대니님 승인 2026-11-11, 수치 모두 [가안]). 육지가 없어도 놓이게 얕은 해저에 뿌리·기둥을 내리고 수면 위로 솟는다
-  mangrove: { name: '맹그로브 덤불', tier: 8, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['lagoon', 'reefflat'], maxDepth: 3, emerge: true, theme: true, give: { shelter: 4, water: 3 } },
-  boardwalk: { name: '수상 데크', tier: 8, kind: 'made', zone: 'bed', w: 4, h: 4, on: ['lagoon', 'reefflat'], maxDepth: 3, emerge: true, theme: true, give: { shelter: 3 } },
+  mangrove: { icon: '🌲', name: '맹그로브 덤불', tier: 8, kind: 'nature', zone: 'bed', w: 4, h: 4, on: ['lagoon', 'reefflat'], maxDepth: 3, emerge: true, theme: true, give: { shelter: 4, water: 3 } },
+  boardwalk: { icon: '🪵', name: '수상 데크', tier: 8, kind: 'made', zone: 'bed', w: 4, h: 4, on: ['lagoon', 'reefflat'], maxDepth: 3, emerge: true, theme: true, give: { shelter: 3 } },
 };
 
 // 티어 기준 발전도 [AW TIERS]
@@ -129,8 +131,24 @@ export const PHASES = ['아침', '낮', '저녁', '밤'];
 // theme = 확장 영역 꾸미기의 테마 물건: 맹그로브 덤불·수상 데크(대니님 승인 2026-11-11, 난파선은 제외)
 export const EXT_RULES = { tier: 8, animals: 12, theme: ['mangrove', 'boardwalk'], residents: 6 };
 
+// 물건 개수 상한(구역별, 확장 영역 포함 전체). null = 상한 없음. 대니님이 시제품 평가 때 정하기로 해서 지금은 모두 꺼 둔다(2026-11-11).
+// 켜면 규칙(sim/rules.js canPlace·freeSpot)이 그 구역 물건 수를 보고 막는다. 후보값별 봇 결과는 docs/p2-report.md
+export const LIMITS = { land: null, bed: null, water: null };
+
+// 실제 지형 모듈(eco/atoll/terrain.js)을 규칙의 지형 약속으로 바꾼다. 지형 함수는 확장 영역이 열렸는지(opts.ext)에 따라
+// 본 블록 옆면 가장자리(바깥 비탈 띠)가 달라지므로, 열리기 전·후 지형을 따로 만들어 화면과 같은 모양을 규칙에 준다.
+// ext = false면 확장 영역 칸은 'void'(블록 밖)로 나온다. 규칙의 확장 영역 판정(한도 +12 등)은 EXT로 그대로 한다.
+export function atollTerrain(T, ext = false) {
+  const o = { ext };
+  return {
+    GRID: T.GRID, EXT: T.EXT, SEA_LEVEL: T.SEA_LEVEL, MAX_DEPTH: T.MAX_DEPTH,
+    kindAt: (x, y) => T.kindAt(x, y, o), cellHeight: (x, y) => T.cellHeight(x, y, o), heightAt: (x, y) => T.heightAt(x, y, o),
+    extOpen: ext,
+  };
+}
+
 // sim/rules.js의 createSim(eco)에 넘길 생태계 객체를 만든다. terrain = 지형 약속(GRID·EXT·SEA_LEVEL·MAX_DEPTH·heightAt·kindAt·cellHeight)
-export function makeEco(terrain) {
+export function makeEco(terrain, { limits = {} } = {}) {
   return {
     id: 'atoll', name: '열대 환초 바다',
     terrain,
@@ -139,5 +157,6 @@ export function makeEco(terrain) {
     tiers: TIERS, maxTier: MAX_TIER, econ: ECON, phases: PHASES,
     ext: EXT_RULES,
     place: { maxStep: 1 }, // 땅·해저 물건이 덮는 칸의 높이 차 허용(1/3칸 단위)
+    limits: { ...LIMITS, ...limits }, // 물건 개수 상한(구역별). 지금은 모두 null(끔)
   };
 }

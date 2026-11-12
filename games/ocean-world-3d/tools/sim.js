@@ -4,12 +4,16 @@
 //   node tools/sim.js --table [시드 수=5] [탭지연=1.5]                      활동·가끔·방치 플레이를 여러 시드로 돌려 표를 찍는다
 //   포착률: 순간 포착 기회 중 탭하는 비율(0이면 방치형) · 요청: 1이면 다 된 요청을 받는다 · 탭지연: 기회가 뜬 뒤 탭까지 걸리는 초
 //   지형: 기본은 test/fixtures/atoll-grid.js(임시 격자). --terrain=<경로>로 다른 지형 모듈(예: eco/atoll/terrain.js)을 쓴다.
+//         실제 지형(bounds를 내보내는 모듈)이면 화면과 같이 T8 전에는 닫힌 지형, T8에 열린 지형으로 바꿔 이어 간다(eco/atoll/data.js atollTerrain).
+//   --limits=육지,해저,수중  물건 개수 상한(구역별, '-'는 없음). 예: --limits=-,-,60
+//   --limit-table [시드 수=3] [분=240]  상한 후보값별로 활동 플레이를 돌려 표를 찍는다(docs/p2-report.md)
 import { createSim } from '../sim/rules.js';
-import { makeEco } from '../eco/atoll/data.js';
+import { makeEco, atollTerrain } from '../eco/atoll/data.js';
 
 const DT = 0.2;
 
-export function run(G, { minutes = 240, seed = 7, captureRate = 0.6, requests = 1, tapDelay = 1.5, log = false, untilMax = true } = {}) {
+export function run(G0, { minutes = 240, seed = 7, captureRate = 0.6, requests = 1, tapDelay = 1.5, log = false, untilMax = true } = {}) {
+  let G = G0;
   const S = G.newGame(seed, 0), ITEMS = G.eco.items, SPECIES = G.eco.species;
   const tierAt = { 1: 0 };
   let botRng = seed * 7919 + 13;
@@ -18,6 +22,8 @@ export function run(G, { minutes = 240, seed = 7, captureRate = 0.6, requests = 
   const income = { view: 0, capture: 0, request: 0 };
   while (S.time < minutes * 60) {
     const p0 = S.pop;
+    // 확장 영역이 열리면 열린 지형의 규칙으로 바꾼다(상태 S는 그대로, 화면은 다시 불러와서 같은 일을 한다)
+    if (G0.post && G === G0 && G.extOpen(S)) { G = G0.post; S.rev++; G.fitTerrain(S); G.drainEvents(S); }
     G.advance(S, DT);
     income.view += S.pop - p0;
     // 순간 포착: 기회마다 한 번 탭할지 정하고, tapDelay초 뒤에 탭한다
@@ -84,10 +90,21 @@ function buy(G, S, w) {
   return at && G.placeItem(S, w.id, at.x, at.y, at.layer);
 }
 
-export async function loadSim(argv = process.argv.slice(2)) {
+export function parseLimits(str) {
+  if (!str) return {};
+  const [land, bed, water] = str.split(',').map((v) => (v === '-' || v === '' || v == null ? null : +v));
+  return { land: land ?? null, bed: bed ?? null, water: water ?? null };
+}
+export async function loadSim(argv = process.argv.slice(2), limits = null) {
   const t = argv.find((a) => a.startsWith('--terrain='));
+  const l = argv.find((a) => a.startsWith('--limits='));
+  const lim = limits ?? parseLimits(l && l.slice(9));
   const path = t ? new URL(t.slice(10), `file://${process.cwd()}/`).href : new URL('../test/fixtures/atoll-grid.js', import.meta.url).href;
-  return createSim(makeEco(await import(path)));
+  const T = await import(path);
+  if (typeof T.bounds !== 'function') return createSim(makeEco(T, { limits: lim }));
+  const G = createSim(makeEco(atollTerrain(T, false), { limits: lim }));
+  G.post = createSim(makeEco(atollTerrain(T, true), { limits: lim }));
+  return G;
 }
 
 const fmt = (v) => (v == null ? '-' : v < 1 ? '0' : Math.round(v).toString());
@@ -95,7 +112,24 @@ function range(list) { const v = list.filter((x) => x != null); if (!v.length) r
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const argv = process.argv.slice(2), G = await loadSim(argv), nums = argv.filter((a) => !a.startsWith('--')).map(Number);
-  if (argv.includes('--table')) {
+  if (argv.includes('--limit-table')) {
+    const [seeds = 3, MIN = 240] = nums;
+    const cands = [['없음(지금)', '-,-,-'], ['수중 40', '-,-,40'], ['수중 60', '-,-,60'], ['수중 90', '-,-,90'], ['해저 120 · 수중 60', '-,120,60'], ['육지 40 · 해저 120 · 수중 60', '40,120,60'], ['육지 30 · 해저 80 · 수중 40', '30,80,40']];
+    console.log(`| 상한(육지·해저·수중) | T8 도달(분) | ${MIN}분 끝 물건 수(육지/해저/수중) | 발전도 | 행복도 | 확장 영역 꾸미기 |\n|---|---|---|---|---|---|`);
+    for (const [name, str] of cands) {
+      const Gc = await loadSim(argv.filter((a) => !a.startsWith('--limits=')), parseLimits(str));
+      const rows = [];
+      for (let s = 1; s <= seeds; s++) rows.push(run(Gc, { minutes: MIN, seed: s, captureRate: 0.6, requests: 1, untilMax: false }));
+      const Gpost = Gc.post || Gc;
+      const zc = (S, z) => S.items.filter((it) => Gc.eco.items[it.id].zone === z).length;
+      const r = (f) => range(rows.map(f));
+      const t8 = r((x) => x.tierAt[8]);
+      const items = `${r((x) => x.S.items.length)} (${r((x) => zc(x.S, 'land'))}/${r((x) => zc(x.S, 'bed'))}/${r((x) => zc(x.S, 'water'))})`;
+      const dev = r((x) => Gpost.stats(x.S).dev), H = r((x) => Gpost.stats(x.S).H * 100);
+      const ext = r((x) => x.S.ext.done.length);
+      console.log(`| ${name} | ${t8} | ${items} | ${dev} | ${H}% | ${ext}/${Gpost.EXT_GOALS.length} |`);
+    }
+  } else if (argv.includes('--table')) {
     const [seeds = 5, tapDelay = 1.5] = nums;
     const plays = [['활동(포착 60%·요청 받음)', 0.6, 1], ['가끔(포착 20%·요청 받음)', 0.2, 1], ['방치(포착·요청 없음)', 0, 0]];
     console.log(`| 플레이 | 시드 | T2 | T3 | T4 | T5 | T6 | T7 | T8 |\n|---|---|---|---|---|---|---|---|---|`);
@@ -109,12 +143,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const [MIN = 240, SEED = 7, CAP = 0.6, REQ = 1, TAP = 1.5] = nums;
     const t0 = Date.now();
     const { S, income } = run(G, { minutes: MIN, seed: SEED, captureRate: CAP, requests: REQ, tapDelay: TAP, log: true, untilMax: false });
-    const st = G.stats(S);
+    const Gend = G.post && G.extOpen(S) ? G.post : G;
+    const st = Gend.stats(S);
     console.log(`끝: ${(S.time / 60).toFixed(0)}분, T${S.tier}, 발전도 ${st.dev}, 행복도 ${(st.H * 100).toFixed(0)}%, 생물 ${st.animals}마리 ${st.species}종, 물건 ${S.items.length}개, 남은 인기 ${Math.floor(S.pop)}`);
     const tot = income.view + income.capture + income.request;
     console.log(`수입: 관람 ${Math.round(income.view)} (${Math.round((income.view / tot) * 100)}%) · 포착 ${Math.round(income.capture)} (${Math.round((income.capture / tot) * 100)}%) · 요청 ${Math.round(income.request)} (${Math.round((income.request / tot) * 100)}%)`);
     const z = {}; for (const it of S.items) { const k = G.eco.items[it.id].zone; z[k] = (z[k] || 0) + 1; }
-    console.log(`구역별 물건: ${Object.entries(z).map(([k, n]) => `${k} ${n}`).join(' · ')} · 확장 영역 꾸미기 ${S.ext.done.length}/${G.EXT_GOALS.length}${G.extMaster(S) ? ' · 마스터' : ''}`);
+    console.log(`구역별 물건: ${Object.entries(z).map(([k, n]) => `${k} ${n}`).join(' · ')} · 확장 영역 꾸미기 ${S.ext.done.length}/${Gend.EXT_GOALS.length}${Gend.extMaster(S) ? ' · 마스터' : ''}`);
     console.log(`행복도(종별): ${Object.entries(st.happy).map(([s, h]) => `${G.eco.species[s].name} ${(h * 100).toFixed(0)}%`).join(' · ')}`);
     console.log(`(실행 ${((Date.now() - t0) / 1000).toFixed(1)}초)`);
   }
