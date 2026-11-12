@@ -237,9 +237,10 @@ export const SPECIES = {
   ottercub: { name: '수달 가족', kind: 'swimmer', region: 'river', color: '#7f5c3e', group: 3 },
 };
 
+// theme: 풍경 테마 이름(themes.js THEMES)
 export const REGIONS = {
   pond: {
-    id: 'pond', name: '작은 호수', order: 0, grade: 1, yard: 1, wind: { from: -70 * D, speed: 6.5, swing: 0.7 }, gustK: 1.35,
+    id: 'pond', name: '작은 호수', order: 0, grade: 1, theme: 'lake', yard: 1, wind: { from: -70 * D, speed: 6.5, swing: 0.7 }, gustK: 1.35,
     shape: { kind: 'lake', ax: 96, ay: 150, ph: 0.4 },
     islands: [{ x: 28, y: -42, r: 13, ph: 1.4 }],
     start: 'reed',
@@ -261,7 +262,7 @@ export const REGIONS = {
     trade: [['coffee', 7], ['spice', 3]], demand: ['porcelain'],
   },
   lake: {
-    id: 'lake', name: '큰 호수', order: 1, grade: 1, yard: 2, wind: { from: -22 * D, speed: 9, swing: 0.5 }, gustK: 1.7, heat: true,
+    id: 'lake', name: '큰 호수', order: 1, grade: 1, theme: 'lake', yard: 2, wind: { from: -22 * D, speed: 9, swing: 0.5 }, gustK: 1.7, heat: true,
     shape: { kind: 'lake', ax: 170, ay: 280, ph: 0 },
     islands: [{ x: 54, y: -118, r: 30, ph: 0.6 }, { x: -62, y: 26, r: 21, ph: 2.2 }, { x: 44, y: 112, r: 13, ph: 4 }],
     start: 'southGate',
@@ -281,7 +282,7 @@ export const REGIONS = {
     trade: [['coffee', 5], ['spice', 4], ['porcelain', 1]], demand: ['porcelain'],
   },
   river: {
-    id: 'river', name: '강', order: 2, grade: 2, yard: 3, wind: { from: -100 * D, speed: 8, swing: 0.8 }, gustK: 1.5, heat: true, flow: 1.1,
+    id: 'river', name: '강', order: 2, grade: 2, theme: 'river', yard: 3, wind: { from: -100 * D, speed: 8, swing: 0.8 }, gustK: 1.5, heat: true, flow: 1.1,
     shape: { kind: 'river', pts: [[0, 1000], [70, 840], [-50, 660], [-110, 470], [20, 290], [130, 120], [50, -70], [-100, -240], [-70, -440], [60, -620], [20, -800], [-30, -1000]], width: 62 },
     islands: [{ x: 96, y: 66, r: 11, ph: 1.2 }],
     start: 'head',
