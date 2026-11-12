@@ -871,6 +871,7 @@ export function newGame(seed = (Date.now() & 0x7fffffff) || 1) {
     growth: { hp: 0, atk: 0, bag: 0 },
     stats: { kills: 0, deaths: 0, looted: 0, rescued: 0, raidsWon: 0, raidsLost: 0, militaryLoot: 0, playTime: 0, eliteKills: 0 },
     ended: null, // 엔딩에 닿은 때 { at: 플레이 시간(초), goals: 달성한 목표 id }
+    hqSeen: 1, // 레벨업 컷씬을 본 본부 레벨(이보다 본부가 높으면 다음 레벨 컷씬을 보여 준다)
     hero: null, // 이번 판의 생존자 { id: HEROES 키, name, runId }
     seenSites: [], // 발견한 전진기지 후보지(미니맵에 보인다)
     over: null,
@@ -1063,6 +1064,11 @@ export function advanceJobs(s, dt, ev = []) {
   }
   return ev;
 }
+
+// 본부 레벨업 컷씬: 본부가 본 레벨(hqSeen)보다 높으면 그다음 레벨의 컷씬을 차례로 보여 준다(2~9 중간, 10 엔딩).
+// 쓰러진 판에는 띄우지 않는다. 화면이 컷씬을 닫을 때 seeCutscene으로 기록한다.
+export const nextCutscene = (s) => (!s.over && s.hqSeen < s.hq ? s.hqSeen + 1 : null);
+export function seeCutscene(s, lv) { s.hqSeen = clamp(Math.max(s.hqSeen, Math.floor(lv)), 1, s.hq); }
 
 // 작업에 낸 자원(시작할 때와 같은 계산, 작업 중에는 대상 레벨이 바뀌지 않는다). 취소하면 이만큼 돌려준다.
 export function jobCost(s, j) {
@@ -2134,7 +2140,7 @@ export function serialize(s) {
     nodeMoves: s.nodes.flatMap((n, i) => (n.moved ? [[i, n.x, n.y]] : [])), // 옮겨진 대상물 자리(나머지는 시드로 다시 만든다)
     player: { x: s.player.x, y: s.player.y, hp: s.player.hp, mag: s.player.mag }, ammo: Math.round(s.ammo * 100) / 100, ammoOn: s.ammoOn, gunOn: s.gunOn, dur: s.dur, armor: s.armor,
     autoHunt: s.autoHunt, autoZone: s.autoZone, stance: s.stance, stats: s.stats, nextId: s.nextId,
-    items: s.items, claimed: s.claimed, over: s.over, ended: s.ended, hero: s.hero, seenSites: s.seenSites,
+    items: s.items, claimed: s.claimed, over: s.over, ended: s.ended, hero: s.hero, seenSites: s.seenSites, hqSeen: s.hqSeen,
   });
 }
 
@@ -2152,6 +2158,7 @@ export function deserialize(text) {
   for (const k of RES_KEYS) s.res[k] = num(o.res?.[k], s.res[k]);
   for (const k of RES_KEYS) s.bag[k] = num(o.bag?.[k], 0);
   s.hq = Math.floor(num(o.hq, 1, 1, HQ_MAX));
+  s.hqSeen = Math.floor(num(o.hqSeen, s.hq, 1, s.hq)); // 기록이 없던 예전 세이브는 지금 레벨까지 본 것으로(지난 컷씬을 몰아 띄우지 않는다)
   for (const k of Object.keys(BUILDINGS)) s.bld[k] = Math.floor(num(o.bld?.[k], 0, 0, buildingMax(s, k)));
   s.level = Math.floor(num(o.level, 1, 1, LEVEL_MAX));
   s.xp = num(o.xp, 0, 0, xpToNext(s.level) - 1e-9);

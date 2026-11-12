@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../logic.js';
 import { run } from '../tools/sim.js';
+import { SCENES, sceneLines, CUT_FIRST, CUT_FINAL } from '../cutscene.js';
 
 const DT = 1 / 30;
 const stepFor = (s, sec, input = null) => { for (let t = 0; t < sec; t += DT) G.step(s, DT, input); };
@@ -2059,4 +2060,112 @@ test('낮과 밤: 플레이 5분마다 바뀌고 부드럽게 이어지며, 게�
   b.stats.playTime = 400;
   for (let t = 0; t < 20; t += DT) { G.step(a, DT); G.step(b, DT); }
   assert.deepEqual(a.zombies.map((z) => [z.type, Math.round(z.x), Math.round(z.y)]), b.zombies.map((z) => [z.type, Math.round(z.x), Math.round(z.y)]));
+});
+
+// ---------- 본부 레벨업 컷씬(2~9 중간, 10 엔딩) ----------
+test('컷씬: 본부 레벨이 오르면 그 레벨 컷씬이 한 번 뜨고, 보면 다시 뜨지 않는다', () => {
+  const s = rich(fresh(71));
+  assert.equal(s.hqSeen, 1);
+  assert.equal(G.nextCutscene(s), null, '새 판(본부 1)은 컷씬 없음');
+  assert.ok(G.upgradeHq(s).ok);
+  assert.equal(G.nextCutscene(s), null, '공사 중에는 아직');
+  const ev = finish(s);
+  assert.ok(ev.some((e) => e.t === 'job-done' && e.kind === 'hq' && e.next === 2));
+  assert.equal(G.nextCutscene(s), 2);
+  G.seeCutscene(s, 2);
+  assert.equal(G.nextCutscene(s), null);
+  assert.equal(s.hqSeen, 2);
+});
+
+test('컷씬: 여러 레벨이 밀리면 낮은 레벨부터 차례로, 본부보다 높게는 기록하지 않는다', () => {
+  const s = fresh(72);
+  s.hq = 4;
+  assert.deepEqual([G.nextCutscene(s), (G.seeCutscene(s, 2), G.nextCutscene(s)), (G.seeCutscene(s, 3), G.nextCutscene(s))], [2, 3, 4]);
+  G.seeCutscene(s, 99);
+  assert.equal(s.hqSeen, 4, '본부 레벨을 넘지 않는다');
+  assert.equal(G.nextCutscene(s), null);
+});
+
+test('컷씬: 최대 레벨(10)은 엔딩 컷씬이고, 본 뒤에도 같은 판을 계속할 수 있다', () => {
+  const s = rich(fresh(73));
+  s.hq = G.HQ_MAX - 1; s.hqSeen = G.HQ_MAX - 1;
+  assert.ok(G.upgradeHq(s).ok);
+  finish(s);
+  assert.equal(s.hq, G.HQ_MAX);
+  assert.equal(G.nextCutscene(s), G.HQ_MAX);
+  G.seeCutscene(s, G.HQ_MAX);
+  assert.equal(G.nextCutscene(s), null);
+  // 계속 플레이: 세계가 그대로 돌고, 본부는 더 오르지 않는다
+  const t0 = s.time;
+  stepFor(s, 3);
+  assert.ok(s.time > t0 && !s.over);
+  assert.equal(G.upgradeHq(s).ok, false);
+  assert.equal(G.nextCutscene(s), null);
+  const t = G.deserialize(G.serialize(s));
+  assert.equal(t.hqSeen, G.HQ_MAX);
+  assert.equal(G.nextCutscene(t), null, '불러와도 엔딩 컷씬이 다시 뜨지 않는다');
+});
+
+test('컷씬: 본 레벨은 저장되고, 안 본 컷씬은 새로고침 뒤에도 남는다', () => {
+  const s = fresh(74);
+  s.hq = 5; s.hqSeen = 4;
+  const t = G.deserialize(G.serialize(s));
+  assert.equal(t.hqSeen, 4);
+  assert.equal(G.nextCutscene(t), 5, '보기 전에 새로고침하면 다시 뜬다');
+  G.seeCutscene(t, 5);
+  const u = G.deserialize(G.serialize(t));
+  assert.equal(G.nextCutscene(u), null, '본 뒤 새로고침하면 뜨지 않는다');
+});
+
+test('컷씬: 기록이 없던 예전 세이브는 지난 컷씬을 몰아 띄우지 않고, 이상한 값은 범위로 자른다', () => {
+  const s = fresh(75);
+  s.hq = 7;
+  const old = JSON.parse(G.serialize(s));
+  delete old.hqSeen;
+  const t = G.deserialize(JSON.stringify(old));
+  assert.equal(t.hqSeen, 7);
+  assert.equal(G.nextCutscene(t), null);
+  for (const [v, want] of [[99, 7], [-3, 1], ['x', 7], [3.7, 3]]) {
+    const o = { ...old, hqSeen: v };
+    assert.equal(G.deserialize(JSON.stringify(o)).hqSeen, want, String(v));
+  }
+});
+
+test('컷씬: 자리를 비운 동안 끝난 본부 공사도 돌아오면 컷씬이 뜬다(예전 세이브 포함)', () => {
+  const s = rich(fresh(76));
+  s.hq = 3; s.hqSeen = 3;
+  assert.ok(G.upgradeHq(s).ok);
+  const o = JSON.parse(G.serialize(s));
+  const t = G.deserialize(JSON.stringify(o));
+  const off = G.applyOffline(t, t.savedAt + 8 * 3600e3);
+  assert.ok(off.done.includes('본부 4레벨'));
+  assert.equal(t.hq, 4);
+  assert.equal(G.nextCutscene(t), 4);
+  delete o.hqSeen; // 컷씬 이전 세이브에서 공사 중이던 본부
+  const u = G.deserialize(JSON.stringify(o));
+  G.applyOffline(u, u.savedAt + 8 * 3600e3);
+  assert.equal(G.nextCutscene(u), 4, '예전 세이브도 새로 오른 레벨은 보여 준다');
+});
+
+test('컷씬: 쓰러진 판에는 뜨지 않는다', () => {
+  const s = fresh(77);
+  s.hq = 3; s.hqSeen = 2;
+  s.over = { at: Date.now(), summary: G.runSummary(s) };
+  assert.equal(G.nextCutscene(s), null);
+});
+
+test('컷씬 문구: 2~10레벨마다 장면이 있고, 10만 엔딩이며, 합니다체가 없다', () => {
+  assert.equal(CUT_FIRST, 2);
+  assert.equal(CUT_FINAL, G.HQ_MAX);
+  for (let lv = CUT_FIRST; lv <= CUT_FINAL; lv++) {
+    const sc = SCENES[lv];
+    assert.ok(sc && sc.title && sc.lines.length >= 3, `${lv}레벨 장면`);
+    assert.equal(!!sc.ending, lv === CUT_FINAL, `${lv}레벨 엔딩 여부`);
+    for (const l of sceneLines(lv, '대니')) {
+      assert.ok(!/(니다|습니까)[.!?"]*$/.test(l) && !/니다[.!?]/.test(l), `해요체: ${l}`);
+      assert.ok(!l.includes('{name}'));
+    }
+  }
+  assert.equal(SCENES[1], undefined, '본부 1레벨(시작)은 컷씬 없음');
+  assert.ok(sceneLines(CUT_FINAL, '대니').some((l) => l.includes('대니 대장')), '엔딩은 생존자 이름을 부른다');
 });
