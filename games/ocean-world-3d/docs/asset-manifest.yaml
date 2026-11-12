@@ -10,9 +10,9 @@ assets:
     spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경. 이야기 그림의 인물 참고 이미지이자 대화 화면 얼굴용"
     prompt: "Japanese theatrical anime film style character portrait with finely detailed painted background and soft backlighting. Bust shot, three-quarter view, of a calm, kind Korean woman in her fifties, the director of a small marine ecosystem research institute on a tropical atoll. Sun-tanned skin, graying hair tied back in a single low ponytail, gentle smile lines around her eyes. Teal (#2f8f8a) institute work shirt with rolled-up sleeves, a diving mask hanging around her neck. Warm morning sunlight from the side. Softly blurred background of a wooden research deck over a clear turquoise lagoon, darker and less saturated than the subject. Face and shoulders within the vertical center 60% of the frame. No text, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image, Google AI Studio) — Google은 생성물의 소유권을 주장하지 않음. 자세한 것은 assets/CREDITS.md"
+    note: "gemini-3.1-flash-image(AI Studio) · 후보 2개 중 2번 채택(1번은 반실사 쪽이라 rookie와 화풍이 달라 탈락) · 참고 이미지 rookie(화풍만) · 896x1200 WebP q82 77KB"
   - id: portrait-rookie
     kind: image
     source: generate
@@ -20,9 +20,9 @@ assets:
     spec: "896x1200(3:4) WebP, 400KB 이하, 불투명 배경. 이야기 그림의 인물 참고 이미지이자 대화 화면 얼굴용"
     prompt: "Japanese theatrical anime film style character portrait with finely detailed painted background and soft backlighting, same style and lighting as the director portrait. Bust shot, three-quarter view, of an excited, curious Korean rookie researcher in their twenties (androgynous look) at a small marine ecosystem research institute on a tropical atoll. Short black hair, bright eager eyes, big friendly grin. Coral-colored (#f0806a) zip-up hoodie, holding a closed laptop against the chest. Warm morning sunlight from the side. Softly blurred background of a wooden research deck over a clear turquoise lagoon, darker and less saturated than the subject. Face and shoulders within the vertical center 60% of the frame. No text, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image, Google AI Studio) — Google은 생성물의 소유권을 주장하지 않음. 자세한 것은 assets/CREDITS.md"
+    note: "gemini-3.1-flash-image(AI Studio) · 후보 1개 · 896x1200 WebP q82 82KB"
   - id: story-1-institute
     kind: image
     source: generate
@@ -30,9 +30,9 @@ assets:
     spec: "1600x900(16:9) WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
     prompt: "Japanese theatrical anime film style illustration with finely detailed background and morning backlight, wide 16:9 game story scene. Story 1/5: a tiny white-sand island in a tropical atoll (Maldives-like) with a small, friendly marine ecosystem research institute: low white buildings with a thatched-and-solar roof, a wooden deck built over a crystal-clear turquoise lagoon, a small survey boat tied to the deck, a few coconut palms, coral patches visible through the shallow water. On the deck stand two small figures seen from a little distance: the institute director (Korean woman in her fifties, graying ponytail, teal shirt, diving mask around her neck) and a rookie researcher (twenties, short black hair, coral-colored hoodie, laptop under the arm), looking out over the lagoon. Bright, warm, hopeful morning. Keep faces and key objects in the upper 70% of the frame; the bottom 30% is calm shallow water and sand only. No text, no letters, no signs, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image, Google AI Studio) — Google은 생성물의 소유권을 주장하지 않음. 자세한 것은 assets/CREDITS.md"
+    note: "gemini-3.1-flash-image(AI Studio) · 후보 4개 중 4번 채택(1번은 배에 SURVEY 글자, 1~3번은 화면 66~72% 높이에 가로 경계선 — 프롬프트의 '아래 30%는 물과 모래만' 문장이 원인이라 4번은 그 문장을 빼고 생성) · 참고 이미지 director·rookie · 1376x768 → 1600x900 WebP q82 130KB · 건물 벽의 작은 게시판은 읽을 수 없는 무늬"
   - id: story-2-surface
     kind: image
     source: generate
@@ -40,9 +40,9 @@ assets:
     spec: "1600x900(16:9) WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
     prompt: "Japanese theatrical anime film style illustration with finely detailed background and backlight, wide 16:9 game story scene. Story 2/5: a split-level view cut by the waterline across the middle of the frame. Above the water: the institute director (Korean woman in her fifties, graying ponytail, teal shirt, diving mask around her neck) and the rookie researcher (twenties, short black hair, coral-colored hoodie) lean on the railing of a wooden deck, looking thoughtfully at the flat, calm sea surface under a wide tropical sky. Below the water: a dazzling coral reef the surface hides, with branching and brain corals, a school of small tropical fish, a moon jellyfish, a green sea turtle, sunbeams and caustic light. The contrast shows that people rarely see what lives underwater. Gentle, slightly wistful mood, still bright. Keep faces in the upper 40% of the frame; the bottom 30% is reef floor and sand without key details. No text, no letters, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image, Google AI Studio) — Google은 생성물의 소유권을 주장하지 않음. 자세한 것은 assets/CREDITS.md"
+    note: "gemini-3.1-flash-image(AI Studio) · 후보 1개 · 참고 이미지 director·rookie · 1600x900 WebP q82 170KB"
   - id: story-3-idea
     kind: image
     source: generate
@@ -50,9 +50,9 @@ assets:
     spec: "1600x900(16:9) WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
     prompt: "Japanese theatrical anime film style illustration with finely detailed background, wide 16:9 game story scene. Story 3/5: night inside the small island research lab, cozy and cluttered with sample jars, coral specimens, diving gear and a desk lamp; through the window, a moonlit lagoon. The rookie researcher (twenties, short black hair, coral-colored hoodie) sits at an open laptop, lit by its soft glow, turning to explain a brilliant idea with wide excited eyes and animated hands. The institute director (Korean woman in her fifties, graying ponytail, teal shirt, diving mask around her neck) stands beside the desk holding a mug of tea, tilting her head with a puzzled but curious smile. The laptop screen shows only abstract soft blue-green glowing shapes, nothing readable. Warm lamp light mixed with cool screen light. Keep faces and the laptop in the upper 70% of the frame; the bottom 30% is desk surface and floor. No text, no letters, no numbers, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image, Google AI Studio) — Google은 생성물의 소유권을 주장하지 않음. 자세한 것은 assets/CREDITS.md"
+    note: "gemini-3.1-flash-image(AI Studio) · 후보 1개 · 참고 이미지 director·rookie · 1600x900 WebP q82 157KB · 화이트보드·서류는 읽을 수 없는 줄 무늬, 오른쪽 아래 상자 라벨에 숫자 2처럼 보이는 무늬 하나(아래 30% 안, 대사 종이에 가려짐)"
   - id: story-4-jelly
     kind: image
     source: generate
@@ -60,9 +60,9 @@ assets:
     spec: "1600x900(16:9) WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
     prompt: "Japanese theatrical anime film style illustration with finely detailed background, wide 16:9 game story scene. Story 4/5: on a wooden table in the island research lab sits a softly glowing transparent jelly block: a clear aqua, rounded-corner rectangular block of wobbly jelly about the size of a small aquarium, containing a miniature tropical sea. Inside it: a tiny white-sand island with palm trees rising above the miniature water line, a coral reef below, a school of tiny fish, a small jellyfish and a small sea turtle. The institute director (Korean woman in her fifties, graying ponytail, teal shirt, diving mask around her neck) and the rookie researcher (twenties, short black hair, coral-colored hoodie) lean in from both sides, their faces lit by the block's turquoise glow; the rookie gently pokes the block with one finger so it jiggles, the director smiles with delight. Dim room, the jelly block is the brightest thing in the picture. Keep faces and the jelly block in the upper 70% of the frame; the bottom 30% is the table surface. No text, no letters, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image, Google AI Studio) — Google은 생성물의 소유권을 주장하지 않음. 자세한 것은 assets/CREDITS.md"
+    note: "gemini-3.1-flash-image(AI Studio) · 후보 1개 · 참고 이미지 director·rookie · 1600x900 WebP q82 104KB"
   - id: story-5-invite
     kind: image
     source: generate
@@ -70,6 +70,6 @@ assets:
     spec: "1600x900(16:9) WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
     prompt: "Japanese theatrical anime film style illustration with finely detailed background and warm morning backlight, wide 16:9 game story scene. Story 5/5: on the institute's wooden deck over the turquoise lagoon, the institute director (Korean woman in her fifties, graying ponytail, teal shirt, diving mask around her neck) and the rookie researcher (twenties, short black hair, coral-colored hoodie) stand side by side facing the viewer, together holding out the softly glowing transparent jelly block (the same clear aqua rounded-corner block as in the previous scene, with the tiny palm island, coral reef, fish, jellyfish and sea turtle inside) toward the viewer as if handing it over. Both smile warmly and invitingly; the block's glow lights their faces. Bright sky, sparkling water behind them. Keep faces and the jelly block in the upper 70% of the frame; the bottom 30% is deck planks and water. No text, no letters, no logo, no watermark, no border."
     url: ""
-    status: pending
-    license: ""
-    note: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image, Google AI Studio) — Google은 생성물의 소유권을 주장하지 않음. 자세한 것은 assets/CREDITS.md"
+    note: "gemini-3.1-flash-image(AI Studio) · 후보 1개 · 참고 이미지 director·rookie·story-4-jelly(젤리 블록 맞춤) · 1600x900 WebP q82 128KB"
