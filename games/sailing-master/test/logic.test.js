@@ -839,7 +839,7 @@ test('저장 v1 → v3: 예전 배는 ★1, 슬루프로 있던 판도 그대로
   const old = JSON.parse(G.serialize(sloopAt('lake')));
   old.v = 1; delete old.best; old.found = { mill2: 1 };
   const T = G.deserialize(JSON.stringify(old));
-  assert.equal(T.v, 4);
+  assert.equal(T.v, 5);
   assert.equal(T.ship.hull, 'sloop');
   assert.equal(HULLS[T.ship.hull].star, 1);
   assert.equal(T.best.hull, 'sloop');
@@ -876,7 +876,7 @@ test('도감: 동물을 기록해도 자원이 늘지 않고, 달성 보상만 �
   for (const id of ids) G.recordSpecies(S, id);
   assert.ok(S.ach.species10 && S.ach.speciesAll);
   assert.equal(S.res.coin, res.coin + 30 + 50 + 80);
-  assert.equal(ACHIEVEMENTS.length, 16);
+  assert.equal(ACHIEVEMENTS.length, 17);
   for (const d of Object.values(SPECIES)) assert.equal(d.reward, undefined);
 });
 
@@ -1026,7 +1026,7 @@ test('저장 v2 → v3: 화물칸 금화는 창고로, 식량은 빵으로, 찾�
   o.v = 2; o.hold = { wood: 3, cloth: 0, coin: 7 }; o.res = { wood: 1, cloth: 2, coin: 5 }; o.food = 4; delete o.pantry; delete o.relics; delete o.letters; delete o.herb;
   o.found = { logpile: 1 }; o.flot = { pond: [{ x: 0, y: 0, k: 'coin', n: 3, ph: 0 }] };
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 4); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
+  assert.equal(T.v, 5); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
   assert.equal(T.pantry[0].k, 'bread'); assert.equal(T.pantry[0].n, 4);
   assert.ok(T.relics.logpile); assert.equal(T.flot.pond[0].k, 'shiny');
 });
@@ -1117,7 +1117,7 @@ test('저장 v3 → v4: 예전 선원은 숙련 1·지금 보수를 기본 보�
   const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }]); const o = JSON.parse(G.serialize(S));
   o.v = 3; o.crew = [{ id: 5, role: 'deckhand', name: '빌럼', gender: '남', wage: 2, skill: 100, humor: 100, drink: 100 }]; delete o.rules;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 4); assert.equal(T.crew[0].lv, 1); assert.equal(T.crew[0].baseWage, 2); assert.ok(T.crew[0].trait); assert.ok(T.rules.reef);
+  assert.equal(T.v, 5); assert.equal(T.crew[0].lv, 1); assert.equal(T.crew[0].baseWage, 2); assert.ok(T.crew[0].trait); assert.ok(T.rules.reef);
   assert.equal(G.workerAt(T, 'sail')?.name, '빌럼');
 });
 

@@ -45,9 +45,14 @@ export function buildAmbient(ac, dest, noise) {
   const washF = filter('bandpass', 1750, 0.55), washG = gain(0);
   loop(1.3, 0.6).connect(washF); washF.connect(washG); washG.connect(dest);
 
+  // 빗소리(S5): 높은 쏴아. 비가 안 오면 0이라 S4 측정과 같은 소리예요
+  const rainF = filter('highpass', 2600, 0.5), rainG = gain(0);
+  loop(1.7, 3.1).connect(rainF); rainF.connect(rainG); rainG.connect(dest);
+
   return {
-    set(windSpeed, boatSpeed) {
+    set(windSpeed, boatSpeed, rain = 0) {
       const t = ac.currentTime, w = Math.min(1.4, windSpeed / 10), b = Math.min(1, boatSpeed / 7.5);
+      rainG.gain.setTargetAtTime(rain * 0.11, t, 1.5);
       swellG.gain.setTargetAtTime(0.28 + w * 0.1, t, 1.2);
       windG.gain.setTargetAtTime(0.02 + w * w * 0.045, t, 0.8); // 2026-11-02 대니님 요청으로 줄임(노 소리는 그대로)
       windF.frequency.setTargetAtTime(460 + w * 420, t, 0.8);
@@ -102,6 +107,10 @@ export const FX = {
   build(ac, noise, d, t) { for (const at of [0, 0.16, 0.32]) { tone(ac, d, t + at, { f: 180, to: 110, type: 'triangle', dur: 0.08, peak: 0.08 }); burst(ac, noise, d, t + at, { f: 2200, dur: 0.05, peak: 0.04 }); } },
   place(ac, noise, d, t) { tone(ac, d, t, { f: 210, to: 140, type: 'triangle', dur: 0.08, peak: 0.08 }); burst(ac, noise, d, t, { f: 1800, dur: 0.04, peak: 0.03 }); },
   dock(ac, _n, d, t) { for (const [at, f] of [[0, 880], [0.22, 880]]) { tone(ac, d, t + at, { f, dur: 0.9, peak: 0.045 }); tone(ac, d, t + at, { f: f * 2.76, dur: 0.4, peak: 0.012 }); } },
+  // S5 날씨: 천둥(멀리 우르릉), 돛 찢어지는 소리, 안개 속 항구 종
+  thunder(ac, noise, d, t) { burst(ac, noise, d, t, { type: 'lowpass', f: 380, to: 70, q: 0.6, dur: 2.6, peak: 0.24, attack: 0.04 }); burst(ac, noise, d, t + 0.35, { type: 'lowpass', f: 240, to: 60, q: 0.5, dur: 2, peak: 0.14, attack: 0.3 }); },
+  tear(ac, noise, d, t) { for (const [at, f] of [[0, 2400], [0.07, 1900], [0.15, 2800], [0.24, 1500]]) burst(ac, noise, d, t + at, { f, to: f * 0.6, q: 2.2, dur: 0.09, peak: 0.12 }); },
+  bell(ac, noise, d, t) { tone(ac, d, t, { f: 660, type: 'triangle', dur: 1.8, peak: 0.035 }); tone(ac, d, t, { f: 1584, dur: 1.1, peak: 0.012 }); },
   gust(ac, noise, d, t) { burst(ac, noise, d, t, { f: 500, to: 1300, q: 0.5, dur: 2.2, peak: 0.13, attack: 0.9 }); tone(ac, d, t + 0.3, { f: 58, to: 38, dur: 1.5, peak: 0.1, attack: 0.1 }); },
   warn(ac, _n, d, t) { for (const at of [0, 0.3]) tone(ac, d, t + at, { f: 392, dur: 0.24, peak: 0.05 }); },
   disaster(ac, noise, d, t) { tone(ac, d, t, { f: 196, to: 98, type: 'triangle', dur: 1.4, peak: 0.12 }); burst(ac, noise, d, t, { type: 'lowpass', f: 900, to: 200, dur: 1.2, peak: 0.2 }); },
@@ -186,7 +195,7 @@ export function createSound() {
     setOn(v, k) { for (const g of k ? [k] : ['fx', 'amb']) { grp[g].on = !!v; level(g); } },
     // 슬라이더(0~1). 끄는 동안 바로 들리게 빠르게 따라가요
     setVolume(k, v) { grp[k].v = Math.max(0, Math.min(1, Number(v) || 0)); level(k, true); },
-    ambient(windSpeed, boatSpeed) { if (amb) amb.set(windSpeed, boatSpeed); },
+    ambient(windSpeed, boatSpeed, rain = 0) { if (amb) amb.set(windSpeed, boatSpeed, rain); },
     // at: 지금부터 몇 초 뒤(오프라인 측정에서 씀). 효과음이 0이면 소리 마디를 만들지도 않아요
     play(name, at = 0, ...args) { if (ac && target('fx') > 0 && FX[name]) FX[name](ac, noise, fxBus, ac.currentTime + 0.005 + at, ...args); },
     pause() { if (ac && ac.suspend) ac.suspend(); },

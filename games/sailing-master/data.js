@@ -34,11 +34,12 @@ export const NAV = {
 
 // 달력: 하루 = 항해 3분, 계절 = 7일. 항구에 있는 동안은 흐르지 않는다
 export const CAL = { day: 180, seasonDays: 7 };
+// 계절별 날씨 확률은 아래 WX 표에 있어요(S5)
 export const SEASONS = [
-  { id: 'spring', name: '봄', icon: '🌱', gust: 0.45 },
-  { id: 'summer', name: '여름', icon: '☀️', gust: 0.25, heat: 0.6 },
-  { id: 'autumn', name: '가을', icon: '🍂', gust: 0.55 },
-  { id: 'winter', name: '겨울', icon: '❄️', gust: 0.35 },
+  { id: 'spring', name: '봄', icon: '🌱' },
+  { id: 'summer', name: '여름', icon: '☀️' },
+  { id: 'autumn', name: '가을', icon: '🍂' },
+  { id: 'winter', name: '겨울', icon: '❄️' },
 ];
 export const WEATHER = {
   gustLen: 40, gustWarn: 25,
@@ -50,7 +51,30 @@ export const WEATHER = {
   droughtDepth: 0.55,    // 가뭄 때 여울 수심 배율
   hitHurt: 0.48,         // 물가 충돌: 속도 × 이 값만큼 내구도가 깎인다
   shoalHurt: 1.44,       // 여울에 걸린 채 움직일 때 초당 내구도 피해
+  swellHurt: 6,          // 너울이 내항성을 넘은 1m마다 초당 내구도 피해(앞바다부터, S5에서 자리만)
 };
+// S5 날씨 종류(2026-11-12). 날마다 종류별로 시드로 한 번 굴려 정해 둬요(예보가 그대로 맞아요). 수역은 REGIONS의 weather 목록으로 골라요.
+// when: event 하루 중 한때(하루의 at~at+span 사이에 시작해 len초, warn초 전부터 예고) · dawn 하루 시작부터 len초(새벽) · day 하루 내내 · cal 달력으로 정해진 날(days)
+// chance: 계절별로 그날 올 확률. fc: 며칠 앞까지 예보에 보이나(없으면 예보 끝까지). sev: 심한 정도(1 조심 · 2 위험 · 3 아주 위험). rough: 돛을 줄일 바람(폭풍 편성·폭풍 곡)
+// salt: 시드에 더하는 수(돌풍·무더위는 S5 전과 같은 값이라 같은 날에 와요). calmFirst: 첫날(처음 나루를 나서는 날)엔 오지 않아요
+// fx 효과: wind 풍속 배율(gust·storm은 수역의 gustK·stormK) · rain 비(그늘막 없으면 식량이 젖어요) · spray 물보라(방수 격벽이 막아요, 앞바다부터)
+//   swell 너울 높이 m(앞바다부터, 지금은 0) · strain 돛을 다 펴고 있으면 1초에 쌓이는 찢어짐(1이면 찢어져요) · fog 안개 짙기(0~1) · sight 보는 거리 배율
+//   flow 물살 배율 · depth 여울 수심 배율 · flot 표류물 한도 배율 · heat 무더위(그늘막 없으면 기력이 빠져요)
+export const WX = {
+  storm: { name: '폭풍', icon: '⛈', sev: 3, calmFirst: true, rough: true, when: 'event', chance: { summer: 0.12, autumn: 0.14 }, at: 0.3, span: 0.45, len: 75, warn: 50, salt: 41.3, fx: { wind: 'storm', rain: 1, strain: 1 / 12, sight: 0.7 } },
+  gust: { name: '돌풍', icon: '💨', sev: 2, rough: true, when: 'event', chance: { spring: 0.45, summer: 0.25, autumn: 0.55, winter: 0.35 }, at: 0.12, span: 0.76, len: 40, warn: 25, salt: 3.1, salt2: 7.7, fx: { wind: 'gust', strain: 1 / 30 } },
+  squall: { name: '소나기', icon: '🌧', sev: 1, calmFirst: true, when: 'event', chance: { spring: 0.3, summer: 0.35, autumn: 0.2, winter: 0.1 }, at: 0.15, span: 0.7, len: 55, warn: 25, salt: 23.9, fx: { wind: 1.15, rain: 1, sight: 0.85 } },
+  fog: { name: '짙은 안개', short: '안개', icon: '🌫', sev: 1, calmFirst: true, when: 'dawn', chance: { spring: 0.5, summer: 0.05, autumn: 0.25, winter: 0.3 }, len: 75, fc: 1, salt: 31.7, fx: { fog: 1, wind: 0.6 } },
+  heat: { name: '무더위', icon: '🥵', sev: 1, when: 'day', chance: { summer: 0.6 }, salt: 11.3, fx: { heat: 1 } },
+  flood: { name: '홍수', icon: '🌊', sev: 1, when: 'cal', days: { spring: [0, 1, 2, 3] }, fx: { flow: 1.6, depth: 1.5, flot: 1.4 } },
+  drought: { name: '가뭄', icon: '🏜', sev: 1, when: 'cal', days: { summer: [3, 4, 5, 6], autumn: [0, 1, 2] }, fx: { depth: WEATHER.droughtDepth } },
+};
+export const WX_ORDER = Object.keys(WX); // 심한 것부터(같은 날 여럿이면 앞의 것이 이름이 돼요)
+// 돛 찢어짐과 수선. tornMax: 찢어진 돛으로 펼 수 있는 넓이(줄임 0.55보다 작아요). cloth: 꿰매는 데 드는 마포(없으면 범포 1장). coin: 항구 돛장이 값(돛 넓이 1당)
+// crewTime·capTime: 바다에서 갑판원·선장이 꿰매는 데 걸리는 초. spare: 출항할 때 창고에서 화물칸으로 알아서 싣는 수선용 마포
+export const SAILCLOTH = { tornMax: 0.45, warnAt: 0.5, relax: 1 / 20, cloth: 2, coin: 10, crewTime: 20, capTime: 30, spare: 2 };
+// 젖은 식량: 비를 soak초 맞으면 젖어요. 빵은 bread일, 물고기는 ffish일 일찍 상하고, 건어는 dfish일 뒤에 상해요
+export const WET = { soak: 25, bread: 2, ffish: 1, dfish: 3 };
 
 // 선체(배 평면 격자는 cols × rows, 칸 한 변 cell m. x0: 0행 앞쪽 끝의 배 좌표). id는 등급과 별을 함께 나타낸다: sloop = 슬루프 ★1, sloop2 = ★2
 // hp: 내구도(피해는 절대값으로 들어온다), yard: 필요한 조선소 등급, speed: 항해 속도 배율(노·돛 모두. 뗏목 2배, 이후 배는 이전 값의 1.5배)
@@ -114,7 +138,7 @@ export const MODULES = {
   sickbay: { name: '의무실', icon: '⚕', fam: 'work', mk: 1, seat: 'medic', w: 1, h: 1, kg: 2, z: 0.6, color: '#e8e4dc', cost: {}, desc: '무더위·추위에 쓰러지지 않게', need: { grade: 4 }, future: true },
   crowsnest: { name: '망루', icon: '🗼', fam: 'watch', mk: 2, seat: 'look', w: 1, h: 1, kg: 3, z: 1.2, color: '#a88a4a', cost: {}, desc: '망원경 다음. 더 멀리, 안개 속까지', need: { grade: 4 }, future: true },
   station: { name: '측후소', icon: '📡', fam: 'watch', mk: 2, seat: 'weather', w: 1, h: 1, kg: 2, z: 1, color: '#b9b4a0', cost: {}, desc: '기압계 다음. 예보 +4일', need: { grade: 4 }, future: true },
-  bulkhead: { name: '방수 격벽', icon: '🧱', fam: 'watch', mk: 1, w: 1, h: 1, kg: 4, z: 0.3, color: '#6f7478', cost: {}, desc: '너울에 덜 상한다. 앞바다부터', need: { grade: 3, region: 'coast' }, future: true },
+  bulkhead: { name: '방수 격벽', icon: '🧱', fam: 'watch', mk: 1, w: 1, h: 1, kg: 4, z: 0.3, color: '#6f7478', cost: {}, desc: '너울에 덜 상하고, 물보라에 식량이 안 젖는다. 앞바다부터', need: { grade: 3, region: 'coast' }, future: true },
   lifeboat: { name: '구명정', icon: '🛟', fam: 'watch', mk: 1, w: 1, h: 2, kg: 4, z: 0.6, color: '#d8634f', cost: {}, desc: '침몰해도 짐 절반을 건진다', need: { grade: 4 }, future: true },
 };
 // 선원 역할(S3, 2026-11-08). seat: 앉는 자리 종류(모듈의 seat). grade: 이 등급 배부터 후보로 와요. future: 뒤 공간 역할(표에만)
@@ -240,7 +264,7 @@ export const SPECIES = {
 // theme: 풍경 테마 이름(themes.js THEMES)
 export const REGIONS = {
   pond: {
-    id: 'pond', name: '작은 호수', order: 0, grade: 1, theme: 'lake', yard: 1, wind: { from: -70 * D, speed: 6.5, swing: 0.7 }, gustK: 1.35,
+    id: 'pond', name: '작은 호수', order: 0, grade: 1, theme: 'lake', yard: 1, wind: { from: -70 * D, speed: 6.5, swing: 0.7 }, gustK: 1.35, weather: ['gust', 'squall', 'fog'],
     shape: { kind: 'lake', ax: 96, ay: 150, ph: 0.4 },
     islands: [{ x: 28, y: -42, r: 13, ph: 1.4 }],
     start: 'reed',
@@ -262,7 +286,7 @@ export const REGIONS = {
     trade: [['coffee', 7], ['spice', 3]], demand: ['porcelain'],
   },
   lake: {
-    id: 'lake', name: '큰 호수', order: 1, grade: 1, theme: 'lake', yard: 2, wind: { from: -22 * D, speed: 9, swing: 0.5 }, gustK: 1.7, heat: true,
+    id: 'lake', name: '큰 호수', order: 1, grade: 1, theme: 'lake', yard: 2, wind: { from: -22 * D, speed: 9, swing: 0.5 }, gustK: 1.7, stormK: 2.05, heat: true, weather: ['storm', 'gust', 'squall', 'fog', 'heat'],
     shape: { kind: 'lake', ax: 170, ay: 280, ph: 0 },
     islands: [{ x: 54, y: -118, r: 30, ph: 0.6 }, { x: -62, y: 26, r: 21, ph: 2.2 }, { x: 44, y: 112, r: 13, ph: 4 }],
     start: 'southGate',
@@ -282,7 +306,7 @@ export const REGIONS = {
     trade: [['coffee', 5], ['spice', 4], ['porcelain', 1]], demand: ['porcelain'],
   },
   river: {
-    id: 'river', name: '강', order: 2, grade: 2, theme: 'river', yard: 3, wind: { from: -100 * D, speed: 8, swing: 0.8 }, gustK: 1.5, heat: true, flow: 1.1,
+    id: 'river', name: '강', order: 2, grade: 2, theme: 'river', yard: 3, wind: { from: -100 * D, speed: 8, swing: 0.8 }, gustK: 1.5, stormK: 1.85, heat: true, flow: 1.1, weather: ['storm', 'gust', 'squall', 'fog', 'heat', 'flood', 'drought'],
     shape: { kind: 'river', pts: [[0, 1000], [70, 840], [-50, 660], [-110, 470], [20, 290], [130, 120], [50, -70], [-100, -240], [-70, -440], [60, -620], [20, -800], [-30, -1000]], width: 62 },
     islands: [{ x: 96, y: 66, r: 11, ph: 1.2 }],
     start: 'head',
@@ -316,6 +340,7 @@ export const ACHIEVEMENTS = [
   { id: 'firstTack', name: '바람을 거슬러', desc: '처음 태킹하기', coin: 10 },
   { id: 'paint', name: '우리 배', desc: '배 색이나 이름 바꾸기', coin: 5, decor: 'pennant' },
   { id: 'gustSafe', name: '돌풍을 넘기다', desc: '돌풍을 피해 없이 넘기기', coin: 15 },
+  { id: 'stormSafe', name: '폭풍을 뚫고', desc: '폭풍을 피해 없이 넘기기', coin: 20 },
   { id: 'heatSafe', name: '시원한 그늘', desc: '그늘막으로 무더위 하루 넘기기', coin: 15 },
   { id: 'crew3', name: '한 배를 탄 사람들', desc: '갑판원·견시·조타수 모두 고용해 본 적 있기', coin: 20, decor: 'cat' },
   { id: 'sloop', name: '진짜 항해', desc: '슬루프 짓기', coin: 20 },

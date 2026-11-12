@@ -1,9 +1,10 @@
 // 밸런스 봇: 사람이 할 만한 순서로 건지고, 입항하고, 배를 키워 강 끝까지 간다. node tools/sim.js [시드] [최대 분] [v] [nocrew]
 // 표류물과 발견지 자리는 아는 채로 움직여서, 실제 사람보다 조금 빠르다.
+// S5: 돌풍·폭풍은 예고부터 줄이고, 그날 폭풍이 아직 안 왔으면 항구에서 하루 묵고, 찢어진 돛은 꿰매고, 저녁엔 오늘 밤 상할 식량을 없는 셈 친다.
 import * as G from '../logic.js';
 import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
-import { HULLS, MODULES, ROLES, ITEMS, MAT_IDS, TRADE_IDS, WORKSHOP } from '../data.js';
+import { HULLS, MODULES, ROLES, ITEMS, MAT_IDS, TRADE_IDS, WORKSHOP, WX, CAL } from '../data.js';
 
 const seed = Number(process.argv[2]) || 1, maxMin = Number(process.argv[3]) || 240, verbose = process.argv[4] === 'v', noCrew = process.argv.includes('nocrew'); // nocrew: 선원 없이(배치 효과 비교용)
 const S = G.newGame(seed), log = {}, income = {};
@@ -44,6 +45,7 @@ function shop() {
   }
   for (const k of ['hemp', 'nail']) { const short = (need[k] || 0) - (S.res[k] || 0); if (short > 0 && S.res.coin > (next.coin || 0) + 10) G.buyMat(S, k, short); }
   if (S.hull < 0.75 && !G.repair(S)) G.repairWithWood(S);
+  if (S.boat.torn && G.mendSail(S).ok) log.mendPort = (log.mendPort || 0) + 1; // 찢어진 돛은 항구에서 꿰맨다
   // 슬루프는 돛대 값까지 있을 때 짓는다(돛대 없이 강을 다니면 노로만 가야 한다)
   const ready = g && (g.kind !== 'sloop' || g.star > 1 || (S.blueprints.mast_m && Object.entries(need).every(([k, v]) => (S.res[k] || 0) >= v)));
   if (ready && G.buildHull(S, g.id).ok) mark(g.star > 1 ? `${g.name} ★${g.star}` : g.name);
@@ -67,12 +69,18 @@ function nearestPort() {
 function think() {
   const w = worldOf(S.region), b = S.boat, st = G.stats(S), persons = 1 + S.crew.length;
   if (st.sailArea) {
-    const want = S.weather.gustOn || S.weather.gustSoon ? 1 : 2;
-    if (b.sailLevel !== want && !S.cap.to) G.setSail(S, want);
+    // 돌풍·폭풍은 예고부터 줄인다(S5)
+    const wx = S.weather, want = wx.gustOn || wx.gustSoon || wx.stormOn || wx.stormSoon ? 1 : 2;
+    if (b.sailLevel !== want && !S.cap.to && !S.mend) G.setSail(S, want);
+    // 돛이 찢어지면 화물칸 마포로 꿰맨다(갑판원이 없으면 선장이 돛대로)
+    if (b.torn && !S.mend && G.canMendAtSea(S) && G.mendSail(S).ok) log.mendSea = (log.mendSea || 0) + 1;
+    if (S.mend && S.mend.by === 'cap') return; // 꿰매는 동안은 키를 놓는다
   }
   // 수리비가 없으면 항구로 가도 소용없으니 벌러 나간다. 다음 배 재료가 모이면 바로 돌아간다
   const wantBuild = HULLS[S.ship.hull].kind === 'raft' && G.canAffordHull(S, G.nextHull(S));
-  const low = wantBuild || S.food < persons * 0.7 || (S.hull < 0.4 && S.res.coin >= G.repairCost(S)) || S.vigor < 0.3 || G.holdUsed(S) >= st.holdCap;
+  // 오늘 밤에 상할 식량(젖은 것 포함)은 저녁부터 없는 셈 친다(S5)
+  const day = G.clock(S).day, late = S.clock % CAL.day > CAL.day * 0.45, rotting = late ? (S.pantry || []).reduce((t, q) => t + (q.exp != null && q.exp <= day + 1 ? q.n : 0), 0) : 0;
+  const low = wantBuild || S.food - rotting < persons * 0.7 || (S.hull < 0.4 && S.res.coin >= G.repairCost(S)) || S.vigor < 0.3 || G.holdUsed(S) >= st.holdCap;
   if (low) {
     if (!(S.route && S.route.target && S.route.target.type === 'port')) { const p = nearestPort(); G.setDest(S, p.x, p.y, { type: 'port', id: p.id }); }
     return;
@@ -92,11 +100,14 @@ function think() {
 }
 
 const ticks = maxMin * 60 * 30;
-let thinkT = 0;
+let thinkT = 0, waitedDay = -1;
 for (let i = 0; i < ticks && !S.ended; i++) {
-  if (S.disaster) { const r = G.rescue(S); log.rescues = (log.rescues || 0) + 1; if (verbose) console.log('구조', JSON.stringify(r)); }
+  if (S.disaster) { const why = `${S.disaster.cause}@${S.region}${S.weather.drought ? '+가뭄' : S.weather.flood ? '+홍수' : ''}`, r = G.rescue(S); log.rescues = (log.rescues || 0) + 1; (log.why ||= {})[why] = (log.why[why] || 0) + 1; if (verbose) console.log('구조', JSON.stringify(r)); }
   if (S.docked) {
     shop();
+    // 오늘 폭풍이 아직 안 왔으면 하루 묵어 간다(조심스러운 사람처럼)
+    const o = G.outlook(S)[0], inDay = S.clock % CAL.day;
+    if (o.ids.includes('storm') && inDay < o.storm + WX.storm.len && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; G.waitDay(S); log.waits = (log.waits || 0) + 1; shop(); }
     const gate = worldOf(S.region).gates[0];
     const r = G.undock(S);
     if (!r.ok && verbose) console.log('출항 못 함', r.why);
@@ -110,4 +121,4 @@ for (let i = 0; i < ticks && !S.ended; i++) {
   if ((thinkT -= G.FIXED_DT) <= 0) { thinkT = 0.5; think(); }
 }
 mark(S.ended ? '강 끝' : `시간 초과(${S.region})`);
-console.log(JSON.stringify({ seed, ...log, state: S.ended ? undefined : { hullHp: +S.hull.toFixed(2), food: +S.food.toFixed(1), vigor: +S.vigor.toFixed(2), mods: S.ship.mods.map((m) => m.id).join(','), crew: S.crew.length, owed: +S.owed.toFixed(1), route: S.route?.target?.type ?? null, docked: S.docked, at: [Math.round(S.boat.x), Math.round(S.boat.y)], spd: +S.boat.spd.toFixed(1), sail: S.boat.sailLevel, canMove: G.stats(S).canMove, rowing: S.boat.row }, hull: S.ship.hull, res: S.res, income, found: Object.keys(S.found).length, ach: Object.keys(S.ach).length, day: G.clock(S).day, rescues: S.stats.rescues, gusts: S.stats.gusts, gustHurt: S.stats.gustHurt }));
+console.log(JSON.stringify({ seed, ...log, state: S.ended ? undefined : { hullHp: +S.hull.toFixed(2), food: +S.food.toFixed(1), vigor: +S.vigor.toFixed(2), mods: S.ship.mods.map((m) => m.id).join(','), crew: S.crew.length, owed: +S.owed.toFixed(1), route: S.route?.target?.type ?? null, docked: S.docked, at: [Math.round(S.boat.x), Math.round(S.boat.y)], spd: +S.boat.spd.toFixed(1), sail: S.boat.sailLevel, canMove: G.stats(S).canMove, rowing: S.boat.row }, hull: S.ship.hull, res: S.res, income, found: Object.keys(S.found).length, ach: Object.keys(S.ach).length, day: G.clock(S).day, rescues: S.stats.rescues, gusts: S.stats.gusts, gustHurt: S.stats.gustHurt, storms: S.stats.storms, stormHurt: S.stats.stormHurt, torn: S.stats.torn, wet: S.stats.wet }));
