@@ -60,7 +60,8 @@ export const WEATHER = {
   thirstVigor: 1 / 45,   // 짠물에서 식수가 바닥나면 초당 기력 감소(굶주림 1/80보다 빨라요)
 };
 // 조수(M2a 앞바다): 하루(CAL.day)에 밀물·썰물 두 번, 물높이 ±amp m. 거리 격자는 그대로 두고 얕은 곳(shoals) 수심만 바뀌어요. 하루가 밀물 꼭대기에서 시작해요
-export const TIDE = { amp: 0.6, per: 2 };
+// low: 이 물높이(m) 밑이면 썰물 때라 바다 동굴·조수 웅덩이에 들어가요(M2b, 하루의 약 38%)
+export const TIDE = { amp: 0.6, per: 2, low: -0.25 };
 // 식수(M2a): 짠물 수역에서만 마셔요. 사람 1명이 하루 1통, 무더위엔 2통. 담수 수역에서는 퍼 마시고, 담수 항구에 대면 물통을 공짜로 채워요
 export const WATER = { name: '식수', icon: '💧', perDay: 1, heatK: 2, price: 1, per: 4, desc: '짠물은 못 마셔! 사람마다 하루 한 통, 무더위엔 두 통' };
 // S5 날씨 종류(2026-11-12). 날마다 종류별로 시드로 한 번 굴려 정해 둬요(예보가 그대로 맞아요). 수역은 REGIONS의 weather 목록으로 골라요.
@@ -102,6 +103,10 @@ const star3 = (b, over) => ({ ...b, id: `${b.kind}3`, star: 3, hp: Math.round(b.
 const raft2 = star2(raft, { len: 5.6, rows: 5, x0: 2.5, buoy: 32, helmX: -1.95, price: { wood: 12 } });
 const rowboat2 = star2(rowboat, { len: 7.6, beam: 2.3, x0: 2.45, buoy: 45, helmX: -3.2, price: { wood: 40, cloth: 15, hemp: 8, coin: 20 } });
 const sloop2 = star2(sloop, { len: 11, rows: 10, x0: 3.8, rowOff: 1, buoy: 107, crew: 3, helmX: -4.2, cockpit: [-4.95, -3.45], price: { oak: 60, canvas: 35, nail: 16, coin: 80 } });
+// 4등급 스쿠너(M2b, 2026-11-12): 14~16.5m, 돛대 둘(maxMasts), 연료 없는 작은 보조 기관(motor m/s: 돛이 그보다 약할 때만 돌아요),
+// 일손(minCrew): 선원이 이보다 적으면 돛을 줄인 만큼만 펴요. sprit: 뱃머리 밖 제1사장 길이(앞 삼각돛을 거기 매요). 조선 항구(조선소 4등급)에서 지어요
+const schooner = { id: 'schooner', kind: 'schooner', star: 1, grade: 4, name: '스쿠너', len: 14, beam: 4.2, deck: 1.35, cols: 5, rows: 14, cell: 0.8, x0: 6.4, drag: 1.05, row: 2.4, turn: 0.42, stability: 1.75, buoy: 170, draft: 0.85, crew: 6, minCrew: 3, foodBase: 10, holdBase: 40, waterBase: 6, helmX: -5.6, cockpit: [-6.5, -4.9], hp: 220, yard: 4, speed: 1.6, motor: 3.2, maxMasts: 2, sprit: 1.8, blueprint: 'schooner', price: { oak: 80, canvas: 50, plate: 16, gear: 4, tar: 14, coin: 180 } };
+const schooner2 = star2(schooner, { len: 16.5, beam: 4.4, rows: 16, x0: 6.7, rowOff: 0, buoy: 220, crew: 7, helmX: -6.9, cockpit: [-7.7, -6.2], price: { oak: 90, canvas: 50, plate: 16, coin: 160 } });
 export const HULLS = {
   raft, raft2,
   raft3: star3(raft2, { row: raft2.row * 1.15, price: { wood: 18, cloth: 4 }, perk: '노걸이 보강', perkDesc: '노 속도 +15%' }),
@@ -109,14 +114,16 @@ export const HULLS = {
   rowboat3: star3(rowboat2, { pointing: 4 * D, leeK: 0.6, yard: 2, price: { wood: 60, cloth: 30, hemp: 10, nail: 10, coin: 40 }, perk: '센터보드', perkDesc: '맞바람 금지 구역 40° → 36°, 옆으로 덜 밀림' }),
   sloop, sloop2,
   sloop3: star3(sloop2, { winch: true, price: { oak: 60, canvas: 50, tar: 16, nail: 16, coin: 120 }, perk: '돛줄 윈치', perkDesc: '돛 바꾸는 시간 절반, 선장 걷는 거리도 절반' }),
+  schooner, schooner2,
+  schooner3: star3(schooner2, { crew: 8, doubleHull: true, price: { oak: 110, canvas: 60, tar: 30, plate: 20, coin: 220 }, perk: '이중 격벽', perkDesc: '너울·부딪힘 피해 절반' }),
 };
 export const HULL_ORDER = Object.keys(HULLS);
-// 조선소 사다리에 보이는 다섯 등급. 스쿠너와 탐사선은 그 바다가 열릴 때 짓는다
+// 조선소 사다리에 보이는 다섯 등급. 탐사선은 그 바다가 열릴 때 짓는다
 export const HULL_TIERS = [
   { grade: 1, kind: 'raft', name: '뗏목', space: '호수' },
   { grade: 2, kind: 'rowboat', name: '나룻배', space: '강' },
   { grade: 3, kind: 'sloop', name: '슬루프', space: '앞바다' },
-  { grade: 4, kind: null, name: '스쿠너', space: '큰 바다' },
+  { grade: 4, kind: 'schooner', name: '스쿠너', space: '큰 바다' },
   { grade: 5, kind: null, name: '대양 탐사선', space: '대양' },
 ];
 export const STAR_STEPS = { 2: { name: '선체 연장', desc: '배가 길어져! 칸이 늘고 더 빠르지만 조금 둔해진다고' }, 3: { name: '보강', desc: '내구도 +30%, 복원력 +15%' } };
@@ -141,19 +148,22 @@ export const MODULES = {
   ballast: { name: '바닥짐', icon: '🪨', fam: 'watch', mk: 1, w: 1, h: 1, kg: 6, z: 0.12, color: '#777d7a', cost: { coin: 8 }, desc: '복원력 +25%, 대신 무겁지', need: { region: 'lake' } },
   barometer: { name: '기압계', icon: '🌡', fam: 'watch', mk: 1, seat: 'weather', w: 1, h: 1, kg: 1, z: 0.8, color: '#c9c3a8', cost: { coin: 25 }, desc: '예보 +2일', need: { blueprint: 'barometer' } },
   // 뒤 공간에서 여는 모듈: 표에만 두고 잠가 둬요(PLAN-M1.5.md 3-3절)
-  wheel: { name: '타륜', icon: '☸️', fam: 'helm', mk: 2, seat: 'helm', w: 1, h: 1, kg: 2, z: 0.9, color: '#6b4a2e', cost: {}, desc: '큰 배는 타륜으로 몬다. 스쿠너부터', need: { grade: 4 }, future: true },
+  // M2b: 스쿠너(4등급)부터 여는 모듈. 타륜은 키를 30% 잘 듣게 하고(큰 배는 키가 무거워요), 주돛대는 앞돛대(돛대)와 함께 돛대 둘을 이뤄요
+  wheel: { name: '타륜', icon: '☸️', fam: 'helm', mk: 2, seat: 'helm', w: 1, h: 1, kg: 2, z: 0.9, color: '#6b4a2e', cost: { oak: 6, plate: 2, gear: 1 }, desc: '큰 배는 타륜으로 몬다! 키가 30% 잘 듣는다고', need: { grade: 4 }, turnK: 1.3 },
   autohelm: { name: '자동 조타', icon: '🧭', fam: 'helm', mk: 3, seat: 'helm', w: 1, h: 1, kg: 2, z: 0.6, color: '#5a6a72', cost: {}, desc: '사람 없이 항로를 지킨다. 대양 탐사선', need: { grade: 5 }, future: true },
-  mast_d: { name: '이중 돛대', icon: '⛵', fam: 'sail', mk: 3, seat: 'sail', w: 1, h: 2, kg: 12, z: 0.2, color: '#6b4a2e', cost: {}, desc: '돛대 둘. 스쿠너부터', need: { grade: 4 }, future: true },
+  mast_d: { name: '주돛대', icon: '⛵', fam: 'sail', mk: 3, seat: 'sail', w: 1, h: 2, kg: 14, z: 0.25, color: '#6b4a2e', cost: { oak: 14, canvas: 20, tar: 6, plate: 3, coin: 15 }, desc: '스쿠너의 큰 돛대! 앞돛대(돛대)랑 둘을 세우면 바람을 두 배로 먹지', need: { grade: 4 }, sail: 1.35, mastH: 15.5, boom: 5.6 },
   oar2: { name: '큰 노 자리', icon: '🚣', fam: 'oar', mk: 2, seat: 'oar', w: 1, h: 1, kg: 2, z: 0.12, color: '#7a4e2c', cost: {}, desc: '둘이 젓는 큰 노', need: { grade: 4 }, future: true },
   water: { name: '물통', icon: '🛢', fam: 'supply', mk: 1, w: 1, h: 1, kg: 4, z: 0.5, color: '#4a7f95', cost: { wood: 8, nail: 2 }, desc: '식수 4통! 짠물 바다에선 이게 목숨이라고', need: { grade: 3, region: 'coast' } },
+  // 조수기(M2b): 바닷물을 끓여 식수로. 앞바다 발견지(바다 동굴)에서 설계도를 얻어요. 짠물 바다를 항해하는 동안 하루 DESAL.perDay통
+  desal: { name: '조수기', icon: '⚗️', fam: 'supply', mk: 2, w: 1, h: 1, kg: 3, z: 0.75, color: '#7a8e96', cost: { plate: 3, gear: 1, nail: 4 }, desc: '바닷물을 끓여 식수로! 항해하는 동안 하루 두 통', need: { grade: 3, blueprint: 'desal' } },
   lounge: { name: '휴게실', icon: '🛋', fam: 'rest', mk: 3, seat: 'rest', w: 2, h: 2, kg: 6, z: 0.8, color: '#e8dcc2', cost: {}, desc: '쉬면 사기가 오른다. 스쿠너부터', need: { grade: 4 }, future: true },
   galley: { name: '조리실', icon: '🍲', fam: 'work', mk: 1, seat: 'cook', w: 1, h: 1, kg: 3, z: 0.7, color: '#b56a4a', cost: {}, desc: '같은 식량으로 기력이 더 돈다', need: { grade: 4 }, future: true },
   bench: { name: '수리대', icon: '🔨', fam: 'work', mk: 1, seat: 'carpenter', w: 1, h: 1, kg: 3, z: 0.5, color: '#8a6a44', cost: { oak: 8, nail: 4, wood: 6 }, desc: '목수가 앉으면 화물칸 잡목으로 항해 중에 고친다', need: { grade: 3 } },
   sickbay: { name: '의무실', icon: '⚕', fam: 'work', mk: 1, seat: 'medic', w: 1, h: 1, kg: 2, z: 0.6, color: '#e8e4dc', cost: {}, desc: '무더위·추위에 쓰러지지 않게', need: { grade: 4 }, future: true },
-  crowsnest: { name: '망루', icon: '🗼', fam: 'watch', mk: 2, seat: 'look', w: 1, h: 1, kg: 3, z: 1.2, color: '#a88a4a', cost: {}, desc: '망원경 다음. 더 멀리, 안개 속까지', need: { grade: 4 }, future: true },
+  crowsnest: { name: '망루', icon: '🗼', fam: 'watch', mk: 2, seat: 'look', w: 1, h: 1, kg: 3, z: 1.2, color: '#a88a4a', cost: { oak: 10, plate: 2, hemp: 4 }, desc: '망원경 다음! 더 멀리 보고(92m), 해무도 조금 더 걷어 내지', need: { grade: 4 } },
   station: { name: '측후소', icon: '📡', fam: 'watch', mk: 2, seat: 'weather', w: 1, h: 1, kg: 2, z: 1, color: '#b9b4a0', cost: {}, desc: '기압계 다음. 예보 +4일', need: { grade: 4 }, future: true },
   bulkhead: { name: '방수 격벽', icon: '🧱', fam: 'watch', mk: 1, w: 1, h: 1, kg: 4, z: 0.3, color: '#6f7478', cost: { oak: 8, tar: 4, nail: 4 }, desc: '너울에 덜 상하고(피해 절반), 물보라에 식량이 안 젖는다', need: { grade: 3, region: 'coast' } },
-  lifeboat: { name: '구명정', icon: '🛟', fam: 'watch', mk: 1, w: 1, h: 2, kg: 4, z: 0.6, color: '#d8634f', cost: {}, desc: '침몰해도 짐 절반을 건진다', need: { grade: 4 }, future: true },
+  lifeboat: { name: '구명정', icon: '🛟', fam: 'watch', mk: 1, w: 1, h: 2, kg: 4, z: 0.6, color: '#d8634f', cost: { oak: 8, canvas: 4, nail: 4 }, desc: '가라앉아도 화물 절반은 건진다!', need: { grade: 4 } },
 };
 // 선원 역할(S3, 2026-11-08). seat: 앉는 자리 종류(모듈의 seat). grade: 이 등급 배부터 후보로 와요. future: 뒤 공간 역할(표에만)
 export const ROLES = {
@@ -224,13 +234,16 @@ export const STORIES = {
 // 아이템(S2, 2026-11-08). kind: mat 재료 · trade 교역품 · coin 돈. 재료는 계열(fam)과 등급(tier)이 있고, 고급 재료는 뒤 공간에서 나와요.
 // id wood·cloth는 옛 저장의 목재·천을 그대로 잡목·마포로 이어 받으려고 남겨 둔 이름이에요. vol: 화물칸 부피, sell: 항구에서 1개 팔 때 금화
 export const ITEMS = {
-  wood: { name: '잡목', icon: '🪵', kind: 'mat', fam: 'wood', tier: 1, vol: 1, sell: 0.5 },
-  oak: { name: '참나무', icon: '🌳', kind: 'mat', fam: 'wood', tier: 2, vol: 1, sell: 1.5 },
+  wood: { name: '잡목', icon: '🪵', kind: 'mat', fam: 'wood', tier: 1, vol: 1, sell: 0.5, buy: 2, buyAt: 'coast' },
+  oak: { name: '참나무', icon: '🌳', kind: 'mat', fam: 'wood', tier: 2, vol: 1, sell: 1.5, buy: 5, buyAt: 'coast' },
   cloth: { name: '마포', icon: '🧵', kind: 'mat', fam: 'cloth', tier: 1, vol: 1, sell: 1 },
-  canvas: { name: '범포', icon: '🏳', kind: 'mat', fam: 'cloth', tier: 2, vol: 1, sell: 2.5 },
+  canvas: { name: '범포', icon: '🏳', kind: 'mat', fam: 'cloth', tier: 2, vol: 1, sell: 2.5, buy: 6, buyAt: 'coast' },
   hemp: { name: '삼 밧줄', icon: '🪢', kind: 'mat', fam: 'rope', tier: 1, vol: 1, sell: 1, buy: 3 },
   tar: { name: '타르 밧줄', icon: '➰', kind: 'mat', fam: 'rope', tier: 2, vol: 1, sell: 2.5 },
   nail: { name: '쇠못', icon: '📌', kind: 'mat', fam: 'metal', tier: 1, vol: 1, sell: 1.5, buy: 4 },
+  // M2b 앞바다부터: 철판(금속 고급, 쇠못 3개로 공방에서도 만들어요)·톱니·베어링(기계 부품, 스쿠너 보조 기관). buyAt: 그 수역 항구에서만 사요(앞바다 항구는 참나무·범포·철판도 팔아요: 교역으로 번 금화가 배가 돼요)
+  plate: { name: '철판', icon: '🔳', kind: 'mat', fam: 'metal', tier: 2, vol: 1, sell: 4, buy: 10, buyAt: 'coast' },
+  gear: { name: '톱니·베어링', icon: '⚙️', kind: 'mat', fam: 'mech', tier: 2, vol: 1, sell: 6, buy: 16, buyAt: 'coast' },
   coffee: { name: '커피', icon: '☕', kind: 'trade', vol: 1, price: 8 },
   spice: { name: '향신료', icon: '🌶', kind: 'trade', vol: 1, price: 14 },
   porcelain: { name: '도자기', icon: '🏺', kind: 'trade', vol: 1, price: 22 },
@@ -242,7 +255,7 @@ export const RES = ITEMS; // 예전 이름
 export const MAT_IDS = Object.keys(ITEMS).filter((k) => ITEMS[k].kind === 'mat');
 export const TRADE_IDS = Object.keys(ITEMS).filter((k) => ITEMS[k].kind === 'trade');
 // 공방: 같은 계열 낮은 등급 3개 + 금화를 높은 등급 1개로(막힘 방지용이라 비싸요)
-export const WORKSHOP = { ratio: 3, fee: 6, pairs: { wood: 'oak', cloth: 'canvas', hemp: 'tar' } };
+export const WORKSHOP = { ratio: 3, fee: 6, pairs: { wood: 'oak', cloth: 'canvas', hemp: 'tar', nail: 'plate' } };
 // 교역: 공간마다 찾는 품목은 1.5배. 같은 공간의 기항지는 값이 같아요
 export const TRADE = { demandK: 1.5 };
 // 보급품. keep: 며칠 뒤 상하나(없으면 안 상함), vigor: 먹으면 기력이 빨리 돌아옴
@@ -251,6 +264,8 @@ export const SUPPLY = {
   dfish: { name: '건어', icon: '🐟', price: 2, desc: '비싸지만 안 상하지' },
   ffish: { name: '신선한 물고기', icon: '🎣', keep: 2, vigor: 1.6, desc: '어망으로 낚아. 기력이 빨리 돌아와. 이틀이면 상해' },
 };
+// 조수기(M2b): 짠물 바다를 항해하는 동안(입항 중엔 안 돌아요) 하루 perDay통씩 식수를 만들어요
+export const DESAL = { perDay: 2 };
 export const HERB = { name: '약초', icon: '🌿', price: 3, cap: 5, vigor: 0.45, at: 0.35, desc: '기력이 바닥나기 전에 알아서 씹어 먹지' };
 
 export const SPECIES = {
@@ -273,11 +288,15 @@ export const SPECIES = {
   kingfisher: { name: '물총새', kind: 'bird', region: 'river', color: '#2a86b8', wing: 0.5 },
   bear: { name: '곰', kind: 'land', region: 'river', color: '#5d4530', height: 1.7 },
   ottercub: { name: '수달 가족', kind: 'swimmer', region: 'river', color: '#7f5c3e', group: 3 },
-  // M2a 앞바다(기존 틀로 그려요. 갯생물·해파리는 C3)
-  gull: { name: '갈매기', kind: 'bird', region: 'coast', color: '#eceee8', wing: 1, sea: true },
-  cormorant: { name: '가마우지', kind: 'wader', region: 'coast', color: '#2e3437', sea: true },
-  dolphin: { name: '돌고래', kind: 'swimmer', region: 'coast', color: '#6f8190', size: 1.9, sea: true },
-  seal: { name: '물범', kind: 'swimmer', region: 'coast', color: '#8b867a', size: 1.3, sea: true },
+  // 앞바다(M2a 4종 → M2b 8종, 바다 생물마다 제 모양). tide: 'low'면 썰물에만 나와요(게는 썰물 해변)
+  gull: { name: '갈매기', kind: 'bird', region: 'coast', color: '#eceee8', tip: '#3d4247', wing: 1, sea: true },
+  cormorant: { name: '가마우지', kind: 'perch', region: 'coast', color: '#2a3033', sea: true },
+  pelican: { name: '펠리컨', kind: 'pelican', region: 'coast', color: '#ece6d8', bill: '#e9a640', size: 1.4, sea: true },
+  dolphin: { name: '돌고래', kind: 'dolphin', region: 'coast', color: '#6f8494', belly: '#dce4e8', size: 1, sea: true },
+  seal: { name: '물범', kind: 'seal', region: 'coast', color: '#8e887b', sea: true },
+  seaturtle: { name: '바다거북', kind: 'seaturtle', region: 'coast', color: '#6a7d4c', shell: '#7c6a3e', sea: true },
+  jelly: { name: '해파리 떼', kind: 'jelly', region: 'coast', color: '#f0b9da', group: 7, sea: true },
+  crab: { name: '게', kind: 'crab', region: 'coast', color: '#c9573c', tide: 'low', sea: true },
 };
 
 // theme: 풍경 테마 이름(themes.js THEMES)
@@ -295,8 +314,8 @@ export const REGIONS = {
       { id: 'raftcamp', name: '뗏목꾼의 빈 야영지', x: 50, y: 112, coin: 6, hemp: 3, wood: 7, cloth: 3, relic: '그을린 주전자', art: 'camp' },
       { id: 'stone', name: '이끼 낀 표지석', x: -72, y: 18, coin: 12, wood: 8, relic: '이끼 낀 이정표 조각', art: 'stone' },
       { id: 'hollow', name: '속이 빈 고목', x: 92, y: 40, coin: 10, wood: 14, relic: '다람쥐가 숨긴 금단추', art: 'stump' },
-      { id: 'fishtrap', name: '부서진 통발', x: -46, y: -62, coin: 6, hemp: 3, wood: 10, cloth: 3, relic: '버들 통발 뚜껑', art: 'wreck' },
-      { id: 'skiff', name: '가라앉은 쪽배', x: 18, y: -84, coin: 18, cloth: 8, blueprint: 'telescope', relic: '녹슨 놋쇠 노걸이', art: 'wreck' },
+      { id: 'fishtrap', name: '부서진 통발', x: -46, y: -62, coin: 6, hemp: 3, wood: 10, cloth: 3, relic: '버들 통발 뚜껑', art: 'wreck', where: 'water' },
+      { id: 'skiff', name: '가라앉은 쪽배', x: 18, y: -84, coin: 18, cloth: 8, blueprint: 'telescope', relic: '녹슨 놋쇠 노걸이', art: 'wreck', where: 'water' },
       // 내륙(inland: 물가에서 안쪽으로 들어간 거리 m)은 망원경이 있어야 찾아요
       { id: 'grove', name: '숲속 돌 제단', x: 62, y: -108, inland: 28, coin: 20, cloth: 10, relic: '제단의 돌 부적', art: 'stone' },
       { id: 'hunter', name: '사냥꾼의 빈 오두막', x: -90, y: -70, inland: 42, coin: 30, wood: 20, relic: '사냥꾼의 뿔피리', art: 'cabin' },
@@ -315,7 +334,7 @@ export const REGIONS = {
       { id: 'lighthouse', name: '작은 등대', x: 118, y: -30, coin: 30, cloth: 20, blueprint: 'mast_m', relic: '등대지기의 기름 등잔', art: 'tower' },
       { id: 'cove', name: '조용한 만', x: -166, y: 45, coin: 22, wood: 30, relic: '조개껍데기 목걸이', art: 'beached' },
       { id: 'isleStone', name: '섬의 돌탑', x: 0, y: -88, coin: 25, cloth: 15, relic: '새긴 돌 조각', art: 'stone' },
-      { id: 'barge', name: '버려진 바지선', x: 118, y: 170, coin: 40, nail: 8, wood: 40, relic: '바지선 선적 장부', art: 'wreck' },
+      { id: 'barge', name: '버려진 바지선', x: 118, y: 170, coin: 40, nail: 8, wood: 40, relic: '바지선 선적 장부', art: 'wreck', where: 'water' },
       { id: 'hut', name: '어부의 빈 오두막', x: -68, y: -212, coin: 30, blueprint: 'barometer', relic: '어부의 낡은 그물추', art: 'cabin' },
       { id: 'pineTower', name: '솔숲 망루', x: -170, y: -160, inland: 32, coin: 40, cloth: 25, relic: '망루의 구리 나팔', art: 'tower' },
       { id: 'oldCamp', name: '숲속 옛 야영지', x: 175, y: 60, inland: 45, coin: 45, hemp: 6, wood: 40, relic: '야영지의 무쇠 냄비', art: 'camp' },
@@ -336,7 +355,7 @@ export const REGIONS = {
       { id: 'rapidsStone', name: '여울목 표지', x: 70, y: 760, coin: 30, oak: 20, wood: 30, relic: '여울 뱃사공의 장대 끝', art: 'stone' },
       { id: 'mill2', name: '멈춘 물레방아', x: -40, y: 540, coin: 35, canvas: 10, cloth: 20, blueprint: 'sloop', relic: '물레방아 쇠굴대', art: 'mill' },
       { id: 'hermit', name: '강가의 은둔처', x: 120, y: 170, coin: 40, tar: 6, relic: '은둔자의 나무 묵주', art: 'shelter' },
-      { id: 'oldBridge', name: '무너진 옛 다리', x: -90, y: -180, coin: 50, oak: 30, nail: 10, wood: 40, relic: '다리 난간의 쇠고리', art: 'wreck' },
+      { id: 'oldBridge', name: '무너진 옛 다리', x: -90, y: -180, coin: 50, oak: 30, nail: 10, wood: 40, relic: '다리 난간의 쇠고리', art: 'wreck', where: 'water' },
       { id: 'cairn', name: '순례자의 돌무지', x: 50, y: -560, coin: 45, relic: '순례자의 조가비 배지', art: 'stone' },
       { id: 'beacon', name: '강 끝 봉화대', x: 12, y: -860, coin: 60, canvas: 20, cloth: 30, relic: '봉화대의 청동 종', art: 'beacon' },
       { id: 'watchHut', name: '산지기 오두막', x: 90, y: 620, inland: 30, coin: 50, oak: 25, wood: 40, relic: '산지기의 쌍안경', art: 'cabin' },
@@ -362,22 +381,26 @@ export const REGIONS = {
     islands: [{ x: -260, y: -400, r: 48, ph: 0.7 }, { x: 430, y: -360, r: 22, ph: 2.1 }, { x: 215, y: -175, r: 19, ph: 3.3 }, { x: -650, y: -210, r: 30, ph: 4.4 }],
     lights: [{ x: -250, y: -440, r: 240 }],
     start: 'fisher',
-    // water: 식수 1통 값(금화). 등대섬은 비싸요
-    ports: [{ id: 'fisher', name: '하구 어촌', x: -215, y: 262, water: 1 }, { id: 'yard', name: '조선 항구', x: 130, y: 236, water: 1 }, { id: 'cape', name: '곶 마을', x: 478, y: 70, water: 1 }, { id: 'light', name: '등대섬', x: -250, y: -338, water: 3 }],
+    // water: 식수 1통 값(금화). 등대섬은 비싸요. yard: 이 항구만 조선소 등급이 달라요(M2b: 조선 항구는 4등급, 스쿠너를 지어요)
+    ports: [{ id: 'fisher', name: '하구 어촌', x: -215, y: 262, water: 1 }, { id: 'yard', name: '조선 항구', x: 130, y: 236, water: 1, yard: 4 }, { id: 'cape', name: '곶 마을', x: 478, y: 70, water: 1 }, { id: 'light', name: '등대섬', x: -250, y: -338, water: 3 }],
     gates: [{ id: 'toRiver', name: '강 하구', x: -150, y: 438, to: 'river', entry: 'mouth', req: {} }, { id: 'toOcean', name: '큰 바다 경계', x: 0, y: -665, to: null, req: { grade: 4 }, open: true }],
+    // where: 놓이는 자리(water 물 위 · shore 물가 뭍 · beach 물가 바로 위 젖은 모래), inland: 내륙 m. tide: 'low'면 썰물에만 들어가요(hide면 그때만 보여요)
     finds: [
       { id: 'lightCape', name: '작은 등대 곶', x: -460, y: -60, coin: 50, canvas: 15, relic: '곶 등대의 렌즈 조각', art: 'tower' },
-      { id: 'coastWreck', name: '해안 난파선', x: 560, y: -250, coin: 60, nail: 12, oak: 20, relic: '난파선의 놋쇠 나침반', art: 'wreck' },
-      { id: 'fishRuin', name: '버려진 어촌', x: -620, y: 228, coin: 40, tar: 8, hemp: 6, relic: '녹슨 고래 작살', art: 'cabin' },
-      { id: 'sealRock', name: '물개 바위 돌탑', x: 430, y: -334, coin: 55, cloth: 20, relic: '물개 수염 부적', art: 'stone' },
-      { id: 'beachedBoat', name: '모래톱에 얹힌 배', x: 640, y: 175, coin: 45, wood: 40, canvas: 10, relic: '얹힌 배의 키 손잡이', art: 'beached' },
+      { id: 'coastWreck', name: '해안 난파선', x: 560, y: -250, coin: 60, nail: 12, oak: 40, plate: 8, blueprint: 'schooner', relic: '난파선의 놋쇠 나침반', art: 'wreck', where: 'water' },
+      { id: 'fishRuin', name: '버려진 어촌', x: -620, y: 228, coin: 40, oak: 10, tar: 8, hemp: 6, relic: '녹슨 고래 작살', art: 'ruins' },
+      { id: 'seaCave', name: '바다 동굴', x: 470, y: 40, coin: 70, gear: 3, nail: 8, blueprint: 'desal', relic: '밀수꾼의 놋쇠 등잔', art: 'cave', where: 'shore', depth: 2, tide: 'low' },
+      { id: 'sealRock', name: '물개 바위', x: 430, y: -334, coin: 55, cloth: 20, relic: '물개 수염 부적', art: 'rocks' },
+      { id: 'tidepool', name: '조수 웅덩이', x: 150, y: 200, coin: 35, canvas: 10, gear: 1, relic: '별 모양 불가사리 화석', art: 'tidepool', where: 'beach', tide: 'low', hide: true },
+      { id: 'beachedBoat', name: '모래톱에 얹힌 배', x: 640, y: 175, coin: 45, oak: 25, wood: 25, canvas: 10, relic: '얹힌 배의 키 손잡이', art: 'beached' },
       { id: 'capeTower', name: '곶 위 망루', x: 390, y: -10, inland: 30, coin: 70, canvas: 20, relic: '망루의 깨진 망원경', art: 'tower' },
       { id: 'pineShrine', name: '해송 숲 옛 제단', x: -330, y: 270, inland: 35, coin: 65, tar: 6, relic: '바다 신의 조개 제기', art: 'shrine' },
+      { id: 'estuaryBuoy', name: '하구 부표', x: -120, y: 330, coin: 30, plate: 4, gear: 1, relic: '부표의 녹슨 종', art: 'buoy', where: 'water' },
     ],
     // 모래톱: 썰물(-0.6m)엔 가운데가 드러나고 밀물(+0.6m)엔 슬루프도 넘어가요. 동쪽 곶 끝과 작은 섬 사이 지름길, 하구 앞 모래톱
     shoals: [{ x: 262, y: -140, r: 42, depth: 0.55 }, { x: 318, y: -102, r: 44, depth: 0.5 }, { x: 368, y: -72, r: 34, depth: 0.6 }, { x: -78, y: 238, r: 36, depth: 0.75 }, { x: 600, y: 120, r: 46, depth: 0.7 }],
-    // 바다는 나무가 덜 떠 있어요. 그물 뭉치(net → 마포), 물통(water → 식수), 반짝이는 곳(비단이 처음 나와요)
-    flot: { cap: 22, table: [['wood', 1.5, 3, 6], ['net', 2.5, 3, 6], ['hemp', 1.5, 2, 4], ['nail', 1, 2, 4], ['tar', 1, 2, 3], ['water', 2.5, 2, 3], ['shiny', 3.5, 1, 1]] },
+    // 바다는 나무가 덜 떠 있어요. 그물 뭉치(net → 마포), 물통(water → 식수), 반짝이는 곳(비단이 처음 나와요). M2b: 철판·톱니가 가끔 떠와요
+    flot: { cap: 30, table: [['wood', 2, 3, 6], ['oak', 2, 2, 5], ['net', 2.5, 3, 6], ['hemp', 1.2, 2, 4], ['nail', 1, 2, 4], ['tar', 1, 2, 3], ['plate', 0.9, 1, 2], ['gear', 0.35, 1, 1], ['water', 2.5, 2, 3], ['shiny', 5, 1, 2]] },
     trade: [['spice', 3], ['porcelain', 4], ['silk', 3], ['painting', 0.4]], demand: ['coffee', 'porcelain'],
   },
 };
@@ -402,7 +425,11 @@ export const ACHIEVEMENTS = [
   { id: 'species10', name: '물가의 친구들', desc: '생물 10종 기록', coin: 50 },
   { id: 'speciesAll', name: '민물 박물학자', desc: '민물 생물 모두 기록', coin: 80, decor: 'garland' },
   { id: 'riverEnd', name: '강이 끝나는 곳', desc: '강 끝을 지나 앞바다에 닿기', coin: 50 },
-  // M2a: 이번 단계의 엔딩(4등급 배로 큰 바다 경계 넘기). 스쿠너는 C4에서 생겨요
+  // M2b 앞바다
+  { id: 'bowRide', name: '뱃머리의 돌고래', desc: '배 앞을 타는 돌고래 기록하기', coin: 30 },
+  { id: 'seaAll', name: '바다 박물학자', desc: '바다 생물 모두 기록', coin: 60 },
+  { id: 'schooner', name: '두 돛대의 배', desc: '스쿠너 짓기', coin: 40 },
+  // 이번 단계의 엔딩(4등급 배로 큰 바다 경계 넘기)
   { id: 'openSea', name: '큰 바다 앞에서', desc: '4등급 배로 큰 바다 경계 넘기', coin: 80 },
 ];
 

@@ -49,6 +49,7 @@ test('M2a 지도: 앞바다는 남쪽이 뭍·북쪽이 바다, 거리 격자 5m
     for (const f of list) {
       assert.ok(w.edgeDist(f.x, f.y) > 60, `시드 ${seed} ${f.id} 경계 가까이`);
       if (f.where === 'water') assert.ok(w.dist(f.x, f.y) > 10);
+      else if (f.where === 'beach') assert.ok(w.landDist(f.x, f.y) > 0 && w.landDist(f.x, f.y) < 6, `시드 ${seed} ${f.id} 조간대`); // M2b 조수 웅덩이
       else { assert.ok(w.landDist(f.x, f.y) < 0, `시드 ${seed} ${f.id} 뭍`); const [ax, ay] = w.nearestWater(f.x, f.y); assert.ok(w.findPath(p0.x, p0.y, ax, ay), `시드 ${seed} ${f.id} 길`); }
     }
   }
@@ -211,7 +212,7 @@ test('M2a 저장 v5 → v6: 식수 0, 강 끝 엔딩을 본 저장은 엔딩을 
   S.ended = true; S.ach.riverEnd = 1;
   const o = JSON.parse(G.serialize(S)); o.v = 5; delete o.water;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 6); assert.equal(T.water, 0); assert.equal(T.ended, false);
+  assert.equal(T.v, 7); assert.equal(T.water, 0); assert.equal(T.ended, false);
   assert.equal(T.region, 'river'); assert.equal(T.docked, 'mouth'); assert.ok(T.ach.riverEnd);
   const p = worldOf('river').ports.find((q) => q.id === 'mouth');
   assert.ok(Math.hypot(T.boat.x - p.x, T.boat.y - p.y) < 1);
