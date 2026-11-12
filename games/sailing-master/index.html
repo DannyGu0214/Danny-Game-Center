@@ -910,7 +910,7 @@ function drainEvents() {
       case 'squallSoon': showHint(ev.shade ? '소나기 온다! 식량은 그늘막 밑으로!' : '소나기 온다! 그늘막이 없으니 식량이 젖겠어!', 3.5, !ev.shade); break;
       case 'rainOn': if (!ev.shade && !ev.storm) toast('🌧 비다! 식량 덮을 데가 없어!'); break;
       case 'foodWet': snd.play('warn'); toast(`💧 ${Object.keys(ev.got).map((k) => SUPPLY[k].name).join('·')}이(가) 젖었다! 상하기 전에 먹어 치우자고`); break;
-      case 'fogOn': showHint('짙은 안개다! 코앞도 안 보여. 천천히 가자고!', 4); break;
+      case 'fogOn': showHint(S.weather.on.includes('seafog') ? '해무다! 바다가 하얗게 덮였어. 등대 불빛이랑 종소리를 따라가자고!' : S.weather.on.includes('fog') ? '짙은 안개다! 코앞도 안 보여. 천천히 가자고!' : '큰 바다 쪽 안개가 짙어진다!', 4); break;
       case 'fogOff': toast('🌤 안개가 걷혔다!'); break;
       case 'floodOn': snd.play('warn'); showHint('강물이 불었다! 물살이 세니 물가 조심해. 떠내려오는 것도 많겠는걸!', 4.5, true); break;
       case 'sailStrain': snd.play('creak'); showHint('돛폭이 비명을 지른다! 줄여, 찢어지겠어!', 3, true); break;
@@ -1698,7 +1698,7 @@ function syncTop() {
   const st = G.stats(S), persons = 1 + S.crew.length, c = G.clock(S);
   // 지금 날씨 중 가장 심한 것. 없으면 다가오는 돌풍·폭풍을 예고로
   const wx = S.weather, now = !S.docked && wx.worst ? WX[wx.worst] : null, soon = !S.docked && wx.soon?.find((id) => WX[id].rough);
-  const sw = S.docked ? 0 : G.swellHere(S), swellAlert = sw > st.sea * 0.85 ? `너울 ${sw.toFixed(1)}m` : ''; // M2a: 내항성에 가까운 너울이 가장 먼저
+  const sw = S.docked ? 0 : G.swellHere(S), swellAlert = sw > st.sea * 0.92 ? `너울 ${sw.toFixed(1)}m` : ''; // M2a: 내항성에 가까운 너울이 가장 먼저
   const color = SEASON_COLOR[c.season.id], alert = swellAlert || (soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : ''); // 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저
   $('dateNum').innerHTML = `<i style="background:${color};color:${color}"></i>${c.season.name} ${c.dayOfSeason + 1}일`;
   $('regionName').textContent = `${REGIONS[S.region].name}${alert ? ` · ${alert}` : ''}`;

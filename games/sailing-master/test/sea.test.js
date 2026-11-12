@@ -5,6 +5,7 @@ import * as G from '../logic.js';
 import * as SH from '../ship.js';
 import { worldOf, createWorld } from '../world.js';
 import { sceneLayout } from '../art.js';
+import { SAIL_SETS, FILES, READY, startSail } from '../music.js';
 import { HULLS, REGIONS, CAL, WX, WEATHER, TIDE, WATER, MODULES, ACHIEVEMENTS } from '../data.js';
 
 const run = (S, sec, each) => { for (let i = 0; i < sec * 30; i++) { G.step(S, G.FIXED_DT); if (each) each(S); } return S; };
@@ -221,4 +222,10 @@ test('M2a 저장 v5 → v6: 식수 0, 강 끝 엔딩을 본 저장은 엔딩을 
   const V = G.deserialize(JSON.stringify(q)); assert.equal(V.docked, 'reed'); assert.equal(V.water, 0);
   // 다시 저장해도 같아요
   assert.deepEqual(JSON.parse(G.serialize(G.deserialize(G.serialize(T)))), JSON.parse(G.serialize(T)));
+});
+
+test('M2a 음악: 앞바다는 sea.mp3(있는 파일)로 시작하고 강 곡과 번갈아요', () => {
+  assert.deepEqual(SAIL_SETS.coast, ['sea', 'river']);
+  assert.equal(startSail('coast').track, 'sea');
+  assert.ok(READY.has(FILES.sea));
 });

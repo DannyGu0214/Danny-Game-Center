@@ -1181,7 +1181,7 @@ function seaHere(S, wx, st, w) {
   // 물보라: 너울이 내항성에 가까우면 갑판을 덮어요(방수 격벽이 막아요, wetFood)
   if (swell > sw * WEATHER.sprayAt) wx.fx.spray = 1;
   // 전조 → 고비: 너울이 버거워지기 시작하면 한 번 알려요. 넘으면 때린다고 알려요
-  const warn = swell > sw * 0.85 ? (over > 0 ? 2 : 1) : 0, was = S.swellState || 0;
+  const warn = swell > sw * 0.92 ? (over > 0 ? 2 : 1) : 0, was = S.swellState || 0;
   if (warn > was) emit(S, warn === 2 ? 'swellHit' : 'swellWarn', { swell, sea: sw, beam: beam > 1.1 });
   if (!over && was === 2) { emit(S, 'swellOff', { hurt: S.swellHurtNow || 0 }); S.swellHurtNow = 0; }
   S.swellState = warn;
