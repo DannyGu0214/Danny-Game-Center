@@ -257,11 +257,11 @@ test('저장 v4 → v5: 돛은 멀쩡, 꿰매기 규칙은 켬, 옛 날씨 칸�
   o.v = 4; delete o.boat.torn; delete o.boat.strain; delete o.mend; delete o.rules?.mend; o.rules = { reef: true, repair: true, storm: false };
   o.weather = { heat: false, drought: false, gustOn: true, gustSoon: false };
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 6); assert.equal(T.boat.torn, false); assert.equal(T.boat.strain, 0); assert.equal(T.rules.mend, true);
+  assert.equal(T.v, 7); assert.equal(T.boat.torn, false); assert.equal(T.boat.strain, 0); assert.equal(T.rules.mend, true);
   assert.ok(T.weather.fx); assert.equal(T.weather.gustOn, true, '돌풍이 끝나는 것도 알아챈다');
   run(T, 2);
   assert.ok(T.weather.fx && Array.isArray(T.weather.on));
-  assert.equal(G.newGame(1).v, 6);
+  assert.equal(G.newGame(1).v, 7);
 });
 
 test('여울: 가뭄에 여울을 기어가도 여울 피해만으로는 가라앉지 않는다(내구도 25%에서 멈춤)', () => {

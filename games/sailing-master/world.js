@@ -251,12 +251,14 @@ export function createWorld(def) {
     for (let i = 0; i < 300 && dist(px, py) > -depth; i++) { const [gx, gy] = gradient(px, py); px -= gx * 2; py -= gy * 2; }
     return [px, py];
   }
-  // 발견지: 난파선은 물 위, 나머지는 물가의 뭍, inland가 있으면 그만큼 내륙이다
+  // 발견지 자리(M2b where 칸): water 물 위 · shore 물가 뭍(3m, depth로 바꿔요) · beach 물가 바로 위(1m, 썰물 웅덩이) · inland가 있으면 그만큼 내륙
+  const whereOf = (f) => (f.where === 'water' ? 'water' : f.inland ? 'inland' : f.where === 'beach' ? 'beach' : 'shore');
+  const depthOf = (f) => f.inland || f.depth || (f.where === 'beach' ? 1 : 3);
   const finds = def.finds.map((f) => {
     const w = snap(f);
-    if (f.art === 'wreck') return { ...w, where: 'water' };
-    const [x, y] = landSpot(w.x, w.y, f.inland || 3);
-    return { ...f, x, y, where: f.inland ? 'inland' : 'shore' };
+    if (whereOf(f) === 'water') return { ...w, where: 'water' };
+    const [x, y] = landSpot(w.x, w.y, depthOf(f));
+    return { ...f, x, y, where: whereOf(f) };
   });
   // 배 대는 자리는 물가에서 12m 안쪽으로 당긴다. 너무 멀면 부두가 닿지 않아 배가 물 한가운데 떠 보인다
   const dockSpot = (p) => {
@@ -275,18 +277,19 @@ export function createWorld(def) {
         const x = bx0 + rnd() * (bx1 - bx0), y = by0 + rnd() * (by1 - by0), d = dist(x, y);
         if (d < 12) continue; // 물 위에서 고른 뒤
         if (coast && edgeDist(x, y) < 70) continue; // 해안 지도: 큰 바다 경계(짙은 안개 띠) 근처는 빼요
-        if (f.art === 'wreck') { if (clear(x, y)) done = { ...f, x, y, where: 'water' }; continue; }
+        const where = whereOf(f);
+        if (where === 'water') { if (clear(x, y)) done = { ...f, x, y, where }; continue; }
         if (d > 34) continue; // 물가 가까이에서 뭍으로 들어간다
-        const depth = f.inland || 3, [px, py] = landSpot(x, y, depth), q = landDist(px, py);
+        const depth = depthOf(f), [px, py] = landSpot(x, y, depth), q = landDist(px, py);
         if (q > -depth + 1 || q < -depth - 8 || !clear(px, py)) continue;
-        done = { ...f, x: px, y: py, where: f.inland ? 'inland' : 'shore' };
+        done = { ...f, x: px, y: py, where };
       }
       out.push(done || finds[i]);
     });
     return out;
   }
 
-  return { id: def.id, def, randomFinds, dist, landDist, edgeDist, isWater: (x, y) => dist(x, y) > 0, gradient, lineClear, nearestWater, findPath, outlines, scatter, flowAt, depthAt, swellAt, ports, gates, finds, bounds: [bx0, by0, bx1, by1], river, coast, cell: CELL, grid: [GW, GH], coastY };
+  return { id: def.id, def, randomFinds, whereOf, dist, landDist, edgeDist, isWater: (x, y) => dist(x, y) > 0, gradient, lineClear, nearestWater, findPath, outlines, scatter, flowAt, depthAt, swellAt, ports, gates, finds, bounds: [bx0, by0, bx1, by1], river, coast, cell: CELL, grid: [GW, GH], coastY };
 }
 
 const cache = {};

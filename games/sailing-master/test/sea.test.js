@@ -211,7 +211,7 @@ test('M2a 저장 v5 → v6: 식수 0, 강 끝 엔딩을 본 저장은 엔딩을 
   S.ended = true; S.ach.riverEnd = 1;
   const o = JSON.parse(G.serialize(S)); o.v = 5; delete o.water;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 6); assert.equal(T.water, 0); assert.equal(T.ended, false);
+  assert.equal(T.v, 7); assert.equal(T.water, 0); assert.equal(T.ended, false);
   assert.equal(T.region, 'river'); assert.equal(T.docked, 'mouth'); assert.ok(T.ach.riverEnd);
   const p = worldOf('river').ports.find((q) => q.id === 'mouth');
   assert.ok(Math.hypot(T.boat.x - p.x, T.boat.y - p.y) < 1);

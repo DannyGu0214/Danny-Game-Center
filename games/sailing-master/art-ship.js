@@ -5,7 +5,12 @@ import { planW, modulePos, sizeOf, statsOf } from './ship.js';
 
 const PI = Math.PI, TAU = PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const CELL = 256, COLS = 8, DIRS = 64, PX = 20; // 아틀라스 한 칸 256px, 1m = 20px, 64방향 = 2048×2048
+const CELL = 256, COLS = 8, DIRS = 64, PX = 20; // 아틀라스 한 칸 256px, 1m = 20px(기본), 64방향 = 2048×2048
+// 선체마다 굽는 배율(M2b): 12m가 넘는 배(스쿠너 14~16.5m)는 1m를 덜 써서 칸 256px 안에 들어가게 해요. 그릴 때 k = zoom / px로 되돌려요
+export const pxOf = (H) => Math.min(PX, Math.floor(230 / H.len));
+// 갑판 위 사람이 서는 높이: 슬루프·스쿠너는 고물 조종석 바닥, 나룻배는 바닥 판, 뗏목은 갑판
+export const floorOf = (H) => (H.kind === 'sloop' ? 0.72 : H.kind === 'schooner' ? H.deck - 0.28 : H.kind === 'rowboat' ? 0.22 : H.deck);
+const big = (H) => H.kind === 'sloop' || H.kind === 'schooner';
 const CENTER_Y = CELL / 2 + 22; // 수면 기준점(높이만큼 위로 그려서 아래로 내려 둠)
 const DZ = 0.075;
 const WOOD = { deck: '#c79c63', deckDark: '#a97f4b', cap: '#8a5b34', floor: '#7f5a36', log: '#a07a4c', logDark: '#7a5a35', logLit: '#bd9767' };
@@ -41,7 +46,7 @@ function drawPerk(g, H) {
   } else if (H.kind === 'rowboat') {
     g.beginPath(); roundRect(g, -0.85, -0.08, 0.75, 0.08, 0.04); g.fillStyle = '#5a3f22'; g.fill();
     g.fillStyle = '#d9b265'; g.fillRect(-0.7, -0.015, 1.3, 0.03);
-  } else {
+  } else if (H.kind === 'sloop') {
     const x = H.cockpit[1] + 0.25;
     for (const y of [-1, 1]) { g.beginPath(); g.arc(x, y * 1.02, 0.13, 0, TAU); g.fillStyle = '#d9b265'; g.fill(); g.beginPath(); g.arc(x, y * 1.02, 0.05, 0, TAU); g.fillStyle = '#6b4a2e'; g.fill(); }
   }
@@ -107,14 +112,15 @@ function sliceRowboat(g, z, paint, H) {
     g.fillStyle = '#6b4a2e'; g.beginPath(); g.ellipse(H.len / 2 - 0.12, 0, 0.12, 0.08, 0, 0, TAU); g.fill();
   }
 }
+// 슬루프·스쿠너 선체. 스쿠너(M2b)는 갑판이 높아(1.35m) 띠 높이를 갑판 비율로 맞추고, 갑판 둘레에 뱃전 벽(bulwark), 두 줄 띠, 구리 밑판, 갑판 승강구를 더해요
 function sliceSloop(g, z, paint, H) {
-  const DECK = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap, [ck0, ck1] = H.cockpit;
+  const DECK = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap, [ck0, ck1] = H.cockpit, sch = H.kind === 'schooner', u = z / DECK, hw = H.beam / 2;
   let from = -1;
   if (z > DECK) from = Math.pow((z - DECK) / 0.42, 1 / 2.2);
   if (from >= 0.98) return;
-  const strake = (z - 0.17) / 0.11, seam = strake % 1 < 0.35 && z > 0.2;
+  const strake = (u - 0.17) / 0.11, seam = strake % 1 < 0.35 && u > 0.2;
   const side = seam ? shade(paint, -0.16) : Math.floor(strake) % 2 ? shade(paint, -0.05) : paint;
-  const color = z < 0.08 ? BOTTOM : z < 0.17 ? BOOT : z < 0.72 ? side : z < 0.83 ? STRIPE : z < DECK - 0.05 ? side : cap;
+  const color = u < 0.08 ? (sch ? '#b5683f' : BOTTOM) : u < 0.17 ? BOOT : u < 0.72 ? side : u < 0.83 ? STRIPE : sch && u > 0.88 && u < 0.92 ? '#e7c46a' : z < DECK - 0.05 ? side : cap;
   hullPath(g, H.id, z, 0, from);
   g.fillStyle = color; g.fill();
   if (z > DECK - 0.05) {
@@ -122,22 +128,37 @@ function sliceSloop(g, z, paint, H) {
     g.fillStyle = WOOD.deck; g.fill();
     g.save(); hullPath(g, H.id, z, 0.14, from); g.clip();
     g.strokeStyle = WOOD.deckDark; g.lineWidth = 0.025;
-    for (let y = -1.6; y < 1.6; y += 0.22) { g.beginPath(); g.moveTo(-H.len / 2, y); g.lineTo(H.len / 2, y); g.stroke(); }
+    for (let y = -hw; y < hw; y += 0.22) { g.beginPath(); g.moveTo(-H.len / 2, y); g.lineTo(H.len / 2, y); g.stroke(); }
     // 판자 끝 이음(엇갈림)과 갑판 쇠고리
     g.strokeStyle = 'rgba(80,55,30,.35)'; g.lineWidth = 0.02;
-    for (let r = 0; r < 15; r++) { const y = -1.6 + r * 0.22, x = -H.len / 2 + 0.6 + ((r * 0.37) % 1) * 1.6; for (let xx = x; xx < H.len / 2; xx += 1.9) { g.beginPath(); g.moveTo(xx, y); g.lineTo(xx, y + 0.22); g.stroke(); } }
+    for (let r = 0; r < Math.ceil(H.beam / 0.22); r++) { const y = -hw + r * 0.22, x = -H.len / 2 + 0.6 + ((r * 0.37) % 1) * 1.6; for (let xx = x; xx < H.len / 2; xx += 1.9) { g.beginPath(); g.moveTo(xx, y); g.lineTo(xx, y + 0.22); g.stroke(); } }
     g.restore();
-    if (from < 0) { g.fillStyle = '#5a5e62'; for (const [x, y] of [[H.len / 2 - 1.2, 0.55], [H.len / 2 - 1.2, -0.55], [ck0 - 0.3, 0.9], [ck0 - 0.3, -0.9]]) { g.beginPath(); roundRect(g, x - 0.12, y - 0.04, x + 0.12, y + 0.04, 0.03); g.fill(); } }
+    if (from < 0) {
+      g.fillStyle = '#5a5e62'; for (const [x, y] of [[H.len / 2 - 1.2, 0.55], [H.len / 2 - 1.2, -0.55], [ck0 - 0.3, hw * 0.6], [ck0 - 0.3, -hw * 0.6]]) { g.beginPath(); roundRect(g, x - 0.12, y - 0.04, x + 0.12, y + 0.04, 0.03); g.fill(); }
+      // 스쿠너: 갑판 승강구 둘(격자 뚜껑)과 닻 감는 양묘기
+      if (sch) {
+        for (const [x0, x1] of [[H.len / 2 - 2.6, H.len / 2 - 1.7], [ck1 + 0.5, ck1 + 1.3]]) {
+          g.fillStyle = '#7f5a36'; g.beginPath(); roundRect(g, x0, -0.45, x1, 0.45, 0.06); g.fill();
+          g.strokeStyle = 'rgba(40,24,10,.55)'; g.lineWidth = 0.03; for (let x = x0 + 0.12; x < x1; x += 0.15) { g.beginPath(); g.moveTo(x, -0.4); g.lineTo(x, 0.4); g.stroke(); } for (let y = -0.33; y < 0.4; y += 0.15) { g.beginPath(); g.moveTo(x0 + 0.05, y); g.lineTo(x1 - 0.05, y); g.stroke(); }
+        }
+        g.fillStyle = '#4a4e52'; g.beginPath(); roundRect(g, H.len / 2 - 1.05, -0.38, H.len / 2 - 0.75, 0.38, 0.08); g.fill();
+      }
+    }
+  }
+  // 스쿠너 뱃전 벽: 갑판 위 0.3m, 안쪽을 비워 둘레만
+  if (sch && z > DECK && z < DECK + 0.3) {
+    hullPath(g, H.id, z, 0.065); g.strokeStyle = z > DECK + 0.24 ? shade(cap, 0.22) : cap; g.lineWidth = 0.13; g.lineJoin = 'round'; g.stroke();
   }
   // 고물 쪽 움푹한 조종석
-  if (z >= 0.6 && z <= DECK + 0.02) {
+  const cut = sch ? DECK - 0.4 : 0.6, floor = sch ? DECK - 0.44 : 0.56, cw = sch ? 1.05 : 0.72;
+  if (z >= cut && z <= DECK + 0.02) {
     g.save(); g.globalCompositeOperation = 'destination-out';
-    g.beginPath(); roundRect(g, ck0, -0.72, ck1, 0.72, 0.28); g.fill(); g.restore();
+    g.beginPath(); roundRect(g, ck0, -cw, ck1, cw, 0.28); g.fill(); g.restore();
   }
-  if (Math.abs(z - 0.56) < DZ * 0.6) {
-    g.beginPath(); roundRect(g, ck0 - 0.1, -0.8, ck1 + 0.1, 0.8, 0.3); g.fillStyle = WOOD.floor; g.fill();
+  if (Math.abs(z - floor) < DZ * 0.6) {
+    g.beginPath(); roundRect(g, ck0 - 0.1, -cw - 0.08, ck1 + 0.1, cw + 0.08, 0.3); g.fillStyle = WOOD.floor; g.fill();
     g.strokeStyle = 'rgba(40,24,10,.35)'; g.lineWidth = 0.02;
-    for (let x = ck0 + 0.05; x < ck1 + 0.1; x += 0.2) { g.beginPath(); g.moveTo(x, -0.75); g.lineTo(x, 0.75); g.stroke(); }
+    for (let x = ck0 + 0.05; x < ck1 + 0.1; x += 0.2) { g.beginPath(); g.moveTo(x, -cw); g.lineTo(x, cw); g.stroke(); }
   }
   if (H.star === 3 && z > DECK && z < DECK + 0.16) drawPerk(g, H);
 }
@@ -204,6 +225,46 @@ function sliceModule(g, m, hullId, z) {
     case 'barometer':
       if (!top) { g.fillStyle = '#6b4a2e'; g.fillRect(cx - 0.05, cy - 0.05, 0.1, 0.1); } else { g.fillStyle = M.color; g.beginPath(); g.arc(cx, cy, 0.16, 0, TAU); g.fill(); g.fillStyle = '#b03a2e'; g.fillRect(cx - 0.01, cy - 0.12, 0.02, 0.12); }
       break;
+    // M2b: 물통·조수기·타륜·망루·구명정·방수 격벽·수리대
+    case 'water': {
+      const r = Math.min(hx, hy) * 0.82;
+      g.fillStyle = top ? '#6aa0b4' : M.color; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
+      if (top || Math.abs(z - M.z * 0.3) < DZ * 0.6 || Math.abs(z - M.z * 0.75) < DZ * 0.6) { g.strokeStyle = '#2f3a40'; g.lineWidth = 0.05; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke(); }
+      if (top) { g.fillStyle = '#2f3a40'; g.beginPath(); g.arc(cx + r * 0.35, cy - r * 0.3, 0.06, 0, TAU); g.fill(); }
+      break;
+    }
+    case 'desal': {
+      // 구리 솥 + 굴뚝 + 감긴 관
+      g.fillStyle = top ? '#d9935a' : '#b8703c'; g.beginPath(); g.arc(cx, cy + 0.05, Math.min(hx, hy) * 0.7, 0, TAU); g.fill();
+      if (z > M.z * 0.5) { g.fillStyle = '#3f4448'; g.beginPath(); g.arc(cx - 0.15, cy - 0.12, 0.09, 0, TAU); g.fill(); }
+      if (top) { g.strokeStyle = '#e8b27a'; g.lineWidth = 0.04; g.beginPath(); g.arc(cx, cy + 0.05, Math.min(hx, hy) * 0.45, 0.4, 5.2); g.stroke(); g.fillStyle = '#9fb7c0'; g.beginPath(); g.arc(cx + 0.18, cy + 0.15, 0.07, 0, TAU); g.fill(); }
+      break;
+    }
+    case 'wheel': {
+      g.fillStyle = '#5a3f22'; g.fillRect(cx - 0.08, cy - 0.08, 0.16, 0.16); // 받침 기둥
+      if (z > M.z - DZ * 3) {
+        g.strokeStyle = '#7a5230'; g.lineWidth = 0.06; g.beginPath(); g.moveTo(cx - 0.05, cy - 0.42); g.lineTo(cx - 0.05, cy + 0.42); g.stroke();
+        g.fillStyle = '#b98f45'; for (const d of [-0.48, -0.24, 0.24, 0.48]) { g.beginPath(); g.arc(cx - 0.05, cy + d, 0.05, 0, TAU); g.fill(); }
+      }
+      break;
+    }
+    case 'crowsnest':
+      if (!top && z < M.z - DZ * 2) { g.fillStyle = '#6b4a2e'; g.fillRect(cx - 0.05, cy - 0.05, 0.1, 0.1); } else { g.fillStyle = '#8a6a3a'; g.beginPath(); g.arc(cx, cy, Math.min(hx, hy) * 0.8, 0, TAU); g.fill(); if (top) { g.fillStyle = '#5a3f22'; g.beginPath(); g.arc(cx, cy, Math.min(hx, hy) * 0.55, 0, TAU); g.fill(); } }
+      break;
+    case 'lifeboat': {
+      // 뒤집어 묶어 둔 작은 보트(빨강·흰 줄)
+      g.fillStyle = top ? '#f1ece2' : M.color; g.beginPath(); g.ellipse(cx, cy, hx * 0.95, hy * 0.82, 0, 0, TAU); g.fill();
+      if (top) { g.fillStyle = M.color; g.beginPath(); g.ellipse(cx, cy, hx * 0.95, hy * 0.3, 0, 0, TAU); g.fill(); g.strokeStyle = '#d9c9a0'; g.lineWidth = 0.04; for (const x of [cx - hx * 0.45, cx + hx * 0.45]) { g.beginPath(); g.moveTo(x, cy - hy * 0.85); g.lineTo(x, cy + hy * 0.85); g.stroke(); } }
+      break;
+    }
+    case 'bulkhead':
+      g.fillStyle = top ? '#8a8f93' : M.color; g.beginPath(); roundRect(g, x0 + 0.04, y0 + 0.04, x1 - 0.04, y1 - 0.04, 0.06); g.fill();
+      if (top) { g.fillStyle = '#4e5357'; for (const [a, b] of [[x0 + 0.12, y0 + 0.12], [x1 - 0.12, y0 + 0.12], [x0 + 0.12, y1 - 0.12], [x1 - 0.12, y1 - 0.12]]) { g.beginPath(); g.arc(a, b, 0.04, 0, TAU); g.fill(); } g.strokeStyle = '#4e5357'; g.lineWidth = 0.04; g.beginPath(); g.arc(cx, cy, 0.14, 0, TAU); g.stroke(); }
+      break;
+    case 'bench':
+      g.fillStyle = top ? '#b48a58' : M.color; g.beginPath(); roundRect(g, x0 + 0.03, y0 + 0.1, x1 - 0.03, y1 - 0.1, 0.04); g.fill();
+      if (top) { g.fillStyle = '#5a5e62'; g.fillRect(cx - 0.2, cy - 0.04, 0.28, 0.08); g.fillStyle = '#6b4a2e'; g.fillRect(cx + 0.08, cy - 0.03, 0.18, 0.06); }
+      break;
     default: // 돛대 받침
       g.beginPath(); g.arc(cx, cy, 0.2, 0, TAU); g.fill();
   }
@@ -231,12 +292,12 @@ function sliceDecor(g, ship, z) {
 // 설계가 바뀔 때 방향마다 층을 쌓아 한 장에 굽는다. 조명은 세상 기준이라 칸마다 입힌다
 export function bakeShip(ship, reuse = null) {
   const H = HULLS[ship.hull], paint = PAINTS.hull[ship.paint?.hull ?? 0] || PAINTS.hull[0];
-  const tall = Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + (H.kind === 'sloop' ? 0.45 : 0.1);
-  const zMax = H.deck + tall, layers = [], size = CELL;
+  const tall = Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + (big(H) ? 0.45 : 0.1);
+  const zMax = H.deck + tall, layers = [], size = CELL, px = pxOf(H);
   for (let z = 0; z <= zMax; z += DZ) {
     const c = document.createElement('canvas'); c.width = c.height = size;
     const g = c.getContext('2d');
-    g.setTransform(PX, 0, 0, PX, size / 2, size / 2);
+    g.setTransform(px, 0, 0, px, size / 2, size / 2);
     if (H.kind === 'raft') sliceRaft(g, z, H); else if (H.kind === 'rowboat') sliceRowboat(g, z, paint, H); else sliceSloop(g, z, paint, H);
     for (const m of ship.mods) sliceModule(g, m, ship.hull, z - H.deck);
     sliceDecor(g, ship, z - H.deck);
@@ -250,7 +311,7 @@ export function bakeShip(ship, reuse = null) {
     g.save();
     g.beginPath(); g.rect((d % COLS) * CELL, Math.floor(d / COLS) * CELL, CELL, CELL); g.clip();
     for (const { c, z } of layers) {
-      g.setTransform(Math.cos(a), Math.sin(a) * VIEW.tiltY, -Math.sin(a), Math.cos(a) * VIEW.tiltY, cx, cy - z * PX * VIEW.tiltZ);
+      g.setTransform(Math.cos(a), Math.sin(a) * VIEW.tiltY, -Math.sin(a), Math.cos(a) * VIEW.tiltY, cx, cy - z * px * VIEW.tiltZ);
       g.drawImage(c, -size / 2, -size / 2);
     }
     // 왼쪽 위에서 오는 햇빛: 오른쪽 아래가 어둡다
@@ -263,13 +324,33 @@ export function bakeShip(ship, reuse = null) {
   }
   for (const l of layers) l.c.width = l.c.height = 0; // iOS 캔버스 메모리 반환
   const st = statsOf(ship);
-  const M = st.mast ? MODULES[st.mastId] : null;
+  // 돛대마다 돛 하나(M2b: 스쿠너는 둘). rigs는 뱃머리 쪽부터, rig는 가장 큰 돛(그림자·깃발·찢어짐). 앞 돛의 붐은 뒤 돛대에 닿지 않게 줄여요. 앞 삼각돛은 맨 앞 돛대에만
+  const xs = st.masts.map((m) => modulePos(ship.hull, m)[0]);
+  const rigs = st.masts.map((m, i) => {
+    const M = MODULES[m.id], x = xs[i], behind = xs.filter((q) => q < x - 0.01).sort((a, b) => b - a)[0];
+    return { x, h: M.mastH, boomL: behind == null ? M.boom : Math.min(M.boom, x - behind - 0.5), boomZ: H.deck + 1.3, big: M.sail >= 1, base: H.deck + 0.05, main: i === 0 };
+  }).sort((a, b) => b.x - a.x);
+  rigs.forEach((r, i) => { r.jib = i === 0 && r.big; r.top = r.h === Math.max(...rigs.map((q) => q.h)); });
   return {
-    atlas, hull: H, oar: ship.mods.find((m) => m.id === 'oar') ? modulePos(ship.hull, ship.mods.find((m) => m.id === 'oar'))[0] : -0.5,
-    rig: M ? { x: st.mastX, h: M.mastH, boomL: M.boom, boomZ: H.deck + 1.3, big: M.sail >= 1, base: H.deck + 0.05 } : null,
+    atlas, px, hull: H, oar: ship.mods.find((m) => m.id === 'oar') ? modulePos(ship.hull, ship.mods.find((m) => m.id === 'oar'))[0] : -0.5,
+    rig: rigs.find((r) => r.main) || null, rigs,
     sail: PAINTS.sail[ship.paint?.sail ?? 0] || PAINTS.sail[0], flag: PAINTS.flag[ship.paint?.flag ?? 0] || PAINTS.flag[0],
     decor: ship.decor || [],
   };
+}
+
+// 아틀라스 칸 안에 들어가나(M2b): 선체 윤곽 점을 굽기와 같은 변환으로 64방향 모두 돌려 칸 좌표의 범위를 돌려줘요(화면 없이, 테스트용)
+export function atlasBounds(ship) {
+  const H = HULLS[ship.hull], px = pxOf(H), zMax = H.deck + Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + (big(H) ? 0.45 : 0.1);
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let d = 0; d < DIRS; d++) {
+    const a = d / DIRS * TAU, c = Math.cos(a), n = Math.sin(a);
+    for (let i = 0; i <= 40; i++) for (const side of [-1, 1]) for (const z of [0, zMax]) {
+      const sv = -1 + 2 * i / 40, x = sv * H.len / 2, y = side * planW(ship.hull, sv), X = CELL / 2 + (c * x - n * y) * px, Y = CENTER_Y - z * px * VIEW.tiltZ + (n * x + c * y) * VIEW.tiltY * px;
+      x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y);
+    }
+  }
+  return { px, x0, x1, y0, y1, cell: CELL, layer: H.len / 2 * px };
 }
 
 // 배 위의 점을 화면 좌표로. 기울기·앞뒤 흔들림을 진짜 3D로 돌린다
@@ -304,9 +385,9 @@ function mainMesh(P, rig, boom, now, luff, t, flapAmp) {
 }
 function jibMesh(P, rig, hull, boom, now, luff, t, flapAmp) {
   const rows = 5, cols = 4, k = clamp((now - 0.6) / 0.4, 0, 1);
-  if (k <= 0 || !rig.big) return null;
+  if (k <= 0 || !(rig.jib ?? rig.big)) return null;
   const side = Math.sign(boom || 1), a = Math.abs(boom) * 0.8 + 0.1, MX = rig.x;
-  const tack = [hull.len / 2 - 0.25, 0, hull.deck + 0.45], head = [MX + 0.25, 0, rig.boomZ + (rig.h - 0.2 - rig.boomZ) * 0.86 * k + 0.2];
+  const tack = [hull.len / 2 - 0.25 + (hull.sprit || 0), 0, hull.deck + 0.45 + (hull.sprit ? 0.2 : 0)], head = [MX + 0.25, 0, rig.boomZ + (rig.h - 0.2 - rig.boomZ) * 0.86 * k + 0.2];
   const clew = [MX + 0.15 + (3 - 3 * Math.cos(a)) * 0.2, side * (0.5 + 2.6 * Math.sin(a)) * k, hull.deck + 0.65];
   const mesh = [];
   for (let j = 0; j <= rows; j++) {
@@ -438,13 +519,16 @@ function drawPerson(g, P, x, y, z, zoom, rowPhase, look, captain) {
 // 수면 그늘과 비친 돛(선체보다 먼저 그린다)
 const rotateLocal = (a, h) => [a[0] * Math.cos(h) - a[1] * Math.sin(h), a[0] * Math.sin(h) + a[1] * Math.cos(h)];
 export function drawShipOnWater(g, sprite, st, zoom, sx, sy) {
-  const hull = sprite.hull, rig = sprite.rig;
+  const hull = sprite.hull;
   g.save();
   g.translate(sx, sy); g.scale(1, VIEW.tiltY); g.rotate(st.h);
   g.fillStyle = 'rgba(14,50,70,.28)';
   g.beginPath(); g.ellipse(0.1 * zoom, 0.25 * zoom, (hull.len / 2 + 0.4) * zoom, (hull.beam / 2 + 0.45) * zoom, 0, 0, TAU); g.fill();
   g.restore();
-  if (!rig || st.sailNow < 0.05) return;
+  if (st.sailNow < 0.05) return;
+  for (const rig of sprite.rigs || (sprite.rig ? [sprite.rig] : [])) sailShadow(g, rig, st, zoom, sx, sy);
+}
+function sailShadow(g, rig, st, zoom, sx, sy) {
   const head = rig.boomZ + (rig.h - 0.2 - rig.boomZ) * (0.22 + 0.78 * st.sailNow);
   const clew = [rig.x - rig.boomL * Math.cos(st.boom), rig.boomL * Math.sin(st.boom), rig.boomZ];
   const shade = (a) => { const [wx, wy] = rotateLocal(a, st.h); return [sx + (wx + a[2] * 0.38) * zoom, sy + (wy + a[2] * 0.2) * VIEW.tiltY * zoom]; };
@@ -467,7 +551,7 @@ export function drawShip(g, sprite, st, zoom, sx, sy) {
   const { h, heel, pitch, bob, sailNow, boom, luff, t, row, rowPhase, flagFrom } = st;
   const { atlas, hull, rig } = sprite, P = st.P;
   const f = ((h / TAU) % 1 + 1) % 1 * DIRS, idx = Math.round(f) % DIRS, rest = (f - Math.round(f)) * TAU / DIRS;
-  const k = zoom / PX, sxa = (idx % COLS) * CELL, sya = Math.floor(idx / COLS) * CELL;
+  const k = zoom / (sprite.px || PX), sxa = (idx % COLS) * CELL, sya = Math.floor(idx / COLS) * CELL;
   const screenRoll = -heel * Math.sin(h) * 0.9 + pitch * Math.cos(h) * 0.7;
   g.save();
   g.translate(sx, sy - bob * VIEW.tiltZ * zoom);
@@ -476,33 +560,40 @@ export function drawShip(g, sprite, st, zoom, sx, sy) {
   g.drawImage(atlas, sxa, sya, CELL, CELL, -CELL / 2, -CENTER_Y, CELL, CELL);
   g.restore();
 
-  const items = [], s = Math.max(1, zoom / 6.5), flapAmp = 0.34, deck = hull.deck;
-  if (rig) {
-    const MX = rig.x, base = P(MX, 0, rig.base), top = P(MX, 0, rig.h);
-    const boomEnd = [MX - rig.boomL * Math.cos(boom), rig.boomL * Math.sin(boom), rig.boomZ];
+  const items = [], s = Math.max(1, zoom / 6.5), flapAmp = 0.34, deck = hull.deck, rigs = sprite.rigs || (rig ? [rig] : []);
+  // 제1사장(스쿠너): 뱃머리 밖으로 뻗은 둥근 막대
+  if (hull.sprit) { const a = [hull.len / 2 - 0.6, 0, deck + 0.35], b = [hull.len / 2 + hull.sprit, 0, deck + 0.75], q = P(...b); items.push({ d: P(...a)[2] + 0.02, draw() { line(g, P, a, b, '#6b4a2e', 1.3 * s); line(g, P, b, [hull.len / 2 - 0.1, 0, 0.35], 'rgba(60,50,40,.5)', 0.5 * s); void q; } }); }
+  const bowTip = [hull.len / 2 - 0.25 + (hull.sprit || 0), 0, deck + 0.45 + (hull.sprit ? 0.2 : 0)];
+  rigs.forEach((R, ri) => {
+    const MX = R.x, base = P(MX, 0, R.base), top = P(MX, 0, R.h), fore = ri === 0, aft = ri === rigs.length - 1;
+    const boomEnd = [MX - R.boomL * Math.cos(boom), R.boomL * Math.sin(boom), R.boomZ];
     items.push({ d: base[2], draw() {
-      line(g, P, [MX, 0, rig.base], [MX, 0, rig.h], '#6b4a2e', (rig.big ? 1.8 : 1.3) * s);
-      line(g, P, [MX, 0, rig.h - 0.05], [hull.len / 2 - 0.25, 0, deck + 0.45], 'rgba(60,50,40,.55)', 0.6 * s);
-      line(g, P, [MX, 0, rig.h - 0.05], [-hull.len / 2 + 0.45, 0, deck + 0.1], 'rgba(60,50,40,.45)', 0.6 * s);
-      line(g, P, [MX, 0, rig.boomZ], boomEnd, '#6b4a2e', (rig.big ? 1.5 : 1.1) * s);
-      // 돛대 꼭대기 깃발: 바람 부는 쪽으로 날린다
-      const dx = -Math.cos(flagFrom) * 6.5 * s, dy = -Math.sin(flagFrom) * 6.5 * s * VIEW.tiltY, wv = Math.sin(t * 7) * 1.2 * s;
-      g.fillStyle = sprite.flag;
-      g.beginPath(); g.moveTo(top[0], top[1] - 1.6 * s); g.quadraticCurveTo(top[0] + dx * 0.5, top[1] + dy * 0.5 + wv - 0.6 * s, top[0] + dx, top[1] + dy + wv * 1.6);
-      g.quadraticCurveTo(top[0] + dx * 0.5, top[1] + dy * 0.5 + wv + 0.6 * s, top[0], top[1] + 1.6 * s); g.closePath(); g.fill();
-      // 삼각기 줄
-      if (sprite.decor.includes('pennant')) {
-        const a = P(MX, 0, rig.h - 1), b = P(hull.len / 2 - 0.3, 0, deck + 0.5);
+      line(g, P, [MX, 0, R.base], [MX, 0, R.h], '#6b4a2e', (R.big ? 1.8 : 1.3) * s);
+      // 앞 버팀줄: 맨 앞 돛대는 뱃머리(제1사장 끝)로, 뒤 돛대는 앞 돛대 꼭대기로. 뒤 버팀줄은 맨 뒤 돛대만 고물로
+      line(g, P, [MX, 0, R.h - 0.05], fore ? bowTip : [rigs[ri - 1].x, 0, rigs[ri - 1].h - 0.3], 'rgba(60,50,40,.55)', 0.6 * s);
+      if (aft) line(g, P, [MX, 0, R.h - 0.05], [-hull.len / 2 + 0.45, 0, deck + 0.1], 'rgba(60,50,40,.45)', 0.6 * s);
+      line(g, P, [MX, 0, R.boomZ], boomEnd, '#6b4a2e', (R.big ? 1.5 : 1.1) * s);
+      // 가장 높은 돛대 꼭대기 깃발: 바람 부는 쪽으로 날린다
+      if (R.top) {
+        const dx = -Math.cos(flagFrom) * 6.5 * s, dy = -Math.sin(flagFrom) * 6.5 * s * VIEW.tiltY, wv = Math.sin(t * 7) * 1.2 * s;
+        g.fillStyle = sprite.flag;
+        g.beginPath(); g.moveTo(top[0], top[1] - 1.6 * s); g.quadraticCurveTo(top[0] + dx * 0.5, top[1] + dy * 0.5 + wv - 0.6 * s, top[0] + dx, top[1] + dy + wv * 1.6);
+        g.quadraticCurveTo(top[0] + dx * 0.5, top[1] + dy * 0.5 + wv + 0.6 * s, top[0], top[1] + 1.6 * s); g.closePath(); g.fill();
+      }
+      // 삼각기 줄(맨 앞 돛대에서 뱃머리로)
+      if (fore && sprite.decor.includes('pennant')) {
+        const a = P(MX, 0, R.h - 1), b = P(...bowTip);
         for (let i = 1; i < 7; i++) { const q = i / 7, px = a[0] + (b[0] - a[0]) * q, py = a[1] + (b[1] - a[1]) * q + Math.sin(q * PI) * 3 * s; g.fillStyle = ['#d6443a', '#e7b64a', '#2f7fb8'][i % 3]; g.beginPath(); g.moveTo(px - 1.3 * s, py); g.lineTo(px + 1.3 * s, py); g.lineTo(px, py + 2.6 * s); g.closePath(); g.fill(); }
       }
     } });
     if (sailNow >= 0.05) {
-      const main = mainMesh(P, rig, boom, sailNow, luff, t, flapAmp);
-      items.push({ d: main[3][2][2] - 0.01, draw() { drawMesh(g, main, sprite.sail); if (st.torn) drawRip(g, main, t, s); } });
-      const jib = jibMesh(P, rig, hull, boom, sailNow, luff, t, flapAmp);
+      const main = mainMesh(P, R, boom, sailNow, luff, t, flapAmp);
+      items.push({ d: main[3][2][2] - 0.01, draw() { drawMesh(g, main, sprite.sail, R.main ? 1 : 0.96); if (st.torn && R.main) drawRip(g, main, t, s); } });
+      const jib = jibMesh(P, R, hull, boom, sailNow, luff, t, flapAmp);
       if (jib) items.push({ d: jib[2][2][2], draw() { drawMesh(g, jib, sprite.sail, 0.97); } });
-    } else items.push({ d: base[2] + 0.01, draw() { line(g, P, [MX, 0, rig.boomZ + 0.14], [boomEnd[0], boomEnd[1], rig.boomZ + 0.14], '#efe6cf', (rig.big ? 3.2 : 2.3) * s); } });
-  } else if (sprite.decor.includes('pennant')) { /* 돛대가 없으면 삼각기 줄을 걸 곳이 없다 */ }
+    } else items.push({ d: base[2] + 0.01, draw() { line(g, P, [MX, 0, R.boomZ + 0.14], [boomEnd[0], boomEnd[1], R.boomZ + 0.14], '#efe6cf', (R.big ? 3.2 : 2.3) * s); } });
+  });
+  if (!rigs.length && sprite.decor.includes('pennant')) { /* 돛대가 없으면 삼각기 줄을 걸 곳이 없다 */ }
 
   // 랜턴: 고물 기둥
   if (sprite.decor.includes('lantern')) {
@@ -514,7 +605,7 @@ export function drawShip(g, sprite, st, zoom, sx, sy) {
     } });
   }
   // 사람들
-  const floor = hull.kind === 'sloop' ? 0.72 : hull.kind === 'rowboat' ? 0.22 : deck;
+  const floor = floorOf(hull);
   const capX = st.capX ?? hull.helmX;
   const manP = P(capX, 0, floor);
   items.push({ d: manP[2], draw() {
@@ -573,7 +664,7 @@ export function drawHullTop(g, hullId, px, ox, oy, paint) {
   if (H.kind === 'raft') { sliceRaft(g, H.deck, H); } else {
     hullPath(g, hullId, H.deck); g.fillStyle = H.star === 3 ? '#b98f45' : paint; g.fill(); // ★3은 테두리에 보강재
     if (H.star === 3) { hullPath(g, hullId, H.deck, 0.05); g.fillStyle = paint; g.fill(); }
-    hullPath(g, hullId, H.deck, 0.12); g.fillStyle = H.kind === 'sloop' ? WOOD.deck : WOOD.floor; g.fill();
+    hullPath(g, hullId, H.deck, 0.12); g.fillStyle = big(H) ? WOOD.deck : WOOD.floor; g.fill();
     if (H.star === 3) drawPerk(g, H);
   }
   g.restore();

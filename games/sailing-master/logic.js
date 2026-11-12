@@ -1,4 +1,4 @@
-import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, WX, WX_ORDER, SAILCLOTH, WET, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB, TRAITS, CREW_GROW, TIDE, WATER } from './data.js';
+import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, WX, WX_ORDER, SAILCLOTH, WET, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB, TRAITS, CREW_GROW, TIDE, WATER, DESAL } from './data.js';
 import { worldOf } from './world.js';
 import * as SH from './ship.js';
 // 게임 규칙 전부. 화면이 없고, 시드와 고정 시간 단계만으로 결과가 같다.
@@ -130,7 +130,7 @@ export function windAt(S) {
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 6, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 7, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: calmWeather(),
@@ -385,7 +385,7 @@ export function nearGate(S, r = NAV.dock + 8) { return W(S).gates.find((g) => Ma
 export function dock(S, portId) {
   placeAtPort(S, portId);
   const got = unload(S);
-  S.boat.sailLevel = 0; S.boat.row = false;
+  S.boat.sailLevel = 0; S.boat.row = false; S.boat.motor = false;
   S.vigor = 1; S.boat.stamina = 1;
   for (const c of S.crew) { c.fatigue = 0; c.px = undefined; }
   if (S.plans?.port) applyPlan(S, 'port');
@@ -410,9 +410,9 @@ function payWages(S) {
   // 사기가 바닥난 선원은 입항하면 떠난다(보수를 받기 전에 마음을 정했다)
   const sad = S.crew.filter((c) => (c.morale ?? 0.7) < CREW_GROW.leaveMorale);
   if (sad.length) { S.crew = S.crew.filter((c) => !sad.includes(c)); for (const c of sad) emit(S, 'crewLeft', { name: c.name, why: 'morale' }); }
-  const due = Math.ceil(S.owed);
+  const due = Math.floor(S.owed + 1e-9); // M2b: 한 닢이 안 되는 끝수는 다음에 같이 줘요(예전엔 잠깐 대기만 해도 한 닢씩 나갔어요)
   if (due > 0) {
-    if (S.res.coin >= due) { S.res.coin -= due; S.owed = 0; emit(S, 'wages', { pay: due }); for (const c of S.crew) c.morale = Math.min(1, (c.morale ?? 0.7) + 0.1); }
+    if (S.res.coin >= due) { S.res.coin -= due; S.owed -= due; emit(S, 'wages', { pay: due }); for (const c of S.crew) c.morale = Math.min(1, (c.morale ?? 0.7) + 0.1); }
     else { S.res.coin = 0; S.owed = 0; const left = S.crew.pop(); if (left) emit(S, 'crewLeft', { name: left.name }); }
   }
 }
@@ -448,6 +448,7 @@ export function departureCheck(S, days = 2) {
     else if (wd < days) warns.push(`식수가 ${wd < 1 ? '하루치도 안 돼' : `${Math.floor(wd)}일치뿐이야`}!`);
     if (st.waterCap < persons * days) warns.push('물통이 모자라! 설계에서 물통을 달아');
   }
+  if (st.minCrew && S.crew.length < st.minCrew) warns.push(`일손이 모자라! ${st.hull.name}는 선원 ${st.minCrew}명은 있어야 돛을 다 펴지(지금 ${S.crew.length}명)`);
   if (S.hull < 0.5) warns.push('선체가 많이 상했어!');
   if (st.load > 0.9) warns.push('짐이 많아서 느려 터졌어');
   if (S.boat.torn) warns.push(`돛이 찢어졌어! 꿰매고 가, 선장!`);
@@ -578,9 +579,11 @@ export function craft(S, from, times = 1) {
   S.res[from] -= n * WORKSHOP.ratio; S.res.coin -= n * WORKSHOP.fee; add(S.res, to, n);
   return n;
 }
+// 사는 재료: buy 값이 있고, buyAt이 있으면 그 수역 항구에서만(M2b 톱니·베어링은 앞바다)
+export const canBuyMat = (S, k) => !!ITEMS[k]?.buy && (!ITEMS[k].buyAt || ITEMS[k].buyAt === S.region);
 export function buyMat(S, k, n = 1) {
   const P = ITEMS[k]?.buy;
-  if (!S.docked || !P) return 0;
+  if (!S.docked || !canBuyMat(S, k)) return 0;
   const q = Math.min(n, Math.floor(S.res.coin / P));
   if (q <= 0) return 0;
   S.res.coin -= q * P; add(S.res, k, q);
@@ -663,7 +666,7 @@ export function placeModule(S, id, col, row, rot = 0) {
   if (M.sail && HULLS[S.ship.hull].grade < 2) return { ok: false, why: `${HULLS[S.ship.hull].name}엔 돛대를 못 세운다고! 나룻배부터야!` };
   if (!canPay(S, cost)) return { ok: false, why: '재료가 모자라! 더 건져 오라고!' };
   const m = { id, col, row, rot };
-  if (!SH.canPlace(S.ship, m)) return { ok: false, why: M.sail && S.ship.mods.some((o) => MODULES[o.id].sail) ? '돛대는 하나면 족해, 선장!' : '거긴 안 들어간다고!' };
+  if (!SH.canPlace(S.ship, m)) { const mp = M.sail && SH.mastProblem(S.ship, m); return { ok: false, why: mp === 'one' ? '돛대는 하나면 족해, 선장!' : mp === 'many' ? '돛대는 둘이면 족해, 선장!' : mp === 'near' ? '돛대끼리 너무 붙었어! 돛이 서로 엉킨다고' : '거긴 안 들어간다고!' }; }
   pay(S, cost);
   S.ship.mods.push(m); S.rev++; noteBest(S);
   return { ok: true };
@@ -709,14 +712,18 @@ export function buildSteps(S) {
   if (up) out.push(up);
   return out;
 }
-const yardName = (n) => (n >= 3 ? '강' : n === 2 ? '큰 호수' : '호수');
+const yardName = (n) => (n >= 4 ? '앞바다 조선' : n >= 3 ? '강' : n === 2 ? '큰 호수' : '호수');
+// 지금 조선소 등급: 같은 수역은 어디서나 같고(F13), 항구 표에 yard가 있으면 그 항구만 달라요(M2b 앞바다 조선 항구 4등급)
+export const yardOf = (S) => W(S).ports.find((p) => p.id === S.docked)?.yard ?? REGIONS[S.region].yard;
+// 설계도가 나오는 수역 이름(조선소 안내용)
+const blueprintWhere = (id) => { const r = REGION_ORDER.find((k) => REGIONS[k].finds.some((f) => f.blueprint === id)); return r ? REGIONS[r].name : ''; };
 // 짓기 조건 목록. 뗏목은 별 없이 나룻배로 넘어가고(서두르게 하려고), 2등급부터는 ★2까지 키워야 다음 등급이다
 export function buildStatus(S, id) {
   const H = HULLS[id], C = HULLS[S.ship.hull], list = [];
   const legal = buildSteps(S).includes(H);
   if (H.kind !== C.kind && C.grade >= 2) list.push({ text: `${C.name} ★2까지 키우기`, ok: C.star >= 2 });
-  list.push({ text: `${yardName(H.yard)} 항구${H.yard < 3 ? ' 이상' : ''}에서 짓기`, ok: REGIONS[S.region].yard >= H.yard });
-  if (H.blueprint) list.push({ text: `${H.name} 설계도(강에서 찾아)`, ok: !!S.blueprints[H.blueprint] });
+  list.push({ text: `${yardName(H.yard)} 항구${H.yard < 3 ? ' 이상' : ''}에서 짓기`, ok: yardOf(S) >= H.yard, yard: true });
+  if (H.blueprint) list.push({ text: `${H.name} 설계도(${blueprintWhere(H.blueprint)}에서 찾아)`, ok: !!S.blueprints[H.blueprint] });
   const short = !canPay(S, H.price);
   return { legal, list, ok: legal && !short && list.every((q) => q.ok), short };
 }
@@ -795,6 +802,14 @@ export function recordSpecies(S, id) {
   checkAch(S);
   return true;
 }
+// 돌고래가 뱃머리를 타는 순간(M2b, DESIGN.md 11절): 화면의 돌고래가 배 앞을 타고 있을 때 탭하면 기록 + 도전과제. 배가 움직일 때만이에요
+export function bowRide(S, id) {
+  if (SPECIES[id]?.kind !== 'dolphin' || S.docked || S.boat.spd < 2) return false;
+  recordSpecies(S, id);
+  if (S.ach.bowRide) return false;
+  giveAch(S, 'bowRide');
+  return true;
+}
 function giveAch(S, id) {
   const a = ACHIEVEMENTS.find((q) => q.id === id);
   if (!a || S.ach[id]) return;
@@ -810,8 +825,8 @@ export function nextHull(S) {
 }
 export function canAffordHull(S, H) {
   if (!H) return false;
-  const st = buildStatus(S, H.id);
-  return st.legal && st.list.every((q) => q.ok) && Object.entries(H.price).every(([k, v]) => (S.res[k] || 0) + (S.hold[k] || 0) >= v);
+  const st = buildStatus(S, H.id), yardHere = W(S).ports.some((p) => (p.yard ?? REGIONS[S.region].yard) >= H.yard); // 이 수역에 그 조선소가 있으면(M2b 조선 항구) 다른 항구에 있어도 알려 줘요
+  return st.legal && st.list.every((q) => q.ok || (q.yard && yardHere)) && Object.entries(H.price).every(([k, v]) => (S.res[k] || 0) + (S.hold[k] || 0) >= v);
 }
 export function checkAch(S) {
   const next = nextHull(S);
@@ -830,6 +845,8 @@ export function checkAch(S) {
   c('heatSafe', t.heatDays >= 1);
   c('crew3', Object.keys(S.hiredEver).length >= 3);
   c('sloop', HULLS[S.ship.hull].grade >= 3);
+  c('schooner', HULLS[S.ship.hull].grade >= 4);
+  c('seaAll', Object.keys(SPECIES).every((id) => !SPECIES[id].sea || S.seen[id]));
   c('lakeAll', worldDone(S, 'lake'));
   const nSeen = Object.keys(S.seen).length;
   c('species5', nSeen >= 5);
@@ -892,6 +909,8 @@ function collectFlot(S) {
     add(S.hold, k, n);
     emit(S, 'pick', { k, n, x: f.x, y: f.y, shiny: f.k === 'shiny' });
     list.splice(i, 1);
+    // M2b: 건지러 가던 그것을 건졌으면 그 항로는 끝이에요(빈 자리를 맴돌지 않게). 돛·노는 그대로 둬요
+    if (S.route?.target?.type === 'pick' && Math.hypot(S.route.dx - f.x, S.route.dy - f.y) < 4) { S.route = null; S.boat.rudder = 0; }
   }
   S.holdFullWarned = 0;
 }
@@ -914,12 +933,16 @@ function readLetter(S, f) {
 // 견시: 망원경 자리에 앉아야 일해요. 눈썰미면 30% 더
 export const lookK = (S) => { const c = workerAt(S, 'look'); return c ? work(S, 'look') * (c.trait === 'sharp' ? 1.3 : 1) : 0; };
 // 안개(fogCut)와 비(fx.sight)는 보는 거리를 줄여요
-export const sightRange = (S) => ((stats(S).telescope ? 70 : 26) + 14 * lookK(S)) * (hasTrait(S, 'lucky') ? 1.1 : 1) * (S.docked ? 1 : (1 - 0.6 * fogCut(S)) * (S.weather?.fx?.sight ?? 1));
+export const sightRange = (S) => ((stats(S).crowsnest ? 92 : stats(S).telescope ? 70 : 26) + 14 * lookK(S)) * (hasTrait(S, 'lucky') ? 1.1 : 1) * (S.docked ? 1 : (1 - 0.6 * fogCut(S)) * (S.weather?.fx?.sight ?? 1));
 // 내륙 발견지는 찾기 전까지 그림도 보이지 않는다(끌어서 둘러봐도 미리 알 수 없게)
 export function canSeeFind(S, f) {
-  if (S.found[f.id] || !f.inland) return true;
+  if (S.found[f.id]) return true;
+  if (f.hide && !lowTide(S)) return false; // 조수 웅덩이(M2b): 밀물엔 물에 잠겨 안 보여요
+  if (!f.inland) return true;
   return stats(S).telescope && Math.hypot(f.x - S.boat.x, f.y - S.boat.y) <= sightRange(S);
 }
+// 썰물 때(물높이가 TIDE.low 밑): 바다 동굴·조수 웅덩이에 들어가요
+export const lowTide = (S, clockT = S.clock) => !!REGIONS[S.region].tide && tideAt(S.region, clockT) <= TIDE.low;
 function checkFinds(S) {
   const st = stats(S), b = S.boat, R = sightRange(S);
   for (const f of findsOf(S)) {
@@ -930,6 +953,8 @@ function checkFinds(S) {
       continue;
     }
     if (d > R) continue;
+    // 썰물에만 들어가는 곳(M2b): 밀물이면 알려만 줘요(한 번)
+    if (f.tide === 'low' && !lowTide(S)) { if (!S.tideHint?.[f.id] && (!f.hide || d < 40)) { (S.tideHint ||= {})[f.id] = 1; emit(S, 'tideGate', { id: f.id, name: f.name, hide: !!f.hide }); } continue; }
     S.found[f.id] = 1;
     const give = {};
     for (const k of Object.keys(ITEMS)) if (typeof f[k] === 'number' && f[k] > 0) { add(S.res, k, f[k]); give[k] = f[k]; }
@@ -949,8 +974,11 @@ function disaster(S, cause) {
 }
 export function rescue(S) {
   if (!S.disaster) return null;
-  const lost = { ...S.hold }, port = S.lastPort, broke = [];
-  S.hold = {};
+  const port = S.lastPort, broke = [], boat = stats(S).lifeboat, lost = {};
+  // 구명정(M2b): 화물 절반은 건져요
+  const kept = {};
+  for (const [k, v] of Object.entries(S.hold)) { const keep = boat ? Math.floor(v / 2) : 0; if (keep) kept[k] = keep; if (v - keep) lost[k] = v - keep; }
+  S.hold = kept;
   // 돛대·노는 남기고 모듈 하나가 부서진다
   const opts = S.ship.mods.filter((m) => !MODULES[m.id].sail && m.id !== 'oar');
   if (opts.length) { const m = opts[Math.floor(rnd(S) * opts.length)]; S.ship.mods = S.ship.mods.filter((o) => o !== m); broke.push(m.id); S.rev++; }
@@ -1098,10 +1126,11 @@ export function soakFood(S) {
 // 너울 피해(앞바다부터): 너울이 배의 내항성보다 높으면 초당 내구도가 깎여요. 방수 격벽이 있으면 절반
 // 내항성(m)은 ship.js statsOf의 sea(등급 × 0.45 + 별 + 바닥짐). beamK: 옆으로 맞을수록 커지는 배율(swellBeamK)
 export const seaworthy = (st) => st.sea ?? st.hull.sea ?? st.hull.grade * 0.5;
-export const swellHurt = (st, swell, beamK = 1) => Math.max(0, swell - seaworthy(st)) * WEATHER.swellHurt * beamK * (st.bulkhead ? 0.5 : 1);
-// 너울은 북쪽 큰 바다에서 남쪽으로 밀려와요. 뱃머리가 너울을 맞받거나 등지면 덜, 옆으로 맞으면 더 상해요
+export const swellHurt = (st, swell, beamK = 1) => Math.max(0, swell - seaworthy(st)) * WEATHER.swellHurt * beamK * (st.bulkhead ? 0.5 : 1) * (st.doubleHull ? 0.5 : 1);
+// 너울은 큰 바다에서 그 수역의 늘 부는 바람(REGIONS.wind.from) 쪽에서 밀려와요(M2b, 앞바다는 거의 북쪽). 뱃머리가 너울을 맞받거나 등지면 덜, 옆으로 맞으면 더 상해요
 export const SWELL_FROM = -PI / 2;
-export const swellBeamK = (h) => WEATHER.swellHead + (WEATHER.swellBeam - WEATHER.swellHead) * Math.abs(Math.sin(angDiff(h, SWELL_FROM)));
+export const swellFrom = (region) => REGIONS[region]?.wind?.from ?? SWELL_FROM;
+export const swellBeamK = (h, from = SWELL_FROM) => WEATHER.swellHead + (WEATHER.swellBeam - WEATHER.swellHead) * Math.abs(Math.sin(angDiff(h, from)));
 // 이 자리의 너울 높이(m)
 export const swellHere = (S, x = S.boat.x, y = S.boat.y) => (S.weather?.fx?.swell || 0) * W(S).swellAt(x, y);
 // 돛 찢어짐: 센 바람(돌풍·폭풍)에 줄임보다 더 펴고 있으면 쌓여요. 절반이면 경고, 다 차면 찢어져요. 줄이면 천천히 풀려요
@@ -1171,7 +1200,7 @@ function sewIfBroke(S) {
 // ── 바다(M2a): 너울·조수·경계 안개·물보라. 그 자리 값을 돌려주고, 날씨(wx)의 fog·spray를 자리에 맞게 고쳐요 ──
 function seaHere(S, wx, st, w) {
   const R = REGIONS[S.region], b = S.boat, tide = tideAt(S.region, S.clock);
-  const swell = (wx.fx.swell || 0) * w.swellAt(b.x, b.y), sw = seaworthy(st), over = Math.max(0, swell - sw), beam = swellBeamK(b.h);
+  const swell = (wx.fx.swell || 0) * w.swellAt(b.x, b.y), sw = seaworthy(st), over = Math.max(0, swell - sw), beam = swellBeamK(b.h, swellFrom(S.region));
   // 지도 끝 짙은 안개 띠: 큰 바다 경계. 4등급 배가 아니면 이 너머로 못 나가요(경계가 물가처럼 막아요)
   if (R.edgeFog) {
     const e = clamp(1 - w.edgeDist(b.x, b.y) / R.edgeFog, 0, 1) * 0.9;
@@ -1203,7 +1232,7 @@ export function fogCut(S) {
   const p = W(S).ports.reduce((m, q) => Math.min(m, Math.hypot(q.x - S.boat.x, q.y - S.boat.y)), 1e9);
   // 등대(M2a): 항구 불빛보다 멀리(r m)까지 안개를 틔워요
   const lit = (REGIONS[S.region].lights || []).reduce((m, L) => Math.max(m, clamp(1 - Math.hypot(L.x - S.boat.x, L.y - S.boat.y) / L.r, 0, 1)), clamp(1 - p / 90, 0, 1));
-  return f * (S.ship.decor?.includes('lantern') ? 0.85 : 1) * (1 - 0.4 * Math.min(1, lookK(S))) * (1 - 0.6 * lit);
+  return f * (S.ship.decor?.includes('lantern') ? 0.85 : 1) * (stats(S).crowsnest ? 0.85 : 1) * (1 - 0.4 * Math.min(1, lookK(S))) * (1 - 0.6 * lit);
 }
 
 // ── 한 단계 ──
@@ -1230,7 +1259,9 @@ export function step(S, dt) {
   if (S.docked) return S;
 
   // 돛 올리고 내리기
-  const wantSail = Math.min(SAIL_LEVELS[b.sailLevel], b.torn ? SAILCLOTH.tornMax : 1) * (st.sailArea ? 1 : 0); // 찢어진 돛은 덜 펴져요
+  // 찢어진 돛은 덜 펴지고, 일손이 모자라면(M2b 스쿠너 minCrew) 줄인 만큼만 펴요
+  const shortHanded = st.minCrew > 0 && S.crew.length < st.minCrew;
+  const wantSail = Math.min(SAIL_LEVELS[b.sailLevel], b.torn ? SAILCLOTH.tornMax : 1, shortHanded ? SAIL_LEVELS[1] : 1) * (st.sailArea ? 1 : 0);
   const sailRate = dt * 0.7 * (st.hull.winch ? 2 : 1);
   b.sailNow += clamp(wantSail - b.sailNow, -sailRate, sailRate);
 
@@ -1257,6 +1288,10 @@ export function step(S, dt) {
   const depth = w.depthAt(b.x, b.y, sea.tide) * wx.fx.depth; // 가뭄엔 얕고 홍수엔 깊어요
   const onShoal = st.draft > depth;
   let target = Math.max(sailT, rowT) + 0.25 * Math.min(sailT, rowT);
+  // 보조 기관(M2b 스쿠너): 연료 없이 느리게. 노를 젓지 않고 돛을 올렸거나 항로가 있을 때, 돛이 기관보다 약하면(바람이 죽거나 맞바람) 저절로 돌아요. 돛 힘에 더하지는 않아요
+  const motorOn = st.motor > 0 && !b.row && (b.sailLevel > 0 || !!S.route) && sailT < st.motor;
+  if (motorOn) target = Math.max(target, st.motor);
+  if (motorOn !== !!b.motor) { b.motor = motorOn; emit(S, motorOn ? 'motorOn' : 'motorOff'); }
   if (sea.over > 0) target *= Math.max(0.5, 1 - WEATHER.swellSlow * sea.over); // 너울이 내항성을 넘으면 느려져요
   // 여울: 긁히며 느려질 뿐 가라앉지는 않는다(가뭄의 최악은 좌초해 날짜를 잃는 것, DESIGN.md 8절). 여울 피해로는 내구도 25% 밑으로 안 내려가요
   if (onShoal) { target = Math.min(target, 0.7); if (!b.shoal) emit(S, 'shoal'); if (b.spd > 0.25 && S.hull > WEATHER.shoalFloor) S.hull = Math.max(WEATHER.shoalFloor, S.hull - WEATHER.shoalHurt * dt / st.hull.hp); }
@@ -1266,7 +1301,7 @@ export function step(S, dt) {
   // 키
   let steer = Math.max(BOAT.minSteer, Math.min(1, b.spd / BOAT.fullSteerSpd));
   if (b.row) steer = Math.max(steer, BOAT.rowSteer);
-  b.turn = ease(b.turn, b.rudder * st.hull.turn * steer, dt, BOAT.turnLag);
+  b.turn = ease(b.turn, b.rudder * st.hull.turn * st.turnK * steer, dt, BOAT.turnLag);
   b.h = (b.h + b.turn * dt) % TAU;
   b.spd *= Math.exp(-Math.abs(b.turn) * 0.1 * dt);
 
@@ -1301,7 +1336,7 @@ export function step(S, dt) {
   if (d < BOAT.clear) {
     const [gx, gy] = w.gradient(nx, ny);
     nx += gx * (BOAT.clear - d); ny += gy * (BOAT.clear - d);
-    if (!b.grounded && b.spd > 1) { emit(S, 'ground'); S.hull -= b.spd * (b.row ? 0.5 : 1) * WEATHER.hitHurt / st.hull.hp; } // 노 속도를 2배로 올리면서 부딪힘 피해는 그대로 둔다
+    if (!b.grounded && b.spd > 1) { emit(S, 'ground'); S.hull -= b.spd * (b.row ? 0.5 : 1) * (st.doubleHull ? 0.5 : 1) * WEATHER.hitHurt / st.hull.hp; } // 노 속도를 2배로 올리면서 부딪힘 피해는 그대로 둔다
     b.grounded = true;
     // 뱃머리가 물가로 향할수록 크게 느려진다. 스치기만 하면 조금만
     const into = Math.max(0, -(Math.cos(b.h) * gx + Math.sin(b.h) * gy));
@@ -1331,6 +1366,8 @@ export function step(S, dt) {
   // 선원은 자리까지 걸어간다(그림)
   for (const q of crewOnDeck(S)) { const seat = seatOf(S, q.c); if (!seat) continue; const cx = q.c.px ?? seat.x, mv = BOAT.walk * dt; q.c.px = Math.abs(seat.x - cx) <= mv ? seat.x : cx + Math.sign(seat.x - cx) * mv; }
   // 식수(M2a): 짠물 수역에서만 마셔요. 바닥나면 기력이 빨리 빠지고 쉬어도 안 돌아와요
+  // 조수기(M2b): 짠물 바다를 항해하는 동안 식수를 만들어요(물통 칸까지)
+  if (st.desal && REGIONS[S.region].salt && S.water < st.waterCap) S.water = Math.min(st.waterCap, (S.water || 0) + st.desal * DESAL.perDay * dt / CAL.day);
   const drink = drinkPerDay(S, wx), thirsty = drink > 0 && (S.water || 0) <= 0;
   if (drink > 0 && S.water > 0) { S.water = Math.max(0, S.water - drink * dt / CAL.day); if (S.water <= 0) emit(S, 'waterOut'); }
   if (wx.heat && !st.awning) S.vigor -= WEATHER.heatVigor * dt;
@@ -1364,11 +1401,21 @@ export function storyLine(text, name) {
   const pair = { 은: ['은', '는'], 이: ['이', '가'], 을: ['을', '를'] };
   return text.replace(/\{N([은이을])\}/g, (_, j) => name + (hangul ? pair[j][batchim ? 0 : 1] : `${pair[j][0]}(${pair[j][1]})`));
 }
+function refreshFindPos(o) {
+  for (const [region, list] of Object.entries(o.findPos || {})) {
+    const def = REGIONS[region];
+    if (!def || !Array.isArray(list)) continue;
+    const old = Object.fromEntries(list.map((f) => [f.id, f]));
+    if (def.finds.every((f) => old[f.id]) && list.length === def.finds.length && list.every((f) => def.finds.find((q) => q.id === f.id)?.art === f.art)) continue;
+    const w = worldOf(region), fresh = w.randomFinds(() => rnd(o)), clear = (q) => Object.values(old).every((p) => Math.hypot(p.x - q.x, p.y - q.y) > 40);
+    o.findPos[region] = def.finds.map((f, i) => (old[f.id] ? { ...f, x: old[f.id].x, y: old[f.id].y, where: w.whereOf(f) === 'water' || old[f.id].where === 'water' ? old[f.id].where : w.whereOf(f) } : clear(fresh[i]) ? fresh[i] : { ...fresh[i] }));
+  }
+}
 export function serialize(S) { const { events, ...rest } = S; return JSON.stringify(rest); }
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || ![1, 2, 3, 4, 5, 6].includes(o.v) || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2, 3, 4, 5, 6, 7].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
     // v2 → v3(S2 아이템): 목재·천은 잡목·마포로 이어 받는다. 화물칸의 금화는 창고로, 식량은 빵으로(5일 뒤 상함), 찾은 발견지의 유물을 준다
     if (o.v < 3) {
@@ -1396,8 +1443,11 @@ export function deserialize(raw) {
     // v5 → v6(M2a 앞바다): 식수 0통. 강 끝 엔딩을 본 저장은 엔딩을 풀고 강 끝 나루에 대 둬요(앞바다로 이어 가게, 도전과제는 그대로)
     o.water ??= 0;
     if (o.ended && o.region === 'river') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'mouth'); }
+    // v6 → v7(M2b 앞바다 내용): 정해 둔 발견지 자리는 지금 표에 맞춰요(그림·보상·자리 규칙은 표에서, 자리 x·y는 그대로). 새로 생긴 발견지(바다 동굴 등)만 새 자리를 받아요
+    o.boat.motor = false;
+    refreshFindPos(o);
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
-    o.v = 6;
+    o.v = 7;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
     if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다

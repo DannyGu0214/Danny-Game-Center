@@ -43,8 +43,17 @@ export function canPlace(design, m) {
   for (const o of design.mods) for (const [c, r] of cellsOf(o)) used.add(`${c},${r}`);
   for (const [c, r] of cellsOf(m)) { if (!ok.has(`${c},${r}`) || used.has(`${c},${r}`)) return false; }
   const M = MODULES[m.id];
-  if (M.sail && design.mods.some((o) => MODULES[o.id].sail)) return false; // 돛대는 하나만
+  if (M.sail && mastProblem(design, m)) return false;
   return true;
+}
+// 돛대 규칙: 보통은 하나, 스쿠너(maxMasts 2)는 둘까지. 둘이면 돛대끼리 MAST_GAP m 넘게 떨어져야 돛이 서로 안 걸려요
+export const MAST_GAP = 3.6;
+export function mastProblem(design, m) {
+  const H = HULLS[design.hull], masts = design.mods.filter((o) => MODULES[o.id].sail && o !== m);
+  if (masts.length >= (H.maxMasts || 1)) return (H.maxMasts || 1) > 1 ? 'many' : 'one';
+  const x = modulePos(design.hull, m)[0];
+  if (masts.some((o) => Math.abs(modulePos(design.hull, o)[0] - x) < MAST_GAP)) return 'near';
+  return null;
 }
 export const moduleAt = (design, col, row) => design.mods.find((m) => cellsOf(m).some(([c, r]) => c === col && r === row));
 
@@ -57,13 +66,17 @@ export function modulePos(hullId, m) {
 // 모든 계기 값. cargo: 실은 화물 수, food: 실은 식량
 export function statsOf(design, cargo = 0, food = 0) {
   const H = HULLS[design.hull], cnt = {};
-  let kg = 2, moment = 0, sailArea = 0, mast = null;
+  let kg = 2, moment = 0;
+  const masts = [];
   for (const m of design.mods) {
     const M = MODULES[m.id], [, y] = modulePos(design.hull, m);
     cnt[m.id] = (cnt[m.id] || 0) + 1;
     kg += M.kg; moment += M.kg * y;
-    if (M.sail) { sailArea = M.sail; mast = m; }
+    if (M.sail) masts.push(m);
   }
+  // 돛 넓이: 큰 돛 하나 + 나머지는 85%(앞돛이 뒷돛 바람을 조금 가려요, M2b 스쿠너). mast는 가장 큰 돛대(선장이 걸어가는 곳)
+  masts.sort((a, b) => MODULES[b.id].sail - MODULES[a.id].sail);
+  const mast = masts[0] || null, sailArea = masts.reduce((a, m, i) => a + MODULES[m.id].sail * (i ? 0.85 : 1), 0);
   kg += cargo * 0.1 + food * 0.2;
   const load = kg / H.buoy;
   const oars = cnt.oar || 0;
@@ -75,7 +88,9 @@ export function statsOf(design, cargo = 0, food = 0) {
     hull: H, kg, load, draft: H.draft * (1 + 0.5 * load),
     maxSpeed: hullSpeed * heavy * (1 - 0.12 * listing),
     rowSpeed: oars ? H.row * (oars > 1 ? 1.25 : 1) * heavy : 0,
-    oars, sailArea, mast, mastId: mast ? mast.id : null,
+    oars, sailArea, mast, masts, mastId: mast ? mast.id : null,
+    // 보조 기관(M2b 스쿠너): 돛이 이 속도보다 약할 때만 돌아요(연료 없음). 타륜은 큰 배 키를 잘 듣게 해요
+    motor: H.motor || 0, minCrew: H.minCrew || 0, turnK: cnt.wheel ? MODULES.wheel.turnK : 1,
     mastX: mast ? modulePos(design.hull, mast)[0] : 0,
     stability, listing,
     noGo: NO_GO - (H.pointing || 0), leeK: H.leeK || 1,
@@ -85,8 +100,9 @@ export function statsOf(design, cargo = 0, food = 0) {
     // M2a: 식수 칸(선체 기본 + 물통 4통씩), 내항성(너울을 견디는 높이 m: 등급 × 0.45 + 별마다 0.1 + 바닥짐 0.1)
     waterCap: (H.waterBase || 0) + 4 * (cnt.water || 0),
     sea: H.sea ?? H.grade * 0.45 + 0.1 * ((H.star || 1) - 1) + (cnt.ballast ? 0.1 : 0),
-    awning: !!cnt.awning, bulkhead: !!cnt.bulkhead, net: !!cnt.net, telescope: !!cnt.telescope, forecast: 1 + (cnt.barometer ? 2 : 0),
-    canMove: oars > 0 || sailArea > 0,
+    awning: !!cnt.awning, bulkhead: !!cnt.bulkhead, net: !!cnt.net, telescope: !!(cnt.telescope || cnt.crowsnest), crowsnest: !!cnt.crowsnest, forecast: 1 + (cnt.barometer ? 2 : 0),
+    desal: cnt.desal || 0, lifeboat: !!cnt.lifeboat, doubleHull: !!H.doubleHull,
+    canMove: oars > 0 || sailArea > 0 || !!H.motor,
     overload: load >= 1,
   };
 }

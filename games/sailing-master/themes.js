@@ -52,22 +52,26 @@ export const THEMES = {
       },
     ],
   },
-  // 3등급 앞바다(M2a 임시, C5에서 다듬어요): 청록 바닷물, 만 안쪽은 모래 해변·해송, 곶 끝과 섬은 바위 해안.
-  // 구간은 남(만 해변) → 북(곶 끝·바깥 섬) 순서예요(zonesOf는 shape.pts가 없으면 지도 남쪽 끝에서 북쪽 끝으로 나눠요)
+  // 3등급 앞바다(M2a 시작, M2b 다듬기): 청록 바닷물. 남쪽 만은 모래 해변(물가에 젖은 모래 띠)·갯풀·해송·어촌·그물 덕장·염전·방파제,
+  // 북쪽 곶 끝과 바깥 섬은 바위 절벽·자갈·큰 바위·기운 해송. 구간은 남(만 해변) → 북(곶 끝·바깥 섬) 순서예요(zonesOf는 shape.pts가 없으면 지도 남쪽 끝에서 북쪽 끝으로 나눠요)
   coast: {
-    name: '앞바다', water: ['#1d7b86', '#22909a'], hut: 'hut', seed: 31,
+    name: '앞바다', water: ['#1d7b86', '#22909a'], hut: 'seahut', seed: 31, strict: true, scatter: { k: 1.5, cap: 2600, tries: 70000 },
     layers: layers(['rgba(110,210,196,.15)', 'rgba(132,220,200,.2)', 'rgba(176,230,206,.3)', 'rgba(226,228,186,.66)']),
     wet: '#cbb98a', shore: { tile: 'sand', base: '#eadcae' }, bank: '#9a8256', ground: { tile: 'grass', base: '#8aa95a', specks: ['rgba(90,120,60,.35)', 'rgba(176,196,120,.4)', 'rgba(236,222,170,.55)'] }, lift: 1.3,
     sections: [
       {
         id: 'beach', name: '모래 해변', to: 0.43, water: ['#1f8290', '#26989f'],
-        wet: '#cdbb8c', shore: { tile: 'sand', base: '#efe2b6' }, bank: '#b79c66', ground: { tile: 'grass', base: '#93ae5e', specks: ['rgba(90,120,60,.35)', 'rgba(176,196,120,.4)', 'rgba(236,222,170,.6)'] }, lift: 1.1,
-        mix: [[7, [['pebbles', 0.12], [null, 1]]], [16, [['reed', 0.25], ['bush', 0.5], [null, 1]]], [Infinity, [['pine', 0.55], ['bush', 0.75], ['rock', 0.85], [null, 1]]]],
+        wet: '#b9a77a', shore: { tile: 'sand', base: '#efe2b6' }, bank: '#c9b07a', ground: { tile: 'grass', base: '#93ae5e', specks: ['rgba(90,120,60,.35)', 'rgba(176,196,120,.4)', 'rgba(236,222,170,.6)'] }, lift: 1.1,
+        mix: [[7, [['seagrass', 0.22], ['pebbles', 0.28], [null, 1]]], [16, [['seagrass', 0.3], ['bush', 0.42], ['seapine', 0.58], [null, 1]]], [Infinity, [['seapine', 0.45], ['pine', 0.53], ['bush', 0.68], ['seagrass', 0.78], [null, 1]]]],
+        decals: [{ kind: 'saltpan', n: 6, size: [6, 10], depth: [9, 70] }],
+        pieces: [{ kind: 'village', n: 4, depth: [12, 50], houses: [3, 4], house: 'fishhut' }, { kind: 'netrack', n: 12, depth: [3, 10] }, { kind: 'breakwater', n: 6, depth: [0.8, 2.6] }, { kind: 'seagrass', n: 70, depth: [1.8, 6], small: true }],
       },
       {
         id: 'rocks', name: '바위 해안', to: 1, water: ['#1a6f7f', '#1f8290'],
         wet: '#8c897c', shore: { tile: 'gravel', base: '#9c968a' }, bank: { tile: 'cliff', base: '#6d685e' }, ground: { tile: 'rocky', base: '#6f8650' }, lift: 2.4,
-        mix: [[6, [['pebbles', 0.35], ['rock', 0.75], ['boulder', 1]]], [Infinity, [['pine', 0.5], ['boulder', 0.66], ['rock', 0.8], ['bush', 1]]]],
+        mix: [[6, [['pebbles', 0.35], ['rock', 0.75], ['boulder', 1]]], [Infinity, [['seapine', 0.42], ['pine', 0.52], ['boulder', 0.66], ['rock', 0.8], ['bush', 1]]]],
+        decals: [{ kind: 'crag', n: 30, r: [3, 7], depth: [5, 80] }],
+        pieces: [{ kind: 'boulder', n: 40, depth: [2.2, 8], small: true }, { kind: 'pebbles', n: 50, depth: [1.8, 5], small: true }],
       },
     ],
   },
@@ -80,6 +84,8 @@ export const BOX = {
   pine: [6.4, 12.1], oak: [9, 10.1], bush: [4.6, 2.8], reed: [2.8, 3], rock: [3.4, 2], willow: [8, 9], reedbed: [5.6, 3.1], flowers: [2.6, 1.1], pebbles: [3.6, 1.1], boulder: [6.2, 4.1],
   windmill: [9.6, 12.8], thatch: [7.6, 5.8], bridge: [9.4, 3.4], haystack: [2.8, 2.5],
   hut: [10.6, 8.6], sign: [5, 5.9], find: [9, 12.6], pier: [4, 3],
+  // 앞바다(M2b)
+  seapine: [7, 9.4], seagrass: [2.4, 1.5], fishhut: [6.4, 5.4], netrack: [5.6, 3.2], breakwater: [10.6, 2.4], seahut: [10.6, 8.6], seamark: [4.4, 9.1], lighthouse: [9, 16.2],
 };
 // 화면 사각형 [x0, x1, y0, y1](m). 세상 y를 눌러 그리고 그림은 기준점에서 위로 선다
 function boxOf(p, kind = p.kind) {
@@ -91,7 +97,7 @@ const hit = (a, b, m = 1) => a[0] < b[1] + m && b[0] < a[1] + m && a[2] < b[3] +
 export function markBoxes(marks) {
   return marks.map((m) => {
     if (m.kind === 'pier') { const x1 = m.x0 + Math.cos(m.ang) * m.len, y1 = m.y0 + Math.sin(m.ang) * m.len, k = VIEW.tiltY; return [Math.min(m.x0, x1) - 1.5, Math.max(m.x0, x1) + 1.5, Math.min(m.y0, y1) * k - 3, Math.max(m.y0, y1) * k + 0.6]; }
-    return boxOf(m, m.port ? 'hut' : m.gate ? 'sign' : 'find');
+    return boxOf(m, m.port ? 'hut' : m.gate ? (BOX[m.kind] ? m.kind : 'sign') : m.lamp ? 'lighthouse' : 'find');
   });
 }
 
@@ -146,7 +152,7 @@ export function dressLand(w, theme, marks) {
   const decals = [], pieces = [], pb = []; // pb: 사물 화면 사각형(pieces와 같은 순서)
   const addPiece = (p) => { pieces.push(p); pb.push(boxOf(p)); };
   const clearMarks = (x, y, r) => marks.every((m) => Math.hypot(m.x - x, m.y - y) > r + 7);
-  const clearDecals = (x, y, r) => decals.every((q) => q.kind === 'creek' || q.kind === 'path' ? q.pts.every(([px, py]) => Math.hypot(px - x, py - y) > r + 2.5) : Math.hypot(q.x - x, q.y - y) > (r + q.r) * (q.kind === 'field' ? 0.8 : 1));
+  const clearDecals = (x, y, r) => decals.every((q) => q.kind === 'creek' || q.kind === 'path' ? q.pts.every(([px, py]) => Math.hypot(px - x, py - y) > r + 2.5) : Math.hypot(q.x - x, q.y - y) > (r + q.r) * (q.kind === 'field' || q.kind === 'saltpan' ? 0.8 : 1));
   const clearBox = (b) => mb.every((q) => !hit(b, q)) && pb.every((q) => !hit(b, q));
   const land = (x, y, lo, hi) => { const d = (w.landDist || w.dist)(x, y); return d > -199 && -d >= lo && -d <= hi; }; // 바다 끝 너머는 땅이 아니에요
   const sample = (si, depth, ok, tries = 400) => {
@@ -173,11 +179,12 @@ export function dressLand(w, theme, marks) {
     // 바닥 무늬: 밭·습지 웅덩이·바위 너덜
     for (const spec of sec.decals || []) for (let n = 0; n < spec.n; n++) {
       sample(si, spec.depth, (x, y) => {
-        if (spec.kind === 'field') {
+        if (spec.kind === 'field' || spec.kind === 'saltpan') {
           const [gx, gy] = w.gradient(x, y), ang = Math.atan2(gy, gx) + (rnd() - 0.5) * 0.5, a = spec.size[0] + rnd() * (spec.size[1] - spec.size[0]), b = a * (0.55 + rnd() * 0.4), r = Math.hypot(a, b);
           const c = Math.cos(ang), s = Math.sin(ang);
           for (const [u, v] of [[0, 0], [1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const px = x + (u * a * c - v * b * s), py = y + (u * a * s + v * b * c); if (!land(px, py, 6, 400) || zones.at(px, py) !== si) return null; }
           if (!clearMarks(x, y, r) || !clearDecals(x, y, r)) return null;
+          if (spec.kind === 'saltpan') { const q = { kind: 'saltpan', x, y, a, b, ang, r, v: rnd() }; decals.push(q); return q; }
           const tone = rnd(), q = { kind: 'field', x, y, a, b, ang, r, tone: tone < 0.34 ? 'wheat' : tone < 0.58 ? 'plow' : tone < 0.82 ? 'crop' : 'paddy', hedge: Math.floor(rnd() * 16), v: rnd() };
           decals.push(q); return q;
         }
@@ -214,7 +221,7 @@ export function dressLand(w, theme, marks) {
     const n = spec.houses[0] + Math.floor(rnd() * (spec.houses[1] - spec.houses[0] + 1)), got = [];
     for (let i = 0; i < n * 6 && got.length < n; i++) {
       const a = rnd() * Math.PI * 2, q = got.length ? 6 + rnd() * 5 : rnd() * 2, hx = x + Math.cos(a) * q, hy = y + Math.sin(a) * q;
-      const p = { kind: 'thatch', x: hx, y: hy, v: rnd(), size: 0.92 + rnd() * 0.16 };
+      const p = { kind: spec.house || 'thatch', x: hx, y: hy, v: rnd(), size: 0.92 + rnd() * 0.16 };
       if (!land(hx, hy, 9, 400) || !clearMarks(hx, hy, 5) || !clearDecals(hx, hy, 4.5)) continue;
       if (got.some((h) => Math.hypot(h.x - hx, h.y - hy) < 7.5 || (Math.abs(h.x - hx) < 7 && Math.abs(h.y - hy) < 6))) continue;
       if (!clearBox(boxOf(p))) continue;
@@ -239,7 +246,7 @@ export function dressLand(w, theme, marks) {
   const inDecal = (t) => decals.some((q) => {
     if (Math.abs(t.x - q.x) > q.r + 3 || Math.abs(t.y - q.y) > q.r + 3) return false;
     if (q.kind === 'creek' || q.kind === 'path') return q.pts.some(([px, py]) => Math.hypot(px - t.x, py - t.y) < (q.kind === 'creek' ? 2.6 : 1.8));
-    if (q.kind === 'field') { const dx = t.x - q.x, dy = t.y - q.y, c = Math.cos(q.ang), s = Math.sin(q.ang), u = dx * c + dy * s, v = -dx * s + dy * c; return Math.abs(u) < q.a + 0.8 && Math.abs(v) < q.b + 0.8; }
+    if (q.kind === 'field' || q.kind === 'saltpan') { const dx = t.x - q.x, dy = t.y - q.y, c = Math.cos(q.ang), s = Math.sin(q.ang), u = dx * c + dy * s, v = -dx * s + dy * c; return Math.abs(u) < q.a + 0.8 && Math.abs(v) < q.b + 0.8; }
     if (q.kind === 'pool') return Math.hypot(t.x - q.x, (t.y - q.y) * 1.2) < q.r * 0.9;
     return t.kind !== 'boulder' && t.kind !== 'rock' && t.kind !== 'pebbles' && Math.hypot(t.x - q.x, t.y - q.y) < q.r * 0.8; // 바위 너덜 위엔 돌만
   });
