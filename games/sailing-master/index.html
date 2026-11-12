@@ -43,6 +43,35 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .iconBtn.off { color: var(--muted); opacity: .55; }
 .iconBtn .slash { display: none; }
 .iconBtn.off .slash { display: inline; }
+.iconBtn.tall { height: 52px; }
+.iconBtn.tall svg { width: 18px; height: 18px; }
+/* 소리 조절(S4): 위쪽 소리 단추로 여는 별도 화면. 슬라이더는 키 슬라이더처럼 끌어요(트랙 어디를 눌러도 됨) */
+#audio { z-index: 8; position: absolute; inset: 0; background: rgba(6,24,34,.62); display: none; align-items: flex-start; justify-content: center; padding: calc(70px + var(--safe-t)) 16px 16px; }
+#audio.on { display: flex; }
+#audBox { width: 100%; max-width: 380px; background: var(--sheet); border: 1px solid rgba(226,196,130,.34); border-radius: 18px; padding: 12px 16px 16px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+#audHead { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+#audHead h3 { flex: 1; margin: 0; font-size: 18px; }
+#audClose { width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,.06); font-size: 16px; }
+.aud { padding: 10px 0 0; }
+.aud + .aud { border-top: 1px solid var(--line); }
+.audTop { display: flex; align-items: center; gap: 9px; }
+.audTop .ic { width: 26px; flex: none; text-align: center; font-size: 21px; }
+.audTop .nm { flex: 1; min-width: 0; line-height: 1.25; }
+.audTop .nm b { display: block; font-size: 15.5px; }
+.audTop .nm small { display: block; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.audTop .val { min-width: 34px; text-align: right; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: #e2c482; }
+.audTog { flex: none; min-width: 54px; height: 34px; border-radius: 17px; background: rgba(255,255,255,.08); border: 1px solid var(--line); color: var(--muted); font-size: 13.5px; font-weight: 700; }
+.audTog.on { background: var(--on); border-color: var(--on); color: #203038; }
+.audSl { --v: 1; position: relative; height: 46px; touch-action: none; cursor: pointer; outline: none; }
+.audSl .tr { position: absolute; left: 15px; right: 15px; top: 20px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); box-shadow: inset 0 1px 1px rgba(0,0,0,.35); }
+.audSl .fl { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--v) * 100%); border-radius: 3px; background: linear-gradient(to right, #b08f50, #f2c14e); }
+.audSl .kn { position: absolute; top: 8px; left: calc(15px + (100% - 30px) * var(--v)); width: 30px; height: 30px; margin-left: -15px; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #fbeec2, #d9b265 58%, #8f6d33); box-shadow: 0 2px 6px rgba(0,0,0,.45); }
+.audSl:focus-visible .kn { outline: 2px solid #eef9fc; outline-offset: 2px; }
+.aud.mute .fl { background: rgba(166,196,203,.35); }
+.aud.mute .kn { filter: grayscale(.85) brightness(.75); }
+.aud.mute .val { color: var(--muted); }
+#audNote { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; text-align: center; }
+#audBox .big { width: 100%; margin-top: 10px; }
 #chips { display: flex; gap: 9px; padding: 5px 11px; align-items: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; background: rgba(2,14,22,.28); border-top: 1px solid rgba(226,196,130,.16); }
 #chips span { display: inline-flex; align-items: center; gap: 4px; }
 #chips svg { width: 15px; height: 15px; flex: none; }
@@ -427,8 +456,7 @@ body.intro #hud, body.intro #panel, body.intro #tabs { visibility: hidden; }
       <div class="inst"><div class="num"><span id="spdNum">0.0</span><small>kt</small></div><div class="sub">배 속도</div></div>
       <div class="inst" id="dateCard"><div class="num" id="dateNum"></div><div class="sub" id="regionName"></div></div>
       <div id="hudBtns">
-        <button class="iconBtn" id="mus" aria-label="음악"><svg viewBox="0 0 16 16"><path d="M6 12.2V3.4l7-1.4v8.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="4.2" cy="12.2" rx="2.1" ry="1.7" fill="currentColor"/><ellipse cx="11.2" cy="10.6" rx="2.1" ry="1.7" fill="currentColor"/><path class="slash" d="M2 2l12 12" stroke="currentColor" stroke-width="1.5"/></svg></button>
-        <button class="iconBtn" id="snd" aria-label="소리"><svg viewBox="0 0 16 16"><path d="M2 6v4h2.6L8 13V3L4.6 6z" fill="currentColor"/><path d="M10.2 5.6a3.4 3.4 0 0 1 0 4.8M12 3.8a6 6 0 0 1 0 8.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path class="slash" d="M2 2l12 12" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        <button class="iconBtn tall" id="snd" aria-label="소리 조절"><svg viewBox="0 0 16 16"><path d="M3.5 2v12M8 2v12M12.5 2v12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".55"/><rect x="1.6" y="8.4" width="3.8" height="2.6" rx="1" fill="currentColor"/><rect x="6.1" y="3.6" width="3.8" height="2.6" rx="1" fill="currentColor"/><rect x="10.6" y="6.6" width="3.8" height="2.6" rx="1" fill="currentColor"/><path class="slash" d="M2 2l12 12" stroke="currentColor" stroke-width="1.5"/></svg></button>
       </div>
     </div>
     <div id="chips"></div>
@@ -470,6 +498,15 @@ body.intro #hud, body.intro #panel, body.intro #tabs { visibility: hidden; }
 <div id="tabs"></div>
 
 <div id="overlay"><div id="ovBox"></div></div>
+
+<div id="audio" role="dialog" aria-modal="true" aria-labelledby="audTitle">
+  <div id="audBox">
+    <div id="audHead"><h3 id="audTitle">🎚 소리 조절</h3><button id="audClose" aria-label="닫기">✕</button></div>
+    <div id="audRows"></div>
+    <p id="audNote">끌면 바로 들린다! 0까지 내리면 쥐 죽은 듯 조용해지지.</p>
+    <button class="big" id="audOk">좋아, 이대로 간다!</button>
+  </div>
+</div>
 
 <div id="story">
   <canvas id="storyArt"></canvas>
@@ -517,8 +554,8 @@ import * as SA from './art-ship.js';
 import * as SH from './ship.js';
 import { drawStoryScene, isJourney, storyImage, STORY_W, STORY_H } from './art-story.js';
 import { createCreatures, drawSpeciesIcon } from './creatures.js';
-import { createSound } from './sound.js';
-import { createMusic } from './music.js';
+import { createSound, readAudioPrefs, writeAudioPrefs, audible as heard } from './sound.js';
+import { createMusic, moodOf, TRACKS } from './music.js';
 import { worldOf } from './world.js';
 import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP, SEATS, TRAITS } from './data.js';
 
@@ -544,8 +581,16 @@ let sc = A.createScene(S.region, G.findsOf(S)), creatures = createCreatures(worl
 const wake = new A.Wake();
 const snd = createSound(), music = createMusic();
 music.setRegion(S.region);
-try { const a = JSON.parse(localStorage.getItem(AUDIO_KEY) || '{}'); if (a.snd === false) { snd.setOn(false); $('snd').classList.add('off'); } if (a.mus === false) { music.setOn(false); $('mus').classList.add('off'); } } catch { /* 무시 */ }
-const saveAudio = () => { try { localStorage.setItem(AUDIO_KEY, JSON.stringify({ snd: snd.on, mus: music.on })); } catch { /* 무시 */ } };
+// 소리 설정: 음악·소리(효과음)·물바람 세 묶음, 각각 켜고 끄기 + 0~100. 예전 저장(켜고 끄기 둘)도 읽어요
+let AP = readAudioPrefs(null);
+try { AP = readAudioPrefs(JSON.parse(localStorage.getItem(AUDIO_KEY) || '{}')); } catch { /* 무시 */ }
+function applyAudio() {
+  music.setOn(AP.mus.on); music.setVolume(AP.mus.vol / 100);
+  for (const k of ['fx', 'amb']) { snd.setOn(AP[k].on, k); snd.setVolume(k, AP[k].vol / 100); }
+  $('snd').classList.toggle('off', !['mus', 'fx', 'amb'].some((k) => heard(AP[k])));
+}
+applyAudio();
+const saveAudio = () => { try { localStorage.setItem(AUDIO_KEY, JSON.stringify(writeAudioPrefs(AP))); } catch { /* 무시 */ } };
 
 let W = 0, H = 0, DPR = 1;
 const cam = { x: S.boat.x, y: S.boat.y, zoom: Number(query.get('zoom')) || VIEW.zoomDefault, cy: 0 };
@@ -698,11 +743,48 @@ function syncButtons() {
 }
 $('sailSeg').addEventListener('pointerdown', (e) => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
-  if (G.setSail(S, Number(b.dataset.lv))) { snd.play(Number(b.dataset.lv) ? 'sail' : 'flap'); syncButtons(); }
+  if (G.setSail(S, Number(b.dataset.lv))) { snd.play(Number(b.dataset.lv) ? 'sail' : 'flap'); if (G.workerAt(S, 'sail')) snd.play('pipe'); syncButtons(); } // 갑판원에게 지시하는 호루라기
 });
 $('oar').addEventListener('pointerdown', () => { if ($('oar').disabled) return; G.setRow(S, !S.boat.row); syncButtons(); });
-$('snd').addEventListener('pointerdown', () => { snd.unlock(); snd.setOn(!snd.on); $('snd').classList.toggle('off', !snd.on); saveAudio(); });
-$('mus').addEventListener('pointerdown', () => { snd.unlock(); music.start(snd.ac); music.setOn(!music.on); $('mus').classList.toggle('off', !music.on); saveAudio(); });
+
+// ── 소리 조절 화면(S4) ──
+const AUD_ROWS = [['mus', '🎵', '음악', '배경 음악'], ['fx', '🔊', '소리', '노·돛·건지기·알림·선원'], ['amb', '🌊', '물·바람', '파도·찰랑임·바람·물살']];
+let audPrevT = 0;
+// 맛보기: 효과음은 끄는 동안 짧은 소리를 띄엄띄엄 낸다. 음악·물바람은 계속 나고 있으니 바로 들린다
+function audPreview(k) { const t = performance.now(); if (k !== 'fx' || t - audPrevT < 260) return; audPrevT = t; snd.play('pick'); }
+function syncAudioRow(r) {
+  const g = AP[r.dataset.g], sl = r.querySelector('.audSl'), t = r.querySelector('.audTog');
+  r.classList.toggle('mute', !heard(g)); sl.style.setProperty('--v', g.vol / 100); sl.setAttribute('aria-valuenow', g.vol);
+  r.querySelector('.val').textContent = g.vol; t.classList.toggle('on', g.on); t.textContent = g.on ? '켬' : '끔'; t.setAttribute('aria-pressed', g.on);
+}
+function buildAudio() {
+  const box = $('audRows'); box.innerHTML = '';
+  for (const [k, ic, name, sub] of AUD_ROWS) {
+    const r = el('div', 'aud', `<div class="audTop"><span class="ic">${ic}</span><div class="nm"><b>${name}</b><small>${sub}</small></div><span class="val"></span><button class="audTog" aria-label="${name} 켜고 끄기"></button></div><div class="audSl" role="slider" tabindex="0" aria-label="${name} 크기" aria-valuemin="0" aria-valuemax="100"><div class="tr"><div class="fl"></div></div><div class="kn"></div></div>`);
+    r.dataset.g = k;
+    const sl = r.querySelector('.audSl');
+    const set = (v) => { AP[k].vol = Math.round(Math.max(0, Math.min(100, v))); if (AP[k].vol > 0) AP[k].on = true; applyAudio(); syncAudioRow(r); audPreview(k); };
+    const from = (e) => { const b = sl.getBoundingClientRect(); return (e.clientX - b.left - 15) / (b.width - 30) * 100; };
+    let ptr = null;
+    sl.addEventListener('pointerdown', (e) => { ptr = e.pointerId; sl.setPointerCapture(ptr); audPrevT = 0; set(from(e)); });
+    sl.addEventListener('pointermove', (e) => { if (e.pointerId === ptr) set(from(e)); });
+    const end = (e) => { if (e.pointerId === ptr) { ptr = null; saveAudio(); } };
+    sl.addEventListener('pointerup', end); sl.addEventListener('pointercancel', end);
+    sl.addEventListener('keydown', (e) => { const d = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5 }[e.key]; if (d) { e.preventDefault(); set(AP[k].vol + d); saveAudio(); } });
+    r.querySelector('.audTog').addEventListener('click', () => {
+      AP[k].on = !AP[k].on; if (AP[k].on && !AP[k].vol) AP[k].vol = 50;
+      applyAudio(); syncAudioRow(r); saveAudio(); if (AP[k].on) { audPrevT = 0; audPreview(k); }
+    });
+    box.append(r); syncAudioRow(r);
+  }
+}
+const audioOpen = () => $('audio').classList.contains('on');
+function openAudio() { snd.unlock(); music.start(snd.ac); buildAudio(); $('audio').classList.add('on'); }
+function closeAudio() { $('audio').classList.remove('on'); saveAudio(); }
+$('snd').addEventListener('click', () => (audioOpen() ? closeAudio() : openAudio()));
+document.addEventListener('pointerdown', () => music.kick(), true);
+$('audClose').addEventListener('click', closeAudio); $('audOk').addEventListener('click', closeAudio);
+$('audio').addEventListener('pointerdown', (e) => { if (e.target === $('audio')) closeAudio(); });
 
 // 키 슬라이더: 끄는 동안만 돌고, 놓으면 가운데로
 const wrap = $('rudderWrap'), knob = $('knob');
@@ -989,7 +1071,7 @@ function renderPort(body) {
     if (up && S.visited.river) {
       const ok = n >= WORKSHOP.ratio && S.res.coin >= WORKSHOP.fee, cb = el('button', `pBtn${ok ? '' : ' off'}`, `→${icon(up)}`);
       cb.title = `${I.name} ${WORKSHOP.ratio}개로 ${ITEMS[up].name} 1개`;
-      cb.addEventListener('click', () => { if (G.craft(S, k, 1)) { snd.play('place'); again(); } else showHint(`${I.name} ${WORKSHOP.ratio}개와 금화 ${WORKSHOP.fee}닢이 있어야 해!`, 2); });
+      cb.addEventListener('click', () => { if (G.craft(S, k, 1)) { snd.play('hammer'); again(); } else showHint(`${I.name} ${WORKSHOP.ratio}개와 금화 ${WORKSHOP.fee}닢이 있어야 해!`, 2); });
       r.append(cb);
     }
     if (I.buy) { const bb = el('button', `pBtn${S.res.coin >= I.buy ? '' : ' off'}`, `사기 ${coin(I.buy)}`); bb.addEventListener('click', () => { if (G.buyMat(S, k, 1)) again(); }); r.append(bb); }
@@ -1564,6 +1646,7 @@ function updateHud(dt) {
   if (b.stamina <= 0 && b.row && hintT <= 0) showHint('팔이 떨어지겠어! 노가 느려진다!', 3);
   if (rudderPtr !== null && !b.row && b.sailNow < 0.05 && !S.cap.then && b.spd < 0.5 && hintT <= 0) showHint(G.stats(S).sailArea ? '돛을 올리든 노를 젓든 해야 움직이지!' : '노를 저어야 움직이지!', 2.5);
   snd.ambient(S.docked ? w.speed * 0.6 : w.speed, S.docked ? 0 : b.spd);
+  music.setMood(moodOf({ docked: !!S.docked, gustOn: S.weather.gustOn, gustSoon: S.weather.gustSoon })); // S5 날씨가 생기면 storm 신호를 더해요
   syncButtons();
   // 상황 단추
   const ctxBox = $('context');
@@ -1701,7 +1784,19 @@ function fxTimers(dt) {
   if (b.luff && flapT <= 0 && !S.docked) { snd.play('flap'); flapT = 1.3 + Math.random() * 1.6; }
   creakT -= dt;
   if (creakT <= 0) { snd.play('creak'); creakT = 3.5 + Math.random() * 6; }
+  // 노래꾼이 타고 있으면 평소 항해 때 가끔 지금 곡의 조로 흥얼거린다
+  if (!S.docked && music.mood === 'sail' && S.crew.some((c) => c.trait === 'singer')) {
+    singT -= dt;
+    if (singT <= 0) { const T = TRACKS[music.track] || TRACKS.river; snd.play('sing', 0, T.root, T.scale); singT = 50 + Math.random() * 50; }
+  }
 }
+// 항구에 있는 동안(항구 시트가 떠 있어도) 조선소 쪽에서 멀리 망치질 소리
+function portTimers(dt) {
+  if (!started || !S.docked) return;
+  yardT -= dt;
+  if (yardT <= 0) { snd.play('hammer', 0, 0.35); yardT = 6 + Math.random() * 9; }
+}
+let singT = 40 + Math.random() * 40, yardT = 3;
 
 const fpsBox = $('fps');
 if (query.get('fps')) fpsBox.style.display = 'block';
@@ -1711,7 +1806,7 @@ function frame(now) {
   const raw = Math.min(0.25, (now - last) / 1000);
   last = now;
   if (paused || !W || !H) return; // 창 크기가 0이면 그릴 곳이 없다(숨은 창에서 열릴 때)
-  const hold = !started || !!sheet || overlayOpen() || $('picker').classList.contains('on') || $('story').classList.contains('on');
+  const hold = !started || !!sheet || overlayOpen() || audioOpen() || $('picker').classList.contains('on') || $('story').classList.contains('on');
   if (!hold) {
     acc += raw;
     let n = 0;
@@ -1723,6 +1818,7 @@ function frame(now) {
     saveT += raw;
     if (saveT > 5) { saveT = 0; save(); }
   } else { S.t += raw * 0.6; S.wind = G.windAt(S); if (S.weather.gustOn) S.wind.speed *= REGIONS[S.region].gustK; } // 시트가 떠 있어도 물은 흐른다
+  portTimers(raw);
   if (!started) renderTitle(now / 1000);
   else { camera(raw); render(); }
   renderPreview(now / 1000);
@@ -1748,7 +1844,7 @@ if ('serviceWorker' in navigator && !query.get('dbg') && (location.protocol === 
 }
 
 // 점검용 창구(?dbg=1): 자동 확인이 상태를 읽고 조작할 때 씁니다
-if (query.get('dbg')) window.SM = { openStory, showStoryPage, story, openTab, get S() { return S; }, get creatures() { return creatures; }, get sc() { return sc; }, G, SH, cam, snd, music, render, renderTitle, worldOf, design, get sheet() { return sheet; }, drainEvents, bakeIfNeeded, openPort, closeSheet, renderSheet, changeRegionArt, openGate, tapWorld };
+if (query.get('dbg')) window.SM = { openStory, showStoryPage, story, openTab, get S() { return S; }, get creatures() { return creatures; }, get sc() { return sc; }, G, SH, cam, snd, music, render, renderTitle, worldOf, design, get sheet() { return sheet; }, drainEvents, bakeIfNeeded, openPort, closeSheet, renderSheet, changeRegionArt, openGate, tapWorld, openAudio, closeAudio, get AP() { return AP; } };
 </script>
 </body>
 </html>

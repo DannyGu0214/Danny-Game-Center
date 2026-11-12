@@ -1,0 +1,79 @@
+version: 1
+style: docs/bgm-style.md   # BGM 스타일·스펙 기준(곡별 대응표 포함). 아래 prompt는 여기서 뽑은 것
+assets:
+  - id: bgm-01-gray-field
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/01-gray-field.mp3
+    spec: "잿빛 들판 · D minor, 68 BPM, chords Dm - Bb - F - C · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental, drumless post-apocalyptic ambient, D minor, 68 BPM, slow and bleak. low detuned analog sawtooth synth pad muffled by a low-pass filter, sparse plucked acoustic guitar melody, soft deep sine bass, faint wind noise in the background. chords Dm - Bb - F - C, 4 bars per phrase. starts with only the pad, then bass enters, then the guitar melody. desolate, empty grey fields, long reverb, no vocals, no drums, calm and steady, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧 · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 사용 trackId 8c6bf601-0d00-4094-b906-9a6484695b37 · 다른 테이크 trackId fa6c5d53-5359-4474-be8b-163fa940aa01 · 추정 D minor · 68 BPM(두 테이크 모두) · 원곡 분위기 비교는 귀로 듣지 않음"
+
+  - id: bgm-02-rusty-radio
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/02-rusty-radio.mp3
+    spec: "녹슨 라디오 · A minor, 84 BPM, chords Am - G - F - E · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental, drumless lo-fi post-apocalyptic, A minor, 84 BPM, melancholic. small flat square-wave lead like an old broken radio (band-pass filtered, narrow and nasal), pulsing quarter-note sine and triangle bass alternating octaves, sparkling music box notes in later phrases, subtle radio static crackle. chords Am - G - F - E, one chord per bar. lonely signal in the ruins, light reverb, no vocals, no drums, calm, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧 · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 사용 trackId 718fbda8-5ad7-4a88-84f3-80a3220204f1 · 다른 테이크 trackId 183b7061-410d-4e5b-ac54-7c5889860eb6 · 추정 C major(나란한조, 3순위 후보 A minor) · 86 BPM. 장조로 추정돼 1회 재생성(태그에 major key 배제)했으나 재생성 2테이크(3e6ed90d·5419ac2c)도 C major로 추정 — 라디오 잡음 때문에 자동 추정이 불확실, 원 테이크 중 A minor 후보가 있는 쪽 사용 · 원곡 분위기 비교는 귀로 듣지 않음"
+
+  - id: bgm-03-last-light
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/03-last-light.mp3
+    spec: "마지막 불빛 · E minor, 58 BPM, chords Em - C - G - D · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental solo piano ballad, E minor, 58 BPM, very slow and intimate. steady eighth-note piano arpeggios (root, fifth, octave, third pattern), a slow sparse piano melody entering in later phrases, one long sustained low bass note per bar. chords Em - C - G - D. the last light in the dark, lonely but a faint ember of hope, soft room reverb, no vocals, no drums, no other instruments, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧 · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 사용 trackId f58e8748-a84d-4fe0-a9a2-eca33fc20691 · 다른 테이크 trackId 59ebee50-7eb3-4cab-8fd0-253495527a3b · 추정 E minor · 59 BPM · 원곡 분위기 비교는 귀로 듣지 않음"
+
+  - id: bgm-04-dawn-patrol
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/04-dawn-patrol.mp3
+    spec: "새벽 정찰 · G major, 76 BPM, chords G - D - Em - C · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental drumless folk ambient, G major, 76 BPM, cautiously hopeful dawn. faint airy pad, nylon acoustic guitar eighth-note arpeggios, soft round bass, then a gently rising piano melody. chords G - D - Em - C, one chord per bar. dawn scouting through quiet ruins, calm and clear, light reverb, no vocals, no drums, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧 · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 사용 trackId cf58778a-b7ef-43d2-9cde-c92088d3cd99 · 다른 테이크 trackId 2f66a998-af38-4140-84db-92e4b843975c · 추정 D major(2순위 G major, 같은 조표 이웃조) · 76 BPM · 원곡 분위기 비교는 귀로 듣지 않음"
+
+  - id: bgm-05-first-harvest
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/05-first-harvest.mp3
+    spec: "첫 수확 · D major, 88 BPM, chords D - Bm - G - A · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental drumless pastoral, D major, 88 BPM, gentle and cheerful. bass playing root and fifth on half notes, piano chords on beats 2 and 4 (off-beat), sparkling music box accents, a whistled melody with soft vibrato in the later phrases. chords D - Bm - G - A, one chord per bar. first harvest after the apocalypse, small joy, warm and light, light reverb, no vocals, no drums, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧 · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 사용 trackId 4e827466-2ae3-4e65-87d9-92952834a3a4 · 다른 테이크 trackId d21d831c-cdea-45c4-823b-7f53375075c1 · 추정 D major · 89 BPM · 원곡 분위기 비교는 귀로 듣지 않음"
+
+  - id: bgm-06-under-the-lantern
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/06-under-the-lantern.mp3
+    spec: "등불 아래 · F major, 66 BPM, chords F - Am - Bb - C · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental drumless lullaby, F major, 66 BPM, warm and cozy. warm soft synth pad, piano broken chords on quarter notes, soft low bass, a music box melody like a lullaby entering in later phrases. chords F - Am - Bb - C, one chord per bar, rising progression. night under a lantern in a safe shelter, tender and calm, soft reverb, no vocals, no drums, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧 · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 사용 trackId 69a400fa-ff77-4774-9e70-f7ed029661ef · 다른 테이크 trackId db5c5250-1df5-43af-9dc7-8914b4cb8e2e · 추정 F major · 65 BPM · 원곡 분위기 비교는 귀로 듣지 않음"
+
+  - id: bgm-07-campfire-song
+    kind: music
+    source: generate
+    path: games/zombie-outpost/assets/bgm/07-campfire-song.mp3
+    spec: "모닥불 노래 · A major, 84 BPM, chords A - D - F#m - E · 연주곡, 드럼 없음 · MP3 스테레오 44.1kHz CBR 128kbps · 목표 약 5:00(최소 3:30) · -16 LUFS · 끝은 페이드아웃"
+    prompt: "instrumental drumless campfire folk, A major, 84 BPM, warm and hopeful. strummed acoustic guitar with a down-up strum from low to high strings, soft bass notes, then a harmonica lead melody with light vibrato. chords A - D - F#m - E, one chord per bar. singing around a campfire in the ruins, gentle and homely, light reverb, no vocals, no drums, no climax"
+    url: ""
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6, 제3자 API 서비스) 생성 — 상업 이용 조건은 확인하지 않음(필요 시 sunoapi.org·Suno 약관 확인)"
+    note: "sunoapi.org V6 연주곡 300초, 요청당 12크레딧 · 앞 무음 제거, 끝 8초 페이드아웃, loudnorm 2패스 -16 LUFS / -1 dBTP, MP3 CBR 128k 44.1kHz · 조성·BPM은 librosa 자동 추정(근사) · 사용 trackId edef5951-e827-4fbb-93a7-f820a299850d · 다른 테이크 trackId 97b0c22c-4bb9-49ef-8135-12a65192e53a · 추정 D major(2순위 A major, 이웃조) · 83 BPM · 원곡 분위기 비교는 귀로 듣지 않음"

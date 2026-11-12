@@ -95,10 +95,10 @@ supersedes:
 | service | target_repo / branch | host |
 |---|---|---|
 | `commodity-radar` | `DannyGu0214/commodity-radar` / `main` | `mac-mini` |
-| `dannyreader` | `DannyGu0214/DannyReader` / `main` | `macbook-15` |
+| `dannyreader` | `DannyGu0214/DannyReader` / `main` | `mac-mini` |
 
 - `host`는 필수로 쓴다(빠지면 `mac-mini`로 처리된다). 틀린 host를 쓰면 어느 러너도 집지 않아 결과가 생기지 않는다. 10분 넘게 결과가 없으면 host·service를 다시 확인한다.
-- macbook-15는 노트북이라 잠자기·이동 중에는 처리가 밀린다. 깨어나면 다음 회차에 처리된다.
+- 지금 등록된 서비스는 모두 mac-mini에서 돈다(`dannyreader`는 2026-11-09 macbook-15에서 이관). macbook-15 러너는 잠자기·이동 중에는 처리가 밀린다.
 
 - `commit`은 `origin/<branch>`에 이미 있어야 하고, 현재 운영본보다 앞이거나 같아야 한다. 같은 sha면 재빌드·재기동만 한다. 되돌리기(이전 sha로 배포)는 거절된다. 되돌리려면 revert 커밋을 머지한 뒤 그 sha로 의뢰한다.
 - 처리 순서: ff 병합 → 빌드 → 재기동 → 헬스체크. 실패하면 러너가 이전 sha로 롤백하고 결과에 `failed`와 사유를 적는다.
@@ -127,6 +127,7 @@ assets:
 
 - 큰 파일(음악·영상·3D)은 Git LFS로 커밋된다. 저장소에 `.gitattributes` LFS 설정이 있어야 한다.
 - 출처와 라이선스는 로컬이 `assets/CREDITS.md`에 함께 기록한다.
+- 생성 모델은 로컬이 정한다. 이미지는 `gemini-3.1-flash-image`, 음악은 sunoapi.org(Suno)다. 의뢰서·`prompt`에 모델을 지정하거나 다른 모델(예: `gemini-3-pro-image`)을 권하지 않는다.
 
 ## 하지 않는 것
 

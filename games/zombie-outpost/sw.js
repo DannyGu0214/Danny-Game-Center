@@ -25,6 +25,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (url.origin !== location.origin) return;
+  if (url.pathname.endsWith('.mp3')) return; // 배경음악 mp3: 서비스 워커를 거치지 않는다(범위 요청·용량). 오프라인이면 합성곡으로 넘어간다
   e.respondWith(
     Promise.race([fetch(req), timeout(NET_TIMEOUT_MS)])
       .then((res) => (res.ok ? put(req, res) : res))
