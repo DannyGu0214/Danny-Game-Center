@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ocean World 3D — 프롤로그 확인</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b2531; color: #e8f6ff;
+    font: 14px/1.5 system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  /* ?behind=1: root 뒤에 게임 장면이 있다고 치고 색 덩어리를 깔아 반투명 바탕이 흐리게 비치는지 본다 */
+  #behind { position: fixed; inset: 0; display: none;
+    background:
+      radial-gradient(circle at 25% 60%, #ffcf6b 0 9%, transparent 9.5%),
+      radial-gradient(circle at 62% 45%, #ff7a8a 0 7%, transparent 7.5%),
+      radial-gradient(circle at 80% 70%, #7affc4 0 10%, transparent 10.5%),
+      linear-gradient(#bfe9ee, #3c9db3); }
+  body.behind #behind { display: block; }
+  #panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; }
+  #panel button { font: inherit; font-size: 15px; padding: 10px 18px; border-radius: 10px; border: 0; cursor: pointer; background: #f8f0dc; color: #17394a; font-weight: 700; }
+  #result { margin-top: 10px; opacity: .8; }
+</style>
+</head>
+<body>
+<div id="behind"></div>
+<div id="panel">
+  <button id="again" type="button">프롤로그 다시 보기</button>
+  <div id="result"></div>
+</div>
+<div id="root"></div>
+<script type="module">
+  import { showPrologue } from './ui/prologue.js';
+  const q = new URLSearchParams(location.search);
+  if (q.get('behind')) document.body.classList.add('behind');
+  const root = document.getElementById('root');
+  const out = document.getElementById('result');
+  const panel = document.getElementById('panel');
+  function run() {
+    out.textContent = '';
+    panel.style.visibility = 'hidden';
+    showPrologue({
+      root,
+      onDone: (r) => console.log('[prologue] onDone', r),
+    }).then((r) => { panel.style.visibility = ''; out.textContent = r.skipped ? '건너뛰기로 끝남' : '마지막 쪽까지 보고 끝남'; });
+  }
+  document.getElementById('again').addEventListener('click', run);
+  run();
+</script>
+</body>
+</html>
