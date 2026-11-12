@@ -1,6 +1,8 @@
 // 물소리·바람 소리와 짧은 효과음. 파일 없이 Web Audio로 합성한다.
 // 잡음 하나를 여러 필터로 나눠 쓴다: 파도(낮은 저역 + 느린 숨결), 찰랑임(중역 + 불규칙한 흔들림), 바람(대역 필터 + 풍속), 뱃머리 물살(고역 + 배 속도).
 
+import { levelOf } from './music.js';
+
 export function makeNoise(ac, sec = 4) {
   const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * sec), ac.sampleRate), d = buf.getChannelData(0);
   // 분홍 잡음에 가깝게 부드럽게 만든다(날카로운 치찰음을 줄인다)
@@ -104,27 +106,90 @@ export const FX = {
   warn(ac, _n, d, t) { for (const at of [0, 0.3]) tone(ac, d, t + at, { f: 392, dur: 0.24, peak: 0.05 }); },
   disaster(ac, noise, d, t) { tone(ac, d, t, { f: 196, to: 98, type: 'triangle', dur: 1.4, peak: 0.12 }); burst(ac, noise, d, t, { type: 'lowpass', f: 900, to: 200, dur: 1.2, peak: 0.2 }); },
   sail(ac, noise, d, t) { burst(ac, noise, d, t, { f: 1500, to: 3200, q: 0.8, dur: 0.5, peak: 0.08, attack: 0.1 }); },
+  // ── S4 선원·항구 소리(2026-11-12) ──
+  // 망치질: 나무에 박는 못 소리. k < 1이면 멀리서(조선소 쪽) 작고 먹먹하게
+  hammer(ac, noise, d, t, k = 1) {
+    const far = k < 1, n = far ? 2 + Math.floor(Math.random() * 3) : 3, gap = far ? 0.42 : 0.2;
+    for (let i = 0; i < n; i++) {
+      const at = t + i * gap + Math.random() * 0.03, p = k * (i === n - 1 ? 1 : 0.8);
+      tone(ac, d, at, { f: 330, to: 190, type: 'triangle', dur: 0.07, peak: 0.07 * p });
+      burst(ac, noise, d, at, { f: far ? 1400 : 2600, q: 1.4, dur: 0.045, peak: 0.06 * p, attack: 0.002 });
+    }
+  },
+  // 갑판장 호루라기(boatswain's call): 짧게 올라갔다 떨고 내려와요. 선원이 지시를 받아 돛을 바꿀 때
+  pipe(ac, _n, d, t) {
+    const o = ac.createOscillator(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain(), end = t + 0.62;
+    o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(2150, t + 0.12); o.frequency.setValueAtTime(2150, t + 0.46); o.frequency.exponentialRampToValueAtTime(1600, end);
+    lfo.frequency.value = 17; lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(45, t + 0.18); lg.gain.setValueAtTime(0, t + 0.44); lfo.connect(lg); lg.connect(o.frequency);
+    g.gain.value = 0.0001; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.022, t + 0.04); g.gain.setValueAtTime(0.022, end - 0.08); g.gain.exponentialRampToValueAtTime(0.0001, end);
+    o.connect(g); g.connect(d); o.start(t); lfo.start(t); o.stop(end + 0.05); lfo.stop(end + 0.05);
+  },
+  // 노래꾼의 흥얼거림: 지금 곡의 조(root·scale)에서 다섯 음 가락. 톱니파를 '오' 모음 두 대역으로 걸러 사람 목소리처럼
+  sing(ac, _n, d, t, root = 62, scale = [0, 2, 4, 5, 7, 9, 11]) {
+    const penta = scale.filter((x) => [0, 2, 4, 7, 9, 3, 10].includes(x)).slice(0, 5), out = ac.createGain();
+    out.gain.value = 1; out.connect(d);
+    const f1 = ac.createBiquadFilter(), f2 = ac.createBiquadFilter(); f1.type = f2.type = 'bandpass'; f1.frequency.value = 480; f2.frequency.value = 820; f1.Q.value = 5; f2.Q.value = 6;
+    const g2 = ac.createGain(); g2.gain.value = 0.5; f1.connect(out); f2.connect(g2); g2.connect(out);
+    let at = t, step = Math.floor(Math.random() * penta.length);
+    for (let i = 0; i < 5; i++) {
+      step = Math.max(0, Math.min(penta.length - 1, step + (Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.7 ? 1 : 2)));
+      const len = i === 4 ? 0.9 : 0.3 + Math.random() * 0.25, f = 440 * 2 ** ((root - 12 + (i === 4 ? 0 : penta[step]) - 69) / 12);
+      const o = ac.createOscillator(), g = ac.createGain(), v = ac.createOscillator(), vg = ac.createGain(), end = at + len;
+      o.type = 'sawtooth'; o.frequency.value = f; v.frequency.value = 5.2; vg.gain.value = f * 0.012; v.connect(vg); vg.connect(o.frequency);
+      g.gain.value = 0.0001; g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.05, at + 0.06); g.gain.setValueAtTime(0.05, end - 0.08); g.gain.linearRampToValueAtTime(0.0001, end);
+      o.connect(g); g.connect(f1); g.connect(f2); o.start(at); v.start(at); o.stop(end + 0.05); v.stop(end + 0.05);
+      at = end + 0.04;
+    }
+  },
 };
 
+// 소리 묶음 셋(2026-11-12 S4): 음악(music.js) · 효과음(fx) · 물·바람(amb). 슬라이더는 0~100, 기본은 지금 크기인 100
+export const AUDIO_GROUPS = ['mus', 'fx', 'amb'];
+const pct = (v, d = 100) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(100, Math.round(Number(v)))) : d);
+// 저장된 값 읽기. 예전 저장 { snd, mus }(켜고 끄기만)도 그대로 이어 받아요: snd가 꺼져 있었으면 효과음·물바람 둘 다 꺼짐
+export function readAudioPrefs(raw) {
+  const a = raw && typeof raw === 'object' ? raw : {}, vol = a.vol && typeof a.vol === 'object' ? a.vol : {};
+  const was = (k, legacy) => (typeof a[k] === 'boolean' ? a[k] : legacy !== false);
+  return { mus: { on: was('mus'), vol: pct(vol.mus) }, fx: { on: was('fx', a.snd), vol: pct(vol.fx) }, amb: { on: was('amb', a.snd), vol: pct(vol.amb) } };
+}
+// 저장할 값. 예전 버전이 읽어도 맞게 snd·mus도 같이 적어요
+export function writeAudioPrefs(p) {
+  return { v: 2, mus: !!p.mus.on, snd: !!(p.fx.on || p.amb.on), fx: !!p.fx.on, amb: !!p.amb.on, vol: { mus: pct(p.mus.vol), fx: pct(p.fx.vol), amb: pct(p.amb.vol) } };
+}
+export const audible = (g) => !!g && g.on && g.vol > 0;
+
+const MASTER = 0.85, FX_GAIN = 2.2; // FX_GAIN: 효과음이 파도 소리(RMS 0.06~0.08)에 묻히지 않게
 export function createSound() {
-  let ac = null, master = null, noise = null, amb = null, on = true, fxBus = null;
+  // master(0.85) ← 효과음 묶음(2.2 × 슬라이더) + 물·바람 묶음(1 × 슬라이더). 슬라이더 100이 S4 전의 크기와 같아요
+  let ac = null, master = null, noise = null, amb = null, fxBus = null, ambBus = null;
+  const grp = { fx: { on: true, v: 1 }, amb: { on: true, v: 1 } };
+  const target = (k) => (grp[k].on ? levelOf(grp[k].v) * (k === 'fx' ? FX_GAIN : 1) : 0);
+  function level(k, quick) { const b = k === 'fx' ? fxBus : ambBus; if (b) b.gain.setTargetAtTime(target(k), ac.currentTime, quick ? 0.03 : 0.1); }
   return {
     get ac() { return ac; },
-    get on() { return on; },
-    unlock() {
+    get on() { return grp.fx.on || grp.amb.on; },
+    isOn(k) { return grp[k].on; },
+    volume(k) { return grp[k].v; },
+    // ctx를 주면 그 컨텍스트(오프라인 측정용)에 붙어요
+    unlock(ctx) {
       if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      ac = new AC();
-      master = ac.createGain(); master.gain.value = on ? 0.85 : 0; master.connect(ac.destination);
-      fxBus = ac.createGain(); fxBus.gain.value = 2.2; fxBus.connect(master); // 효과음이 파도 소리(RMS 0.06~0.08)에 묻히지 않게
+      const AC = !ctx && (window.AudioContext || window.webkitAudioContext);
+      if (!ctx && !AC) return;
+      ac = ctx || new AC();
+      master = ac.createGain(); master.gain.value = MASTER; master.connect(ac.destination);
+      fxBus = ac.createGain(); fxBus.gain.value = target('fx'); fxBus.connect(master);
+      ambBus = ac.createGain(); ambBus.gain.value = target('amb'); ambBus.connect(master);
       noise = makeNoise(ac);
-      amb = buildAmbient(ac, master, noise);
+      amb = buildAmbient(ac, ambBus, noise);
     },
-    setOn(v) { on = v; if (ac) master.gain.setTargetAtTime(v ? 0.85 : 0, ac.currentTime, 0.1); },
+    // 묶음 하나 켜고 끄기. 묶음을 안 주면 둘 다(예전 소리 단추)
+    setOn(v, k) { for (const g of k ? [k] : ['fx', 'amb']) { grp[g].on = !!v; level(g); } },
+    // 슬라이더(0~1). 끄는 동안 바로 들리게 빠르게 따라가요
+    setVolume(k, v) { grp[k].v = Math.max(0, Math.min(1, Number(v) || 0)); level(k, true); },
     ambient(windSpeed, boatSpeed) { if (amb) amb.set(windSpeed, boatSpeed); },
-    play(name) { if (ac && on && FX[name]) FX[name](ac, noise, fxBus, ac.currentTime + 0.005); },
-    pause() { if (ac) ac.suspend(); },
-    resume() { if (ac) ac.resume(); },
+    // at: 지금부터 몇 초 뒤(오프라인 측정에서 씀). 효과음이 0이면 소리 마디를 만들지도 않아요
+    play(name, at = 0, ...args) { if (ac && target('fx') > 0 && FX[name]) FX[name](ac, noise, fxBus, ac.currentTime + 0.005 + at, ...args); },
+    pause() { if (ac && ac.suspend) ac.suspend(); },
+    resume() { if (ac && ac.resume) ac.resume(); },
   };
 }

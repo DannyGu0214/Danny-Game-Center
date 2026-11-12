@@ -82,6 +82,37 @@ assets:
     status: done
     license: "Suno 무료 플랜 생성 — 비상업 전용, 저작권은 Suno 보유(상업 이용 시 유료 플랜으로 재생성 필요)"
     note: "곡 이름: 넓은 바다(바다·대양) · 2026-11-08 대니님 지시로 로컬이 추가한 항목 · Suno v6-mini 연주곡, 길이 2:24~2:27 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드해 루프 이음새 처리(ffmpeg) · 128kbps 44.1kHz"
+  # S4 상황 곡(2026-11-12, DESIGN.md 43절). 파일이 생기면 게임이 알아서 mp3를 쓰고, 없으면 music.js 합성곡(같은 이름)을 틀어요. 크기는 기존 4곡과 비슷하게(평균 -17.5dB 안팎)
+  - id: bgm-lively
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/lively.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental fast folk reel in 4/4, about 140 BPM, D major. Fiddle drives a running eighth-note melody, tin whistle takes it on the repeat, plucked mandolin offbeat chords, upright bass, foot stomps on a wooden deck, tambourine. Bright, breezy, a fair wind filling the sails and the crew grinning, a little faster and more energetic than a tavern jig. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 순풍이다!(평소 항해 중간중간 나오는 생동감 곡, 모든 수역 공통)"
+  - id: bgm-port
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/port.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental folk street-festival polka in 4/4, about 120 BPM, F major. Accordion leads a singable oom-pah melody, tin whistle answers, plucked mandolin chords, upright bass, hand claps, foot stomps, tambourine and frequent clinking of mugs, a distant hubbub of a crowded harbor market day. Warm, homely, common folk celebrating on the docks of a small Age of Sail harbor town. Short open-air reverb. Not cute, not childlike. No vocals, no singing, no spoken words. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 부두 장날(항구에 있을 때만, 모든 수역 공통)"
+  - id: bgm-storm
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/storm.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental very fast, intense sea-shanty folk in 4/4, about 156 BPM, E harmonic minor. Aggressive bowed fiddle melody, accordion stabs, driving upright bass on every eighth note, pounding foot stomps and bodhran, tense low drone underneath. A sudden squall hitting a small sailing boat, crew fighting the ropes, urgent and dramatic but still folk, not orchestral, not metal. Short wooden-room reverb. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 돌풍 속으로(기상이변 곡. 지금은 돌풍 예고·돌풍 동안, S5 날씨 체계부터는 폭풍 이벤트)"
   - id: story-ride
     kind: image
     source: generate

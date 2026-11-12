@@ -355,8 +355,8 @@ test('뗏목은 선원이 탈 자리가 없고 해먹·선실도 놓을 수 없�
   assert.equal(S.ship.mods.some((m) => m.id === 'hammock'), false);
 });
 
-test('선술집 곡: 마디마다 박자가 맞고 조에서 벗어나지 않는다', () => {
-  assert.deepEqual(TRACK_IDS, ['pond', 'lake', 'river']);
+test('합성곡: 마디마다 박자가 맞고 조에서 벗어나지 않는다(선술집 3곡 + S4 상황 곡 3곡)', () => {
+  assert.deepEqual(TRACK_IDS, ['pond', 'lake', 'river', 'lively', 'port', 'storm']);
   for (const [id, T] of Object.entries(TRACKS)) {
     assert.equal(T.chords.length, T.melody.length, id);
     assert.ok(T.bpm >= 100, `${id}는 흥겨운 빠르기`);

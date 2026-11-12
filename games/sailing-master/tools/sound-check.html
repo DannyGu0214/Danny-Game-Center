@@ -3,8 +3,8 @@
 <title>소리 점검</title>
 <pre id="out">렌더 중…</pre>
 <script type="module">
-// 소리를 오프라인으로 렌더해 크기를 잰다: 바람·배 속도별 환경음과 효과음마다 RMS·최고값(1을 넘으면 찢어짐). 결과는 window.RESULT.
-import { buildAmbient, FX, makeNoise } from '../sound.js';
+// 소리를 오프라인으로 렌더해 크기를 잰다: 바람·배 속도별 환경음과 효과음마다 RMS·최고값(1을 넘으면 찢어짐), 곡마다 크기, S4 슬라이더 셋의 분리. 결과는 window.RESULT.
+import { buildAmbient, FX, makeNoise, createSound } from '../sound.js';
 import { createMusic, TRACK_IDS } from '../music.js';
 const SR = 44100;
 const rmsPeak = (d, a = 0, b = d.length) => { let s = 0, p = 0; for (let i = a; i < b; i++) { s += d[i] * d[i]; p = Math.max(p, Math.abs(d[i])); } return { rms: +Math.sqrt(s / (b - a)).toFixed(4), peak: +p.toFixed(3) }; };
@@ -31,6 +31,52 @@ for (const id of TRACK_IDS) {
   R.music[id] = rmsPeak((await ac.startRendering()).getChannelData(0));
 }
 // 바람만 따로(2026-11-02 대니님 요청으로 줄임): 파도·찰랑임을 뺀 비교는 아래 FX와 함께 본다
+
+// ── S4 슬라이더 셋(2026-11-12): 음악·소리·물바람이 각자 자기 소리만 바꾸는지 ──
+// 같은 난수로 여러 번 렌더해 빼 본다. 음악을 먼저 예약하고 효과음을 마지막에 쳐서, 효과음을 0으로 해도 다른 소리의 난수가 바뀌지 않게 한다
+const realRandom = Math.random;
+function seed(n = 1) { let x = n; Math.random = () => ((x = (x * 1103515245 + 12345) % 2147483648) / 2147483648); }
+const MIX_S = 10;
+async function mix(cfg = {}, live = null) {
+  const v = { mus: 1, fx: 1, amb: 1, ...cfg }, on = { mus: true, fx: true, amb: true, ...(cfg.on || {}) };
+  seed(11);
+  const ac = new OfflineAudioContext(1, SR * MIX_S, SR);
+  const m = createMusic({ rand: () => 0.5 }); m.setOn(on.mus); m.setVolume(v.mus); m.renderInto(ac, 'pond', MIX_S);
+  const s = createSound(); for (const k of ['fx', 'amb']) { s.setOn(on[k], k); s.setVolume(k, v[k]); }
+  s.unlock(ac); s.ambient(9, 5);
+  for (const [name, at] of [['stroke', 1], ['pick', 2.5], ['sail', 3.5], ['warn', 5], ['hammer', 6.2], ['stroke', 7.4], ['found', 8.4]]) s.play(name, at);
+  if (live) ac.suspend(live.at).then(() => { if (live.g === 'mus') m.setVolume(live.v); else s.setVolume(live.g, live.v); ac.resume(); });
+  const d = (await ac.startRendering()).getChannelData(0);
+  Math.random = realRandom;
+  return d;
+}
+const sub = (a, b, k = 1) => a.map((x, i) => x - k * b[i]);
+const rmsOf = (d, a = 0, b = d.length) => { let q = 0; for (let i = a; i < b; i++) q += d[i] * d[i]; return Number(Math.sqrt(q / (b - a)).toPrecision(3)); }; // 반올림 없이(아주 작은 값도 보이게)
+const { levelOf } = await import('../music.js');
+const base = await mix(), stem = { mus: await mix({ fx: 0, amb: 0 }), fx: await mix({ mus: 0, amb: 0 }), amb: await mix({ mus: 0, fx: 0 }) };
+const again = await mix();
+R.sliders = {
+  base: rmsPeak(base), again: { diff: rmsOf(sub(base, again)) }, // 같은 설정을 두 번 렌더하면 똑같아야 한다
+  stems: { mus: rmsPeak(stem.mus), fx: rmsPeak(stem.fx), amb: rmsPeak(stem.amb) },
+  sumResidual: rmsOf(sub(sub(sub(base, stem.mus), stem.fx), stem.amb)), // 셋을 더하면 전체와 같다
+  groups: {},
+};
+for (const g of ['mus', 'fx', 'amb']) {
+  const row = R.sliders.groups[g] = {};
+  for (const val of [0.75, 0.5, 0.25, 0]) {
+    const d = await mix({ [g]: val }), k = levelOf(val);
+    // 바뀐 만큼이 그 묶음의 (k - 1)배와 같으면, 다른 두 묶음은 그대로라는 뜻
+    const others = sub(d, stem[g], k), othersBase = sub(base, stem[g]);
+    row[val * 100] = { mixRms: rmsOf(d), expectGain: +k.toFixed(4), ownRms: +(rmsOf(sub(d, othersBase)) / rmsOf(stem[g])).toFixed(4), othersChange: rmsOf(sub(others, othersBase)) };
+  }
+  const off = await mix({ on: { [g]: false } });
+  row.off = { residual: rmsOf(sub(off, sub(base, stem[g]))) }; // 끄기 = 그 묶음만 뺀 소리
+  // 끄는 중: 4초에 0으로 내리면 4.3초부터는 그 묶음 소리가 없다
+  const lv = await mix({ ...Object.fromEntries(['mus', 'fx', 'amb'].filter((q) => q !== g).map((q) => [q, 0])) }, { g, at: 4, v: 0 });
+  row.liveTo0 = { before: rmsOf(lv, 1 * SR, 4 * SR), after: rmsOf(lv, Math.round(4.3 * SR), MIX_S * SR), peakAfter: Number(lv.subarray(Math.round(4.3 * SR)).reduce((m, x) => Math.max(m, Math.abs(x)), 0).toPrecision(3)) };
+}
+const zero = await mix({ mus: 0, fx: 0, amb: 0 });
+R.sliders.allZero = rmsPeak(zero);
 
 window.RESULT = R;
 document.getElementById('out').textContent = JSON.stringify(R, null, 1);
