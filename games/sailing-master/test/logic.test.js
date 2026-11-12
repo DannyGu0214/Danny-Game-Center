@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import * as G from '../logic.js';
 import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
-import { advanceFlow, waveAngle, FLOW_LAYERS } from '../art.js';
+import { advanceFlow, waveAngle, FLOW_LAYERS, sceneLayout } from '../art.js';
+import { THEMES, themeOf, zonesOf, markBoxes, BOX } from '../themes.js';
 import { createCreatures, hitRadius } from '../creatures.js';
 import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS, ROLES, CAPTAINS, STORIES, MAT_IDS, ITEMS, SUPPLY, HERB, WORKSHOP, TRAITS, CREW_GROW } from '../data.js';
 // 모든 재료와 금화를 n개씩(S2 아이템부터 배 값에 여러 재료가 들어가요)
@@ -1118,4 +1119,45 @@ test('저장 v3 → v4: 예전 선원은 숙련 1·지금 보수를 기본 보�
   const T = G.deserialize(JSON.stringify(o));
   assert.equal(T.v, 4); assert.equal(T.crew[0].lv, 1); assert.equal(T.crew[0].baseWage, 2); assert.ok(T.crew[0].trait); assert.ok(T.rules.reef);
   assert.equal(G.workerAt(T, 'sail')?.name, '빌럼');
+});
+
+// L1 육지 풍경(2026-11-12)
+test('L1 테마: 호수 두 곳은 예전 나무 배치 그대로, 수역마다 테마가 있고 표에 필요한 값이 다 있다', () => {
+  for (const id of ['pond', 'lake']) {
+    const old = worldOf(id).scatter(), L = sceneLayout(id), trees = L.props.filter((p) => !L.marks.includes(p));
+    const near = (t) => L.marks.some((m) => (m.port || m.find || m.gate) && Math.hypot(m.x - t.x, m.y - t.y) < 9);
+    assert.deepEqual(trees, old.filter((t) => !near(t)), id);
+    assert.equal(L.decals.length, 0);
+    assert.equal(themeOf(REGIONS[id]), THEMES.lake);
+  }
+  for (const id of REGION_ORDER) assert.ok(THEMES[REGIONS[id].theme], id);
+  for (const [k, T] of Object.entries(THEMES)) {
+    assert.ok(T.water && T.layers && T.hut && T.lift && (T.mix || T.sections.every((s) => s.mix)), k);
+    for (const sec of T.sections || []) for (const key of ['water', 'wet', 'shore', 'bank', 'ground']) assert.ok(sec[key] ?? T[key], `${k}.${sec.id}.${key}`);
+  }
+});
+test('L1 강: 물길을 따라 협곡 → 들판 → 습지, 물 색은 경계에서 섞인다', () => {
+  const w = worldOf('river'), Z = zonesOf(w, THEMES.river), ids = (x, y) => Z.list[Z.at(x, y)].id;
+  assert.equal(ids(20, 900), 'gorge'); assert.equal(ids(70, 700), 'gorge');
+  assert.equal(ids(-100, 330), 'farm'); assert.equal(ids(80, 60), 'farm');
+  assert.equal(ids(-60, -380), 'marsh'); assert.equal(ids(30, -900), 'marsh');
+  const [, , f] = Z.waterAt(0, 1000 - 2000 * 0.27);
+  assert.ok(f > 0 && f < 1, '경계에서 섞임');
+  const L = sceneLayout('river'), kinds = new Set(L.props.map((p) => p.kind));
+  for (const k of ['willow', 'reedbed', 'flowers', 'windmill', 'thatch', 'bridge', 'boulder', 'pebbles']) assert.ok(kinds.has(k), k);
+  for (const k of ['field', 'pool', 'crag', 'creek']) assert.ok(L.decals.some((q) => q.kind === k), k);
+});
+test('L1 강: 판마다 다른 발견지 자리에서도 사물이 항구·부두·수문·발견지와 겹치지 않는다', () => {
+  const k = 0.62, box = (p) => { const [w, h] = BOX[p.kind], s = p.size || 1; return [p.x - w * s / 2, p.x + w * s / 2, p.y * k - h * s, p.y * k + 0.6]; };
+  const hit = (a, b) => a[0] < b[1] && b[0] < a[1] && a[2] < b[3] && b[2] < a[3];
+  for (let seed = 1; seed <= 8; seed++) {
+    const S = G.newGame(seed), L = sceneLayout('river', G.findsOf(S, 'river')), mb = markBoxes(L.marks);
+    const land = L.props.filter((p) => !L.marks.includes(p));
+    for (const p of land) for (let i = 0; i < mb.length; i++) assert.ok(!hit(box(p), mb[i]), `시드 ${seed}: ${p.kind} (${p.x | 0}, ${p.y | 0}) × ${L.marks[i].kind}`);
+    // 바닥 무늬도 표지 밑에 깔리지 않게
+    for (const q of L.decals) for (const m of L.marks) {
+      if (q.pts) for (const [x, y] of q.pts) assert.ok(Math.hypot(x - m.x, y - m.y) > 6, `시드 ${seed}: ${q.kind} × ${m.kind}`);
+      else assert.ok(Math.hypot(q.x - m.x, q.y - m.y) > q.r + 5, `시드 ${seed}: ${q.kind} × ${m.kind}`);
+    }
+  }
 });

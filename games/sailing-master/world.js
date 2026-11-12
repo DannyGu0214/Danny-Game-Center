@@ -179,12 +179,13 @@ export function createWorld(def) {
     return out;
   }
 
-  // 땅 위에 나무·바위를 시드로 흩어 놓는다(바꾸지 않음, 저장하지 않음)
-  function scatter(seed = 11) {
+  // 땅 위에 나무·바위를 시드로 흩어 놓는다(바꾸지 않음, 저장하지 않음). pick: (물가 거리, 난수, x, y) → 종류(themes.js 테마 표). null이면 비워 둔다
+  const lakePick = (d, r) => d > -6 ? (r < 0.5 ? 'rock' : r < 0.8 ? 'bush' : 'reed') : r < 0.46 ? 'pine' : r < 0.86 ? 'oak' : r < 0.95 ? 'bush' : 'rock';
+  function scatter(seed = 11, pick = lakePick, opt = {}) {
     let s = seed >>> 0;
     const rnd = () => (s = (s + 0x6D2B79F5) >>> 0, ((s ^ (s >>> 15)) * (1 | s) >>> 0) / 4294967296);
     const out = [], used = new Set(), W2 = bx1 - bx0, H2 = by1 - by0, area = W2 * H2 / 1000;
-    const tries = Math.min(40000, area * 40), cap = Math.min(1400, area * 2.2);
+    const k = opt.k ?? 1, tries = Math.min(opt.tries ?? 40000, area * 40 * k), cap = Math.min(opt.cap ?? 1400, area * 2.2 * k); // opt: 테마의 빽빽함
     for (let t = 0; t < tries && out.length < cap; t++) {
       const x = bx0 + rnd() * W2, y = by0 + rnd() * H2, d = dist(x, y);
       if (d > -2.5 || d <= -199) continue;
@@ -192,8 +193,8 @@ export function createWorld(def) {
       const key = `${Math.round(x / 7)},${Math.round(y / 7)}`;
       if (used.has(key)) continue;
       used.add(key);
-      const r = rnd();
-      const kind = d > -6 ? (r < 0.5 ? 'rock' : r < 0.8 ? 'bush' : 'reed') : r < 0.46 ? 'pine' : r < 0.86 ? 'oak' : r < 0.95 ? 'bush' : 'rock';
+      const r = rnd(), kind = pick(d, r, x, y);
+      if (!kind) continue;
       out.push({ x, y, kind, v: rnd(), size: 0.8 + rnd() * 0.5 });
     }
     return out.sort((a, b) => a.y - b.y);
