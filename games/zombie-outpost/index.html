@@ -674,6 +674,10 @@ function resize() {
   clearArt(); // 크기·배율이 바뀌면 미리 그린 그림을 새로 그린다
 }
 window.addEventListener('resize', resize);
+// iOS Safari는 페이지를 불러오는 동안(글꼴·음악 등) 화면 크기가 바뀌어도 resize 이벤트를 보내지 않는다.
+// 그사이 회전·주소창·홈 화면 앱의 첫 화면 정착으로 캔버스 CSS 크기만 바뀌면 옛 픽셀 크기를 늘여 그려 화면이 세로로 늘어나 보인다.
+// 그래서 캔버스 자체의 크기 변화도 ResizeObserver로 받아 바로 다시 맞춘다.
+if (window.ResizeObserver) new ResizeObserver(() => { const r = view.getBoundingClientRect(); if (r.width !== VW || r.height !== VH) resize(); }).observe(view);
 
 // ---------- 투영 ----------
 const isoX = (x, y) => (x - y) * ISO_A * zoom;

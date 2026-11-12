@@ -364,8 +364,10 @@ export function runTitle(canvas, { onLayout, onPhase } = {}) {
     [20, 14, 2.8, 7.4, 44, 30, C('#3a3a4a')], [10, 23, 0.6, 7.6, 46, 6, C('#5a4a3a')],
   ];
 
+  let seenW = -1, seenH = -1; // 마지막으로 맞춘 캔버스 CSS 크기(ResizeObserver가 같은 크기로 다시 부르면 건너뛴다)
   function resize() {
     dpr = Math.min(3, window.devicePixelRatio || 1);
+    seenW = canvas.clientWidth; seenH = canvas.clientHeight;
     const cw = canvas.clientWidth || window.innerWidth || 360, ch = canvas.clientHeight || window.innerHeight || 640; // 숨은 탭처럼 크기가 0이면 임시 크기(보이면 resize로 다시 그린다)
     canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
     cell = Math.max(2, Math.round(canvas.width / 200)); // 가로 약 200칸
@@ -508,11 +510,14 @@ export function runTitle(canvas, { onLayout, onPhase } = {}) {
 
   const onResize = () => resize();
   window.addEventListener('resize', onResize);
+  // iOS Safari는 로딩 중 resize 이벤트를 보내지 않으므로(index.html의 화면 크기 주석) 캔버스 크기 변화도 직접 받는다
+  const ro = window.ResizeObserver ? new ResizeObserver(() => { if (canvas.clientWidth !== seenW || canvas.clientHeight !== seenH) resize(); }) : null;
+  ro?.observe(canvas);
   resize();
   raf = requestAnimationFrame(loop);
   return {
     get phase() { return phase; },
     skip() { if (phase === 'splash') skipAt = true; },
-    stop() { cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); },
+    stop() { cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); ro?.disconnect(); },
   };
 }
