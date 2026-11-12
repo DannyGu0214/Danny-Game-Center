@@ -1144,7 +1144,8 @@ export function step(S, dt) {
   const depth = w.depthAt(b.x, b.y) * wx.fx.depth; // 가뭄엔 얕고 홍수엔 깊어요
   const onShoal = st.draft > depth;
   let target = Math.max(sailT, rowT) + 0.25 * Math.min(sailT, rowT);
-  if (onShoal) { target = Math.min(target, 0.7); if (!b.shoal) emit(S, 'shoal'); if (b.spd > 0.25) S.hull -= WEATHER.shoalHurt * dt / st.hull.hp; }
+  // 여울: 긁히며 느려질 뿐 가라앉지는 않는다(가뭄의 최악은 좌초해 날짜를 잃는 것, DESIGN.md 8절). 여울 피해로는 내구도 25% 밑으로 안 내려가요
+  if (onShoal) { target = Math.min(target, 0.7); if (!b.shoal) emit(S, 'shoal'); if (b.spd > 0.25 && S.hull > WEATHER.shoalFloor) S.hull = Math.max(WEATHER.shoalFloor, S.hull - WEATHER.shoalHurt * dt / st.hull.hp); }
   b.shoal = onShoal;
   b.spd = ease(b.spd, target, dt, target > b.spd ? BOAT.accel : BOAT.coast);
 

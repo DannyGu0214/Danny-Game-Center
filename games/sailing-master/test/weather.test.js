@@ -261,3 +261,15 @@ test('저장 v4 → v5: 돛은 멀쩡, 꿰매기 규칙은 켬, 옛 날씨 칸�
   assert.ok(T.weather.fx && Array.isArray(T.weather.on));
   assert.equal(G.newGame(1).v, 5);
 });
+
+test('여울: 가뭄에 여울을 기어가도 여울 피해만으로는 가라앉지 않는다(내구도 25%에서 멈춤)', () => {
+  const S = G.newGame(1); S.region = 'river'; S.visited.river = 1; S.docked = null;
+  const w = worldOf('river'), q = w.def.shoals[0];
+  S.ship.hull = 'sloop'; S.ship.mods = [{ id: 'oar', col: 1, row: 4, rot: 0 }]; S.hull = 0.3; S.food = 50;
+  // 가뭄 날(시드 1은 10일째)로 옮겨 슬루프가 여울에 걸리게 한다
+  S.clock = 10 * CAL.day + 60; assert.ok(G.weatherAt('river', S.seed, S.clock).fx.depth < 1, '가뭄 날');
+  let shoal = 0;
+  for (let i = 0; i < 30 * 60; i++) { S.boat.x = q.x; S.boat.y = q.y; S.boat.spd = Math.max(S.boat.spd, 1); S.boat.row = true; S.vigor = 1; S.food = 50; G.step(S, G.FIXED_DT); if (S.boat.shoal) shoal++; }
+  assert.ok(shoal > 30 * 50, `여울에 걸려 있었어요 ${shoal}`);
+  assert.ok(S.hull >= 0.249, `내구도 ${S.hull}`); assert.ok(!S.disaster);
+});
