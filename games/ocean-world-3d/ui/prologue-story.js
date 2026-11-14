@@ -39,6 +39,7 @@ export const PROLOGUE = {
     },
     {
       art: 'assets/story/jelly.webp',
+      low: true,   // 젤리 블록 아래쪽이 종이에 가려서 종이를 낮춤(대니님 결정 2026-11-14)
       alt: '탁자 위에서 은은히 빛나는 투명한 젤리 블록. 그 안의 작은 바다를 두 사람이 들여다본다.',
       lines: [
         { who: 'rookie', text: '투명한 젤리 블록에 담는 거예요. 건드리면 말랑하게 출렁이고, 안에서는 생물들이 어울려 살아요.' },
@@ -47,6 +48,7 @@ export const PROLOGUE = {
     },
     {
       art: 'assets/story/invite.webp',
+      low: true, artUp: 5,   // 젤리 블록 아래쪽이 종이에 가려서 종이를 낮추고 그림을 5% 올림(대니님 결정 2026-11-14)
       alt: '젤리 블록을 이쪽으로 내미는 두 사람. 블록의 빛이 얼굴에 비친다.',
       lines: [
         { who: 'director', text: '이제 이 작은 바다를 당신에게 맡길게요. 생물을 들이고, 살 곳을 가꿔 주세요.' },

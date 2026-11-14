@@ -113,6 +113,8 @@ export function showPrologue({ root, onDone } = {}) {
     next.textContent = last ? S.finishLabel : S.nextLabel;
     skip.style.display = last ? 'none' : '';
     wrap.dataset.page = String(i + 1);
+    wrap.classList.toggle('low', !!P.low);   // 그림 아래쪽이 중요한 쪽: 종이를 내용 높이로 낮춤
+    art.style.top = P.artUp ? `-${P.artUp}%` : '';   // 그래도 가리면 그림을 화면 높이의 n%만큼 올림(크기는 그대로)
 
     // 그림: 읽었으면 보이고, 못 읽었으면 바다색 바탕(.owp-sea)만 남긴다.
     art.classList.remove('on');

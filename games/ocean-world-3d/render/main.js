@@ -30,6 +30,7 @@ import { createSim, STEP } from '../sim/rules.js';
 import { createStage } from './core/stage.js';
 import { makeCoords } from './core/coords.js';
 import { JellyBlock } from './core/jelly.js';
+import { createEvents } from './core/events.js';
 import { CameraRig } from './core/camera.js';
 import { buildTerrain, buildTerrainAsync } from './core/terrain.js';
 import { PropBatch } from './core/batched.js';
@@ -401,6 +402,7 @@ function evalPlace() {
   hud.setPlacing(placing);
 }
 function startPlace(id) {
+  events.emit('placeMode', { on: true, id });
   const d = IT[id];
   const at = G.freeSpot(S, id);
   placing = { id, x: at ? at.x : Math.floor(bounds.w / 2 - d.w / 2), y: at ? at.y : Math.floor(bounds.h / 2 - d.h / 2), layer: at ? at.layer : d.zone === 'water' ? d.layers[0] : null, rot: 0 };
@@ -408,7 +410,7 @@ function startPlace(id) {
   evalPlace();
   if (!at) hud.toast('놓을 빈자리가 없어요. 다른 물건을 치우거나 다른 구역을 써 보세요');
 }
-function endPlace() { placing = null; drawGhost(); hud.setPlacing(null); }
+function endPlace() { if (placing) events.emit('placeMode', { on: false, id: placing.id }); placing = null; drawGhost(); hud.setPlacing(null); }
 /** 놓기 중 블록을 누름: 그 물건 구역의 면(육지·해저는 지형, 수중은 고른 층 높이의 수평면)에서 자리를 잡는다 */
 function placeAt(e) {
   const d = IT[placing.id];
@@ -429,9 +431,9 @@ function pick(e) {
   const hits = screenPick({ camera, dom: canvas, matrix: world.matrixWorld, items: creatures.drawn, x: e.clientX, y: e.clientY, minPx });
   if (S.chance) {
     const h = hits.find((c) => c.item.uid === S.chance.uid);
-    if (h) { capture(); hud.select({ kind: 'animal', uid: h.item.uid }); return true; }
+    if (h) { events.emit('tapCreature', { uid: h.item.uid, sp: h.item.sp }); capture(); hud.select({ kind: 'animal', uid: h.item.uid }); return true; }
   }
-  if (hits.length) { hud.select({ kind: 'animal', uid: hits[0].item.uid }); return true; }
+  if (hits.length) { events.emit('tapCreature', { uid: hits[0].item.uid, sp: hits[0].item.sp }); hud.select({ kind: 'animal', uid: hits[0].item.uid }); return true; }
   const ph = screenPick({ camera, dom: canvas, matrix: world.matrixWorld, items: propView.pickList(), x: e.clientX, y: e.clientY, minPx: 12 });
   if (ph.length) { hud.select({ kind: 'item', uid: ph[0].item.uid }); return true; }
   if (hud.selected) { hud.select(null); }
@@ -439,10 +441,12 @@ function pick(e) {
 }
 function capture() {
   if (!S.chance) return;
-  const r = G.capture(S, S.chance.uid);
+  const uid = S.chance.uid;
+  const r = G.capture(S, uid);
   if (!r.ok) { hud.toast(r.why); return; }
   hud.toast(`📸 ${SP[r.sp].icon ?? ''}${SP[r.sp].name} 포착! ⭐+${r.reward}${r.first ? ' (첫 포착)' : ''}`, r.first);
   jelly.poke(-0.3, 0.1, 0.05);
+  events.emit('capture', { uid, sp: r.sp, first: !!r.first });
   save();
 }
 const _scr = {};
@@ -464,14 +468,15 @@ function chanceTap() {
 }
 
 // ---------- 사건 ----------
+const events = createEvents();   // P4 연결점: 젤리 반응·소리가 구독(render/core/events.js)
 function handleEvents(evs) {
   let dirty = false;
   for (const e of evs) {
     if (e.type === 'place' || e.type === 'remove' || e.type === 'terrain') dirty = true;
     if (!live) continue;
-    if (e.type === 'tier') { hud.toast(`🎉 T${e.tier} 달성! 새 생물과 물건이 열렸어요`, true, 4200); jelly.poke(-0.9, 0.25, 0.15); hf.disturb(20, 20, 2.2, -2.4); }
+    if (e.type === 'tier') { hud.toast(`🎉 T${e.tier} 달성! 새 생물과 물건이 열렸어요`, true, 4200); jelly.poke(-0.9, 0.25, 0.15); hf.disturb(20, 20, 2.2, -2.4); events.emit('tier', { n: e.tier }); }
     else if (e.type === 'ext' && !opt.ext) growExt();
-    else if (e.type === 'chance') hud.toast(`✨ ${SP[e.sp].name}이 특별한 행동을 해요! 7초 안에 눌러요`);
+    else if (e.type === 'chance') { events.emit('chance', { uid: e.uid, sp: e.sp }); hud.toast(`✨ ${SP[e.sp].name}이 특별한 행동을 해요! 7초 안에 눌러요`); }
     else if (e.type === 'claim') hud.toast(`요청 완료 ⭐+${e.reward}`);
     else if (e.type === 'extGoal' && e.key !== 'visit') hud.toast('확장 영역 꾸미기 하나 달성! 요청 탭에서 받아요');
     else if (e.type === 'extMaster') hud.toast(`확장 영역 마스터! ⭐+${e.reward}`, true, 5000);
@@ -496,6 +501,7 @@ async function growExt() {
   grow = { t: -1, cost: {} };
   const ms = () => performance.now();
   hud?.toast('🌊 확장 영역이 열려요!', true, 3000);
+  events.emit('expandStart');
   // 1) 새 것 만들기(아직 화면에 붙이지 않음)
   await nextTick();
   let t0 = ms();
@@ -621,6 +627,7 @@ function finishGrow() {
   g.cost.finish = performance.now() - t0;
   window.__ow.growCost = g.cost;
   grow = null;
+  events.emit('expand');
   setTimeout(save, 400);   // 저장·안내 창은 다음 프레임들로(마무리 프레임을 가볍게)
   setTimeout(() => hud?.refresh(), 200);
   setTimeout(() => hud?.modal('<h3>🌊 확장 영역이 열렸어요!</h3><p>블록 옆에 바다가 20칸 더 붙었어요. 생물을 12마리 더 들일 수 있고, 요청 탭에 확장 영역 꾸미기가 생겼어요.</p>', [{ label: '좋아요' }]), 700);
@@ -634,6 +641,7 @@ const game = {
     if (!r.ok) { hud.toast(r.why); return; }
     const a = r.animal;
     hf.disturb(a.x, a.y, 1.6, -1.8); jelly.poke(-0.35, 0.08, 0.04);
+    events.emit('adopt', { uid: a.uid, sp, x: a.x, y: a.y, z: a.z });
     hud.toast(`${SP[sp].icon ?? ''} ${SP[sp].name} 들어왔어요!`);
     curC = G.creatures(S);
     save();
@@ -656,6 +664,7 @@ const game = {
     if (!r.ok) { hud.toast(r.why); evalPlace(); return; }
     handleEvents(G.drainEvents(S));
     hf.disturb(p.x + IT[p.id].w / 2, p.y + IT[p.id].h / 2, 1.4, -1.2); jelly.poke(-0.25);
+    events.emit('place', { uid: r.item.uid, id: p.id, zone: IT[p.id].zone, layer: p.layer, x: p.x + IT[p.id].w / 2, y: p.y + IT[p.id].h / 2 });
     // 모이는 연출(화면만): 물속 물건이면 가까운 헤엄 생물 몇 마리가 잠깐 다가갔다 돌아감
     const d = IT[p.id], cx = p.x + d.w / 2, cy = p.y + d.h / 2;
     if (d.zone !== 'land') creatures.lure(cx, cy, d.zone === 'water' ? (d.float ? -0.9 : G.space.itemZ(r.item)) : heightAt(cx, cy) + 1.2);
@@ -664,8 +673,8 @@ const game = {
     save();
   },
   cancelPlace: endPlace,
-  release(uid) { const r = G.release(S, uid); if (!r.ok) { hud.toast(r.why); return; } hud.toast(`바다로 돌려보냈어요 ⭐+${r.refund}`); hud.select(null); curC = G.creatures(S); save(); },
-  removeItem(uid) { const r = G.removeItem(S, uid); if (!r.ok) { hud.toast(r.why); return; } handleEvents(G.drainEvents(S)); hud.toast(`치웠어요 ⭐+${r.refund}`); hud.select(null); save(); },
+  release(uid) { const sp = S.animals.find((a) => a.uid === uid)?.sp; const r = G.release(S, uid); if (!r.ok) { hud.toast(r.why); return; } events.emit('release', { uid, sp }); hud.toast(`바다로 돌려보냈어요 ⭐+${r.refund}`); hud.select(null); curC = G.creatures(S); save(); },
+  removeItem(uid) { const r = G.removeItem(S, uid); if (!r.ok) { hud.toast(r.why); return; } events.emit('remove', { uid }); handleEvents(G.drainEvents(S)); hud.toast(`치웠어요 ⭐+${r.refund}`); hud.select(null); save(); },
   capture, chanceTap,
   claim(uid) { const r = G.claim(S, uid); if (!r.ok) hud.toast(r.why); else save(); },
   swap(uid) { const r = G.swapRequest(S, uid); if (!r.ok) hud.toast(r.why); },
@@ -673,6 +682,8 @@ const game = {
   setView(name) { rig.setView(name); },
   deselect() {},
   panelChanged() { resize(); },
+  on: events.on,                        // P4: game.on('adopt', fn) 등. 이름·인자는 render/core/events.js
+  isPlacing: () => !!placing,
 };
 
 // ---------- 루프 ----------
@@ -716,7 +727,7 @@ app.onUpdate((dt, t) => {
 const gridOf = (p) => coords.toGrid(p.x, p.y, p.z, {});
 const input = new BlockInput({
   dom: canvas, camera, rig, jelly, hitMesh,
-  onTap: (p) => { const g = gridOf(p); hf.disturb(g.x, g.y, 1.4, -2.2); },
+  onTap: (p) => { const g = gridOf(p); hf.disturb(g.x, g.y, 1.4, -2.2); events.emit('tapBlock', { x: g.x, y: g.y, z: g.z }); },
   onDrag: (p) => { const g = gridOf(p); hf.disturb(g.x, g.y, 0.9, -0.35); },
   onPick: (e) => pick(e),
 });
@@ -811,7 +822,7 @@ app.installCapture({
   },
   game,
 });
-window.__ow = { app, opt, jelly, rig, creatures, propView, batch, fog, input, hitMesh, G, game, schools, growExt, get hf() { return hf; }, get heightAt() { return heightAt; }, get coords() { return coords; }, get terrains() { return terrains; }, get grow() { return grow; }, get S() { return S; }, get mode() { return mode; }, get placing() { return placing; }, ghost, save };
+window.__ow = { app, opt, jelly, events, rig, creatures, propView, batch, fog, input, hitMesh, G, game, schools, growExt, get hf() { return hf; }, get heightAt() { return heightAt; }, get coords() { return coords; }, get terrains() { return terrains; }, get grow() { return grow; }, get S() { return S; }, get mode() { return mode; }, get placing() { return placing; }, ghost, save };
 app.start();
 
 // ---------- 설정·확인용 작은 창(⚙) ----------
