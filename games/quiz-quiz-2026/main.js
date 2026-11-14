@@ -9,8 +9,9 @@ import { createStage, drawLogo, drawDuoCard, drawTrophy, DUOS, DUO_IDS } from '.
 import { createSound, SFX_GROUPS } from './sound.js';
 
 // 문제은행: bank/(문제은행 칸 담당)가 있으면 그걸, 없으면 테스트용 샘플로 돈다
+// 실제 문제은행은 대니님 검수를 거친 live 문항만 낸다(draft·checked는 아직 검수 전)
 let BANK;
-try { BANK = (await import('./bank/index.js')).BANK; } catch { BANK = (await import('./test/fixtures/bank/index.js')).BANK; }
+try { BANK = (await import('./bank/index.js')).BANK.filter((q) => q.status === 'live'); } catch { BANK = (await import('./test/fixtures/bank/index.js')).BANK; }
 
 const $ = (id) => document.getElementById(id);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
