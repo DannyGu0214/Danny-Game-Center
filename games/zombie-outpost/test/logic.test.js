@@ -1580,6 +1580,45 @@ test('배경음악: 7곡(단조 3 + 장조 4), 한 곡 5분, 마디마다 4박�
   }
 });
 
+test('배경음악 mp3: 6곡 × 테이크 2개 = 12개 파일이 있고, 같은 곡(다른 테이크 포함)이 연달아 나오지 않는다', async () => {
+  const M = await import('../music.js');
+  const { existsSync } = await import('node:fs');
+  assert.equal(M.FILES.length, 12);
+  assert.equal(new Set(M.FILES.map((f) => f.file)).size, 12);
+  const names = [...new Set(M.FILES.map((f) => f.name))];
+  assert.deepEqual(names, ['잿빛 들판', '녹슨 라디오', '마지막 불빛', '등불 아래', '녹슨 발전기', '정전 구역']);
+  for (const n of names) assert.equal(M.FILES.filter((f) => f.name === n).length, 2, `${n}: 테이크 2개`);
+  for (const f of M.FILES) assert.ok(existsSync(new URL(`../assets/bgm/${f.file}`, import.meta.url)), `${f.file} 파일`);
+
+  // 가짜 Audio·AudioContext로 파일 재생 흐름만 돌린다(곡이 끝날 때마다 다음 곡을 고른다)
+  const g0 = { Audio: globalThis.Audio, setInterval: globalThis.setInterval, setTimeout: globalThis.setTimeout };
+  const els = [];
+  let tick = null;
+  const param = { value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}, cancelScheduledValues() {} };
+  const node = () => ({ gain: param, connect() {}, disconnect() {} });
+  const ctx = {
+    currentTime: 0, sampleRate: 8000, state: 'running', destination: {}, createGain: node, createConvolver: node, createMediaElementSource: node,
+    createBuffer: (_, len) => ({ getChannelData: () => new Float32Array(len) }),
+  };
+  globalThis.Audio = class { constructor(src) { this.src = src; this.paused = true; this.ended = false; this.currentTime = 0; this.duration = 299; els.push(this); } addEventListener() {} play() { this.paused = false; return Promise.resolve(); } pause() { this.paused = true; } };
+  globalThis.setInterval = (fn) => { tick = fn; return 0; };
+  globalThis.setTimeout = () => 0;
+  try {
+    let seed = 7;
+    const m = M.createMusic({ rand: () => (seed = (seed * 16807) % 2147483647) / 2147483647 });
+    m.start(ctx);
+    assert.equal(m.source, 'mp3');
+    for (let i = 0; i < 300; i++) { els.at(-1).ended = true; tick(); }
+    const h = m.history;
+    assert.ok(h.length > 300);
+    for (let i = 1; i < h.length; i++) assert.notEqual(h[i], h[i - 1], `${i}번째: 같은 곡이 연달아`);
+    assert.deepEqual(new Set(h), new Set(names), '6곡이 모두 나온다');
+    assert.equal(new Set(els.map((e) => e.src.split('/').pop())).size, 12, '12개 파일이 모두 쓰인다');
+  } finally {
+    Object.assign(globalThis, g0);
+  }
+});
+
 test('탐험 지역: 구역 7개(폐허 도심·검은 숲 추가), 군사 구역이 가장 바깥이고 가장 위험하다', () => {
   assert.deepEqual(G.ZONE_NAMES, ['기지 주변', '주택가', '상가 거리', '공단', '폐허 도심', '검은 숲', '군사 구역']);
   assert.equal(G.zoneIndex(99), 6, '가장 바깥은 군사 구역');
