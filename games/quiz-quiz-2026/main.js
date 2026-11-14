@@ -54,13 +54,20 @@ function tvStatic() { const el = $('static'); el.classList.remove('on'); void el
 
 // ---------- 말풍선 ----------
 // 말풍선 자리: 진행자는 고개 아래, 팀은 머리 위(꼬리가 아래)
-const SPOT = { na: [120, 70, 56], wang: [214, 70, 76], 0: [6, 80, 40], 1: [274, 80, 160] };
+// 팀 말풍선은 가운데 문제 카드(x 116~364)를 가리지 않게 양옆 칸 안에 두고, 아래를 머리 위에 고정해 긴 말은 위로 늘어난다
+const SPOT = { na: [120, 70, 56], wang: [214, 70, 76] };
+const TEAM_SPOT = { 0: [4, 40], 1: [368, 50] }; // [왼쪽 x, 꼬리 x]
 function bubble(who, text, { cls = 'host', ms = 0 } = {}) {
   const el = document.createElement('div');
   el.className = `bubble ${cls}`; el.textContent = text;
-  const [x, y, tail] = SPOT[who];
-  el.style.left = `${x}px`; el.style.top = `${y}px`; el.style.setProperty('--tail', `${tail}px`);
-  if (who === 0 || who === 1) el.classList.add('down');
+  if (who === 0 || who === 1) {
+    const [x, tail] = TEAM_SPOT[who];
+    el.classList.add('down', 'team');
+    el.style.left = `${x}px`; el.style.bottom = '158px'; el.style.setProperty('--tail', `${tail}px`);
+  } else {
+    const [x, y, tail] = SPOT[who];
+    el.style.left = `${x}px`; el.style.top = `${y}px`; el.style.setProperty('--tail', `${tail}px`);
+  }
   $('bubbles').append(el);
   if (ms) setTimeout(() => el.remove(), ms);
   return el;
@@ -399,7 +406,7 @@ function getAnswer(r, t, lim, tiles, order) {
   if (cpu) {
     const d = cpuDecide(M);
     st.think[t] = true;
-    const lines = ['이거 아까 봤는데…', '음… 잠깐만!', '찍을까 말까…', '알 것 같은데!', '둘이 상의 좀 할게요~'];
+    const lines = ['이거 아까 봤는데…', '음… 잠깐만!', '찍을까 말까…', '알 것 같은데!', '둘이 상의할게요~'];
     thinkEl = bubble(t, lines[Math.floor(Math.random() * lines.length)], { cls: 'cpu' });
     const delay = lim ? Math.min(d.delay, (lim - 1) * 1000) : d.delay;
     cpuTimer = setTimeout(async () => {
