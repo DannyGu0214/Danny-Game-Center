@@ -514,7 +514,10 @@ function sfxCheck() {
       box.append(b);
     }
   }
-  $('musicToggle').onclick = () => { sound.unlock(); const on = !sound.playing(); sound.music(on); $('musicToggle').textContent = on ? '배경 음악 멈춤' : '배경 음악 듣기'; };
+  let songIdx = -1;
+  const showSong = () => { $('musicName').textContent = sound.songName(); $('musicToggle').textContent = sound.playing() ? '배경 음악 멈춤' : '배경 음악 듣기'; };
+  $('musicToggle').onclick = () => { sound.unlock(); sound.music(!sound.playing()); showSong(); };
+  $('musicNext').onclick = () => { sound.unlock(); songIdx = (songIdx + 1) % sound.songs().length; sound.music(true, songIdx); showSong(); };
   show('sfxCheck');
 }
 
