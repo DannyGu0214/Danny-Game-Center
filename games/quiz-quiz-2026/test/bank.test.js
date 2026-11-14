@@ -1,7 +1,7 @@
 // 문제은행과 검사 도구 테스트. 실행: node --test test/bank.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BANK, SOURCES, checkBank, checkSources, summary, tierOfScore, normalize } from '../tools/check-bank.mjs';
+import { BANK, SOURCES, checkBank, checkSources, tierOfScore, normalize } from '../tools/check-bank.mjs';
 
 const good = {
   id: 'sci-9001', cat: 'science', fact: 'fc-sci-test', topic: '시험', when: 'E3-4', std: '',
@@ -16,13 +16,26 @@ test('지금 문제은행은 검사를 통과해요', () => {
   assert.deepEqual(checkBank(), []);
 });
 
-test('시범 묶음: 분야별 10문항, 등급 분포, 형식 비율', () => {
-  const s = summary();
-  assert.equal(s.total, 60);
-  for (const c of ['science', 'history', 'geo', 'art', 'general', 'nonsense']) assert.equal(s.cat[c], 10, c);
-  // 목표 15·25·30·20·10% → 60문항이면 9·15·18·12·6
-  assert.deepEqual([1, 2, 3, 4, 5].map((t) => s.tier[t]), [9, 15, 18, 12, 6]);
-  assert.equal(s.type.choice, 36); // 4지선다 60%
+// 최종 목표 비율(2026-11-14 대니님 확정): 5분야는 15·25·30·20·10%, 넌센스는 쉬운 쪽(1,000문항 중 250 = 50·75·75·37·13)
+const TIER_RATIO = { default: [0.15, 0.25, 0.3, 0.2, 0.1], nonsense: [0.2, 0.3, 0.3, 0.148, 0.052] };
+test('분야마다 등급 분포와 4지선다 비율이 목표 비율에 맞아요(±1문항)', () => {
+  for (const c of ['science', 'history', 'geo', 'art', 'general', 'nonsense']) {
+    const qs = BANK.filter((q) => q.cat === c), n = qs.length;
+    assert.ok(n >= 10, c);
+    const r = TIER_RATIO[c] ?? TIER_RATIO.default;
+    r.forEach((x, i) => {
+      const got = qs.filter((q) => q.tier === i + 1).length;
+      assert.ok(Math.abs(got - n * x) <= 1, `${c} ★${i + 1}: ${got}개, 목표 ${(n * x).toFixed(1)}`);
+    });
+    const choice = qs.filter((q) => q.type === 'choice').length;
+    assert.ok(Math.abs(choice - n * 0.6) <= 1, `${c} 4지선다 ${choice}/${n}`);
+  }
+});
+
+test('역사는 한국사 80%, 세계사 20% 안팎이에요(±1문항)', () => {
+  const qs = BANK.filter((q) => q.cat === 'history');
+  const world = qs.filter((q) => q.topic.startsWith('세계사')).length;
+  assert.ok(Math.abs(world - qs.length * 0.2) <= 1, `세계사 ${world}/${qs.length}`);
 });
 
 test('문항마다 출처가 실제 출처표에 있고, 출처표가 온전해요', () => {
