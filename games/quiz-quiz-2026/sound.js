@@ -128,25 +128,102 @@ export function createSound() {
   };
   function play(name) { if (!vol.on || !vol.sfx || !ensure() || !SFX[name]) return; SFX[name](); }
 
-  // ---------- 배경음악: 90년대 예능 밴드 느낌의 칩튠 루프(신스 브라스 + 슬랩 베이스 흉내) ----------
-  const BPM = 132, STEP = 60 / BPM / 4;
-  const MEL = [72, 0, 76, 0, 79, 0, 76, 77, 79, 0, 0, 81, 79, 0, 76, 0, 74, 0, 77, 0, 81, 0, 77, 79, 81, 0, 0, 83, 84, 0, 0, 0];
-  const BASS = [48, 0, 48, 60, 0, 48, 0, 55, 53, 0, 53, 65, 0, 53, 0, 57, 50, 0, 50, 62, 0, 50, 0, 57, 55, 0, 55, 67, 0, 55, 59, 0];
-  let step = 0, next = 0, timer = null;
+  // ---------- 배경음악: 칩튠 6곡, 판마다 무작위(바로 전 곡은 피한다) ----------
+  // 곡은 멜로디(8분음표 단위: 음이름·'-' 늘임·'.' 쉼)와 마디별 코드만 적고, 베이스·화음·드럼은 코드와 스타일에서 만든다.
+  const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const midi = (t) => { const m = /^([A-G])([#b]?)(\d)$/.exec(t); return 12 * (+m[3] + 1) + NOTE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); };
+  const QUAL = { '': [0, 4, 7], m: [0, 3, 7], 7: [0, 4, 7, 10], maj7: [0, 4, 7, 11], m7: [0, 3, 7, 10] };
+  const chord = (c) => { const m = /^([A-G])([#b]?)(maj7|m7|m|7)?$/.exec(c); return { root: NOTE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0), iv: QUAL[m[3] ?? ''] }; };
+  // 드럼: 한 마디 16칸(3박자는 12칸)에서 킥·스네어·하이햇 자리
+  const DRUMS = {
+    rock: { k: [0, 8, 10], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14] },
+    shuffle: { k: [0, 8], s: [4, 12], h: [0, 3, 4, 7, 8, 11, 12, 15] },
+    light: { k: [0, 10], s: [8], h: [0, 4, 8, 12] },
+    smooth: { k: [0, 7, 10], s: [4, 12], h: [2, 6, 10, 14], soft: true },
+    fast: { k: [0, 4, 8, 12], s: [4, 12], h: [2, 6, 10, 14] },
+    waltz: { k: [0], s: [4, 8], h: [2, 6, 10], soft: true },
+  };
+  const SONGS = [
+    { name: '퀴즈 타임', bpm: 132, lead: 0.25, bass: 'oct', comp: 'stab', drum: 'rock',
+      chords: 'C Am F G C Am F G F G Em Am F G C C',
+      mel: `E5 - G5 - C6 - G5 - | A5 - G5 E5 C5 - . . | F5 - A5 - C6 - A5 - | G5 - - - . . D5 - |
+            E5 - G5 - C6 - E6 - | D6 - C6 - A5 - . . | A5 - G5 - F5 - E5 - | D5 - - - - - . . |
+            C5 - F5 - A5 - C6 - | B5 - A5 - G5 - D5 - | E5 - G5 - B5 - G5 - | A5 - - - E5 - . . |
+            F5 - A5 - C6 - A5 - | B5 - D6 - B5 - G5 - | C6 - - - G5 - E5 - | C5 - - - . . . .` },
+    { name: '산책길', bpm: 108, lead: 0.5, bass: 'walk', comp: 'arp', drum: 'shuffle',
+      chords: 'G Em C D G Em C D C D Bm Em C D G G',
+      mel: `B4 - D5 - G5 - - . | E5 - D5 - B4 - G4 - | A4 - C5 - E5 - D5 - | D5 - - - . . . . |
+            B4 - D5 - G5 - B5 - | A5 - G5 - E5 - D5 - | C5 - E5 - D5 - C5 - | A4 - - - - - . . |
+            E5 - G5 - E5 - C5 - | F#5 - A5 - F#5 - D5 - | D5 - F#5 - B5 - A5 - | G5 - - - E5 - . . |
+            E5 - G5 - C6 - B5 - | A5 - F#5 - D5 - F#5 - | G5 - - - D5 - B4 - | G4 - - - . . . .` },
+    { name: '생각 중', bpm: 96, lead: 0.125, bass: 'pump', comp: 'arp', drum: 'light',
+      chords: 'Am F C G Am F E E F G Em Am Dm E Am Am',
+      mel: `E5 - . A4 C5 - E5 - | F5 - E5 - C5 - A4 - | G4 - C5 - E5 - G5 - | F5 - E5 - D5 - . . |
+            E5 - . A4 C5 - E5 - | A5 - G5 - F5 - C5 - | B4 - D5 - G#5 - E5 - | E5 - - - . . . . |
+            A4 - C5 - F5 - E5 - | D5 - G5 - B5 - G5 - | E5 - G5 - B5 - A5 - | C6 - - - A5 - . . |
+            F5 - A5 - D6 - A5 - | G#5 - B5 - E5 - D5 - | C5 - E5 - A5 - - - | A4 - - - . . . .` },
+    { name: '소풍 왈츠', bpm: 144, beats: 3, lead: 0.25, bass: 'waltz', comp: 'stab', drum: 'waltz',
+      chords: 'F C Dm Bb F C F F Bb C Am Dm Gm C F F',
+      mel: `A4 - C5 - F5 - | E5 - - - G4 - | F5 - - - A4 - | D5 - F5 - Bb5 - |
+            A5 - - - F5 - | G5 - E5 - C5 - | F5 - - - - - | . . . . C5 - |
+            D5 - F5 - D5 - | E5 - G5 - C6 - | C6 - - - A5 - | F5 - - - A5 - |
+            G5 - Bb5 - G5 - | E5 - - - C5 - | F5 - A5 - C6 - | F5 - - - . .` },
+    { name: '밤의 쇼', bpm: 100, lead: 0.5, bass: 'walk', comp: 'stab', drum: 'smooth', vib: true,
+      chords: 'Dmaj7 Bm7 Em7 A7 Dmaj7 Bm7 Em7 A7 Gmaj7 F#m7 Em7 A7 Gmaj7 A7 D D',
+      mel: `F#5 - - A5 - - F#5 E5 | D5 - - - . . B4 D5 | E5 - - G5 - - E5 D5 | C#5 - - - . . A4 C#5 |
+            F#5 - - A5 - - D6 C#6 | B5 - - A5 - - F#5 - | G5 - F#5 - E5 - D5 - | E5 - - - - - . . |
+            B5 - - A5 - - G5 F#5 | A5 - - - . . F#5 A5 | G5 - - F#5 - - E5 D5 | E5 - - - . . C#5 E5 |
+            D5 - - B4 - - D5 G5 | F#5 - - E5 - - C#5 E5 | D5 - - - - - . . | . . . . . . A4 C#5` },
+    { name: '터보 라운드', bpm: 152, lead: 0.25, bass: 'oct', comp: 'arp', drum: 'fast',
+      chords: 'A E F#m D A E D E D E C#m F#m D E A A',
+      mel: `C#5 - E5 - A5 - E5 - | G#5 - B5 - G#5 - E5 - | A5 - F#5 - C#5 - F#5 - | A5 - - - F#5 - D5 - |
+            E5 - A5 - C#6 - A5 - | B5 - G#5 - E5 - B4 - | D5 - F#5 - A5 - F#5 - | E5 - - - . . E5 - |
+            F#5 - A5 - D6 - A5 - | G#5 - B5 - E6 - B5 - | C#6 - B5 - G#5 - E5 - | F#5 - - - . . C#5 - |
+            D5 - F#5 - A5 - D6 - | B5 - - - G#5 - B5 - | A5 - - - E5 - C#5 - | A4 - - - . . . .` },
+  ];
+  // 멜로디 문자열 → 8분음표 칸마다 [MIDI, 길이(8분음표 수)] 또는 null
+  for (const sg of SONGS) {
+    const toks = sg.mel.replace(/\|/g, ' ').trim().split(/\s+/), notes = toks.map(() => null);
+    let last = -1;
+    toks.forEach((t, i) => { if (t === '-') { if (last >= 0) notes[last][1]++; } else if (t === '.') last = -1; else { notes[i] = [midi(t), 1]; last = i; } });
+    sg.notes = notes; sg.ch = sg.chords.split(' ').map(chord); sg.beats ??= 4;
+    if (toks.length !== sg.ch.length * sg.beats * 2) throw new Error(`곡 길이 오류: ${sg.name}`);
+  }
+  let song = null, lastSong = -1, step = 0, next = 0, timer = null;
+  function kickM(at, v) { const t0 = ac.currentTime + at, k = ac.createOscillator(), g = ac.createGain(); k.type = 'triangle'; k.frequency.setValueAtTime(150, t0); k.frequency.exponentialRampToValueAtTime(45, t0 + 0.1); g.gain.setValueAtTime(v, t0); g.gain.linearRampToValueAtTime(0.0001, t0 + 0.12); k.connect(g); g.connect(musicBus); k.start(t0); k.stop(t0 + 0.15); }
   function schedule() {
+    const sg = song, S16 = 60 / sg.bpm / 4, bar = sg.beats * 4, loop = sg.ch.length * bar, dr = DRUMS[sg.drum];
     while (next < ac.currentTime + 0.2) {
-      const at = next - ac.currentTime, i = step % 32, m = MEL[i], b = BASS[i];
-      if (m) tone(hz(m), at, STEP * 1.5, { duty: 0.25, v: 0.12, out: musicBus });
-      if (b) tone(hz(b), at, STEP * 0.85, { tri: true, v: 0.3, out: musicBus });
-      if (i % 8 === 0) { const t0 = at; const k = ac.createOscillator(), g = ac.createGain(); k.type = 'triangle'; k.frequency.setValueAtTime(150, ac.currentTime + t0); k.frequency.exponentialRampToValueAtTime(45, ac.currentTime + t0 + 0.1); g.gain.setValueAtTime(0.4, ac.currentTime + t0); g.gain.linearRampToValueAtTime(0.0001, ac.currentTime + t0 + 0.12); k.connect(g); g.connect(musicBus); k.start(ac.currentTime + t0); k.stop(ac.currentTime + t0 + 0.15); }
-      if (i % 8 === 4) hiss(at, 0.1, { v: 0.12, hp: 1200, out: musicBus });
-      if (i % 2 === 0) hiss(at, 0.03, { short: true, v: 0.05, hp: 6000, out: musicBus });
-      next += STEP; step++;
+      const at = next - ac.currentTime, i = step % loop, b = Math.floor(i / bar), j = i % bar, c = sg.ch[b];
+      const tones = c.iv.map((x) => 60 + ((c.root + x) % 12)); // 화음은 4옥타브 근처
+      const root = 40 + (c.root + 8) % 12;                      // 베이스 근음(E2~D#3)
+      // 멜로디(8분음표 칸 = 16분음표 2칸)
+      if (j % 2 === 0) { const n = sg.notes[(b * bar + j) / 2]; if (n) tone(hz(n[0]), at, S16 * 2 * n[1] * 0.92, { duty: sg.lead, v: 0.11, out: musicBus, vib: sg.vib && n[1] >= 3 ? 5 : 0 }); }
+      // 베이스
+      const bs = { oct: j % 2 === 0 ? (j % 4 === 0 ? root : root + 12) : null,
+        walk: j % 4 === 0 ? root + [0, 4, 7, 9][(j / 4) % 4] - (c.iv[1] === 3 && (j / 4) % 4 === 1 ? 1 : 0) : null,
+        pump: j % 4 === 0 ? root + ((j / 4) % 2 ? 7 : 0) : null,
+        waltz: j === 0 ? root : (j === 8 ? root + 7 : null) }[sg.bass];
+      if (bs != null) tone(hz(bs), at, S16 * (sg.bass === 'oct' ? 1.7 : 3.4), { tri: true, v: 0.28, out: musicBus });
+      // 반주: 분산화음(16분음표로 위로) 또는 엇박 화음
+      if (sg.comp === 'arp') tone(hz(tones[j % tones.length] + 12), at, S16 * 0.9, { duty: 0.125, v: 0.035, out: musicBus });
+      else if (sg.beats === 3 ? j === 4 || j === 8 : j % 4 === 2) tones.slice(0, 3).forEach((n) => tone(hz(n), at, S16 * 1.4, { duty: 0.5, v: 0.025, out: musicBus }));
+      // 드럼
+      const sv = dr.soft ? 0.6 : 1;
+      if (dr.k.includes(j)) kickM(at, 0.38 * sv);
+      if (dr.s.includes(j)) hiss(at, 0.1, { v: 0.11 * sv, hp: 1200, out: musicBus });
+      if (dr.h.includes(j)) hiss(at, 0.03, { short: true, v: 0.045 * sv, hp: 6000, out: musicBus });
+      next += S16; step++;
     }
   }
-  function music(on) {
+  // music(true)는 새 곡을 무작위로 고른다. 번호를 주면 그 곡(점검 화면용)
+  function music(on, pick = null) {
     if (on && vol.on && vol.music && ensure()) {
-      if (timer) return;
+      if (timer && pick == null) return;
+      if (timer) clearInterval(timer);
+      let k = pick ?? Math.floor(Math.random() * SONGS.length);
+      if (pick == null && SONGS.length > 1 && k === lastSong) k = (k + 1 + Math.floor(Math.random() * (SONGS.length - 1))) % SONGS.length;
+      song = SONGS[k]; lastSong = k;
       next = ac.currentTime + 0.05; step = 0;
       timer = setInterval(schedule, 60);
     } else if (!on && timer) { clearInterval(timer); timer = null; }
@@ -155,6 +232,8 @@ export function createSound() {
   return {
     play, music, unlock, names: Object.keys(SFX),
     playing: () => !!timer,
+    songName: () => (timer ? song.name : ''),
+    songs: () => SONGS.map((x) => x.name),
     setVolume({ on, sfx, music: mv } = {}) {
       if (on != null) vol.on = on;
       if (sfx != null) vol.sfx = sfx;
