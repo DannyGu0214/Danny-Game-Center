@@ -48,6 +48,7 @@
 | 하위 칸 | Game Space 세이빙 모드: 하위 칸은 Gemini Hydrogen(yolo). P4 젤리 반응 = g-ocean, P4 소리 = g-sailing, P5 마감 = g-ocean | 2026-11-14 |
 | 배경음악 | 1곡, Web Audio 합성(무료, 퀴즈퀴즈 2026 `sound.js` 방식) | 2026-11-14 |
 | 게임 센터 공개 | P5가 끝난 뒤 `main` 병합과 함께 | 2026-11-14 |
+| 3D 모델 개선 | 직접 플레이 뒤 **나중에 할 것**으로 미룸: 바다거북·문어 디자인 개선, 그 밖의 3D 모델 개선. 4차 회차(P4·P5)를 먼저 진행 | 2026-11-14 |
 
 위 답에 맞춘 해석(다르면 알려 주세요, 둘 다 데이터 값이라 바꾸기 쉬워요)
 
@@ -205,12 +206,13 @@ Game Space 메인(Claude)이 계획·확인·병합을 맡고, 모듈 구현은 
 
 준비(메인, `claude/ocean-world-3d-p4-prep`):
 - 이벤트 훅 `render/core/events.js` + `render/main.js` 연결. 화면 연출 모듈은 `game.on(사건, fn)`으로 구독하고, `game.isPlacing()`으로 놓기 모드인지 물어요. 사건 12종(adopt·release·place·remove·placeMode·tapCreature·tapBlock·chance·capture·tier·expandStart·expand)이 브라우저에서 모두 발생하는 것을 확인했어요(콘솔 오류 0).
+- 연출 분리: `render/main.js`에 흩어져 있던 젤리 반응(들이기·놓기·포착·티어·블록 누르기)을 `ui/react.js`의 `attachReact(fx)`로 옮김(동작 같음, 브라우저에서 출렁임 값 확인). 소리는 `audio/sound.js`의 `attachSound(fx)` 빈 틀. 둘 다 `main.js`에 연결해 두어 W1·W2는 `main.js`를 고치지 않아요.
 - 프롤로그 4·5쪽 종이 낮추기(`low`, `artUp`). 1440×900에서 종이 위쪽 끝이 621 → 732px로 내려가 젤리 블록 전체가 보임. 5쪽은 화면 아래 양옆에 그림을 올린 만큼(약 3%) 바다색 띠가 보여요.
 
 | 묶음 | 내용 | 맡는 파일(이 밖은 고치지 않음) | 칸 |
 |---|---|---|---|
-| W1 젤리 반응 | DESIGN 4.2 반응 7가지와 4.3 경계(놓기 모드·카메라 회전 중 블록 출렁임 없음, 진폭 상한, 0.2초 안 연타 무시), 설정 "출렁임: 보통/약하게/끄기" | `render/core/jelly.js`, `render/core/deform.js`, `ui/react.js`(새, 훅 구독), `ui/settings.js`(새), `docs/p4-jelly-report.md` | g-ocean |
-| W2 소리 | 생물 8종 소리, 배경음악 1곡(Web Audio 합성), 음량·끄기 저장 | `audio/`(새 폴더), `docs/p4-sound-report.md` | g-sailing |
+| W1 젤리 반응 | DESIGN 4.2 반응 7가지와 4.3 경계(놓기 모드·카메라 회전 중 블록 출렁임 없음, 진폭 상한, 0.2초 안 연타 무시), 설정 "출렁임: 보통/약하게/끄기" | `render/core/jelly.js`, `render/core/deform.js`, `ui/react.js`, `ui/settings.js`(새), `docs/p4-jelly-report.md` | g-ocean |
+| W2 소리 | 생물 8종 소리, 배경음악 1곡(Web Audio 합성), 음량·끄기 저장. `attachSound`가 `{ muted, setMuted, volume, setVolume }`를 돌려줌 | `audio/`, `docs/p4-sound-report.md` | g-sailing |
 | W3 마감 | `manifest.webmanifest`, `sw.js`(오프라인 캐시, `vendor/`·`assets/` 포함), `icons/`, `README.md` | 그 파일들 | g-ocean(W1 뒤) |
 | 연결·등록 | 새 모듈을 `render/main.js`·`index.html`에 한 줄씩 잇기, `main` 병합 때 루트 목록 등록 | `render/main.js`, `index.html`, 루트 파일 | 메인 |
 

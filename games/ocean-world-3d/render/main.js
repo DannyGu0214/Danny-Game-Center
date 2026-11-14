@@ -31,6 +31,8 @@ import { createStage } from './core/stage.js';
 import { makeCoords } from './core/coords.js';
 import { JellyBlock } from './core/jelly.js';
 import { createEvents } from './core/events.js';
+import { attachReact } from '../ui/react.js';
+import { attachSound } from '../audio/sound.js';
 import { CameraRig } from './core/camera.js';
 import { buildTerrain, buildTerrainAsync } from './core/terrain.js';
 import { PropBatch } from './core/batched.js';
@@ -445,7 +447,6 @@ function capture() {
   const r = G.capture(S, uid);
   if (!r.ok) { hud.toast(r.why); return; }
   hud.toast(`📸 ${SP[r.sp].icon ?? ''}${SP[r.sp].name} 포착! ⭐+${r.reward}${r.first ? ' (첫 포착)' : ''}`, r.first);
-  jelly.poke(-0.3, 0.1, 0.05);
   events.emit('capture', { uid, sp: r.sp, first: !!r.first });
   save();
 }
@@ -474,7 +475,7 @@ function handleEvents(evs) {
   for (const e of evs) {
     if (e.type === 'place' || e.type === 'remove' || e.type === 'terrain') dirty = true;
     if (!live) continue;
-    if (e.type === 'tier') { hud.toast(`🎉 T${e.tier} 달성! 새 생물과 물건이 열렸어요`, true, 4200); jelly.poke(-0.9, 0.25, 0.15); hf.disturb(20, 20, 2.2, -2.4); events.emit('tier', { n: e.tier }); }
+    if (e.type === 'tier') { hud.toast(`🎉 T${e.tier} 달성! 새 생물과 물건이 열렸어요`, true, 4200); events.emit('tier', { n: e.tier }); }
     else if (e.type === 'ext' && !opt.ext) growExt();
     else if (e.type === 'chance') { events.emit('chance', { uid: e.uid, sp: e.sp }); hud.toast(`✨ ${SP[e.sp].name}이 특별한 행동을 해요! 7초 안에 눌러요`); }
     else if (e.type === 'claim') hud.toast(`요청 완료 ⭐+${e.reward}`);
@@ -640,7 +641,6 @@ const game = {
     const r = G.adopt(S, sp);
     if (!r.ok) { hud.toast(r.why); return; }
     const a = r.animal;
-    hf.disturb(a.x, a.y, 1.6, -1.8); jelly.poke(-0.35, 0.08, 0.04);
     events.emit('adopt', { uid: a.uid, sp, x: a.x, y: a.y, z: a.z });
     hud.toast(`${SP[sp].icon ?? ''} ${SP[sp].name} 들어왔어요!`);
     curC = G.creatures(S);
@@ -663,7 +663,6 @@ const game = {
     const p = placing, r = G.placeItem(S, p.id, p.x, p.y, p.layer, p.rot);
     if (!r.ok) { hud.toast(r.why); evalPlace(); return; }
     handleEvents(G.drainEvents(S));
-    hf.disturb(p.x + IT[p.id].w / 2, p.y + IT[p.id].h / 2, 1.4, -1.2); jelly.poke(-0.25);
     events.emit('place', { uid: r.item.uid, id: p.id, zone: IT[p.id].zone, layer: p.layer, x: p.x + IT[p.id].w / 2, y: p.y + IT[p.id].h / 2 });
     // 모이는 연출(화면만): 물속 물건이면 가까운 헤엄 생물 몇 마리가 잠깐 다가갔다 돌아감
     const d = IT[p.id], cx = p.x + d.w / 2, cy = p.y + d.h / 2;
@@ -727,10 +726,16 @@ app.onUpdate((dt, t) => {
 const gridOf = (p) => coords.toGrid(p.x, p.y, p.z, {});
 const input = new BlockInput({
   dom: canvas, camera, rig, jelly, hitMesh,
-  onTap: (p) => { const g = gridOf(p); hf.disturb(g.x, g.y, 1.4, -2.2); events.emit('tapBlock', { x: g.x, y: g.y, z: g.z }); },
+  onTap: (p) => { const g = gridOf(p); events.emit('tapBlock', { x: g.x, y: g.y, z: g.z }); },
   onDrag: (p) => { const g = gridOf(p); hf.disturb(g.x, g.y, 0.9, -0.35); },
   onPick: (e) => pick(e),
 });
+
+// ---------- P4 연출 모듈(PLAN 4.1.4절) ----------
+// 젤리 반응(ui/react.js, W1)과 소리(audio/sound.js, W2)는 게임 사건을 구독만 한다. 두 모듈은 이 파일을 고치지 않는다.
+const fx = { game, jelly, rig, input, creatures, propView, deformUniforms, opt, get hf() { return hf; } };
+const react = attachReact(fx);
+const sound = attachSound(fx);
 
 // ---------- 시작 흐름 ----------
 // 타이틀 동안: 카메라는 블록 둘레를 천천히 돌고(조작 잠금), 규칙 시간은 타이틀용 사본에서만 흐른다(진짜 상태는 멈춤, PLAN 7.2절).
@@ -822,7 +827,7 @@ app.installCapture({
   },
   game,
 });
-window.__ow = { app, opt, jelly, events, rig, creatures, propView, batch, fog, input, hitMesh, G, game, schools, growExt, get hf() { return hf; }, get heightAt() { return heightAt; }, get coords() { return coords; }, get terrains() { return terrains; }, get grow() { return grow; }, get S() { return S; }, get mode() { return mode; }, get placing() { return placing; }, ghost, save };
+window.__ow = { app, opt, jelly, events, react, sound, rig, creatures, propView, batch, fog, input, hitMesh, G, game, schools, growExt, get hf() { return hf; }, get heightAt() { return heightAt; }, get coords() { return coords; }, get terrains() { return terrains; }, get grow() { return grow; }, get S() { return S; }, get mode() { return mode; }, get placing() { return placing; }, ghost, save };
 app.start();
 
 // ---------- 설정·확인용 작은 창(⚙) ----------
