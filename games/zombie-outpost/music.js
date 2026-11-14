@@ -1,13 +1,21 @@
-// 배경음악: 기본은 Suno로 만든 mp3 7곡(assets/bgm, 아래 FILES — 합성곡 7곡과 1:1 대응)을 틀고,
-// 파일을 못 불러오면(오프라인·차단 등) 아래 Web Audio 합성곡으로 이어서 틀어 소리가 끊기지 않게 한다.
+// 배경음악: 기본은 Suno로 만든 mp3 12곡(assets/bgm, 아래 FILES — 6곡 × 테이크 2개)을 틀고,
+// 파일을 못 불러오면(오프라인·차단 등) 아래 Web Audio 합성곡 7곡으로 이어서 틀어 소리가 끊기지 않게 한다.
+// 무작위로 한 곡을 골라 끝까지(합성곡은 5분) 틀고, 다음 곡은 직전 곡(같은 제목의 다른 테이크 포함)을 빼고
+// 무작위로 골라 4초 동안 겹쳐 넘어간다.
 // 합성곡 설명:
-// 포스트 아포칼립스 분위기의 단순한 멜로디 7곡(단조 3곡 + 조금 희망적인 장조 4곡). 무작위로 한 곡을 골라 5분 동안 틀고,
-// 다음 곡은 직전 곡을 빼고 무작위로 골라 4초 동안 겹쳐 넘어간다.
+// 포스트 아포칼립스 분위기의 단순한 멜로디 7곡(단조 3곡 + 조금 희망적인 장조 4곡).
 // 음표는 0.6초 앞까지 미리 예약한다(Web Audio 표준 예약 방식: setInterval로 깨어나 ctx.currentTime 기준으로 예약).
 
-export const SEGMENT_S = 300; // 한 곡을 트는 시간(5분). mp3는 약 4분 58초라 파일 끝에서 넘어간다
-// TRACKS와 같은 순서(1:1): 잿빛 들판 · 녹슨 라디오 · 마지막 불빛 · 새벽 정찰 · 첫 수확 · 등불 아래 · 모닥불 노래
-export const FILES = ['01-gray-field', '02-rusty-radio', '03-last-light', '04-dawn-patrol', '05-first-harvest', '06-under-the-lantern', '07-campfire-song'].map((n) => `${n}.mp3`);
+export const SEGMENT_S = 300; // 한 곡을 트는 시간(5분). mp3는 약 4분 59초라 파일 끝에서 넘어간다
+// mp3 목록(2026-11-13 교체). name이 같으면 같은 곡의 다른 테이크다. 출처·trackId는 assets/CREDITS.md
+export const FILES = [
+  ['01-gray-field-a', '잿빛 들판'], ['02-gray-field-b', '잿빛 들판'],
+  ['03-rusty-radio-a', '녹슨 라디오'], ['04-rusty-radio-b', '녹슨 라디오'],
+  ['05-last-light-a', '마지막 불빛'], ['06-last-light-b', '마지막 불빛'],
+  ['07-under-the-lantern-a', '등불 아래'], ['08-under-the-lantern-b', '등불 아래'],
+  ['09-rusty-generator-a', '녹슨 발전기'], ['10-rusty-generator-b', '녹슨 발전기'],
+  ['11-blackout-zone-a', '정전 구역'], ['12-blackout-zone-b', '정전 구역'],
+].map(([n, name]) => ({ file: `${n}.mp3`, name }));
 const FILE_BASE = new URL('./assets/bgm/', import.meta.url);
 const FADE_S = 4;
 const LOOKAHEAD_S = 0.6;
@@ -241,8 +249,9 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
     c.connect(wet); wet.connect(bus);
     return c;
   }
-  function pick() {
-    const choices = TRACKS.map((_, k) => k).filter((k) => k !== (cur?.k ?? fcur?.k));
+  // list(TRACKS 또는 FILES)에서 직전 곡 last와 이름이 다른 곡을 무작위로 고른다
+  function pick(list, last) {
+    const choices = list.map((_, k) => k).filter((k) => last == null || list[k].name !== list[last].name);
     return choices[Math.floor(rand() * choices.length)];
   }
   // 한 곡 시작: 곡마다 자기 볼륨 노드(겹쳐 넘어가기용)를 가진다
@@ -271,7 +280,7 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
   }
   // until 시각까지 음표를 예약한다. 5분이 지나면 다음 곡으로 겹쳐 넘어간다.
   function scheduleUntil(until) {
-    if (!cur) begin(pick(), ac.currentTime + 0.1);
+    if (!cur) begin(pick(TRACKS), ac.currentTime + 0.1);
     // 멈췄다 돌아오면(소리 끔·화면 숨김·컨텍스트 정지) 밀린 음표를 몰아 치지 않고 지금부터 이어 간다. 멈춘 시간은 5분에 셈하지 않는다.
     const now = ac.currentTime;
     if (cur.nextBar < now) { const gap = now + 0.05 - cur.nextBar; cur.start += gap; cur.nextBar += gap; cur.noiseUntil = Math.max(cur.noiseUntil, cur.nextBar); }
@@ -280,7 +289,7 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
         const old = cur, t = cur.nextBar;
         old.g.gain.setValueAtTime(old.T.gain, t); old.g.gain.exponentialRampToValueAtTime(0.0001, t + FADE_S);
         setTimeout(() => old.g.disconnect(), (t - ac.currentTime + FADE_S + 2) * 1000);
-        begin(pick(), t);
+        begin(pick(TRACKS, old.k), t);
       }
       if (cur.T.noise && cur.noiseUntil < cur.nextBar + 8) { noiseLayer(ac, cur.g, noiseBuf, cur.noiseUntil, 8, cur.T.noise); cur.noiseUntil += 8; }
       scheduleBar(cur);
@@ -290,12 +299,12 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
   // 파일마다 <audio>를 MediaElementSource로 같은 AudioContext 버스에 연결한다(스트리밍이라 메모리를 거의 안 쓰고, iOS에서도 음량이 먹는다).
   const shouldPlay = () => on && !paused;
   function fileBegin(k) {
-    const el = new Audio(new URL(FILES[k], FILE_BASE).href), g = ac.createGain(), t = ac.currentTime;
+    const el = new Audio(new URL(FILES[k].file, FILE_BASE).href), g = ac.createGain(), t = ac.currentTime;
     el.preload = 'auto';
     const src = ac.createMediaElementSource(el);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(TRACKS[k].fileGain ?? 1, t + FADE_S);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + FADE_S);
     src.connect(g); g.connect(bus);
-    const f = { k, T: TRACKS[k], el, src, g, retryAt: 0 };
+    const f = { k, T: FILES[k], el, src, g, retryAt: 0 };
     el.addEventListener('error', () => fileFail(f));
     fcur = f;
     history.push(f.T.name);
@@ -308,7 +317,7 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
     filesOk = false; fileDrop(f); fcur = null;
   }
   function fileTick() {
-    if (!fcur) fileBegin(pick());
+    if (!fcur) fileBegin(pick(FILES));
     const f = fcur, el = f.el, now = performance.now();
     if (el.paused && !el.ended && now >= f.retryAt) { f.retryAt = now + 1000; el.play().catch(() => {}); }
     const len = Number.isFinite(el.duration) && el.duration > 0 ? Math.min(el.duration, segment) : segment;
@@ -316,7 +325,7 @@ export function createMusic({ segment = SEGMENT_S, volume = 0.34, rand = Math.ra
       const t = ac.currentTime;
       f.g.gain.setValueAtTime(Math.max(0.0001, f.g.gain.value), t); f.g.gain.exponentialRampToValueAtTime(0.0001, t + FADE_S);
       setTimeout(() => fileDrop(f), (FADE_S + 1) * 1000);
-      fileBegin(pick());
+      fileBegin(pick(FILES, f.k));
     }
   }
   function syncFile() {

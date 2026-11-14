@@ -13,7 +13,7 @@
 | `index.html` | 화면·조작·HUD·효과음·저장(브라우저 저장소, claude.ai에서는 계정 클라우드 저장) |
 | `logic.js` | 게임 규칙 전부(화면 없음, 고정 시간 단계 1/30초, 시드 난수) |
 | `art.js` | 그림 전용(쿼터뷰 도형으로 땅·지형지물·건물·캐릭터를 그림) |
-| `music.js` | 배경음악 재생: `assets/bgm/` mp3 7곡(Suno 생성), 못 불러오면 Web Audio 합성 7곡 |
+| `music.js` | 배경음악 재생: `assets/bgm/` mp3 12곡(Suno 생성, 6곡 × 테이크 2개), 못 불러오면 Web Audio 합성 7곡 |
 | `test/logic.test.js` | 규칙 테스트 |
 | `tools/sim.js` | 균형 측정용 봇 시뮬레이션 |
 | `title.js` | 시작 화면: Danny Soft 로고 → 픽셀 아트 쿼터뷰 타이틀 |
