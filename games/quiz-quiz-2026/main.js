@@ -100,19 +100,22 @@ $('duoBtn').onclick = () => { sound.unlock(); openSetup('duo'); };
 // ---------- 팀 고르기(처음 실행, 리셋 뒤) ----------
 let pickedDuo = null;
 function openTeamPick() {
-  pickedDuo = null; $('teamOk').disabled = true;
+  pickedDuo = null; $('teamHint').textContent = '위에서 팀을 눌러 골라 주세요'; $('teamHint').classList.remove('ok');
   const box = $('teamCards'); box.innerHTML = '';
   for (const id of DUO_IDS) {
     const b = document.createElement('button');
     b.className = 'duoCard';
     b.innerHTML = `<canvas></canvas>${DUOS[id].name}<small>${DUOS[id].rel}</small>`;
     drawDuoCard(b.querySelector('canvas'), id);
-    b.onclick = () => { pickedDuo = id; sound.play('press'); [...box.children].forEach((c) => c.classList.toggle('on', c === b)); $('teamOk').disabled = false; };
+    b.onclick = () => { pickedDuo = id; sound.play('press'); [...box.children].forEach((c) => c.classList.toggle('on', c === b)); $('teamHint').textContent = `${DUOS[id].name} 팀으로 나가요!`; $('teamHint').classList.add('ok'); };
     box.append(b);
   }
   show('teamPick');
 }
-$('teamOk').onclick = () => { if (!pickedDuo) return; save.profile = newProfile(pickedDuo); persist(); sound.play('titleUp'); toTitle(); };
+// 팀을 안 고르고 누르면 반응 없이 끝나지 않게, 카드를 흔들어 고르라고 알려 준다
+$('teamOk').onclick = () => {
+  if (!pickedDuo) { sound.play('aww'); const box = $('teamCards'); box.classList.remove('nudge'); void box.offsetWidth; box.classList.add('nudge'); return; }
+  save.profile = newProfile(pickedDuo); persist(); sound.play('titleUp'); toTitle(); };
 
 // ---------- 판 준비 ----------
 let mode = 'solo', skill = S.skill, p2Duo = null;

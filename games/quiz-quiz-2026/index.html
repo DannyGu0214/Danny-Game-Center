@@ -49,6 +49,9 @@ button:disabled { cursor: default; }
 .duoCard canvas { width: 100px; height: 88px; image-rendering: pixelated; border-radius: 4px; }
 .duoCard small { color: var(--muted); font-weight: 600; font-size: 9.5px; }
 .duoCard.on { border-color: var(--gold); }
+#teamCards.nudge .duoCard { animation: shake .3s 2; }
+.pickHint { font-size: 10.5px; color: var(--gold); font-weight: 900; }
+.pickHint.ok { color: var(--good); }
 .duoCard:disabled { opacity: .35; }
 .pick { padding: 5px 10px; border-radius: 6px; background: var(--panel2); font-size: 11px; font-weight: 800; border: 2px solid transparent; }
 .pick.on { border-color: var(--gold); background: #3b3478; }
@@ -187,9 +190,9 @@ button:disabled { cursor: default; }
   <div id="teamPick" class="layer hide">
     <div class="sheet">
       <h2>우리 팀을 골라 주세요</h2>
-      <p>고른 팀으로 계속 대회에 나가요. 이길수록 칭호가 올라가요.<br>팀은 설정의 "팀 리셋"으로만 바꿀 수 있어요.</p>
+      <p>이길수록 칭호가 올라요. 팀은 설정의 "팀 리셋"으로만 바꿔요.</p>
       <div class="row" id="teamCards"></div>
-      <div class="row"><button class="btn" id="teamOk" disabled>이 팀으로 출전!</button></div>
+      <div class="row"><span class="pickHint" id="teamHint">위에서 팀을 눌러 골라 주세요</span><button class="btn" id="teamOk">이 팀으로 출전!</button></div>
     </div>
   </div>
 
