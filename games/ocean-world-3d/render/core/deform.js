@@ -1,6 +1,6 @@
 // 생태계와 무관한 공용 꼭짓점 변형 조각(GLSL). 주입은 materials/shaderPatches.js가 한다.
 // 몸 지오메트리는 꼭짓점 속성 aDef(vec4)를 갖는다: x = 몸 길이 방향 s(0..1), y = 가림 마스크, z = 부위 번호, w = 부위 안 번호/방향.
-// 인스턴스 속성: aPhase(위상), aSpeed(주기 배율), aParams(개체차, 종마다 뜻이 다름).
+// 인스턴스 속성: aPhase(위상), aSpeed(주기 배율), aParams(개체차: x=흔들림차, y=걷기, z=촉수 오므림, w=젤리 스쿼시).
 import * as THREE from 'three';
 
 /** 변형 조각이 함께 쓰는 uniform. uCurrent는 확장(예: aqua 해류)이 값을 채운다. */
@@ -82,7 +82,7 @@ export const GAIT = {
 }`,
 };
 
-/** 젤리 반응(눌림 스쿼시): aParams.w = 출렁 세기. 부피를 1차 근사로 보존. */
+/** 젤리 반응(눌림 스쿼시 + 말미잘 촉수 오므림): aParams.w = 출렁 세기, aParams.z = 촉수 오므림(0..1). 부피를 1차 근사로 보존. */
 export const SQUASH = {
   name: 'squash',
   vertexDeform: /* glsl */`
@@ -90,6 +90,11 @@ export const SQUASH = {
   float j = (aParams.w + uSquash) * uDeformGain;
   transformed.y *= 1.0 + j;
   transformed.xz *= 1.0 - j * 0.5;
+  if (aParams.z > 0.001 && aDef.z > 1.5) {
+    float t = aParams.z * aDef.x * uDeformGain;
+    transformed.xz *= 1.0 - 0.52 * t;
+    transformed.y += length(transformed.xz) * 0.55 * t;
+  }
 }`,
 };
 
