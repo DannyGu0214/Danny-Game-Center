@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ocean World 3D</title>
-<link rel="icon" href="data:,">
+<meta name="theme-color" content="#8fd3e3">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ocean World">
 <style>
   :root { --ink: #1d3340; --panel: rgba(255, 255, 255, 0.82); --line: rgba(29, 51, 64, 0.14); --accent: #1f8fb0; }
   * { box-sizing: border-box; }
@@ -49,5 +54,10 @@
   <div class="hint">빈 곳 끌기 = 돌리기 · 휠/두 손가락 = 확대 · 오른쪽 끌기 = 옮겨 보기 · Shift+끌기 = 블록 위에서도 돌리기</div>
 </div>
 <script type="module" src="./render/main.js"></script>
+<script>
+// 오프라인 실행(sw.js). https나 localhost에서만, claude.ai Artifact 안과 녹화 모드(?capture)에서는 등록하지 않는다
+if ('serviceWorker' in navigator && !window.claude && !new URLSearchParams(location.search).has('capture') &&
+  (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
 </body>
 </html>
