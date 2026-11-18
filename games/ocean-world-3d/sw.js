@@ -3,7 +3,7 @@
 // 처음 설치할 때 아래 CORE를 모두 받아 둔다. 게임이 불러오는 파일이 바뀌면 이 목록과 CACHE 버전을 함께 고친다
 // (목록 근거: render/main.js에서 따라간 import 그래프 + 프롤로그가 부르는 css·그림. docs/p5-finish-report.md 2절).
 // 테스트(test/)·문서(docs/)·도구(tools/)·안 쓰는 파일(render/aqua/swim.js, assets/portraits/)은 넣지 않는다.
-const CACHE = 'ocean-world-3d-v1';
+const CACHE = 'ocean-world-3d-v2';
 const CORE = [
   './',
   'index.html',
@@ -87,6 +87,7 @@ const CORE = [
   'sim/space.js',
   'sim/util.js',
   'ui/hud.js',
+  'ui/pc-only.js',
   'ui/prologue-story.js',
   'ui/prologue.js',
   'ui/react.js',

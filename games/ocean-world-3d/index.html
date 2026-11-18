@@ -53,11 +53,16 @@
   <div class="row"><span class="lab">확인</span><a data-k="perf" href="?perf=1">성능 표시</a><a data-k="demo" href="?demo=1">견본 장면</a></div>
   <div class="hint">빈 곳 끌기 = 돌리기 · 휠/두 손가락 = 확대 · 오른쪽 끌기 = 옮겨 보기 · Shift+끌기 = 블록 위에서도 돌리기</div>
 </div>
-<script type="module" src="./render/main.js"></script>
-<script>
-// 오프라인 실행(sw.js). https나 localhost에서만, claude.ai Artifact 안과 녹화 모드(?capture)에서는 등록하지 않는다
-if ('serviceWorker' in navigator && !window.claude && !new URLSearchParams(location.search).has('capture') &&
-  (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+<script type="module">
+// PC 전용(ui/pc-only.js): 휴대폰·태블릿이면 게임을 불러오지 않고 안내만 보여 준다(오프라인 캐시도 받지 않음)
+import { isMobileDevice, showPcOnly } from './ui/pc-only.js';
+if (isMobileDevice()) showPcOnly();
+else {
+  import('./render/main.js');
+  // 오프라인 실행(sw.js). https나 localhost에서만, claude.ai Artifact 안과 녹화 모드(?capture)에서는 등록하지 않는다
+  if ('serviceWorker' in navigator && !window.claude && !new URLSearchParams(location.search).has('capture') &&
+    (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
