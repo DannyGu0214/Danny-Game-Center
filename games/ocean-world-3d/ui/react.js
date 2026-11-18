@@ -223,6 +223,8 @@ export function attachReact(fx) {
   return {
     setLevel,
     level: () => level,
+    /** 설정 창(캡처 모드에서는 null). 소리 줄은 render/main.js가 settings.addSound로 붙인다 */
+    settings,
     /** 확인용: 지금 돌고 있는 연출 수 */
     active: () => ({ drops: drops.size, bodies: bodies.size, props: props.size, calm: calm() }),
   };

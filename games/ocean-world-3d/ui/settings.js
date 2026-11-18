@@ -30,6 +30,8 @@ const CSS = `
 #ow-set .lab { min-width: 46px; opacity: .72; }
 #ow-set button { font: inherit; color: inherit; background: #fff; border: 1px solid rgba(23,50,63,.18); border-radius: 8px; padding: 4px 9px; cursor: pointer; }
 #ow-set button.on { background: #2a8fb8; border-color: #2a8fb8; color: #fff; }
+#ow-set .row + .row { margin-top: 8px; }
+#ow-set input[type=range] { width: 92px; }
 #ow-set .hint { margin-top: 8px; font-size: 12px; opacity: .65; }
 body.intro #ow-set-btn, body.intro #ow-set, body.capture #ow-set-btn, body.capture #ow-set { display: none; }
 @media (max-width: 899px) { #ow-set-btn { right: 12px; } #ow-set { right: 12px; } }
@@ -37,10 +39,10 @@ body.intro #ow-set-btn, body.intro #ow-set, body.capture #ow-set-btn, body.captu
 
 /**
  * @param {{ level: string, onChange: (level: string) => void }} o
- * @returns {{ set(level: string): void, el: HTMLElement }}
+ * @returns {{ set(level: string): void, addSound(sound: object): void, el: HTMLElement }}
  */
 export function createSettings(o) {
-  if (typeof document === 'undefined') return { set() {}, el: null };
+  if (typeof document === 'undefined') return { set() {}, addSound() {}, el: null };
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
@@ -77,6 +79,23 @@ export function createSettings(o) {
   }, true);
   for (const el of [btn, box]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
 
+  // 소리 줄(audio/sound.js의 { muted, setMuted, volume, setVolume }을 render/main.js가 넘김)
+  function addSound(sound) {
+    if (!sound || box.querySelector('[data-k=snd]')) return;
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.dataset.k = 'snd';
+    r.innerHTML = '<span class="lab">소리</span><button type="button" data-k="mute"></button>' +
+      '<input data-k="vol" type="range" min="0" max="1" step="0.05" aria-label="음량">';
+    const mb = r.querySelector('[data-k=mute]'), vol = r.querySelector('[data-k=vol]');
+    const show = () => { const m = sound.muted(); mb.textContent = m ? '꺼짐' : '켜짐'; mb.classList.toggle('on', !m); vol.disabled = m; };
+    vol.value = String(sound.volume());
+    mb.onclick = () => { sound.setMuted(!sound.muted()); show(); };
+    vol.oninput = () => { sound.setVolume(parseFloat(vol.value)); };
+    show();
+    box.insertBefore(r, box.querySelector('.hint'));
+  }
+
   document.body.append(btn, box);
-  return { set, el: box };
+  return { set, addSound, el: box };
 }

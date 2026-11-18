@@ -561,7 +561,8 @@ async function growExt() {
   drawGhost();
   if (rig.current === 'default' || rig.current === 'title' || rig.current === '_custom') rig.setView('default', GROW_SEC + 0.6);
   const sgn = side[0] === '-' ? -1 : 1;
-  jelly.poke(-0.55, axis === 'x' ? 0.45 * sgn : 0, axis === 'z' ? -0.45 * sgn : 0);
+  // 놓기 확정 안에서 확장이 시작되면 그 순간은 놓기 모드라 젤리 가드가 출렁임을 거절한다 → 다음 프레임으로 미룸(docs/p4-jelly-report.md 5절)
+  requestAnimationFrame(() => jelly.poke(-0.55, axis === 'x' ? 0.45 * sgn : 0, axis === 'z' ? -0.45 * sgn : 0, { force: true }));
   grow.cost.swap = ms() - t0;
   Object.assign(grow, { t: 0, slab, extT, extHf, extW, axis, mainBox, fullBox: waterBoxOf(coords.half), box: new THREE.Box3(), G2, H2, W2,
     wallN: side === '+x' ? [1, 0] : side === '-x' ? [-1, 0] : side === '+y' ? [0, 1] : [0, -1] });
@@ -736,6 +737,7 @@ const input = new BlockInput({
 const fx = { game, jelly, rig, input, creatures, propView, deformUniforms, opt, get hf() { return hf; } };
 const react = attachReact(fx);
 const sound = attachSound(fx);
+react.settings?.addSound(sound);
 
 // ---------- 시작 흐름 ----------
 // 타이틀 동안: 카메라는 블록 둘레를 천천히 돌고(조작 잠금), 규칙 시간은 타이틀용 사본에서만 흐른다(진짜 상태는 멈춤, PLAN 7.2절).
