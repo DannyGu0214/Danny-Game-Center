@@ -113,8 +113,8 @@ const rowboat2 = star2(rowboat, { len: 7.6, beam: 2.3, x0: 2.45, buoy: 45, helmX
 const sloop2 = star2(sloop, { len: 11, rows: 10, x0: 3.8, rowOff: 1, buoy: 107, crew: 3, helmX: -4.2, cockpit: [-4.95, -3.45], price: { oak: 60, canvas: 35, nail: 16, coin: 80 } });
 // 4등급 스쿠너(M2b, 2026-11-12): 14~16.5m, 돛대 둘(maxMasts), 연료 없는 작은 보조 기관(motor m/s: 돛이 그보다 약할 때만 돌아요),
 // 일손(minCrew): 선원이 이보다 적으면 돛을 줄인 만큼만 펴요. sprit: 뱃머리 밖 제1사장 길이(앞 삼각돛을 거기 매요). 조선 항구(조선소 4등급)에서 지어요
-const schooner = { id: 'schooner', kind: 'schooner', star: 1, grade: 4, name: '스쿠너', len: 14, beam: 4.2, deck: 1.35, cols: 5, rows: 14, cell: 0.8, x0: 6.4, drag: 1.05, row: 2.4, turn: 0.42, stability: 1.75, buoy: 170, draft: 0.85, crew: 6, minCrew: 3, foodBase: 10, holdBase: 40, waterBase: 6, helmX: -5.6, cockpit: [-6.5, -4.9], hp: 220, yard: 4, speed: 1.6, motor: 3.2, maxMasts: 2, sprit: 1.8, blueprint: 'schooner', price: { oak: 80, canvas: 50, plate: 16, gear: 4, tar: 14, coin: 180 } };
-const schooner2 = star2(schooner, { len: 16.5, beam: 4.4, rows: 16, x0: 6.7, rowOff: 0, buoy: 220, crew: 7, helmX: -6.9, cockpit: [-7.7, -6.2], price: { oak: 90, canvas: 50, plate: 16, coin: 160 } });
+const schooner = { id: 'schooner', kind: 'schooner', star: 1, grade: 4, name: '스쿠너', len: 14, beam: 4.2, deck: 1.35, cols: 5, rows: 14, cell: 0.8, x0: 6.4, drag: 1.05, row: 2.4, turn: 0.42, stability: 1.75, buoy: 170, draft: 0.85, crew: 6, minCrew: 3, foodBase: 10, holdBase: 40, waterBase: 6, helmX: -5.6, cockpit: [-6.5, -4.9], engineAt: [-4.0, 0.9], hp: 220, yard: 4, speed: 1.6, motor: 3.2, maxMasts: 2, sprit: 1.8, blueprint: 'schooner', price: { oak: 80, canvas: 50, plate: 16, gear: 4, tar: 14, coin: 180 } };
+const schooner2 = star2(schooner, { len: 16.5, beam: 4.4, rows: 16, x0: 6.7, rowOff: 0, buoy: 220, crew: 7, helmX: -6.9, cockpit: [-7.7, -6.2], engineAt: [-5.3, 0.9], price: { oak: 90, canvas: 50, plate: 16, coin: 160 } });
 export const HULLS = {
   raft, raft2,
   raft3: star3(raft2, { row: raft2.row * 1.15, price: { wood: 18, cloth: 4 }, perk: '노걸이 보강', perkDesc: '노 속도 +15%' }),
@@ -164,12 +164,13 @@ export const MODULES = {
   water: { name: '물통', icon: '🛢', fam: 'supply', mk: 1, w: 1, h: 1, kg: 4, z: 0.5, color: '#4a7f95', cost: { wood: 8, nail: 2 }, desc: '식수 4통! 짠물 바다에선 이게 목숨이라고', need: { grade: 3, region: 'coast' } },
   // 조수기(M2b): 바닷물을 끓여 식수로. 앞바다 발견지(바다 동굴)에서 설계도를 얻어요. 짠물 바다를 항해하는 동안 하루 DESAL.perDay통
   desal: { name: '조수기', icon: '⚗️', fam: 'supply', mk: 2, w: 1, h: 1, kg: 3, z: 0.75, color: '#7a8e96', cost: { plate: 3, gear: 1, nail: 4 }, desc: '바닷물을 끓여 식수로! 항해하는 동안 하루 두 통', need: { grade: 3, blueprint: 'desal' } },
-  lounge: { name: '휴게실', icon: '🛋', fam: 'rest', mk: 3, seat: 'rest', w: 2, h: 2, kg: 6, z: 0.8, color: '#e8dcc2', cost: {}, desc: '쉬면 사기가 오른다. 스쿠너부터', need: { grade: 4 }, future: true },
-  galley: { name: '조리실', icon: '🍲', fam: 'work', mk: 1, seat: 'cook', w: 1, h: 1, kg: 3, z: 0.7, color: '#b56a4a', cost: {}, desc: '같은 식량으로 기력이 더 돈다', need: { grade: 4 }, future: true },
+  // M3 B4: 휴게실(쉼 자리 2, 사기 회복 ×2)·조리실(요리사 자리, 식량 소비 ×0.9)·의무실(의무원 자리)·측후소(예보 +4일, 설계도는 버려진 측후소)
+  lounge: { name: '휴게실', icon: '🛋', fam: 'rest', mk: 3, seat: 'rest', seats: 2, w: 2, h: 2, kg: 6, z: 0.8, color: '#e8dcc2', cost: { oak: 16, canvas: 8, coin: 20 }, desc: '쉼 자리 둘! 쉬는 동안 사기가 두 배로 돌아와', need: { grade: 4 } },
+  galley: { name: '조리실', icon: '🍲', fam: 'work', mk: 1, seat: 'cook', w: 1, h: 1, kg: 3, z: 0.7, color: '#b56a4a', cost: { oak: 8, plate: 2, nail: 4 }, desc: '요리사 자리. 요리사가 없어도 식량 소비가 10% 줄어', need: { grade: 4 }, foodK: 0.9 },
   bench: { name: '수리대', icon: '🔨', fam: 'work', mk: 1, seat: 'carpenter', w: 1, h: 1, kg: 3, z: 0.5, color: '#8a6a44', cost: { oak: 8, nail: 4, wood: 6 }, desc: '목수가 앉으면 화물칸 잡목으로 항해 중에 고친다', need: { grade: 3 } },
-  sickbay: { name: '의무실', icon: '⚕', fam: 'work', mk: 1, seat: 'medic', w: 1, h: 1, kg: 2, z: 0.6, color: '#e8e4dc', cost: {}, desc: '무더위·추위에 쓰러지지 않게', need: { grade: 4 }, future: true },
+  sickbay: { name: '의무실', icon: '⚕', fam: 'work', mk: 1, seat: 'medic', w: 1, h: 1, kg: 2, z: 0.6, color: '#e8e4dc', cost: { oak: 6, canvas: 6, coin: 30 }, desc: '의무원 자리. 기력·피로가 빨리 돌아오지', need: { grade: 4 } },
   crowsnest: { name: '망루', icon: '🗼', fam: 'watch', mk: 2, seat: 'look', w: 1, h: 1, kg: 3, z: 1.2, color: '#a88a4a', cost: { oak: 10, plate: 2, hemp: 4 }, desc: '망원경 다음! 더 멀리 보고(92m), 해무도 조금 더 걷어 내지', need: { grade: 4 } },
-  station: { name: '측후소', icon: '📡', fam: 'watch', mk: 2, seat: 'weather', w: 1, h: 1, kg: 2, z: 1, color: '#b9b4a0', cost: {}, desc: '기압계 다음. 예보 +4일', need: { grade: 4 }, future: true },
+  station: { name: '측후소', icon: '📡', fam: 'watch', mk: 2, seat: 'weather', w: 1, h: 1, kg: 2, z: 1, color: '#b9b4a0', cost: { plate: 4, gear: 2, coin: 40 }, desc: '기압계 다음! 예보 +4일(기압계 +2 대신), 태풍은 2일 더 일찍 알아', need: { grade: 4, blueprint: 'station' } },
   bulkhead: { name: '방수 격벽', icon: '🧱', fam: 'watch', mk: 1, w: 1, h: 1, kg: 4, z: 0.3, color: '#6f7478', cost: { oak: 8, tar: 4, nail: 4 }, desc: '너울에 덜 상하고(피해 절반), 물보라에 식량이 안 젖는다', need: { grade: 3, region: 'coast' } },
   lifeboat: { name: '구명정', icon: '🛟', fam: 'watch', mk: 1, w: 1, h: 2, kg: 4, z: 0.6, color: '#d8634f', cost: { oak: 8, canvas: 4, nail: 4 }, desc: '가라앉아도 화물 절반은 건진다!', need: { grade: 4 } },
 };
@@ -181,15 +182,16 @@ export const ROLES = {
   helmsman: { name: '조타수', icon: '☸️', seat: 'helm', desc: '선장이 키를 떠나도 항로는 지키지. 돛·노를 오가도 배가 안 헤맨다고', brief: '선장이 자리를 떠도 항로는 지키지!', hire: 20, wage: 2, region: 'river', grade: 3, z: 1 },
   fisher: { name: '어부', icon: '🎣', seat: 'fish', desc: '어망 자리에서 물고기를 두 배로 낚지', brief: '어망만 주면 저녁은 걱정 마!', hire: 15, wage: 1, region: 'river', grade: 3, z: 1 },
   carpenter: { name: '목수', icon: '🔨', seat: 'carpenter', desc: '수리대 자리에서 화물칸 잡목으로 항해 중에 배를 고치지', brief: '잡목만 실어 주면 바다 위에서 고친다!', hire: 20, wage: 2, region: 'river', grade: 3, z: 1 },
-  cook: { name: '요리사', icon: '🍲', seat: 'cook', desc: '식량 효율과 사기', hire: 20, wage: 3, region: 'river', grade: 4, future: true },
-  engineer: { name: '기관사', icon: '⚙️', seat: 'engine', desc: '기관·배터리 효율', hire: 30, wage: 4, region: 'river', grade: 4, future: true },
-  bosun: { name: '갑판장', icon: '📯', seat: 'sail', desc: '갑판원 효과 증가, 돌풍 대응이 빨라져', hire: 30, wage: 4, region: 'river', grade: 4, future: true },
-  medic: { name: '의무원', icon: '⚕', seat: 'medic', desc: '탈진·질병 회복', hire: 30, wage: 4, region: 'river', grade: 4, future: true },
+  // M3 B4: 뒤 공간 역할 넷을 열어요(PLAN-M3.md 5-1절). region은 후보가 처음 나오는 수역
+  cook: { name: '요리사', icon: '🍲', seat: 'cook', desc: '조리실에서 식량을 아껴 쓰고(소비 −25%), 하루 한 번 모두의 사기를 올리지', brief: '같은 식량으로 더 오래 가게 해 주지!', hire: 20, wage: 2, region: 'coast', grade: 4, z: 1 },
+  engineer: { name: '기관사', icon: '⚙️', seat: 'engine', desc: '보조 기관을 15% 더 돌리고, 무풍 날엔 돛보다 기관을 먼저 돌려', brief: '바람이 죽어도 내가 배를 밀지!', hire: 30, wage: 3, region: 'coast', grade: 4, z: 1 },
+  bosun: { name: '갑판장', icon: '📯', seat: 'sail', desc: '갑판원 효과 +25%, 돌풍·태풍 예고에 곧바로 돛을 줄이고, 돛 바꾸는 시간이 절반', brief: '돛줄은 내가 쥐고 있지!', hire: 30, wage: 3, region: 'coast', grade: 4, z: 1 },
+  medic: { name: '의무원', icon: '⚕', seat: 'medic', desc: '기력이 1.5배 빨리 돌아오고, 무더위·목마름에 덜 지치고, 선원 피로도 빨리 풀어 줘', brief: '아픈 사람은 내게 맡겨!', hire: 30, wage: 3, region: 'sea', grade: 4, z: 1 },
   weather: { name: '기상사', icon: '📡', seat: 'weather', desc: '예보 기간·정확도', hire: 35, wage: 4, region: 'river', grade: 5, future: true },
   mate: { name: '일등 항해사', icon: '🧭', seat: 'bridge', desc: '선장 대리, 다른 선원 지휘', hire: 50, wage: 6, region: 'river', grade: 5, future: true },
 };
 // 자리 이름(선원 탭 평면도). helm은 모든 배의 고물에 있고, rest는 해먹·선실이에요
-export const SEATS = { helm: '조타', oar: '노', sail: '돛', look: '견시', fish: '어망', carpenter: '수리대', rest: '쉼', weather: '기상' };
+export const SEATS = { helm: '조타', oar: '노', sail: '돛', look: '견시', fish: '어망', carpenter: '수리대', rest: '쉼', weather: '기상', engine: '기관', cook: '조리', medic: '의무' };
 // 특성: 사람마다 하나
 export const TRAITS = {
   diligent: { name: '부지런함', desc: '피로가 30% 덜 쌓여' },

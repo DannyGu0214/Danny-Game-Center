@@ -418,3 +418,125 @@ test('B3 생물 8종: 큰 바다 도감, 야자집게는 밀물에도 남고, �
   assert.ok(seen.has('coconutcrab'), `밀물에도 야자집게가 보여야 해요: ${[...seen]}`); assert.ok(!seen.has('crab'));
   for (const sp of seen) assert.equal(SPECIES[sp].region, 'sea', sp);
 });
+
+// ── B4 선원·모듈 ──
+import { ROLES, MODULES } from '../data.js';
+const mate = (id, role, extra = {}) => ({ id, role, name: `c${id}`, gender: '남', skill: 3, humor: 3, drink: 3, baseWage: ROLES[role].wage, wage: ROLES[role].wage, lv: 1, xp: 0, fatigue: 0, morale: 0.7, trait: 'diligent', ...extra });
+// 스쿠너 + 지정 모듈 + 지정 선원(역할마다 맞는 자리에 앉아요)
+function crewShip(mods, roles, seed = 1) {
+  const S = seaShip(seed); S.ship.mods.push(...mods.map((m) => ({ rot: 0, ...m }))); S.rev++;
+  S.crew = roles.map((r, i) => mate(100 + i, r)); S.crew.forEach((c) => { c.seat = undefined; }); G.autoSeat(S);
+  return S;
+}
+const GALLEY = { id: 'galley', col: 0, row: 4 }, SICK = { id: 'sickbay', col: 4, row: 4 }, LOUNGE = { id: 'lounge', col: 0, row: 6 };
+
+test('B4 역할 4개가 열리고 자리 3개(기관·조리·의무)가 생겨요', () => {
+  for (const [id, region, wage, hire] of [['cook', 'coast', 2, 20], ['bosun', 'coast', 3, 30], ['engineer', 'coast', 3, 30], ['medic', 'sea', 3, 30]]) {
+    const R = ROLES[id]; assert.ok(!R.future, id); assert.deepEqual([R.region, R.wage, R.hire], [region, wage, hire], id);
+  }
+  assert.ok(ROLES.weather.future && ROLES.mate.future);
+  for (const id of ['galley', 'sickbay', 'lounge']) assert.ok(!MODULES[id].future && MODULES[id].need.grade === 4, id);
+  assert.equal(MODULES.oar2.future, true);
+  const S = crewShip([GALLEY, SICK], ['cook', 'engineer', 'medic']);
+  const types = G.seatsOf(S).map((q) => q.type);
+  for (const t of ['engine', 'cook', 'medic']) assert.ok(types.includes(t), t);
+  assert.deepEqual(S.crew.map((c) => G.seatsOf(S).find((q) => q.key === c.seat)?.type), ['cook', 'engine', 'medic']);
+  assert.ok(G.seatsOf(seaShip()).some((q) => q.key === 'engine'), '기관 자리는 모듈 없이 생겨요');
+  assert.equal(G.seatsOf(G.newGame(1)).some((q) => q.type === 'engine'), false, '뗏목엔 기관 자리가 없어요');
+  // 후보: 앞바다부터 요리사·갑판장·기관사, 큰 바다부터 의무원
+  const at = (region) => { const S2 = seaShip(2); S2.region = region; const set = new Set(); for (let i = 0; i < 80; i++) { S2.cands = {}; S2.clock += 9999 * 180; S2.docked = region === 'sea' ? 'depot' : 'light'; for (const c of G.candidatesAt(S2)) set.add(c.role); } return set; };
+  const coastRoles = at('coast'), seaRoles = at('sea');
+  assert.ok(coastRoles.has('cook') && coastRoles.has('bosun') && coastRoles.has('engineer')); assert.ok(!coastRoles.has('medic'));
+  assert.ok(seaRoles.has('medic'));
+});
+
+test('B4 요리사·조리실: 식량 소비 ×0.9, 요리사까지 앉으면 ×0.675, 하루 한 번 사기 +5%', () => {
+  const none = crewShip([GALLEY], ['deckhand']), gal = crewShip([GALLEY], []), cook = crewShip([GALLEY], ['cook']);
+  assert.equal(G.foodK(crewShip([], [])), 1); assert.ok(Math.abs(G.foodK(gal) - 0.9) < 1e-9); assert.ok(Math.abs(G.foodK(none) - 0.9) < 1e-9); assert.ok(Math.abs(G.foodK(cook) - 0.9 * 0.75) < 1e-9);
+  const eatOver = (S) => { S.boat.x = 0; S.boat.y = 0; S.food = 20; S.water = 8; const f0 = S.food; for (let i = 0; i < 30 * 30; i++) { G.step(S, G.FIXED_DT); S.boat.x = 0; S.boat.y = 0; S.boat.spd = 0; } return f0 - S.food; };
+  G.undock(none); G.undock(cook);
+  const a = eatOver(none), b = eatOver(cook);
+  assert.ok(Math.abs(b / a - 0.75) < 0.03, `소비 비율 ${(b / a).toFixed(3)}`); // 요리사 효과 ×(1−0.25)
+  // 사기: 하루에 한 번
+  const T = crewShip([GALLEY], ['cook', 'deckhand']); G.undock(T); const m0 = T.crew[1].morale; T.crew.forEach((c) => { c.morale = 0.5; });
+  for (let i = 0; i < 30 * 5; i++) { G.step(T, G.FIXED_DT); T.boat.x = 0; T.boat.y = 0; }
+  assert.ok(T.crew[1].morale > 0.54 && T.crew[1].morale < 0.57, `하루 한 번 +5%: ${T.crew[1].morale}`); void m0;
+});
+
+test('B4 갑판장: 갑판원 효과 ×1.25, 돛 바꾸는 시간 절반, 돌풍 예고에 곧바로 돛을 줄여요', () => {
+  const deck = crewShip([], ['deckhand']), both = crewShip([], ['deckhand', 'bosun']);
+  const w0 = G.crewWork(deck, 'sail'), w1 = G.crewWork(both, 'sail');
+  assert.ok(w0 > 0); assert.ok(Math.abs(w1 / w0 - 1.25) < 0.01, `비율 ${w1 / w0}`);
+  // 돛 속도: 갑판장 자리에서 돛이 2배 빨리 펴져요
+  const rate = (S) => { G.undock(S); S.boat.x = 0; S.boat.y = 0; S.boat.sailLevel = 2; S.boat.sailNow = 0; G.step(S, 0.2); return S.boat.sailNow; };
+  const solo = crewShip([], ['deckhand']), boss = crewShip([], ['bosun']);
+  assert.ok(Math.abs(rate(boss) / rate(solo) - 2) < 0.05, '절반 시간');
+  // 돌풍 예고(gustSoon)에 축범: 갑판장은 즉시, 갑판원은 돌풍이 온 뒤에야
+  const seed = 2, d = dayWith(seed, (q) => q.gust !== null && q.gust !== undefined && !q.storm && !q.typhoon, 5);
+  const gustAt = G.dayWeather(seed, d).gust;
+  const run = (role) => { const S = crewShip([], [role], seed); G.undock(S); S.boat.x = 0; S.boat.y = 0; S.food = 500; S.water = 20; S.boat.sailLevel = 2; S.boat.sailNow = 1; S.clock = d * CAL.day + gustAt - 40; let soonAt = -1; for (let i = 0; i < 30 * 70; i++) { G.step(S, G.FIXED_DT); S.boat.x = 0; S.boat.y = 0; S.boat.spd = 0; if (soonAt < 0 && S.weather.gustSoon) { soonAt = i; if (S.boat.sailLevel === 1) return 'early'; } } return S.boat.sailLevel === 1 ? 'late' : 'none'; };
+  assert.ok(typeof gustAt !== 'undefined');
+  assert.equal(run('bosun'), 'early'); assert.notEqual(run('deckhand'), 'early');
+});
+
+test('B4 기관사: 기관 ×1.15(3.2 → 3.68), 무풍 날엔 돛보다 기관이 먼저 돌아요', () => {
+  const S = crewShip([], ['engineer'], 2), N = crewShip([], [], 2);
+  assert.ok(Math.abs(G.roleWork(S, 'engineer') - 1) < 1e-9);
+  const calm = dayWith(2, (q) => q.calm, 1);
+  const topSpeed = (T) => { G.undock(T); T.clock = calm * CAL.day + 60; T.boat.x = 0; T.boat.y = 0; T.boat.h = 0; T.boat.sailLevel = 1; T.food = 500; T.water = 20; let m = 0; for (let i = 0; i < 30 * 50; i++) { G.step(T, G.FIXED_DT); T.boat.row = false; T.boat.sailLevel = 1; m = Math.max(m, T.boat.spd); if (T.boat.x > 600) T.boat.x = 0; T.boat.rudder = 0; } return m; };
+  const a = topSpeed(N), b = topSpeed(S);
+  assert.ok(a <= 3.25, `기관사 없음 ${a}`); assert.ok(b > a * 1.08 && b <= 3.2 * 1.15 + 0.05, `기관사 ${b} vs ${a}`);
+});
+
+test('B4 의무원: 기력 회복 ×1.5·피로 회복 ×1.5, 무더위 감소 ×0.6', () => {
+  const none = crewShip([SICK], ['deckhand']), med = crewShip([SICK], ['medic', 'deckhand']);
+  assert.ok(Math.abs(G.roleWork(med, 'medic') - 1) < 1e-9);
+  const gain = (S) => { G.undock(S); S.boat.x = 0; S.boat.y = 0; S.food = 500; S.water = 20; S.vigor = 0.2; for (let i = 0; i < 30 * 10; i++) { G.step(S, G.FIXED_DT); S.boat.x = 0; S.boat.y = 0; S.boat.spd = 0; } return S.vigor - 0.2; };
+  const a = gain(none), b = gain(med);
+  assert.ok(Math.abs(b / a - 1.5) < 0.05, `회복 비율 ${(b / a).toFixed(3)}`);
+  // 피로 회복: 쉬는 선원이 1.5배 빨리 풀려요
+  const T = crewShip([SICK, { id: 'hammock', col: 1, row: 6 }], ['medic', 'cook']); G.undock(T);
+  const U = crewShip([{ id: 'hammock', col: 1, row: 6 }], ['cook']); G.undock(U);
+  T.crew[1].fatigue = 0.8; U.crew[0].fatigue = 0.8; T.crew[1].seat = null; U.crew[0].seat = null;
+  for (let i = 0; i < 30 * 8; i++) { for (const X of [T, U]) { G.step(X, G.FIXED_DT); X.boat.x = 0; X.boat.y = 0; X.boat.spd = 0; } }
+  assert.ok(0.8 - T.crew[1].fatigue > 1.3 * (0.8 - U.crew[0].fatigue), `피로 ${T.crew[1].fatigue} vs ${U.crew[0].fatigue}`);
+});
+
+test('B4 휴게실: 쉼 자리 2개·정원 +2, 쉬는 동안 사기 회복 ×2', () => {
+  const S = crewShip([LOUNGE], []); const rest = G.seatsOf(S).filter((q) => q.type === 'rest'); assert.equal(rest.length, 2); assert.equal(new Set(rest.map((q) => q.key)).size, 2);
+  assert.equal(G.stats(S).crewCap, 2);
+  const hammock = crewShip([{ id: 'hammock', col: 0, row: 6 }], ['rower']); assert.equal(G.stats(hammock).crewCap, 1);
+  const L = crewShip([LOUNGE], ['rower', 'rower']), H = crewShip([{ id: 'hammock', col: 0, row: 6 }, { id: 'hammock', col: 1, row: 6 }], ['rower', 'rower']);
+  for (const X of [L, H]) { G.undock(X); X.crew.forEach((c) => { c.seat = null; }); X.crew.forEach((c) => { c.morale = 0.4; c.seat = G.seatsOf(X).find((q) => q.type === 'rest' && !X.crew.some((o) => o.seat === q.key))?.key ?? null; }); }
+  assert.ok(L.crew.every((c) => c.seat) && H.crew.every((c) => c.seat));
+  for (let i = 0; i < 30 * 10; i++) for (const X of [L, H]) { G.step(X, G.FIXED_DT); X.boat.x = 0; X.boat.y = 0; X.boat.spd = 0; X.food = 500; X.water = 20; }
+  const gl = L.crew[0].morale - 0.4, gh = H.crew[0].morale - 0.4; assert.ok(gl > 1.8 * gh && gl < 2.2 * gh, `휴게실 ${gl} vs 해먹 ${gh}`);
+});
+
+test('B4 측후소: 예보 +4일(기압계 +2 대신), 설계도가 있어야 짓고, 태풍 예보는 +2일', () => {
+  const S = seaShip(); assert.equal(G.stats(S).forecast, 1);
+  const st = (m) => { const T = seaShip(); T.ship.mods.push({ ...m, rot: 0 }); return T; };
+  assert.equal(G.stats(st({ id: 'barometer', col: 0, row: 0 })).forecast, 3);
+  assert.equal(G.stats(st({ id: 'station', col: 0, row: 1 })).forecast, 5);
+  assert.ok(!G.isUnlocked(S, 'station')); S.blueprints.station = 1; assert.ok(G.isUnlocked(S, 'station'));
+  assert.deepEqual(MODULES.station.cost, { plate: 4, gear: 2, coin: 40 });
+  const T = st({ id: 'station', col: 0, row: 1 }); assert.equal(G.stats(T).typhoonAhead, 4);
+});
+
+test('B4 옮겨 탈 때 선원이 남아요(정원 안), 정원이 줄 때만 숙련 낮은 사람부터 내려요, 바다 품삯 ×0.75', () => {
+  const S = coastShip('sloop'); S.ship.hull = 'sloop2'; S.crew = [mate(1, 'deckhand', { lv: 3 }), mate(2, 'rower', { lv: 1 })];
+  S.blueprints.schooner = 1; S.res = { ...S.res, oak: 300, canvas: 300, plate: 99, gear: 20, tar: 99, nail: 99, coin: 2000, wood: 99 }; G.dock(S, 'yard'); drain(S);
+  assert.ok(G.buildHull(S, 'schooner').ok, JSON.stringify(G.buildStatus(S, 'schooner')));
+  assert.deepEqual(S.crew.map((c) => c.id), [1, 2]); assert.ok(S.crew.every((c) => c.seat === undefined || c.seat === null || G.seatsOf(S).some((q) => q.key === c.seat)));
+  // 정원이 줄 때(시험용으로 스쿠너 정원을 1로 낮춰요)
+  const R = coastShip('sloop'); R.ship.hull = 'sloop2'; R.crew = [mate(1, 'deckhand', { lv: 1 }), mate(2, 'rower', { lv: 4 })];
+  R.blueprints.schooner = 1; R.res = { ...R.res, oak: 300, canvas: 300, plate: 99, gear: 20, tar: 99, nail: 99, coin: 2000, wood: 99 }; G.dock(R, 'yard'); drain(R);
+  const keep = HULLS.schooner.crew; HULLS.schooner.crew = 1;
+  try { assert.ok(G.buildHull(R, 'schooner').ok); } finally { HULLS.schooner.crew = keep; }
+  assert.deepEqual(R.crew.map((c) => c.id), [2], '숙련 높은 사람이 남아요'); assert.ok(drain(R).some((e) => e.type === 'crewLeft' && e.why === 'size'));
+  // 바다 품삯: 같은 선원·같은 시간에 쌓이는 보수가 짠물 수역에서 0.75배
+  const b = seaShip(); b.crew = [mate(1, 'deckhand', { wage: 4, baseWage: 4 })]; G.undock(b); b.owed = 0; b.food = 500; b.water = 20;
+  for (let i = 0; i < 30 * 10; i++) { G.step(b, G.FIXED_DT); b.boat.spd = 0; }
+  assert.ok(Math.abs(b.owed - 4 * 10 / CAL.day * 0.75) < 0.01, `짠물 품삯 ${b.owed}`);
+  const fresh = G.newGame(1); fresh.region = 'river'; assert.equal(G.wageK(fresh), 1); assert.equal(G.wageK(b), 0.75);
+});

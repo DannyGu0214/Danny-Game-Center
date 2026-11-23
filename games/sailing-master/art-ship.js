@@ -265,6 +265,32 @@ function sliceModule(g, m, hullId, z) {
       g.fillStyle = top ? '#b48a58' : M.color; g.beginPath(); roundRect(g, x0 + 0.03, y0 + 0.1, x1 - 0.03, y1 - 0.1, 0.04); g.fill();
       if (top) { g.fillStyle = '#5a5e62'; g.fillRect(cx - 0.2, cy - 0.04, 0.28, 0.08); g.fillStyle = '#6b4a2e'; g.fillRect(cx + 0.08, cy - 0.03, 0.18, 0.06); }
       break;
+    // M3 B4: 조리실·의무실·휴게실·측후소
+    case 'galley': {
+      // 철제 화덕 + 솥 + 굴뚝
+      g.fillStyle = top ? '#7a6a5e' : M.color; g.beginPath(); roundRect(g, x0 + 0.05, y0 + 0.05, x1 - 0.05, y1 - 0.05, 0.05); g.fill();
+      if (top) { g.fillStyle = '#2f3a40'; g.beginPath(); g.arc(cx - 0.05, cy + 0.05, 0.19, 0, TAU); g.fill(); g.fillStyle = '#cbd2d6'; g.beginPath(); g.arc(cx - 0.05, cy + 0.05, 0.13, 0, TAU); g.fill(); g.fillStyle = '#3f4448'; g.beginPath(); g.arc(cx + 0.22, cy - 0.2, 0.07, 0, TAU); g.fill(); }
+      else if (z > M.z * 0.5) { g.fillStyle = '#3f4448'; g.beginPath(); g.arc(cx + 0.22, cy - 0.2, 0.07, 0, TAU); g.fill(); }
+      break;
+    }
+    case 'sickbay': {
+      // 흰 약상자에 약초 잎(적십자는 쓰지 않아요)
+      g.fillStyle = top ? '#f3f0e8' : M.color; g.beginPath(); roundRect(g, x0 + 0.07, y0 + 0.09, x1 - 0.07, y1 - 0.09, 0.05); g.fill();
+      if (top) { g.fillStyle = '#5a9a58'; g.beginPath(); g.ellipse(cx - 0.07, cy, 0.14, 0.06, -0.7, 0, TAU); g.fill(); g.beginPath(); g.ellipse(cx + 0.07, cy, 0.14, 0.06, 0.7, 0, TAU); g.fill(); g.strokeStyle = '#8a8f93'; g.lineWidth = 0.03; g.strokeRect(x0 + 0.1, y0 + 0.12, x1 - x0 - 0.2, y1 - y0 - 0.24); }
+      break;
+    }
+    case 'lounge': {
+      // 긴 의자 둘과 가운데 작은 탁자
+      g.fillStyle = top ? '#a98a5a' : M.color; g.beginPath(); roundRect(g, x0 + 0.06, y0 + 0.06, x1 - 0.06, y0 + (y1 - y0) * 0.32, 0.05); g.fill(); g.beginPath(); roundRect(g, x0 + 0.06, y1 - (y1 - y0) * 0.32, x1 - 0.06, y1 - 0.06, 0.05); g.fill();
+      if (top) { g.fillStyle = '#c9524a'; g.fillRect(x0 + 0.1, y0 + 0.1, x1 - x0 - 0.2, (y1 - y0) * 0.14); g.fillRect(x0 + 0.1, y1 - 0.1 - (y1 - y0) * 0.14, x1 - x0 - 0.2, (y1 - y0) * 0.14); g.fillStyle = '#7a5230'; g.beginPath(); g.arc(cx, cy, 0.17, 0, TAU); g.fill(); }
+      break;
+    }
+    case 'station': {
+      // 기둥 위에 풍향계와 바람개비(컵 셋)
+      g.fillStyle = '#5a5e62'; g.fillRect(cx - 0.04, cy - 0.04, 0.08, 0.08);
+      if (top || z > M.z * 0.6) { g.strokeStyle = '#4a4f54'; g.lineWidth = 0.035; g.beginPath(); g.moveTo(cx - 0.3, cy + 0.12); g.lineTo(cx + 0.3, cy + 0.12); g.stroke(); g.fillStyle = '#c9524a'; g.beginPath(); g.moveTo(cx + 0.3, cy + 0.12); g.lineTo(cx + 0.14, cy + 0.04); g.lineTo(cx + 0.14, cy + 0.2); g.closePath(); g.fill(); for (let i = 0; i < 3; i++) { const a = i * 2.1; g.fillStyle = '#e8e4dc'; g.beginPath(); g.arc(cx - 0.12 + Math.cos(a) * 0.12, cy - 0.12 + Math.sin(a) * 0.12, 0.05, 0, TAU); g.fill(); } }
+      break;
+    }
     default: // 돛대 받침
       g.beginPath(); g.arc(cx, cy, 0.2, 0, TAU); g.fill();
   }

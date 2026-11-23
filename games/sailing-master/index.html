@@ -945,7 +945,7 @@ function drainEvents() {
       case 'arrive': snd.play('arrive'); syncButtons(); break;
       case 'atGate': openGate(worldOf(S.region).gates.find((g) => g.id === ev.id)); break;
       case 'docked': snd.play('dock'); openPort(ev); break;
-      case 'crewLeft': toast(ev.why === 'morale' ? `${ev.name}이(가) 이 배는 못 견디겠다며 내려 버렸어!` : `${ev.name}이(가) 보수를 못 받았다고 내려 버렸어!`); break;
+      case 'crewLeft': toast(ev.why === 'size' ? `${ev.name}은(는) 새 배엔 자리가 모자라 내렸어. 고마웠다고!` : ev.why === 'morale' ? `${ev.name}이(가) 이 배는 못 견디겠다며 내려 버렸어!` : `${ev.name}이(가) 보수를 못 받았다고 내려 버렸어!`); break;
       case 'crewLevel': toast(`⭐ ${ev.name} 숙련 ${ev.lv}! 보수도 조금 올랐어`); break;
       case 'carpNoWood': toast('🔨 목수: 화물칸에 잡목이 없어서 못 고친다고!'); break;
       case 'plan': toast(ev.name === 'storm' ? '🌀 폭풍 편성으로!' : '⛵ 항해 편성으로 돌아왔다'); break;
@@ -1412,7 +1412,7 @@ function renderCrew(body) {
 
 // 선원 자리 배치(S3): 편성 · 위임 규칙 · 갑판 평면도. 선원 카드를 누른 뒤 자리를 누르면 앉는다
 let crewSel = null;
-const SEAT_ICON = { helm: '☸️', oar: '🚣', sail: '⛵', look: '🔭', fish: '🎣', carpenter: '🔨', rest: '🛏', weather: '🌡' };
+const SEAT_ICON = { helm: '☸️', oar: '🚣', sail: '⛵', look: '🔭', fish: '🎣', carpenter: '🔨', rest: '🛏', weather: '🌡', engine: '⚙️', cook: '🍲', medic: '⚕' };
 function crewPlanUI() {
   for (const c of S.crew) G.seatType(S, c); // 아직 자리가 없으면 알아서 앉힌다
   const out = [], plan = S.plan || 'sail';

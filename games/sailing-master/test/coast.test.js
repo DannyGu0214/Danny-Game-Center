@@ -128,12 +128,13 @@ test('M2b 스쿠너 짓기: 슬루프 ★2 이상 + 조선 항구(조선소 4등
   assert.ok(G.canAffordHull(S, H));
   const coin = S.res.coin;
   assert.ok(G.buildHull(S, 'schooner').ok);
-  assert.equal(S.ship.hull, 'schooner'); assert.equal(S.crew.length, 0, '선원은 내려요');
+  assert.equal(S.ship.hull, 'schooner'); assert.equal(S.crew.length, 2, '정원(스쿠너 6) 안이라 선원은 그대로 타요(M3 B4)');
   assert.ok(S.res.coin <= coin - H.price.coin + 60 + 40, '배 값(옛 모듈 절반 + 도전과제 금화는 돌려받아요)'); assert.ok(S.ach.schooner);
   assert.ok(G.stats(S).canMove, '보조 기관이 있어 모듈 없이도 움직여요');
   // 스쿠너 모듈이 열려요(주돛대·타륜·망루·구명정), 아직 표에만 있는 것은 잠겨 있어요
   for (const id of ['mast_d', 'wheel', 'crowsnest', 'lifeboat']) assert.ok(G.isUnlocked(S, id), id);
-  for (const id of ['galley', 'lounge', 'sickbay', 'oar2']) assert.ok(!G.isUnlocked(S, id), id);
+  for (const id of ['galley', 'lounge', 'sickbay']) assert.ok(G.isUnlocked(S, id), `${id} (M3 B4에서 열렸어요)`);
+  assert.ok(!G.isUnlocked(S, 'station'), '측후소는 설계도가 있어야 해요'); assert.ok(!G.isUnlocked(S, 'oar2'), 'oar2는 그대로 잠겨 있어요');
   // 톱니·베어링은 앞바다 항구에서만 사요. 공방은 쇠못 3개로 철판
   assert.ok(G.canBuyMat(S, 'gear') && G.buyMat(S, 'gear', 1) === 1);
   const R = G.newGame(1); R.region = 'river'; R.docked = 'head'; R.res.coin = 100; assert.equal(G.canBuyMat(R, 'gear'), false); assert.equal(G.buyMat(R, 'gear', 1), 0); assert.ok(G.canBuyMat(R, 'nail'));

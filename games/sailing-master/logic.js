@@ -292,10 +292,12 @@ export function seatsOf(S) {
   const key = shipKey(S), hit = seatCache.get(S);
   if (hit && hit.key === key) return hit.seats;
   const H = HULLS[S.ship.hull], seats = [{ key: 'helm', type: 'helm', x: H.helmX, y: 0.4 }];
+  if (H.engineAt) seats.push({ key: 'engine', type: 'engine', x: H.engineAt[0], y: H.engineAt[1] }); // 기관 자리는 모듈 없이 생겨요(조타 자리처럼, M3 B4)
   for (const m of S.ship.mods) {
     const M = MODULES[m.id];
     if (!M.seat || M.seat === 'helm') continue;
     const [x, y] = SH.modulePos(S.ship.hull, m);
+    if (M.seats > 1) { for (let i = 0; i < M.seats; i++) seats.push({ key: `${m.id}@${m.col},${m.row}${i ? `#${i}` : ''}`, type: M.seat, x, y: y + (i - (M.seats - 1) / 2) * 0.7, mod: m }); continue; } // 휴게실처럼 자리가 여럿인 모듈
     seats.push({ key: `${m.id}@${m.col},${m.row}`, type: M.seat, x: M.seat === 'sail' ? x - 0.5 : x, y: M.seat === 'sail' ? 0.4 : y, mod: m });
   }
   seatCache.set(S, { key, seats });
@@ -327,7 +329,21 @@ export function crewEff(S, c, type = seatType(S, c)) {
   return (0.7 + 0.15 * lv) * apt * (1 - 0.5 * (c.fatigue || 0)) * ((c.morale ?? 0.7) < 0.3 ? 0.8 : 1);
 }
 const BASE_EFF = 0.85; // 숙련 1, 맞는 자리, 쌩쌩할 때
-const work = (S, type) => { const c = workerAt(S, type); return c ? crewEff(S, c, type) / BASE_EFF * (c.trait === 'strong' && (type === 'oar' || type === 'carpenter') ? 1.2 : 1) : 0; };
+const work = (S, type) => { const c = workerAt(S, type); return c ? crewEff(S, c, type) / BASE_EFF * (c.trait === 'strong' && (type === 'oar' || type === 'carpenter') ? 1.2 : 1) * (type === 'sail' ? bosunK(S) : 1) : 0; };
+// M3 B4 역할 효과: 그 역할 선원이 제 자리에 앉아 있을 때의 일솜씨(숙련 1·쌩쌩하면 1). 없으면 0
+export function roleWork(S, role) {
+  ensureSeats(S);
+  const seat = ROLES[role].seat, c = S.crew.find((q) => q.role === role && seatType(S, q) === seat);
+  return c ? crewEff(S, c, seat) / BASE_EFF : 0;
+}
+export const crewWork = work; // 테스트·화면용: 그 자리 선원의 일솜씨
+// 갑판장: 갑판원 효과 × (1 + 0.25 × 갑판장 솜씨)
+const bosunK = (S) => 1 + 0.25 * roleWork(S, 'bosun');
+// 요리사·조리실: 식량 소비 배율(조리실 ×0.9, 요리사 × (1 − 0.25 × 솜씨))
+export const foodK = (S) => Math.max(0.4, stats(S).foodK * (1 - 0.25 * roleWork(S, 'cook')));
+// 기관사: 보조 기관 속도 배율 / 의무원: 기력 회복·피로 회복 배율(1~1.5)과 무더위·목마름 감소 배율(1~0.6)
+const engineK = (S) => 1 + 0.15 * roleWork(S, 'engineer');
+const medicK = (S) => Math.min(1, roleWork(S, 'medic'));
 // 자리 바꾸기: 그 자리에 누가 있으면 서로 바꾼다. key가 null이면 내린다
 export function setSeat(S, id, key) {
   ensureSeats(S);
@@ -356,6 +372,8 @@ export function applyPlan(S, name) {
 // 위임 규칙: reef 돌풍·폭풍이면 갑판원이 돛 줄이기, repair 선체 50% 아래면 목수가 고치기, storm 돌풍·폭풍 예고면 폭풍 편성으로, mend 돛이 찢어지면 갑판원이 꿰매기(S5)
 export const rulesOf = (S) => (S.rules ||= { reef: true, repair: true, storm: false, mend: true });
 export function setRule(S, k, on) { if (!(k in rulesOf(S))) return false; S.rules[k] = !!on; return true; }
+// 바다 품삯(M3 B4): 짠물 수역에서는 × 0.75(바다 교역 수입이 커서 상쇄)
+export const wageK = (S) => (REGIONS[S.region].salt ? 0.75 : 1);
 export const wageOf = (c) => Math.round((c.baseWage ?? c.wage) * (1 + CREW_GROW.wageStep * ((c.lv || 1) - 1)));
 // 일하면 숙련·피로가 쌓이고, 쉬면 풀린다. 사기는 굶주림·밀린 보수·무더위에 떨어지고 쉼·신선한 물고기에 오른다
 function crewTick(S, dt, wx, st) {
@@ -373,16 +391,18 @@ function crewTick(S, dt, wx, st) {
         const need = c.lv * g.lvDays * day;
         if (c.xp >= need) { c.xp -= need; c.lv++; c.wage = wageOf(c); emit(S, 'crewLevel', { name: c.name, lv: c.lv }); }
       }
-    } else c.fatigue = Math.max(0, c.fatigue - dt / ((type === 'rest' ? g.restDays : g.idleDays) * day));
+    } else c.fatigue = Math.max(0, c.fatigue - dt / ((type === 'rest' ? g.restDays : g.idleDays) * day) * (1 + 0.5 * medicK(S))); // 의무원이 있으면 피로가 1.5배 빨리 풀려요
     let dm = 0;
     if (S.food <= 0) dm -= 0.6;
     if (S.owed > 1) dm -= 0.25;
     if (wx.heat && !st.awning) dm -= 0.2;
-    if (type === 'rest') dm += 0.12;
+    if (type === 'rest') dm += 0.12 * (seatOf(S, c)?.mod?.id === 'lounge' ? 2 : 1); // 휴게실에서 쉬면 사기 회복 ×2
     if (S.pantry?.[0]?.k === 'ffish' && S.food > 0) dm += 0.1;
     if (dm < 0 && singer && c.trait !== 'singer') dm *= 0.6;
     c.morale = clamp(c.morale + dm * dt / day, 0, 1);
   }
+  // 요리사(M3 B4): 하루 한 번 모두의 사기 +5%
+  if (roleWork(S, 'cook') > 0 && S.cookDay !== today(S)) { S.cookDay = today(S); for (const c of S.crew) c.morale = clamp((c.morale ?? 0.7) + 0.05, 0, 1); }
 }
 // 화면용: 갑판 위 선원 자리(그림이 걸어가는 위치)
 export function crewOnDeck(S) {
@@ -746,7 +766,7 @@ export function repairWithWood(S) {
 export function waitDay(S) {
   if (!S.docked) return false;
   S.clock += CAL.day - (S.clock % CAL.day);
-  S.owed += S.crew.reduce((a, c) => a + c.wage, 0);
+  S.owed += S.crew.reduce((a, c) => a + c.wage, 0) * wageK(S);
   payWages(S);
   return true;
 }
@@ -890,7 +910,13 @@ export function buildHull(S, id) {
     const free = SH.validCells(id).find(([c, r]) => r >= Math.floor(H.rows / 2) && c === Math.floor(H.cols / 2)) || SH.validCells(id)[0];
     S.ship.mods.push({ id: 'oar', col: free[0], row: free[1], rot: 0 });
     S.food = Math.min(S.food, SH.statsOf(S.ship, 0, 0).foodCap); syncPantry(S);
-    S.crew = [];
+    // 옮겨 탈 때 선원은 새 배 정원 안이면 그대로 타요(자리만 다시 앉아요). 정원이 줄 때만 숙련 낮은 사람부터 내려요(M3 B4)
+    if (S.crew.length > H.crew) {
+      const order = [...S.crew].sort((a, b) => (b.lv || 1) - (a.lv || 1) || a.id - b.id), keep = new Set(order.slice(0, H.crew));
+      for (const c of S.crew) if (!keep.has(c)) emit(S, 'crewLeft', { name: c.name, why: 'size' });
+      S.crew = S.crew.filter((c) => keep.has(c));
+    }
+    for (const c of S.crew) { c.seat = undefined; c.px = undefined; }
   }
   S.hull = 1; S.cap.x = H.helmX; S.rev++;
   noteBest(S);
@@ -1222,7 +1248,7 @@ export function dockHere(S, port) { S.stats.docks = (S.stats.docks || 0) + 1; do
 
 // ── 날씨(S5) ──
 // 선원이 폭풍 편성·축범으로 버티는 때: 돌풍 중, 폭풍 예고부터 폭풍이 끝날 때까지
-const braced = (wx) => !!(wx.gustOn || wx.stormOn || wx.stormSoon || wx.tyBrace);
+const braced = (wx, early = false) => !!(wx.gustOn || wx.stormOn || wx.stormSoon || wx.tyBrace || (early && (wx.gustSoon || wx.typhoonSoon))); // early: 갑판장은 돌풍·태풍 예고 즉시 돛을 줄여요(M3 B4)
 function weatherEvents(S, wx, prev, st) {
   const b = S.boat, R = rulesOf(S);
   if (wx.gustSoon && !prev.gustSoon) emit(S, 'gustSoon');
@@ -1230,13 +1256,14 @@ function weatherEvents(S, wx, prev, st) {
   if (wx.squallSoon && !prev.squallSoon) emit(S, 'squallSoon', { shade: st.awning });
   if (wx.gustOn && !prev.gustOn) { S.gustHurt = 0; emit(S, 'gustOn'); }
   if (wx.stormOn && !prev.stormOn) { S.stormHurt = 0; emit(S, 'stormOn'); }
-  if (braced(wx) && !braced(prev)) {
+  const early = roleWork(S, 'bosun') > 0;
+  if (braced(wx, early) && !braced(prev, early)) {
     if (R.storm && applyPlan(S, 'storm')) emit(S, 'plan', { name: 'storm' });
     if (R.reef && workerAt(S, 'sail') && b.sailLevel === 2) { b.sailLevel = 1; S.reefedByCrew = 1; }
   }
   if (!wx.gustOn && prev.gustOn) { S.stats.gusts++; if (S.gustHurt > 0.005) S.stats.gustHurt++; emit(S, 'gustOff', { hurt: S.gustHurt }); }
   if (!wx.stormOn && prev.stormOn) { S.stats.storms = (S.stats.storms || 0) + 1; if (S.stormHurt > 0.005) S.stats.stormHurt = (S.stats.stormHurt || 0) + 1; emit(S, 'stormOff', { hurt: S.stormHurt }); }
-  if (!braced(wx) && braced(prev)) {
+  if (!braced(wx, early) && braced(prev, early)) {
     if (S.reefedByCrew) { b.sailLevel = 2; S.reefedByCrew = 0; }
     if (R.storm && S.plan === 'storm' && applyPlan(S, 'sail')) emit(S, 'plan', { name: 'sail' });
   }
@@ -1409,7 +1436,7 @@ export function step(S, dt) {
   // 찢어진 돛은 덜 펴지고, 일손이 모자라면(M2b 스쿠너 minCrew) 줄인 만큼만 펴요
   const shortHanded = st.minCrew > 0 && S.crew.length < st.minCrew;
   const wantSail = Math.min(SAIL_LEVELS[b.sailLevel], b.torn ? SAILCLOTH.tornMax : 1, shortHanded ? SAIL_LEVELS[1] : 1) * (st.sailArea ? 1 : 0);
-  const sailRate = dt * 0.7 * (st.hull.winch ? 2 : 1);
+  const sailRate = dt * 0.7 * (st.hull.winch ? 2 : 1) * (roleWork(S, 'bosun') > 0 ? 2 : 1); // 갑판장은 돛 바꾸는 시간이 절반
   b.sailNow += clamp(wantSail - b.sailNow, -sailRate, sailRate);
 
   const windSide = angDiff(from, b.h);
@@ -1436,8 +1463,9 @@ export function step(S, dt) {
   const onShoal = st.draft > depth;
   let target = Math.max(sailT, rowT) + 0.25 * Math.min(sailT, rowT);
   // 보조 기관(M2b 스쿠너): 연료 없이 느리게. 노를 젓지 않고 돛을 올렸거나 항로가 있을 때, 돛이 기관보다 약하면(바람이 죽거나 맞바람) 저절로 돌아요. 돛 힘에 더하지는 않아요
-  const motorOn = st.motor > 0 && !b.row && (b.sailLevel > 0 || !!S.route) && sailT < st.motor;
-  if (motorOn) target = Math.max(target, st.motor);
+  const engW = roleWork(S, 'engineer'), motorV = st.motor * (1 + 0.15 * engW), calmEng = engW > 0 && wx.on.includes('calm'); // 기관사: 기관 +15%, 무풍 날엔 돛보다 기관을 먼저 돌려요
+  const motorOn = st.motor > 0 && !b.row && (b.sailLevel > 0 || !!S.route) && sailT < motorV * (calmEng ? 1.5 : 1);
+  if (motorOn) target = Math.max(target, motorV);
   if (motorOn !== !!b.motor) { b.motor = motorOn; emit(S, motorOn ? 'motorOn' : 'motorOff'); }
   if (sea.over > 0) target *= Math.max(0.5, 1 - WEATHER.swellSlow * sea.over); // 너울이 내항성을 넘으면 느려져요
   // 여울: 긁히며 느려질 뿐 가라앉지는 않는다(가뭄의 최악은 좌초해 날짜를 잃는 것, DESIGN.md 8절). 여울 피해로는 내구도 25% 밑으로 안 내려가요
@@ -1500,8 +1528,8 @@ export function step(S, dt) {
   const dayNow = today(S);
   if (S.foodDay !== dayNow) { if (S.foodDay != null) spoil(S); S.foodDay = dayNow; }
   const fresh = S.pantry?.[0]?.k === 'ffish' && S.food > 0; // 지금 먹는 것이 신선한 물고기면 기력이 빨리 돌아온다
-  eat(S, persons * dt / CAL.day);
-  S.owed += S.crew.reduce((a, q) => a + q.wage, 0) * dt / CAL.day;
+  eat(S, persons * dt / CAL.day * foodK(S));
+  S.owed += S.crew.reduce((a, q) => a + q.wage, 0) * wageK(S) * dt / CAL.day;
   if (st.net && b.spd > 1 && S.food < st.foodCap) { syncPantry(S); stock(S, 'ffish', Math.min(st.foodCap - S.food, dt / 60 * (1 + work(S, 'fish')))); } // 어부가 앉으면 두 배
   // 목수: 선체가 50% 아래면 화물칸 잡목으로 고친다(잃은 내구도 1에 잡목 1개)
   const carp = work(S, 'carpenter');
@@ -1517,10 +1545,11 @@ export function step(S, dt) {
   if (st.desal && REGIONS[S.region].salt && S.water < st.waterCap) S.water = Math.min(st.waterCap, (S.water || 0) + st.desal * DESAL.perDay * dt / CAL.day);
   const drink = drinkPerDay(S, wx), thirsty = drink > 0 && (S.water || 0) <= 0;
   if (drink > 0 && S.water > 0) { S.water = Math.max(0, S.water - drink * dt / CAL.day); if (S.water <= 0) emit(S, 'waterOut'); }
-  if (wx.heat && !st.awning) S.vigor -= WEATHER.heatVigor * dt;
-  else if (S.food > 0 && !thirsty) S.vigor = Math.min(1, S.vigor + WEATHER.restVigor * dt * (fresh ? SUPPLY.ffish.vigor : 1));
+  const med = medicK(S); // 의무원(M3 B4): 회복 ×1.5, 무더위·목마름 감소 ×0.6
+  if (wx.heat && !st.awning) S.vigor -= WEATHER.heatVigor * dt * (1 - 0.4 * med);
+  else if (S.food > 0 && !thirsty) S.vigor = Math.min(1, S.vigor + WEATHER.restVigor * dt * (fresh ? SUPPLY.ffish.vigor : 1) * (1 + 0.5 * med));
   if (S.food <= 0) S.vigor -= WEATHER.hungerVigor * dt;
-  if (thirsty) S.vigor -= WEATHER.thirstVigor * dt;
+  if (thirsty) S.vigor -= WEATHER.thirstVigor * dt * (1 - 0.4 * med);
   S.waterLowWarned = drink > 0 && S.water > 0 && S.water < drink * 0.4 ? (S.waterLowWarned || (emit(S, 'waterLow'), 1)) : 0;
   // 약초: 기력이 바닥나기 전에 알아서 씹어 먹는다
   if (S.vigor < HERB.at && S.herb > 0) { S.herb--; S.vigor = Math.min(1, S.vigor + HERB.vigor); emit(S, 'herb', { left: S.herb }); }
