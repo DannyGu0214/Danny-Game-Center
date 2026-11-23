@@ -227,3 +227,34 @@ test('O3 무풍대를 건너: 남쪽(−4,400m 아래)을 지난 배가 북쪽 �
   const T = openWater('ocean', 0, -3000, 2); T.boat.y = -4000; G.step(T, G.FIXED_DT); assert.ok(!T.ach.doldrums); T.boat.y = -7200; G.step(T, G.FIXED_DT);
   assert.ok(T.ach.doldrums, '남에서 북으로 건넜어요'); assert.ok(T.res.coin >= c0 + 40);
 });
+
+// ── O4 엔딩 ──
+import { ENDINGS, CAPTAINS, STORIES } from '../data.js';
+
+test('O4 엔딩: 새 대륙 항구에 처음 대면 ended·crossed·crossOcean(150닢), 두 번째는 보통 항구, 저장해도 이어져요', () => {
+  const S = openWater('ocean', 0, -11400); S.ship.hull = 'explorer'; const c0 = S.res.coin, evs = [];
+  S.crossed = null; G.dock(S, 'newLand'); for (const e of S.events || []) evs.push(e.type || e.k);
+  assert.ok(S.ended && S.crossed >= 1 && S.stats.crossDays === S.crossed && S.ach.crossOcean);
+  assert.ok(S.res.coin >= c0 + 150);
+  const day = S.crossed; S.ended = false; G.undock(S); G.dock(S, 'newLand'); assert.ok(!S.ended && S.crossed === day, '두 번째는 엔딩 없음');
+  const T = openWater('ocean', 0, -11400); G.dock(T, 'lastLight'); assert.ok(!T.ended && T.crossed == null, '다른 항구는 엔딩이 아니에요');
+  // 엔딩 도중 저장 → 불러오면 항구에서 이어가요
+  const R = G.deserialize(G.serialize(S)); R.ended = true; const R2 = G.deserialize(G.serialize(R)); assert.ok(!R2.ended && R2.crossed === day);
+});
+
+test('O4 엔딩 글: 공통 2쪽 + 선장별 2쪽(4명 모두), 합니다체 없이 이름 자리({N은})가 있고, 장면 이름이 달라요', () => {
+  assert.deepEqual(Object.keys(ENDINGS.captain).sort(), Object.keys(CAPTAINS).sort());
+  const pages = [ENDINGS.arrival, ENDINGS.crew, ...Object.values(ENDINGS.captain)];
+  for (const P of pages) { assert.ok(P.title && P.scene && P.text.length > 60); assert.ok(!/합니다|습니다/.test(P.text), `${P.title} 합니다체`); }
+  assert.equal(new Set(pages.map((p) => p.scene)).size, 6);
+  for (const id of Object.keys(CAPTAINS)) assert.match(ENDINGS.captain[id].text, /\{N[은이을]\}/);
+  assert.equal(STORIES.sailor.pages.length, 3);
+  assert.equal(G.storyLine(ENDINGS.captain.sailor.text, '하늘').includes('{'), false);
+});
+
+test('O4 엔딩 장면 6장: 캔버스 대체 그림이 선장 4명 모두 오류 없이 그려져요', async () => {
+  globalThis.Image = class { constructor() { this.complete = false; this.naturalWidth = 0; } addEventListener() {} }; // 그림 파일 없음 = 대체 장면
+  const { drawStoryScene } = await import('../art-story.js');
+  const calls = []; const g = new Proxy({}, { get: (t, k) => (k in t ? t[k] : k === 'createLinearGradient' || k === 'createRadialGradient' ? () => ({ addColorStop() {} }) : (...a) => { calls.push(k); }), set: (t, k, v) => { t[k] = v; return true; } });
+  for (const cap of Object.values(CAPTAINS)) for (const sc of ['endArrival', 'endSailor', 'endLucky', 'endTrader', 'endCrafter', 'endCrew']) { calls.length = 0; drawStoryScene(g, cap, sc, 1); assert.ok(calls.length > 20, `${cap.id}/${sc}`); }
+});

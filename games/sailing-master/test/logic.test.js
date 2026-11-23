@@ -879,7 +879,7 @@ test('도감: 동물을 기록해도 자원이 늘지 않고, 달성 보상만 �
   for (const id of ids) G.recordSpecies(S, id);
   assert.ok(S.ach.species10 && S.ach.speciesAll && S.ach.seaAll && S.ach.islandNaturalist);
   assert.equal(S.res.coin, res.coin + 30 + 50 + 80 + 60 + 60 + 80); // 대양 박물학자(80, M4 O3)까지
-  assert.equal(ACHIEVEMENTS.length, 29);
+  assert.equal(ACHIEVEMENTS.length, 30);
   for (const d of Object.values(SPECIES)) assert.equal(d.reward, undefined);
 });
 

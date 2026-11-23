@@ -548,8 +548,12 @@ export function dock(S, portId) {
   // 금화도 잡목도 없어 못 고치는 배는 항구 사람들이 절반까지 대충 때워 준다(침몰 → 구조 → 침몰 악순환 방지)
   const patched = patchIfBroke(S), sewn = sewIfBroke(S), wat = portWater(S);
   S.mend = null;
+  // 새 대륙 항구에 처음 닿으면 엔딩(M4 O4): 처음 한 번만. 다시 오면 보통 항구예요
+  const first = S.region === 'ocean' && portId === 'newLand' && S.crossed == null;
+  if (first) { S.crossed = clock(S).day + 1; S.stats.crossDays = S.crossed; S.ended = true; }
   checkAch(S);
   emit(S, 'docked', { got, port: portId, gift, patched, sewn, waterGift: wat.gift || 0, scoop: wat.scoop || 0 });
+  if (first) emit(S, 'crossed', { day: S.crossed });
   return got;
 }
 function patchIfBroke(S) {
@@ -1076,6 +1080,7 @@ export function checkAch(S) {
   c('riverEnd', !!S.visited.coast);
   c('openSea', !!S.visited.sea);
   c('oceanGate', !!S.visited.ocean);
+  c('crossOcean', S.crossed != null);
 }
 
 // ── 안개 걷기 ──
@@ -1684,6 +1689,7 @@ export function deserialize(raw) {
     // v7 → v8(M3 큰 바다): 큰 바다 경계는 이제 엔딩이 아니라 큰 바다로 가는 문이에요. 스쿠너로 그 경계에서 엔딩을 본 저장은 엔딩을 풀고 앞바다 등대섬에 대 둬요(북쪽으로 가면 큰 바다. 도전과제는 그대로라 금화는 다시 안 줘요)
     if (o.ended && o.region === 'coast') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'light'); }
     if (o.region === 'coast' && o.route?.target?.type === 'gate' && o.route.target.id === 'toOcean') o.route = null; // 옛 관문 id
+    if (o.ended && o.region === 'ocean') o.ended = false; // 새 대륙 엔딩 도중 저장했어도 불러오면 항구에서 이어가요(M4 O4)
     if (o.ended && o.region === 'sea') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'depot'); } // M3 엔딩을 본 저장: 엔딩을 풀고 큰 바다 보급항에 대 둬요(M4에서 관문이 대양으로 이어져도 안전)
     o.stats.typhoons ??= 0; o.stats.typhoonHurt ??= 0; o.stats.calmDays ??= 0;
     for (const k of Object.keys(NEW_MATS)) o.res[k] ??= 0; // M3 B3 최고급 재료 5종: 창고 기본 0

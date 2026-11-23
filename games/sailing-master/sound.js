@@ -122,6 +122,11 @@ export const FX = {
   thunder(ac, noise, d, t) { burst(ac, noise, d, t, { type: 'lowpass', f: 380, to: 70, q: 0.6, dur: 2.6, peak: 0.24, attack: 0.04 }); burst(ac, noise, d, t + 0.35, { type: 'lowpass', f: 240, to: 60, q: 0.5, dur: 2, peak: 0.14, attack: 0.3 }); },
   tear(ac, noise, d, t) { for (const [at, f] of [[0, 2400], [0.07, 1900], [0.15, 2800], [0.24, 1500]]) burst(ac, noise, d, t + at, { f, to: f * 0.6, q: 2.2, dur: 0.09, peak: 0.12 }); },
   bell(ac, noise, d, t) { tone(ac, d, t, { f: 660, type: 'triangle', dur: 1.8, peak: 0.035 }); tone(ac, d, t, { f: 1584, dur: 1.1, peak: 0.012 }); },
+  // 탐사선 뱃고동(M4 O4): 새 대륙 첫 입항·엔딩 시작. 낮은 두 음이 길게 울려요
+  horn(ac, noise, d, t) { for (const f of [117, 175]) { tone(ac, d, t, { f, type: 'sawtooth', dur: 2.4, peak: 0.05, attack: 0.12 }); tone(ac, d, t + 0.02, { f: f * 2, type: 'triangle', dur: 2.2, peak: 0.02, attack: 0.15 }); } burst(ac, noise, d, t, { type: 'lowpass', f: 500, to: 200, q: 0.7, dur: 2.2, peak: 0.02, attack: 0.15 }); },
+  // 고래 노래(M4 O5): 저주파 활강 둘 + 긴 울음. 물기둥 숨소리: 짧은 하아 소리
+  whaleSong(ac, noise, d, t) { tone(ac, d, t, { f: 90, to: 220, dur: 2.6, peak: 0.05, attack: 0.5 }); tone(ac, d, t + 2.2, { f: 240, to: 110, dur: 3, peak: 0.045, attack: 0.4 }); tone(ac, d, t + 0.3, { f: 135, to: 330, type: 'triangle', dur: 2.4, peak: 0.012, attack: 0.5 }); },
+  blow(ac, noise, d, t) { burst(ac, noise, d, t, { type: 'bandpass', f: 1400, to: 700, q: 0.8, dur: 0.7, peak: 0.07, attack: 0.04 }); },
   // 섬 새소리(M3 B6): 군함조의 짧은 꽥 + 슴새의 높은 두 음. v로 어느 쪽인지 골라요
   isleBird(ac, noise, d, t, v = 0) {
     if (v < 0.5) { tone(ac, d, t, { f: 1500, to: 900, type: 'triangle', dur: 0.22, peak: 0.05, attack: 0.02 }); tone(ac, d, t + 0.26, { f: 1350, to: 800, type: 'triangle', dur: 0.2, peak: 0.04, attack: 0.02 }); }
