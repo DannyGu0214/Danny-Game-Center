@@ -1016,6 +1016,14 @@ export function bowRide(S, id) {
   giveAch(S, 'bowRide');
   return true;
 }
+// 고래가 뛰어오르는 순간(M4 O3, PLAN-M3.md 8-3절): 화면의 고래가 물 위로 뛰어오른 때 탭하면 기록 + 도전과제
+export function whaleLeap(S, id) {
+  if (SPECIES[id]?.kind !== 'whale') return false;
+  recordSpecies(S, id);
+  if (S.ach.whaleLeap) return false;
+  giveAch(S, 'whaleLeap');
+  return true;
+}
 function giveAch(S, id) {
   const a = ACHIEVEMENTS.find((q) => q.id === id);
   if (!a || S.ach[id]) return;
@@ -1058,6 +1066,7 @@ export function checkAch(S) {
   c('explorer', HULLS[S.ship.hull].grade >= 5);
   c('seaAll', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'coast' || S.seen[id])); // 앞바다 생물(큰 바다 생물은 islandNaturalist)
   c('islandNaturalist', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'sea' || S.seen[id]));
+  c('oceanNaturalist', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'ocean' || S.seen[id]));
   c('seaIsles', worldDone(S, 'sea'));
   c('lakeAll', worldDone(S, 'lake'));
   const nSeen = Object.keys(S.seen).length;
@@ -1587,6 +1596,8 @@ export function step(S, dt) {
   // 조수기(M2b): 짠물 바다를 항해하는 동안 식수를 만들어요(물통 칸까지)
   if (st.desal && REGIONS[S.region].salt && S.water < st.waterCap) S.water = Math.min(st.waterCap, (S.water || 0) + st.desal * DESAL.perDay * dt / CAL.day);
   // 빗물받이(M4 O1): 비(소나기·폭풍·태풍 바깥 원)가 오는 동안 한 대당 20초마다 한 통, 물통 칸까지
+  // 무풍대를 남에서 북으로 지나기(M4 O3): 무풍대 남쪽 끝(−4,400m) 아래를 지난 배가 북쪽 끝(−7,100m)을 넘으면 도전과제
+  if (S.region === 'ocean' && !S.docked) { const by = S.boat.y; if (by > -4300) S.stats.dolSouth = 1; else if (by < -7150 && S.stats.dolSouth && !S.ach.doldrums) giveAch(S, 'doldrums'); }
   if (st.raincatch && !S.docked && (wx.rain || S.ty?.in) && (S.water || 0) < st.waterCap) {
     S.catchT = (S.catchT || 0) + dt * st.raincatch;
     if (S.catchT >= 20) { S.catchT -= 20; S.water = Math.min(st.waterCap, (S.water || 0) + 1); S.stats.rainWater = (S.stats.rainWater || 0) + 1; }

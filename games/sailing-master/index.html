@@ -856,6 +856,8 @@ function tapWorld(sx, sy) {
   if (c) {
     // 뱃머리를 타는 돌고래(M2b): 그 순간 탭하면 도전과제
     if (c.bow && G.bowRide(S, c.sp)) { snd.play('record'); showHint('🐬 돌고래가 뱃머리를 탄다! 이 맛에 바다에 나오지!', 3.5); drainEvents(); return; }
+    // 뛰어오르는 고래(M4 O3): 그 순간 탭하면 도전과제
+    if (c.breach > 0 && G.whaleLeap(S, c.sp)) { snd.play('record'); showHint('🐋 고래가 뛰어올랐다! 평생 못 잊을 장면이야!', 3.5); drainEvents(); return; }
     if (G.recordSpecies(S, c.sp)) { snd.play('record'); drainEvents(); return; }
     toast(SPECIES[c.sp].name);
   }
@@ -1669,7 +1671,7 @@ const dexCanvas = () => { const cv = el('canvas'), dpr = Math.min(2.5, devicePix
 function renderSpecies(body) {
   const seen = Object.keys(S.seen).length, all = Object.keys(SPECIES).length;
   const coin = (id) => ACHIEVEMENTS.find((a) => a.id === id).coin;
-  const ms = [['5종', 'species5'], ['10종', 'species10'], ['민물 전체', 'speciesAll'], ['앞바다 전체', 'seaAll'], ['큰 바다 전체', 'islandNaturalist']].map(([n, id]) => `<span class="${S.ach[id] ? 'on' : ''}">${n}<em class="cost"><svg><use href="#i-coin"/></svg>${coin(id)}</em></span>`).join('');
+  const ms = [['5종', 'species5'], ['10종', 'species10'], ['민물 전체', 'speciesAll'], ['앞바다 전체', 'seaAll'], ['큰 바다 전체', 'islandNaturalist'], ['대양 전체', 'oceanNaturalist']].map(([n, id]) => `<span class="${S.ach[id] ? 'on' : ''}">${n}<em class="cost"><svg><use href="#i-coin"/></svg>${coin(id)}</em></span>`).join('');
   body.append(dexHead('만난 생물', seen, all, `<div class="tip"><div>지나가는 놈들을 탭하면 적어 둔다!</div><div>사슴·곰 같은 뭍짐승은 망원경이 있어야 보여.</div><div>게는 썰물 해변에만, 돌고래는 뱃머리를 탈 때 탭하면 좋은 일이 있지!</div></div><div class="ms">${ms}</div>`));
   for (const r of REGION_ORDER) {
     const ids = Object.keys(SPECIES).filter((id) => SPECIES[id].region === r);
@@ -1680,7 +1682,7 @@ function renderSpecies(body) {
       const known = S.seen[id], def = SPECIES[id], cell = el('div', `sp${known ? '' : ' unk'}`);
       if (known) {
         const [cv, dpr] = dexCanvas(), g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-        if (['fish', 'duck', 'turtle', 'swimmer', 'frog', 'dolphin', 'seaturtle', 'jelly', 'pelican', 'flyfish', 'fin', 'manta'].includes(def.kind)) { g.fillStyle = 'rgba(60,150,180,.3)'; g.fillRect(0, 0, 108, 66); }
+        if (['fish', 'duck', 'turtle', 'swimmer', 'frog', 'dolphin', 'seaturtle', 'jelly', 'pelican', 'flyfish', 'fin', 'manta', 'whale', 'sunfish'].includes(def.kind)) { g.fillStyle = 'rgba(60,150,180,.3)'; g.fillRect(0, 0, 108, 66); }
         drawSpeciesIcon(g, id, 54, 33, 42);
         cell.append(cv);
       } else cell.append(el('div', 'q', '?'));
@@ -2008,7 +2010,7 @@ function frame(now) {
     if (n >= 12 * fastMul) acc = 0;
     drainEvents();
     fxTimers(raw);
-    creatures.update(raw, cam, W, H, S.boat, G.stats(S).telescope, { tide: G.tideAt(S.region, S.clock), len: sprite.hull.len, docked: !!S.docked });
+    creatures.update(raw, cam, W, H, S.boat, G.stats(S).telescope, { tide: G.tideAt(S.region, S.clock), len: sprite.hull.len, docked: !!S.docked, berg: S.region === 'ocean' ? G.findsOf(S).find((f) => f.art === 'iceberg') : null });
     saveT += raw;
     if (saveT > 5) { saveT = 0; save(); }
   } else { S.t += raw * 0.6; S.wind = G.windNow(S); } // 시트가 떠 있어도 물은 흐른다

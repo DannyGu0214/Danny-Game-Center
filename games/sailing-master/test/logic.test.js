@@ -50,7 +50,7 @@ test('지도: 수역마다 항구·수문·발견지가 물 위에 있고 서로
       else if (f.where === 'shore') { assert.ok(d < 0 && d > -7, `${f.id} 물가 ${d}`); assert.ok(gap < 24, `${f.id} 맨눈 ${gap}`); } else { assert.ok(d < -12, `${f.id} 내륙 ${d}`); assert.ok(gap < 66, `${f.id} 망원경 ${gap}`); }
     }
     if (w.finds.length) assert.ok(w.finds.some((f) => f.where === 'inland'), `${id} 내륙 발견지`); // 대양은 발견지가 O3에서 생겨요
-    if (w.finds.length) assert.ok(w.finds.some((f) => f.where === 'shore'), `${id} 물가 발견지`);
+    if (w.finds.length) assert.ok(w.finds.some((f) => f.where === 'shore' || (id === 'ocean' && f.where === 'beach')), `${id} 물가 발견지`);
     for (const I of REGIONS[id].islands) assert.equal(w.isWater(I.x, I.y), false, `${id} 섬`);
   }
   assert.equal(worldOf('pond').isWater(0, 400), false);
@@ -878,8 +878,8 @@ test('도감: 동물을 기록해도 자원이 늘지 않고, 달성 보상만 �
   assert.ok(!S.ach.species10);
   for (const id of ids) G.recordSpecies(S, id);
   assert.ok(S.ach.species10 && S.ach.speciesAll && S.ach.seaAll && S.ach.islandNaturalist);
-  assert.equal(S.res.coin, res.coin + 30 + 50 + 80 + 60 + 60);
-  assert.equal(ACHIEVEMENTS.length, 26);
+  assert.equal(S.res.coin, res.coin + 30 + 50 + 80 + 60 + 60 + 80); // 대양 박물학자(80, M4 O3)까지
+  assert.equal(ACHIEVEMENTS.length, 29);
   for (const d of Object.values(SPECIES)) assert.equal(d.reward, undefined);
 });
 

@@ -17,6 +17,8 @@ export function createCreatures(world) {
       // 화면 안쪽 가장자리 근처에 나타난다
       const sx = (R() * 0.9 + 0.05) * W, sy = (R() * 0.8 + 0.08) * H;
       const x = cam.x + (sx - W / 2) / z, y = cam.y + (sy - cam.cy) / (z * k), d = world.dist(x, y);
+      if (def.kind === 'penguin') return null; // 빙산 위에서만 나와요
+      if (def.rare && R() > def.rare) return null;
       const land = def.kind === 'land', shore = def.kind === 'wader' || def.kind === 'frog', rock = def.kind === 'perch' || def.kind === 'seal', beach = def.kind === 'crab';
       if (land ? (d < -45 || d > -3) : shore ? (d < 0.5 || d > 5) : rock ? (d < -2.5 || d > -0.3) : beach ? (d < -5 || d > -0.4) : d < 7) continue;
       const n = def.kind === 'crab' ? 3 : 1;
@@ -78,6 +80,19 @@ export function createCreatures(world) {
             if (c.next < 0) { c.act = c.act > 0 ? 0 : c.kind === 'seaturtle' ? 3 : 1.4; c.next = 4 + R() * 6; } else c.act -= dt;
             break;
           }
+          // 고래(M4 O3): 떠올라 숨 쉬고(st 1, 물기둥) 잠수해 물그림자만 남겨요. 배에서 120m 안에서 90초에 한 번꼴로 3초 동안 뛰어올라요(breach)
+          case 'whale': {
+            const sp = (c.st ? 1.3 : 0.8) * (c.size > 2 ? 1.3 : 1); c.x += Math.cos(c.h) * dt * sp; c.y += Math.sin(c.h) * dt * sp;
+            if (world.dist(c.x + Math.cos(c.h) * 20, c.y + Math.sin(c.h) * 20) < 15) c.h += dt * 1.2; else if (R() < dt * 0.1) c.h += (R() - 0.5) * 0.7;
+            if (c.breach > 0) { c.breach -= dt; c.next = Math.max(c.next, 2); if (c.breach <= 0) { c.breach = 0; c.st = 1; } }
+            else if (c.next < 0) { c.st = c.st ? 0 : 1; c.next = c.st ? 8 + R() * 4 : 5 + R() * 4; }
+            else if (c.st && away < 120 && R() < dt / 90) { c.breach = 3; c.st = 1; c.life = Math.max(c.life, c.age + 8); }
+            if (c.st === undefined) { c.st = 1; c.next = 6; }
+            break;
+          }
+          // 개복치: 물 위에 납작 누워 떠 있어요
+          case 'sunfish': { c.x += Math.cos(c.h) * dt * 0.25; c.y += Math.sin(c.h) * dt * 0.25; if (R() < dt * 0.08) c.h += (R() - 0.5) * 1.4; break; }
+          case 'penguin': { if (c.next < 0) { c.act = c.act > 0 ? 0 : 1.4; c.next = 2 + R() * 5; } else c.act -= dt; break; }
           case 'jelly': { c.x += Math.cos(c.h) * dt * 0.25; c.y += Math.sin(c.h) * dt * 0.25; if (R() < dt * 0.1) c.h += (R() - 0.5); break; }
           // 게: 옆으로 종종 걷다 멈춰요. 밀물이 들면 일찍 사라져요
           case 'crab': { if (c.next < 0) { c.act = c.act > 0 ? 0 : 1.2; c.next = 1 + R() * 2.5; c.h = R() < 0.5 ? 0 : Math.PI; } else c.act -= dt; if (c.act > 0) { const nx = c.x + Math.cos(c.h) * dt * 0.9; if (world.dist(nx, c.y) < -0.3) c.x = nx; } if (!low) c.life = Math.min(c.life, c.age + 2); break; }
@@ -86,7 +101,11 @@ export function createCreatures(world) {
           default: break;
         }
       }
-      const choices = pool.filter((id) => (telescope || SPECIES[id].kind !== 'land') && (SPECIES[id].tide !== 'low' || low));
+      // 펭귄(M4 O3): 빙산 발견지가 화면에 들어오면 그 위에 두 마리가 올라가 있어요
+      if (env.berg && pool.includes('penguin') && !list.some((c) => c.sp === 'penguin') && Math.abs(env.berg.x - cam.x) < hw && Math.abs(env.berg.y - cam.y) < hh) {
+        for (const o of [-1, 1]) list.push({ sp: 'penguin', kind: 'penguin', x: env.berg.x + o * 3.2, y: env.berg.y - 0.5, h: o < 0 ? Math.PI : 0, age: 0, life: 1e9, ph: R() * TAU, act: 0, next: 2 + R() * 4, bob: 0, size: 1, n: 1 });
+      }
+      const choices = pool.filter((id) => SPECIES[id].kind !== 'penguin' && (telescope || SPECIES[id].kind !== 'land') && (SPECIES[id].tide !== 'low' || low));
       if (timer <= 0 && list.length < 7 && choices.length) {
         timer = 1.6 + R() * 2.6;
         const c = place(choices[Math.floor(R() * choices.length)], cam, W, H);
@@ -137,6 +156,7 @@ function bodyLift(c, z) {
 }
 export function hitRadius(c, z) {
   const s = Math.max(0.75, z / 8), def = SPECIES[c.sp];
+  if (c.kind === 'whale') return Math.max(26, 24 * s * (def.size || 1));
   const body = c.kind === 'fish' ? def.len * 1.9 * z * 0.5 + (def.school ? 2 * z : 0) : c.kind === 'land' ? 7 * s * (def.height || 1) : c.kind === 'wader' || c.kind === 'perch' ? 9 * s : c.kind === 'bird' ? 10 * s : c.kind === 'dolphin' ? 1.3 * z : c.kind === 'jelly' ? 2.2 * z : c.kind === 'crab' ? 6 * s : 7 * s * (c.size || 1);
   return Math.max(16, body + 6);
 }
@@ -151,6 +171,52 @@ function drops(g, x, y, r, a) {
   for (const q of [-1, -0.4, 0.5, 1]) { g.beginPath(); g.arc(x + q * r, y - Math.abs(q) * r * 0.25, 1, 0, TAU); g.fill(); }
 }
 const DRAW = {
+  // 고래(M4 O3): 물그림자 + 떠오르면 등과 물기둥, 잠수 때 꼬리, 브리칭이면 몸을 들어 올려요. head: hump(둥근 이마) · blunt(뭉툭한 머리·비스듬한 물기둥)
+  whale(g, c, x, y, z, def) {
+    const s = Math.max(0.8, z / 8) * (def.size || 1), up = c.st === 1, br = c.breach > 0 ? Math.sin((1 - c.breach / 3) * Math.PI) : 0, blunt = def.head === 'blunt';
+    const body = (lift, col, a, len) => {
+      g.save(); g.translate(x, y - lift); g.scale(1, VIEW.tiltY + 0.2); g.rotate(c.h);
+      g.globalAlpha *= a; g.fillStyle = col; g.beginPath(); g.moveTo(len * s * 0.5, 0); g.quadraticCurveTo(len * s * 0.3, -3.6 * s, -len * s * 0.1, -3 * s); g.quadraticCurveTo(-len * s * 0.4, -1.4 * s, -len * s * 0.55, -2.2 * s); g.lineTo(-len * s * 0.5, 0); g.lineTo(-len * s * 0.55, 2.2 * s); g.quadraticCurveTo(-len * s * 0.4, 1.4 * s, -len * s * 0.1, 3 * s); g.quadraticCurveTo(len * s * 0.3, 3.6 * s, len * s * 0.5, 0); g.fill();
+      g.restore();
+    };
+    body(0, 'rgba(10,40,62,.38)', 1, 15);
+    if (br > 0) { const h = br * 2.2 * z; body(h, def.color, 1, 15); g.fillStyle = def.belly; g.globalAlpha *= 0.9; drops(g, x, y, (0.9 + (1 - c.breach / 3) * 1.4) * z, 0.9 * (1 - 0.5 * (1 - br))); return; }
+    if (!up) { ripple(g, x, y, 5 * s, 0.35); return; }
+    const hump = Math.sin(c.ph * 0.9) * 0.4 * s;
+    g.save(); g.translate(x, y); g.scale(1, VIEW.tiltY + 0.2); g.rotate(c.h);
+    g.fillStyle = def.color; g.beginPath(); g.ellipse(0, 0, 6.2 * s, 2.4 * s, 0, Math.PI, TAU); g.fill();
+    g.beginPath(); g.ellipse(blunt ? 5.4 * s : 4.6 * s, 0.2 * s, blunt ? 3.4 * s : 2.8 * s, blunt ? 2.2 * s : 1.7 * s, 0, Math.PI, TAU); g.fill();
+    if (!blunt) { g.fillStyle = def.belly; g.beginPath(); g.ellipse(2.8 * s, 0.5 * s, 3.6 * s, 0.6 * s, 0, 0, Math.PI); g.fill(); }
+    g.fillStyle = def.color; g.beginPath(); g.moveTo(-2.2 * s, -1.6 * s); g.lineTo(-3.2 * s, -4.2 * s - hump); g.lineTo(-1.2 * s, -2 * s); g.closePath(); g.fill(); // 등지느러미
+    if (c.next < 2.2) { g.beginPath(); g.moveTo(-6 * s, -1 * s); g.quadraticCurveTo(-8 * s, -6 * s, -10 * s, -8 * s); g.quadraticCurveTo(-8.4 * s, -5.5 * s, -6.6 * s, -1 * s); g.fill(); } // 잠수 때 꼬리
+    g.restore();
+    // 물기둥: 위로 올랐다 흩어져요(향유고래는 비스듬히)
+    const t = (c.ph * 0.9) % 1, a = 0.75 * (1 - t), lean = blunt ? 4 * s * t : 0, px = x + Math.cos(c.h) * 2.4 * s + lean, py = y - 2 * s;
+    g.strokeStyle = `rgba(236,248,252,${a})`; g.lineWidth = 1.6 * s; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(px, py); g.lineTo(px + lean * 0.3, py - (4 + t * 9) * s); g.stroke();
+    g.beginPath(); g.moveTo(px, py - (4 + t * 9) * s); g.lineTo(px - 2.2 * s, py - (2 + t * 8) * s); g.moveTo(px + lean * 0.3, py - (4 + t * 9) * s); g.lineTo(px + 2.4 * s + lean * 0.3, py - (2 + t * 8) * s); g.stroke();
+    ripple(g, x, y + 1.4 * s, 8 * s, 0.4);
+  },
+  // 개복치: 옆으로 납작 누운 둥근 몸에 큰 등·밑지느러미
+  sunfish(g, c, x, y, z, def) {
+    const s = Math.max(0.8, z / 8) * (def.size || 1), wave = Math.sin(c.ph * 1.6) * 0.5 * s;
+    g.save(); g.translate(x, y); g.scale(1, VIEW.tiltY + 0.25); g.rotate(c.h);
+    g.fillStyle = 'rgba(10,40,62,.3)'; g.beginPath(); g.ellipse(0.8 * s, 1.2 * s, 5.2 * s, 4.4 * s, 0, 0, TAU); g.fill();
+    g.fillStyle = def.color; g.beginPath(); g.ellipse(0, 0, 4.6 * s, 3.8 * s, 0, 0, TAU); g.fill();
+    g.fillStyle = shadeHex(def.color, -0.15); g.beginPath(); g.moveTo(-0.4 * s, -3.4 * s); g.lineTo(-1.8 * s + wave, -8 * s); g.lineTo(1.6 * s, -3.4 * s); g.closePath(); g.fill(); g.beginPath(); g.moveTo(-0.4 * s, 3.4 * s); g.lineTo(-1.8 * s - wave, 8 * s); g.lineTo(1.6 * s, 3.4 * s); g.closePath(); g.fill();
+    g.fillStyle = '#1b2227'; g.beginPath(); g.arc(3 * s, -0.8 * s, 0.6 * s, 0, TAU); g.fill();
+    g.restore(); ripple(g, x, y + 1 * s, 7 * s, 0.3);
+  },
+  // 펭귄(빙산 위): 검은 등, 흰 배, 주황 부리. act 동안 날개를 들어요
+  penguin(g, c, x, y, z, def) {
+    const s = Math.max(0.8, z / 8) * 1.1, f = Math.cos(c.h) >= 0 ? 1 : -1, wob = Math.sin(c.ph * 2) * 0.12, up = c.act > 0 ? 1 : 0, by = y - 11 * s;
+    g.save(); g.translate(x, by); g.scale(f * s, s); g.rotate(wob);
+    g.fillStyle = def.color; g.beginPath(); g.ellipse(0, -3, 2.6, 4.2, 0, 0, TAU); g.fill(); g.beginPath(); g.arc(0.6, -8, 1.7, 0, TAU); g.fill();
+    g.fillStyle = def.belly; g.beginPath(); g.ellipse(0.7, -2.6, 1.6, 3.2, 0, 0, TAU); g.fill();
+    g.fillStyle = '#e8923a'; g.beginPath(); g.moveTo(2, -8); g.lineTo(3.8, -7.6); g.lineTo(2, -7); g.closePath(); g.fill(); g.fillRect(-1, 1, 2.6, 0.9);
+    g.strokeStyle = def.color; g.lineWidth = 1.1; g.lineCap = 'round'; g.beginPath(); g.moveTo(-2, -5); g.lineTo(-3.4, up ? -8 : -2.5); g.stroke();
+    g.restore();
+  },
   // 물고기: 평소엔 물속 그림자, 가끔 튀어 오른다
   fish(g, c, x, y, z, def) {
     const n = def.school || 1;
@@ -230,6 +296,7 @@ const DRAW = {
   },
   // 날짐승: 하늘을 가로지르고 물 위에 그림자가 진다
   bird(g, c, x, y, z, def) {
+    if (def.group > 1 && !c.sub) { const k = z / 8; for (let i = 0; i < def.group; i++) DRAW.bird(g, { ...c, sub: 1, ph: c.ph + i * 0.7 }, x + Math.cos(i * 2.4) * (12 + i * 5) * k, y + Math.sin(i * 2.4) * 6 * k, z, def); return; } // 슴새 떼(M4 O3)
     const s = Math.max(0.8, z / 8) * (def.wing > 1 ? 1.5 : 0.9), flap = Math.sin(c.ph * (def.wing > 1 ? 5 : 15));
     const alt = 14 * z * 0.5 * (def.high ? 1.7 : def.low ? 0.3 : 1); // 군함조는 높이, 슴새는 물 위 낮게(M3)
     g.fillStyle = 'rgba(14,50,70,.2)'; g.beginPath(); g.ellipse(x + alt * 0.2, y, 7 * s, 2.4 * s, 0, 0, TAU); g.fill();
@@ -418,9 +485,9 @@ const shadeHex = (hex, k) => { const n = parseInt(hex.slice(1), 16), f = (v) => 
 // 도감 그림: 한 칸에 맞춰 그린다
 export function drawSpeciesIcon(g, id, x, y, size) {
   const def = SPECIES[id], z = 8;
-  const c = { h: 0, ph: 1, act: def.kind === 'fish' ? 0.45 : def.kind === 'flyfish' ? 0.8 : def.kind === 'manta' ? 0.65 : def.kind === 'dolphin' ? 0.55 : def.kind === 'perch' ? 1.25 : 0, life: 1, size: def.size || 1, n: 1, x: 0, y: 0 };
+  const c = { h: 0, ph: 1, st: 1, next: 5, breach: 0, act: def.kind === 'fish' ? 0.45 : def.kind === 'flyfish' ? 0.8 : def.kind === 'manta' ? 0.65 : def.kind === 'dolphin' ? 0.55 : def.kind === 'perch' ? 1.25 : 0, life: 1, size: def.size || 1, n: 1, x: 0, y: 0 };
   // 종류마다 몸이 그려지는 높이가 달라 칸 안에 들어오게 크기와 기준 높이를 맞춘다
-  const fit = { flyfish: [0.05, size * 0.4], fin: [0.07, size * 0.3], manta: [0.04, size * 0.3], fish: [0.05, size * 0.42], duck: [0.05 / (def.neck || 1) / (def.size || 1), size * 0.34], wader: [0.042, size * 0.72], frog: [0.08, size * 0.22], swimmer: [0.08, size * 0.14], turtle: [0.08, 0], bird: [0.05, 0], land: [0.075 / (def.height || 1), size * 0.5], dolphin: [0.06, size * 0.3], seal: [0.075, size * 0.12], seaturtle: [0.06, 0], jelly: [0.06, -size * 0.12], crab: [0.11, size * 0.12], pelican: [0.042, size * 0.3], perch: [0.05, size * 0.5] }[def.kind];
+  const fit = { flyfish: [0.05, size * 0.4], fin: [0.07, size * 0.3], manta: [0.04, size * 0.3], fish: [0.05, size * 0.42], duck: [0.05 / (def.neck || 1) / (def.size || 1), size * 0.34], wader: [0.042, size * 0.72], frog: [0.08, size * 0.22], swimmer: [0.08, size * 0.14], turtle: [0.08, 0], bird: [0.05, 0], land: [0.075 / (def.height || 1), size * 0.5], dolphin: [0.06, size * 0.3], seal: [0.075, size * 0.12], seaturtle: [0.06, 0], jelly: [0.06, -size * 0.12], crab: [0.11, size * 0.12], pelican: [0.042, size * 0.3], perch: [0.05, size * 0.5], whale: [0.045, size * 0.2], sunfish: [0.06, size * 0.15], penguin: [0.07, size * 0.62] }[def.kind];
   const k = size * fit[0], lift = def.kind === 'bird' ? 7 * z * k * (def.high ? 1.7 : def.low ? 0.3 : 1) : fit[1]; // 나는 높이(high·low)만큼 되돌려 칸 안에
   g.save();
   g.translate(x, y + lift);

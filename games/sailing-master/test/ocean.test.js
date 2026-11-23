@@ -167,3 +167,63 @@ test('O2 대양 태풍: 폭 3.6km 띠를 가로질러 가고(대피 항구 없�
   const live = (() => { const S = openWater('ocean', 0, -6000, seed); for (let t = 0; t < 180 * 3; t += 1) { const q = G.typhoonAt('ocean', seed, (d - 1) * 180 + tr.t0 + t, G.typhoonPos('ocean', tr, t)[0], G.typhoonPos('ocean', tr, t)[1]); if (q && q.zone === 'eye') return q; } return null; })();
   assert.ok(live && live.windDown === TYPHOON.eyeWind);
 });
+
+// ── O3 발견지·생물·도전과제 ──
+import { SPECIES } from '../data.js';
+import { createCreatures } from '../creatures.js';
+
+test('O3 발견지 8곳: 띠마다 어울리는 자리, 항구·수문과 겹치지 않고 다 닿아요', () => {
+  const w = worldOf('ocean'), f = Object.fromEntries(w.finds.map((q) => [q.id, q])); assert.equal(w.finds.length, 8);
+  const arts = w.finds.map((q) => q.art).sort(); assert.deepEqual(arts, ['beached', 'bottle', 'buoy', 'iceberg', 'kelp', 'stone', 'vent', 'whalespot']);
+  const band = (y) => REGIONS.ocean.windBands.find((b) => y <= b.y0 && y > b.y1).id;
+  assert.equal(band(f.kelpMat.y), 'doldrums'); assert.equal(band(f.iceberg.y), 'westerlies'); assert.equal(band(f.weatherBuoy.y), 'trade');
+  assert.ok(f.iceberg.y < -10000, '편서풍 띠 북쪽 끝'); assert.equal(f.farSideStone.where, 'inland'); assert.ok(w.dist(f.farSideStone.x, f.farSideStone.y) < -25, '새 대륙 내륙');
+  for (const q of w.finds) for (const p of [...w.ports, ...w.gates]) assert.ok(Math.hypot(p.x - q.x, p.y - q.y) > 40, `${q.id} 가 ${p.id} 와 겹쳐요`);
+  for (const q of w.finds.filter((v) => v.where === 'water')) assert.ok(w.dist(q.x, q.y) > 30, `${q.id} 물 위`);
+  const o = { mats: ['steel', 'chip', 'teak', 'syrope', 'synth'] }; assert.ok(f.weatherBuoy.chip === 2 && f.seaVent.steel === 6 && f.kelpMat.syrope === 8 && f.lagoonBoat.teak > 0 && o.mats.length);
+  // 다 찾으면 발견물 도감에 유물 8개
+  const S = openWater('ocean', 0, 252); S.ship.mods.push({ id: 'telescope', col: 0, row: 3, rot: 0 });
+  for (const q of G.findsOf(S)) for (let i = 0; i < 60 && !S.found[q.id]; i++) { S.boat.x = q.x; S.boat.y = q.y; S.boat.spd = 0; S.food = 99; S.hull = 1; G.step(S, G.FIXED_DT); }
+  assert.equal(Object.keys(S.relics).filter((k) => w.finds.some((q) => q.id === k)).length, 8);
+});
+
+test('O3 대양 생물 8종: 고래 3종·돌고래 떼·개복치·바다제비·펭귄·슴새 떼, 도감은 대양 칸에', () => {
+  const ids = Object.keys(SPECIES).filter((id) => SPECIES[id].region === 'ocean'); assert.equal(ids.length, 8);
+  assert.deepEqual(ids.map((id) => SPECIES[id].kind).sort(), ['bird', 'bird', 'dolphin', 'penguin', 'sunfish', 'whale', 'whale', 'whale']);
+  assert.ok(SPECIES.bluewhale.size >= 2.6 && SPECIES.bluewhale.rare < 0.5 && SPECIES.spermwhale.head === 'blunt');
+  for (const id of ids) assert.ok(SPECIES[id].sea, `${id}: 민물 도감(speciesAll)에서 빠져요`);
+  // 큰 바다 도감(islandNaturalist)·앞바다(seaAll)엔 안 들어가요
+  const S = G.newGame(1); for (const id of Object.keys(SPECIES)) if (SPECIES[id].region !== 'ocean') G.recordSpecies(S, id);
+  assert.ok(!S.ach.oceanNaturalist && S.ach.islandNaturalist);
+  for (const id of ids) G.recordSpecies(S, id); assert.ok(S.ach.oceanNaturalist); assert.equal(ACHIEVEMENTS.find((a) => a.id === 'oceanNaturalist').coin, 80);
+});
+
+test('O3 생물이 실제로 나와요: 고래·개복치·돌고래·새를 시뮬레이션에서 볼 수 있고, 펭귄은 빙산 위에서만', () => {
+  const w = worldOf('ocean'), cr = createCreatures(w), seen = new Set(), cam = { x: 0, y: -6000, zoom: 5.5, cy: 300 }, boat = { x: 0, y: -6000, h: 0, spd: 4 };
+  let seed = 7; const R = Math.random; Math.random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  try { for (let i = 0; i < 20000; i++) { cr.update(0.1, cam, 400, 600, boat, false, { tide: 0, len: 9, docked: false }); for (const c of cr.list) seen.add(c.sp); if (i % 40 === 0) cr.clear(); } } finally { Math.random = R; }
+  for (const id of ['humpback', 'spermwhale', 'commondolphin', 'sunfish', 'petrel', 'shearflock']) assert.ok(seen.has(id), `${id} 안 나와요`);
+  assert.ok(!seen.has('penguin'), '펭귄은 빙산 없이 안 나와요');
+  const cr2 = createCreatures(w); cr2.update(0.1, { x: -560, y: -10900, zoom: 5.5, cy: 300 }, 400, 600, boat, false, { berg: { x: -560, y: -10900 } });
+  assert.equal(cr2.list.filter((c) => c.sp === 'penguin').length, 2);
+});
+
+test('O3 고래의 도약: 뛰어오르는 고래를 탭하면 기록 + 도전과제(50닢), 고래가 아니면 안 돼요', () => {
+  const S = G.newGame(1); S.region = 'ocean'; const c0 = S.res.coin;
+  assert.equal(G.whaleLeap(S, 'duck'), false);
+  assert.equal(G.whaleLeap(S, 'humpback'), true); assert.ok(S.seen.humpback && S.ach.whaleLeap); assert.equal(S.res.coin, c0 + 50);
+  assert.equal(G.whaleLeap(S, 'humpback'), false, '한 번만');
+  // 크리처: 배 120m 안 고래는 가끔 breach 를 해요
+  const w = worldOf('ocean'), cr = createCreatures(w), boat = { x: 0, y: -6000, h: 0, spd: 0 }; let any = 0;
+  cr.list.push({ sp: 'humpback', kind: 'whale', x: 60, y: -6000, h: 0, age: 0, life: 1e6, ph: 0, act: 0, next: 5, size: 1.6, st: 1, breach: 0 });
+  let sd = 11; const R0 = Math.random; Math.random = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  try { for (let i = 0; i < 30 * 1800 && !any; i++) { cr.update(1 / 30, { x: 0, y: -6000, zoom: 5.5, cy: 300 }, 400, 600, boat, false, {}); const q = cr.list.find((v) => v.sp === 'humpback'); if (q) { q.life = 1e6; q.x = 60; if (q.breach > 0) any = q.breach; } } } finally { Math.random = R0; }
+  assert.ok(any > 0 && any <= 3, '30분 안에 뛰어올라야 해요');
+});
+
+test('O3 무풍대를 건너: 남쪽(−4,400m 아래)을 지난 배가 북쪽 끝(−7,100m)을 넘으면 40닢', () => {
+  const S = openWater('ocean', 0, -3000); S.food = 99; const c0 = S.res.coin;
+  S.boat.y = -7200; G.step(S, G.FIXED_DT); assert.ok(!S.ach.doldrums, '북쪽만 온 배는 안 돼요');
+  const T = openWater('ocean', 0, -3000, 2); T.boat.y = -4000; G.step(T, G.FIXED_DT); assert.ok(!T.ach.doldrums); T.boat.y = -7200; G.step(T, G.FIXED_DT);
+  assert.ok(T.ach.doldrums, '남에서 북으로 건넜어요'); assert.ok(T.res.coin >= c0 + 40);
+});

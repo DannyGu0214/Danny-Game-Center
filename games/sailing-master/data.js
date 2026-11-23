@@ -335,6 +335,15 @@ export const SPECIES = {
   frigatebird: { name: '군함조', kind: 'bird', region: 'sea', color: '#1e2326', pouch: '#d6402f', wing: 2, high: true, sea: true },
   shearwater: { name: '슴새', kind: 'bird', region: 'sea', color: '#4a5058', wing: 1.2, low: true, sea: true },
   coconutcrab: { name: '야자집게', kind: 'crab', region: 'sea', color: '#7a4f3a', size: 1.6, sea: true },
+  // M4 O3 대양 생물 8종(PLAN-M3.md 8-3절). sea: true는 민물 도감(speciesAll)에서 빼려는 표시예요
+  humpback: { name: '혹등고래', kind: 'whale', region: 'ocean', color: '#34495a', belly: '#d7dee2', size: 1.6, head: 'hump', sea: true },
+  spermwhale: { name: '향유고래', kind: 'whale', region: 'ocean', color: '#56606a', belly: '#c9d0d4', size: 1.5, head: 'blunt', sea: true },
+  bluewhale: { name: '대왕고래', kind: 'whale', region: 'ocean', color: '#4c6c86', belly: '#cfe0ea', size: 2.6, head: 'hump', rare: 0.25, sea: true },
+  commondolphin: { name: '참돌고래 떼', kind: 'dolphin', region: 'ocean', color: '#5f7a8d', belly: '#e8eef0', size: 0.9, group: 5, sea: true },
+  sunfish: { name: '개복치', kind: 'sunfish', region: 'ocean', color: '#a9b4ba', size: 1.2, sea: true },
+  petrel: { name: '바다제비', kind: 'bird', region: 'ocean', color: '#2e343a', wing: 0.8, low: true, sea: true },
+  penguin: { name: '펭귄', kind: 'penguin', region: 'ocean', color: '#20262b', belly: '#f3f2ee', size: 1, berg: true, sea: true },
+  shearflock: { name: '슴새 떼', kind: 'bird', region: 'ocean', color: '#4a5058', wing: 1.2, low: true, group: 4, sea: true },
 };
 
 // theme: 풍경 테마 이름(themes.js THEMES)
@@ -493,7 +502,17 @@ export const REGIONS = {
     start: 'lastLight',
     ports: [{ id: 'lastLight', name: '마지막 등대', x: 0, y: 252, water: 2 }, { id: 'atollA', name: '첫째 산호섬 나루', x: -250, y: -3893, water: 3, shop: false }, { id: 'atollB', name: '둘째 산호섬 나루', x: 300, y: -7888, water: 3, shop: false }, { id: 'newLand', name: '새 대륙 항구', x: 0, y: -11570, water: 2, yard: 5 }],
     gates: [{ id: 'toSea', name: '남쪽 물목', x: 0, y: 360, to: 'sea', entry: 'depot', req: {}, open: true }],
-    finds: [],
+    // M4 O3 발견지 8곳(PLAN-M3.md 8-2절). 자리는 모두 정해져 있어요(fixed): 띠마다 어울리는 곳에
+    finds: [
+      { id: 'kelpMat', name: '떠도는 해초 숲', x: -420, y: -5600, fixed: true, where: 'water', size: 1.3, coin: 50, syrope: 8, relic: '해초에 엉킨 낡은 닻줄', art: 'kelp' },
+      { id: 'seaVent', name: '해저 화산 김', x: 520, y: -2300, fixed: true, where: 'water', coin: 60, steel: 6, relic: '뜨거운 부석', art: 'vent' },
+      { id: 'iceberg', name: '빙산', x: -560, y: -10900, fixed: true, where: 'water', size: 1.4, coin: 70, synth: 8, relic: '빙산 속 오래된 공기방울', art: 'iceberg' },
+      { id: 'whaleGround', name: '고래가 모이는 바다', x: 520, y: -9300, fixed: true, where: 'water', size: 1.3, coin: 60, teak: 10, relic: '고래 노래를 닮은 소라', art: 'whalespot' },
+      { id: 'expBottle', name: '옛 탐험대의 표류병', x: -380, y: -900, fixed: true, where: 'water', coin: 40, relic: '탐험대의 마지막 편지(「서쪽 별을 따라 북으로 간다」)', art: 'bottle' },
+      { id: 'weatherBuoy', name: '무인 기상 부표', x: 380, y: -1100, fixed: true, where: 'water', coin: 40, chip: 2, relic: '기상 부표 표식판', art: 'buoy' },
+      { id: 'lagoonBoat', name: '석호의 쪽배', x: -140, y: -3995, fixed: true, where: 'beach', coin: 40, teak: 12, relic: '쪽배 이물의 조개 장식', art: 'beached' },
+      { id: 'farSideStone', name: '새 대륙 절벽 표지', x: 120, y: -11500, fixed: true, inland: 30, coin: 80, relic: '건너편 사람들의 표지석', art: 'stone' },
+    ],
     // 산호초 고리: 수심 1.6~2.0m라 탐사선(흘수 1.3m)도 지나가요. 해도에서 얕은 물로 보여요
     shoals: [{ x: -250, y: -3860, r: 60, depth: 1.8 }, { x: -180, y: -3990, r: 60, depth: 1.7 }, { x: -320, y: -3990, r: 60, depth: 1.9 }, { x: 300, y: -7860, r: 60, depth: 1.8 }, { x: 390, y: -8000, r: 60, depth: 1.7 }, { x: 230, y: -8090, r: 60, depth: 2 }],
     flot: { cap: 40, table: [['wood', 0.6, 3, 6], ['teak', 1.2, 1, 3], ['net', 1.6, 3, 6], ['syrope', 1, 1, 3], ['steel', 0.6, 1, 2], ['water', 3.5, 2, 3], ['shiny', 8, 1, 2]] },
@@ -532,6 +551,10 @@ export const ACHIEVEMENTS = [
   { id: 'seaIsles', name: '섬과 섬 사이', desc: '큰 바다 발견지 모두 찾기', coin: 60 },
   { id: 'islandNaturalist', name: '섬 바다 박물학자', desc: '큰 바다 생물 모두 기록', coin: 60 },
   { id: 'explorer', name: '대양 탐사선', desc: '대양 탐사선 짓기', coin: 60 },
+  // M4 O3 대양: 고래 브리칭 · 무풍대 · 대양 생물
+  { id: 'whaleLeap', name: '고래의 도약', desc: '뛰어오르는 고래를 탭해 기록하기', coin: 50 },
+  { id: 'doldrums', name: '무풍대를 건너', desc: '무풍대를 남에서 북으로 지나기', coin: 40 },
+  { id: 'oceanNaturalist', name: '대양 박물학자', desc: '대양 생물 모두 기록', coin: 80 },
   { id: 'oceanGate', name: '대양 앞에서', desc: '5등급 대양 탐사선으로 대양 어귀를 넘어 대양에 처음 닿기', coin: 100 },
   { id: 'openSea', name: '큰 바다로', desc: '4등급 배로 앞바다 북쪽 경계를 넘어 큰 바다에 들어가기', coin: 80 },
 ];
