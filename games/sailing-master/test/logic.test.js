@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import * as G from '../logic.js';
 import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
-import { advanceFlow, waveAngle, FLOW_LAYERS } from '../art.js';
+import { advanceFlow, waveAngle, FLOW_LAYERS, sceneLayout } from '../art.js';
+import { THEMES, themeOf, zonesOf, markBoxes, BOX } from '../themes.js';
 import { createCreatures, hitRadius } from '../creatures.js';
 import { NO_GO, HULLS, MODULES, REGIONS, REGION_ORDER, SPECIES, ACHIEVEMENTS, CAL, SAIL_LEVELS, ROLES, CAPTAINS, STORIES, MAT_IDS, ITEMS, SUPPLY, HERB, WORKSHOP, TRAITS, CREW_GROW } from '../data.js';
 // 모든 재료와 금화를 n개씩(S2 아이템부터 배 값에 여러 재료가 들어가요)
@@ -45,6 +46,7 @@ test('지도: 수역마다 항구·수문·발견지가 물 위에 있고 서로
       const [ax, ay] = w.nearestWater(f.x, f.y), gap = Math.hypot(f.x - ax, f.y - ay), d = w.dist(f.x, f.y);
       assert.ok(w.findPath(p0.x, p0.y, ax, ay), `${id} 길 ${f.id}`);
       if (f.where === 'water') assert.ok(d > 5, `${f.id} 물 위`);
+      else if (f.where === 'beach') assert.ok(d > 0 && d < 6, `${f.id} 조간대 ${d}`);
       else if (f.where === 'shore') { assert.ok(d < 0 && d > -7, `${f.id} 물가 ${d}`); assert.ok(gap < 24, `${f.id} 맨눈 ${gap}`); } else { assert.ok(d < -12, `${f.id} 내륙 ${d}`); assert.ok(gap < 66, `${f.id} 망원경 ${gap}`); }
     }
     assert.ok(w.finds.some((f) => f.where === 'inland'), `${id} 내륙 발견지`);
@@ -355,8 +357,8 @@ test('뗏목은 선원이 탈 자리가 없고 해먹·선실도 놓을 수 없�
   assert.equal(S.ship.mods.some((m) => m.id === 'hammock'), false);
 });
 
-test('선술집 곡: 마디마다 박자가 맞고 조에서 벗어나지 않는다', () => {
-  assert.deepEqual(TRACK_IDS, ['pond', 'lake', 'river']);
+test('합성곡: 마디마다 박자가 맞고 조에서 벗어나지 않는다(선술집 3곡 + S4 상황 곡 3곡)', () => {
+  assert.deepEqual(TRACK_IDS, ['pond', 'lake', 'river', 'lively', 'port', 'storm']);
   for (const [id, T] of Object.entries(TRACKS)) {
     assert.equal(T.chords.length, T.melody.length, id);
     assert.ok(T.bpm >= 100, `${id}는 흥겨운 빠르기`);
@@ -759,8 +761,9 @@ test('등급 올리기: 뗏목은 바로, 2등급부터 ★2가 먼저고, 슬�
   assert.ok(S.ach.sloop);
   assert.equal(G.buildHull(S, 'sloop3').ok, false);
   assert.ok(G.buildHull(S, 'sloop2').ok); assert.ok(G.buildHull(S, 'sloop3').ok);
-  assert.equal(G.buildSteps(S).length, 0, '지금은 슬루프 ★3이 끝');
-  assert.equal(G.nextHull(S), null);
+  assert.deepEqual(G.buildSteps(S).map((H) => H.id), ['schooner'], '슬루프 ★3 다음은 스쿠너(M2b)');
+  assert.equal(G.nextHull(S).id, 'schooner');
+  assert.match(G.buildHull(S, 'schooner').why, /조선 항구/, '강에서는 스쿠너를 못 지어요');
   // 강 물레방아에서 슬루프 설계도가 나온다
   assert.equal(REGIONS.river.finds.filter((f) => f.blueprint === 'sloop').length, 1);
 });
@@ -838,7 +841,7 @@ test('저장 v1 → v3: 예전 배는 ★1, 슬루프로 있던 판도 그대로
   const old = JSON.parse(G.serialize(sloopAt('lake')));
   old.v = 1; delete old.best; old.found = { mill2: 1 };
   const T = G.deserialize(JSON.stringify(old));
-  assert.equal(T.v, 4);
+  assert.equal(T.v, 7);
   assert.equal(T.ship.hull, 'sloop');
   assert.equal(HULLS[T.ship.hull].star, 1);
   assert.equal(T.best.hull, 'sloop');
@@ -873,9 +876,9 @@ test('도감: 동물을 기록해도 자원이 늘지 않고, 달성 보상만 �
   assert.equal(S.res.coin, res.coin + 30);
   assert.ok(!S.ach.species10);
   for (const id of ids) G.recordSpecies(S, id);
-  assert.ok(S.ach.species10 && S.ach.speciesAll);
-  assert.equal(S.res.coin, res.coin + 30 + 50 + 80);
-  assert.equal(ACHIEVEMENTS.length, 16);
+  assert.ok(S.ach.species10 && S.ach.speciesAll && S.ach.seaAll);
+  assert.equal(S.res.coin, res.coin + 30 + 50 + 80 + 60);
+  assert.equal(ACHIEVEMENTS.length, 21);
   for (const d of Object.values(SPECIES)) assert.equal(d.reward, undefined);
 });
 
@@ -888,11 +891,12 @@ test('동물 탭 범위는 몸에 맞고, 떨어진 곳은 잡지 않는다', ()
   assert.ok(hitRadius(cr.list[0], zoom) < 34);
 });
 
-test('강 끝: 슬루프로 닿으면 엔딩', () => {
+test('강 끝(M2a): 슬루프로 닿으면 엔딩이 아니라 앞바다 하구 어촌에 닿고, 강 끝 도전과제를 받는다', () => {
   const S = sloopAt('river');
   const g = worldOf('river').gates[0];
   assert.ok(G.passGate(S, g));
-  assert.ok(S.ended && S.ach.riverEnd);
+  assert.ok(!S.ended && S.ach.riverEnd);
+  assert.equal(S.region, 'coast'); assert.equal(S.docked, 'fisher');
 });
 
 test('저장: 다시 불러도 같고, 망가진 저장은 거른다', () => {
@@ -1025,7 +1029,7 @@ test('저장 v2 → v3: 화물칸 금화는 창고로, 식량은 빵으로, 찾�
   o.v = 2; o.hold = { wood: 3, cloth: 0, coin: 7 }; o.res = { wood: 1, cloth: 2, coin: 5 }; o.food = 4; delete o.pantry; delete o.relics; delete o.letters; delete o.herb;
   o.found = { logpile: 1 }; o.flot = { pond: [{ x: 0, y: 0, k: 'coin', n: 3, ph: 0 }] };
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 4); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
+  assert.equal(T.v, 7); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
   assert.equal(T.pantry[0].k, 'bread'); assert.equal(T.pantry[0].n, 4);
   assert.ok(T.relics.logpile); assert.equal(T.flot.pond[0].k, 'shiny');
 });
@@ -1116,6 +1120,47 @@ test('저장 v3 → v4: 예전 선원은 숙련 1·지금 보수를 기본 보�
   const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }]); const o = JSON.parse(G.serialize(S));
   o.v = 3; o.crew = [{ id: 5, role: 'deckhand', name: '빌럼', gender: '남', wage: 2, skill: 100, humor: 100, drink: 100 }]; delete o.rules;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 4); assert.equal(T.crew[0].lv, 1); assert.equal(T.crew[0].baseWage, 2); assert.ok(T.crew[0].trait); assert.ok(T.rules.reef);
+  assert.equal(T.v, 7); assert.equal(T.crew[0].lv, 1); assert.equal(T.crew[0].baseWage, 2); assert.ok(T.crew[0].trait); assert.ok(T.rules.reef);
   assert.equal(G.workerAt(T, 'sail')?.name, '빌럼');
+});
+
+// L1 육지 풍경(2026-11-12)
+test('L1 테마: 호수 두 곳은 예전 나무 배치 그대로, 수역마다 테마가 있고 표에 필요한 값이 다 있다', () => {
+  for (const id of ['pond', 'lake']) {
+    const old = worldOf(id).scatter(), L = sceneLayout(id), trees = L.props.filter((p) => !L.marks.includes(p));
+    const near = (t) => L.marks.some((m) => (m.port || m.find || m.gate) && Math.hypot(m.x - t.x, m.y - t.y) < 9);
+    assert.deepEqual(trees, old.filter((t) => !near(t)), id);
+    assert.equal(L.decals.length, 0);
+    assert.equal(themeOf(REGIONS[id]), THEMES.lake);
+  }
+  for (const id of REGION_ORDER) assert.ok(THEMES[REGIONS[id].theme], id);
+  for (const [k, T] of Object.entries(THEMES)) {
+    assert.ok(T.water && T.layers && T.hut && T.lift && (T.mix || T.sections.every((s) => s.mix)), k);
+    for (const sec of T.sections || []) for (const key of ['water', 'wet', 'shore', 'bank', 'ground']) assert.ok(sec[key] ?? T[key], `${k}.${sec.id}.${key}`);
+  }
+});
+test('L1 강: 물길을 따라 협곡 → 들판 → 습지, 물 색은 경계에서 섞인다', () => {
+  const w = worldOf('river'), Z = zonesOf(w, THEMES.river), ids = (x, y) => Z.list[Z.at(x, y)].id;
+  assert.equal(ids(20, 900), 'gorge'); assert.equal(ids(70, 700), 'gorge');
+  assert.equal(ids(-100, 330), 'farm'); assert.equal(ids(80, 60), 'farm');
+  assert.equal(ids(-60, -380), 'marsh'); assert.equal(ids(30, -900), 'marsh');
+  const [, , f] = Z.waterAt(0, 1000 - 2000 * 0.27);
+  assert.ok(f > 0 && f < 1, '경계에서 섞임');
+  const L = sceneLayout('river'), kinds = new Set(L.props.map((p) => p.kind));
+  for (const k of ['willow', 'reedbed', 'flowers', 'windmill', 'thatch', 'bridge', 'boulder', 'pebbles']) assert.ok(kinds.has(k), k);
+  for (const k of ['field', 'pool', 'crag', 'creek']) assert.ok(L.decals.some((q) => q.kind === k), k);
+});
+test('L1 강: 판마다 다른 발견지 자리에서도 사물이 항구·부두·수문·발견지와 겹치지 않는다', () => {
+  const k = 0.62, box = (p) => { const [w, h] = BOX[p.kind], s = p.size || 1; return [p.x - w * s / 2, p.x + w * s / 2, p.y * k - h * s, p.y * k + 0.6]; };
+  const hit = (a, b) => a[0] < b[1] && b[0] < a[1] && a[2] < b[3] && b[2] < a[3];
+  for (let seed = 1; seed <= 8; seed++) {
+    const S = G.newGame(seed), L = sceneLayout('river', G.findsOf(S, 'river')), mb = markBoxes(L.marks);
+    const land = L.props.filter((p) => !L.marks.includes(p));
+    for (const p of land) for (let i = 0; i < mb.length; i++) assert.ok(!hit(box(p), mb[i]), `시드 ${seed}: ${p.kind} (${p.x | 0}, ${p.y | 0}) × ${L.marks[i].kind}`);
+    // 바닥 무늬도 표지 밑에 깔리지 않게
+    for (const q of L.decals) for (const m of L.marks) {
+      if (q.pts) for (const [x, y] of q.pts) assert.ok(Math.hypot(x - m.x, y - m.y) > 6, `시드 ${seed}: ${q.kind} × ${m.kind}`);
+      else assert.ok(Math.hypot(q.x - m.x, q.y - m.y) > q.r + 5, `시드 ${seed}: ${q.kind} × ${m.kind}`);
+    }
+  }
 });

@@ -15,16 +15,20 @@ const cols = 8, rows = [
   { name: '맞바람 펄럭임', sailNow: 1, boom: 0.1, luff: true, heel: 0, row: false },
   { name: '돛 내림 + 노', sailNow: 0, boom: 0.15, luff: false, heel: 0, row: true },
 ];
-const cw = 25 * zoom, ch = 26 * zoom, dpr = 2, cv = document.getElementById('c');
+// M2b: ?hull=schooner(·schooner2·schooner3)는 돛대 둘(앞돛대 + 주돛대)과 타륜·망루·구명정·해먹을 달아요. 칸 크기는 배 길이에 맞춰요
+const hull = q.get('hull') || 'sloop', big = hull.startsWith('schooner'), L = { sloop: 9, sloop2: 11, sloop3: 11, schooner: 14, schooner2: 16.5, schooner3: 16.5 }[hull] || 9;
+const cw = (L + 13) * zoom, ch = (big ? 30 : 26) * zoom, dpr = 2, cv = document.getElementById('c');
 cv.width = cols * cw * dpr; cv.height = rows.length * ch * dpr; cv.style.width = cols * cw + 'px';
 const g = cv.getContext('2d');
-const sprite = SA.bakeShip({ hull: q.get('hull') || 'sloop', mods: q.get('hull') ? [{ id: 'oar', col: 0, row: 2, rot: 0 }, { id: q.get('hull') === 'rowboat' ? 'mast_s' : 'mast_m', col: 1, row: 1, rot: 0 }] : [{ id: 'mast_m', col: 1, row: 1, rot: 0 }, { id: 'cabin', col: 0, row: 2, rot: 0 }, { id: 'oar', col: 1, row: 5, rot: 0 }], paint: { hull: 0, sail: 0, flag: 0 }, decor: [] });
+const SCH = [{ id: 'mast_m', col: 2, row: 2, rot: 0 }, { id: 'mast_d', col: 2, row: 7, rot: 0 }, { id: 'wheel', col: 2, row: 12, rot: 0 }, { id: 'oar', col: 0, row: 5, rot: 0 }, { id: 'crowsnest', col: 4, row: 4, rot: 0 }, { id: 'lifeboat', col: 4, row: 8, rot: 0 }, { id: 'hammock', col: 1, row: 4, rot: 0 }, { id: 'hammock', col: 3, row: 4, rot: 0 }, { id: 'desal', col: 1, row: 10, rot: 0 }, { id: 'water', col: 3, row: 10, rot: 0 }, { id: 'hold', col: 0, row: 8, rot: 0 }];
+const sprite = SA.bakeShip({ hull, mods: big ? SCH : q.get('hull') ? [{ id: 'oar', col: 0, row: 2, rot: 0 }, { id: q.get('hull') === 'rowboat' ? 'mast_s' : 'mast_m', col: 1, row: 1, rot: 0 }] : [{ id: 'mast_m', col: 1, row: 1, rot: 0 }, { id: 'cabin', col: 0, row: 2, rot: 0 }, { id: 'oar', col: 1, row: 5, rot: 0 }], paint: { hull: Number(q.get('paint')) || 0, sail: 0, flag: 0 }, decor: big ? ['pennant'] : [] });
+window.__sprite = sprite; // 점검용: 아틀라스 칸의 그림 범위를 재요
 g.fillStyle = '#2b86a0'; g.fillRect(0, 0, cv.width, cv.height);
 rows.forEach((r, j) => {
   for (let i = 0; i < cols; i++) {
     const h = i / cols * Math.PI * 2, bx = (i + 0.5) * cw, by = (j + 0.72) * ch, pitch = 0, bob = 0, heel = r.heel;
     const P = SA.makeProjector(bx, by, h, heel, pitch, zoom, bob);
-    const st = { P, h, heel, pitch, bob, sailNow: r.sailNow, boom: r.boom, luff: r.luff, t: 1.3, row: r.row, rowPhase: 0.9 + i * 0.6, flagFrom: 0.4, rudder: 0.3, capX: r.row ? sprite.oar : sprite.hull.helmX, crew: [] };
+    const st = { P, h, heel, pitch, bob, sailNow: r.sailNow, boom: r.boom, luff: r.luff, t: 1.3, row: r.row, rowPhase: 0.9 + i * 0.6, flagFrom: 0.4, rudder: 0.3, capX: r.row ? sprite.oar : sprite.hull.helmX, crew: big ? [{ c: { id: 1, role: 'deckhand' }, type: 'sail', x: (sprite.rigs[0]?.x ?? 0) - 0.5, y: 0.4 }, { c: { id: 2, role: 'lookout' }, type: 'look', x: 2.6, y: 1.6 }, { c: { id: 3, role: 'helmsman', gender: '여' }, type: 'helm', x: sprite.hull.helmX + 0.6, y: 0.4 }] : [] };
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     SA.drawShipOnWater(g, sprite, st, zoom, bx, by);
     SA.drawShip(g, sprite, st, zoom, bx, by);
