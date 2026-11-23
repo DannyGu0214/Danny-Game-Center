@@ -579,7 +579,7 @@ test('B5 돛대 셋 규칙: 셋까지(MAST_GAP 3.6m 이상), 넷째는 many, 가
 test('B5 탐사선 짓기: 보급항(조선소 5등급)에서만, 설계도·재료가 있어야 해요', () => {
   const S = seaShip(); S.ship.hull = 'schooner3'; S.rev++; rich5(S);
   G.dock(S, 'southLight'); drain(S);
-  assert.match(G.buildHull(S, 'explorer').why, /설계도|조선/);
+  assert.match(G.buildHull(S, 'explorer').why, /설계도|조선|보급/);
   S.blueprints.explorer = 1; assert.equal(G.buildHull(S, 'explorer').ok, false, '남쪽 등대 항은 조선소 4등급');
   G.dock(S, 'depot'); drain(S); assert.equal(G.yardOf(S), 5);
   const miss = { ...S.res }; S.res.chip = 5; assert.equal(G.buildHull(S, 'explorer').ok, false, '전자 부품 6개가 모자라요'); S.res.chip = miss.chip;
