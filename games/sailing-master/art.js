@@ -545,6 +545,9 @@ export function drawShoreFoam(g, sc, cam, W, H, t, dpr) {
   g.strokeStyle = 'rgba(255,255,250,.55)'; g.lineWidth = Math.max(0.7, 0.2 * z); g.lineCap = 'round';
   const pad = 30;
   for (const poly of sc.shore) {
+    // 섬 둘레의 상자가 화면 밖이면 점마다 계산하지 않고 건너뛰어요(그려지는 선은 같아요)
+    const bb = poly.bb || (poly.bb = poly.reduce((o, [x, y]) => [Math.min(o[0], x), Math.min(o[1], y), Math.max(o[2], x), Math.max(o[3], y)], [Infinity, Infinity, -Infinity, -Infinity]));
+    if (W / 2 + (bb[2] - cam.x) * z < -pad || W / 2 + (bb[0] - cam.x) * z > W + pad || cam.cy + (bb[3] - cam.y) * z * k < -pad || cam.cy + (bb[1] - cam.y) * z * k > H + pad) continue;
     let open = false;
     g.beginPath();
     for (let i = 0; i < poly.length + 1; i++) {
@@ -637,9 +640,13 @@ export function visibleProps(sc, cam, W, H) {
   const hw = W / 2 / z + 8;
   // 많이 축소하면 작은 것을 건너뛰어 그리는 양을 줄인다
   const skip = z < 3.4 ? 2 : 1;
-  for (let i = 0; i < sc.props.length; i++) {
-    const p = sc.props[i];
-    if (p.y < topY || p.y > botY) continue;
+  // sc.props는 y 순으로 정렬돼 있어요(sceneOf): 이분 탐색으로 화면 위쪽부터 보고, 아래쪽을 넘으면 그만(2천 개 넘는 큰 바다에서 매 장면 전체를 훑지 않게)
+  const props = sc.props;
+  let lo = 0, hi = props.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (props[mid].y < topY) lo = mid + 1; else hi = mid; }
+  for (let i = lo; i < props.length; i++) {
+    const p = props[i];
+    if (p.y > botY) break;
     if (Math.abs(p.x - cam.x) > hw) continue;
     if (skip > 1 && SMALL.has(p.kind)) continue;
     out.push(p);

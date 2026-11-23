@@ -325,8 +325,11 @@ export const hasRole = (S, role) => S.crew.some((c) => c.role === role);
 const seatCache = new WeakMap();
 const shipKey = (S) => `${S.ship.hull}|${S.ship.mods.map((m) => `${m.id}${m.col},${m.row}`).join(';')}`;
 export function seatsOf(S) {
-  const key = shipKey(S), hit = seatCache.get(S);
-  if (hit && hit.key === key) return hit.seats;
+  const hit = seatCache.get(S), mods = S.ship.mods;
+  // 빠른 확인: 같은 배 판(rev)·같은 모듈 배열·같은 개수면 열쇠 문자열을 다시 만들지 않아요(매 단계 여러 번 불려요)
+  if (hit && hit.rev === S.rev && hit.mods === mods && hit.n === mods.length && hit.hull === S.ship.hull) return hit.seats;
+  const key = shipKey(S);
+  if (hit && hit.key === key) { Object.assign(hit, { rev: S.rev, mods, n: mods.length, hull: S.ship.hull }); return hit.seats; }
   const H = HULLS[S.ship.hull], seats = [{ key: 'helm', type: 'helm', x: H.helmX, y: 0.4 }];
   if (H.bridgeAt) seats.push({ key: 'bridge', type: 'bridge', x: H.bridgeAt[0], y: H.bridgeAt[1] }); // 함교 자리(탐사선, M4 O2)
   if (H.engineAt) seats.push({ key: 'engine', type: 'engine', x: H.engineAt[0], y: H.engineAt[1] }); // 기관 자리는 모듈 없이 생겨요(조타 자리처럼, M3 B4)
@@ -337,7 +340,7 @@ export function seatsOf(S) {
     if (M.seats > 1) { for (let i = 0; i < M.seats; i++) seats.push({ key: `${m.id}@${m.col},${m.row}${i ? `#${i}` : ''}`, type: M.seat, x, y: y + (i - (M.seats - 1) / 2) * 0.7, mod: m }); continue; } // 휴게실처럼 자리가 여럿인 모듈
     seats.push({ key: `${m.id}@${m.col},${m.row}`, type: M.seat, x: M.seat === 'sail' ? x - 0.5 : x, y: M.seat === 'sail' ? 0.4 : y, mod: m });
   }
-  seatCache.set(S, { key, seats });
+  seatCache.set(S, { key, seats, rev: S.rev, mods, n: mods.length, hull: S.ship.hull });
   return seats;
 }
 const seatOf = (S, c) => (c.seat ? seatsOf(S).find((q) => q.key === c.seat) : null);
