@@ -258,3 +258,25 @@ test('O4 엔딩 장면 6장: 캔버스 대체 그림이 선장 4명 모두 오�
   const calls = []; const g = new Proxy({}, { get: (t, k) => (k in t ? t[k] : k === 'createLinearGradient' || k === 'createRadialGradient' ? () => ({ addColorStop() {} }) : (...a) => { calls.push(k); }), set: (t, k, v) => { t[k] = v; return true; } });
   for (const cap of Object.values(CAPTAINS)) for (const sc of ['endArrival', 'endSailor', 'endLucky', 'endTrader', 'endCrafter', 'endCrew']) { calls.length = 0; drawStoryScene(g, cap, sc, 1); assert.ok(calls.length > 20, `${cap.id}/${sc}`); }
 });
+
+// ── O5 풍경·소리·음악 ──
+import { THEMES, zonesOf, dressLand, BOX } from '../themes.js';
+import { SAIL_SETS, FILES, READY, FALLBACK, MOODS, trackFor, startSail } from '../music.js';
+import { FX } from '../sound.js';
+
+test('O5 대양 테마: 산호섬 구간 + 새 대륙 구간(남→북), 새 대륙에는 색 회벽 집(cityhut)이 있고 모두 뭍 위에', () => {
+  assert.equal(REGIONS.ocean.theme, 'ocean'); const th = THEMES.ocean, w = worldOf('ocean');
+  assert.deepEqual(th.sections.map((q) => q.id), ['atolls', 'newland']); assert.ok(BOX.cityhut);
+  const z = zonesOf(w, th); assert.equal(z.at(0, 252), 0); assert.equal(z.at(-250, -4000), 0); assert.equal(z.at(0, -11570), 1);
+  const { props } = dressLand(w, th, []); const huts = props.filter((p) => p.kind === 'cityhut');
+  assert.ok(huts.length >= 3 && huts.every((p) => z.at(p.x, p.y) === 1 && w.dist(p.x, p.y) < -5), '새 대륙 집');
+  assert.ok(props.filter((p) => p.kind === 'palm').every((p) => z.at(p.x, p.y) === 0), '야자수는 산호섬에만');
+});
+
+test('O5 소리·음악: 뱃고동·고래 노래·물기둥 효과음이 있고, 새 곡 mp3가 없으면 이웃 곡으로 가요(엔딩곡은 엔딩 기분)', () => {
+  for (const k of ['horn', 'whaleSong', 'blow']) assert.equal(typeof FX[k], 'function', k);
+  assert.deepEqual(SAIL_SETS.sea, ['opensea', 'sea']); assert.deepEqual(SAIL_SETS.ocean, ['ocean', 'opensea']);
+  for (const id of ['opensea', 'ocean', 'ending']) { assert.ok(FILES[id] && !READY.has(FILES[id]), `${id}: 아직 mp3 없음`); }
+  assert.deepEqual([FALLBACK.opensea, FALLBACK.ocean, FALLBACK.ending], ['sea', 'opensea', 'ocean']);
+  assert.ok(MOODS.includes('ending')); assert.equal(trackFor('ending', startSail('ocean')), 'ending'); assert.equal(startSail('ocean').track, 'ocean');
+});

@@ -501,7 +501,7 @@ export const REGIONS = {
   // M4 O0 대양(2026-11-24, PLAN-M3.md 7절): 남북으로 긴 바다 한 장(1.8 × 12.4km). 동·서·남 끝은 안개 경계, 북쪽은 새 대륙 해안선(shape.north).
   // 항구 넷: 마지막 등대(남) · 산호섬 둘(−4,000, −8,000) · 새 대륙 항구(북, 처음 닿으면 엔딩은 O4). 바람 띠·무풍대는 O1, 대양 태풍은 O2, 발견지·생물은 O3
   ocean: {
-    id: 'ocean', name: '대양', order: 5, grade: 5, theme: 'sea', yard: 5, zoom: 5.5, salt: true, tide: false, edgeFog: 150, fast: true,
+    id: 'ocean', name: '대양', order: 5, grade: 5, theme: 'ocean', yard: 5, zoom: 5.5, salt: true, tide: false, edgeFog: 150, fast: true,
     wind: { from: 45 * D, speed: 10, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['typhoon', 'storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
     swell: { base: 1.8, day: 0.5, gust: 0.4, storm: 1.3 },
     // 바람 띠(M4 O1, PLAN-M3.md 7-2절): 배 y로 골라요(경계 300m씩 섞어요). 무풍대는 지도에 고정(calm)이라 해도에 빗금 띠로 늘 보여요. from은 바람이 오는 쪽(동 0°·남 90°), swellK는 너울 배율

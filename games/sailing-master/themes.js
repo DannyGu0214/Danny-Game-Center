@@ -84,6 +84,28 @@ export const THEMES = {
     decals: [{ kind: 'crag', n: 16, r: [3, 6], depth: [8, 80] }],
     pieces: [{ kind: 'village', n: 3, depth: [10, 40], houses: [2, 4], house: 'islehut' }, { kind: 'seagrass', n: 60, depth: [1.8, 6], small: true }, { kind: 'pebbles', n: 30, depth: [1.8, 5], small: true }],
   },
+  // 5등급 대양(M4 O5): 더 깊은 남색 바다. 남쪽 4/5는 산호섬(큰 바다와 같은 모래·야자), 북쪽은 새 대륙(높은 바위 절벽·석조 부두·색 회벽 집 cityhut). 구간 경계는 지도 위 u(남→북)
+  ocean: {
+    name: '대양', water: ['#0a3350', '#0d4062'], hut: 'seahut', seed: 53, strict: true, scatter: { k: 1.2, cap: 2400, tries: 60000 },
+    layers: layers(['rgba(70,200,190,.2)', 'rgba(96,222,204,.28)', 'rgba(150,238,214,.38)', 'rgba(248,240,200,.78)']),
+    wet: '#cdbf95', shore: { tile: 'sand', base: '#f6eed2' }, bank: { tile: 'sand', base: '#d9c99a' }, ground: { tile: 'grass', base: '#3f8a48' }, lift: 1.2,
+    sections: [
+      {
+        id: 'atolls', name: '산호섬', to: 0.875, water: ['#0a3350', '#0d4062'],
+        wet: '#cdbf95', shore: { tile: 'sand', base: '#f6eed2' }, bank: { tile: 'sand', base: '#d9c99a' }, ground: { tile: 'grass', base: '#3f8a48', specks: ['rgba(30,90,50,.35)', 'rgba(120,180,90,.4)', 'rgba(250,236,170,.5)'] }, lift: 1.2,
+        mix: [[6, [['seagrass', 0.25], ['pebbles', 0.35], ['palm', 0.55], ['palm2', 0.68], [null, 1]]], [Infinity, [['palm', 0.3], ['palm2', 0.5], ['bush', 0.68], ['seagrass', 0.78], [null, 1]]]],
+        decals: [{ kind: 'crag', n: 6, r: [3, 6], depth: [8, 80] }],
+        pieces: [{ kind: 'seagrass', n: 40, depth: [1.8, 6], small: true }, { kind: 'pebbles', n: 20, depth: [1.8, 5], small: true }],
+      },
+      {
+        id: 'newland', name: '새 대륙', to: 1, water: ['#0d4263', '#10506f'],
+        wet: '#8c897c', shore: { tile: 'gravel', base: '#a29c90' }, bank: { tile: 'cliff', base: '#6d685e' }, ground: { tile: 'rocky', base: '#6f8650' }, lift: 2.6,
+        mix: [[6, [['pebbles', 0.35], ['rock', 0.7], ['boulder', 1]]], [Infinity, [['pine', 0.34], ['seapine', 0.5], ['boulder', 0.62], ['rock', 0.74], ['bush', 1]]]],
+        decals: [{ kind: 'crag', n: 40, r: [3, 7.5], depth: [5, 90] }],
+        pieces: [{ kind: 'village', n: 4, depth: [10, 50], houses: [3, 5], house: 'cityhut' }, { kind: 'boulder', n: 30, depth: [2.2, 8], small: true }, { kind: 'pebbles', n: 30, depth: [1.8, 5], small: true }],
+      },
+    ],
+  },
 };
 // 지역 → 테마. 표에 없으면 호수 테마예요
 export const themeOf = (def) => THEMES[def.theme] || THEMES.lake;
@@ -94,7 +116,7 @@ export const BOX = {
   windmill: [9.6, 12.8], thatch: [7.6, 5.8], bridge: [9.4, 3.4], haystack: [2.8, 2.5],
   hut: [10.6, 8.6], sign: [5, 5.9], find: [9, 12.6], pier: [4, 3],
   // 앞바다(M2b)
-  palm: [6.4, 10.4], palm2: [6, 6.2], islehut: [6.4, 5.4],
+  palm: [6.4, 10.4], palm2: [6, 6.2], islehut: [6.4, 5.4], cityhut: [7.4, 9],
   seapine: [7, 9.4], seagrass: [2.4, 1.5], fishhut: [6.4, 5.4], netrack: [5.6, 3.2], breakwater: [10.6, 2.4], seahut: [10.6, 8.6], seamark: [4.4, 9.1], lighthouse: [9, 16.2],
 };
 // 화면 사각형 [x0, x1, y0, y1](m). 세상 y를 눌러 그리고 그림은 기준점에서 위로 선다

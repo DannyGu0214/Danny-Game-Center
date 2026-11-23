@@ -181,7 +181,7 @@ function sharedArt() {
       pebbles: [pebblesSprite(0.3), pebblesSprite(0.8)], boulder: [boulderSprite(0.2), boulderSprite(0.7)], windmill: windmillSprite(), thatch: [thatchSprite(0.2), thatchSprite(0.7)], haystack: haystackSprite(), bridge: bridgeSprite(),
       // 앞바다(M2b): 발견지 5종, 바다 관문 표지, 등대, 어촌 항구 집, 해안 풍경
       ruins: ruinsSprite(), cave: caveSprite(), rocks: rocksSprite(), tidepool: tidepoolSprite(), buoy: buoySprite(), seamark: seamarkSprite(), lighthouse: lighthouseSprite(), volcano: volcanoSprite(), reef: reefSprite(), turtlebeach: turtlebeachSprite(), arch: archSprite(), falls: fallsSprite(), glassfloat: glassfloatSprite(), kelp: kelpSprite(), vent: ventSprite(), iceberg: icebergSprite(), whalespot: whalespotSprite(), bottle: glassfloatSprite(), seahut: hutSprite('seahut'),
-      seapine: [seapineSprite(0.2), seapineSprite(0.8)], seagrass: [seagrassSprite(0.2), seagrassSprite(0.7)], fishhut: [fishhutSprite(0.2), fishhutSprite(0.8)], palm: [palmSprite(0.2, false), palmSprite(0.8, false)], palm2: [palmSprite(0.3, true), palmSprite(0.75, true)], islehut: [islehutSprite(0.2), islehutSprite(0.8)], netrack: netrackSprite(), breakwater: breakwaterSprite(),
+      seapine: [seapineSprite(0.2), seapineSprite(0.8)], seagrass: [seagrassSprite(0.2), seagrassSprite(0.7)], fishhut: [fishhutSprite(0.2), fishhutSprite(0.8)], palm: [palmSprite(0.2, false), palmSprite(0.8, false)], palm2: [palmSprite(0.3, true), palmSprite(0.75, true)], islehut: [islehutSprite(0.2), islehutSprite(0.8)], cityhut: [cityhutSprite(0.2), cityhutSprite(0.8)], netrack: netrackSprite(), breakwater: breakwaterSprite(),
       pier: pierSprite(), hut: hutSprite(), sign: signSprite(), stone: stoneSprite(), stump: stumpSprite(), wreck: wreckSprite(), tower: towerSprite(), cabin: cabinSprite(), mill: millSprite(), shrine: shrineSprite(), camp: campSprite(), logpile: logpileSprite(), beacon: beaconSprite(), shelter: shelterSprite(), beached: beachedSprite(),
     },
     flot: Object.fromEntries(['wood', 'oak', 'cloth', 'canvas', 'hemp', 'tar', 'nail', 'shiny', 'bottle', 'coin', 'water', 'net', 'teak', 'syrope', 'steel', 'plate', 'gear'].map((k) => [k, flotSprite(k)])),
@@ -1601,6 +1601,19 @@ function islehutSprite(v) {
   g.fillStyle = '#e8836a'; g.beginPath(); g.arc(...P(1.6, -0.1), 0.2 * S, 0, TAU); g.fill(); // 문 옆 화분
   g.fillStyle = '#8a4a35'; g.fillRect(...P(0.2, -4.6), 0.34 * S, 0.8 * S);
   return { c, W: 7, H: 6, ox: 3.5, oy: 5.4, smoke: [0.37, -4.8] };
+}
+// 새 대륙 도시 집(M4 O5): 색 회벽 3층, 붉은 기와, 작은 종탑. v로 벽 색을 골라요
+function cityhutSprite(v) {
+  const { S, c, g, P } = spriteBox(7.4, 9.4, 0.6), wall = v < 0.5 ? ['#e6c9a0', '#cfae84'] : ['#b9cfc0', '#9bb5a4'];
+  shadowAt(g, P, S, 0.4, 3.2, 0.55, 0.26);
+  const poly = (pts, fill) => { g.beginPath(); for (const q of pts) g.lineTo(...P(...q)); g.closePath(); g.fillStyle = fill; g.fill(); };
+  poly([[-2.6, 0], [1.4, 0], [1.4, -5], [-2.6, -5]], wall[0]); poly([[1.4, 0], [2.7, -0.6], [2.7, -5.6], [1.4, -5]], wall[1]);
+  poly([[-3, -4.9], [-0.6, -6.6], [1.8, -4.9]], '#b5482f'); poly([[-0.6, -6.6], [1.8, -4.9], [3, -5.5], [0.6, -7.2]], '#963a26');
+  g.fillStyle = '#fbf3df'; g.fillRect(...P(-1.9, -7.9), 0.9 * S, 1.8 * S); poly([[-2.1, -7.9], [-1.45, -8.7], [-0.8, -7.9]], '#b5482f'); // 종탑
+  g.fillStyle = '#e8b64a'; g.beginPath(); g.arc(...P(-1.45, -7.2), 0.18 * S, 0, TAU); g.fill();
+  g.fillStyle = '#4a3322'; g.fillRect(...P(-0.5, -1.6), 0.9 * S, 1.6 * S);
+  g.fillStyle = '#ffe3a0'; for (const [x, y] of [[-2.1, -2.1], [-0.9, -3.6], [-2.1, -3.8], [0.3, -2.4]]) g.fillRect(...P(x, y), 0.6 * S, 0.7 * S);
+  return { c, W: 7.4, H: 9.4, ox: 3.7, oy: 8.8, smoke: [0.6, -6.9] };
 }
 // 갯풀: 모래언덕의 마른 띠풀 무더기
 function seagrassSprite(v) {

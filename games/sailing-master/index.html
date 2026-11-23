@@ -703,8 +703,8 @@ $('capGo').addEventListener('click', () => {
 const story = { cap: null, pages: [], title: '', kick: '', endLabel: '', onClose: null, page: 0, raf: 0, t0: 0 };
 function openStory(cap) { startStory(cap, STORIES[cap.id].pages, { title: STORIES[cap.id].title, kick: `${cap.name}의 이야기`, endLabel: '갈대 나루에 내리기 →', onClose: enterGame }); }
 // 이야기 화면 공용(M4 O4: 엔딩도 같은 화면을 써요). pages: [{ scene, text, title? }]
-function startStory(cap, pages, o) { Object.assign(story, { cap, pages, title: o.title || '', kick: o.kick, endLabel: o.endLabel, onClose: o.onClose, page: 0 }); for (const P of pages) storyImage(P.scene); $('story').classList.add('on'); showStoryPage(); }
-function closeStory() { cancelAnimationFrame(story.raf); $('story').classList.remove('on'); (story.onClose || enterGame)(); }
+function startStory(cap, pages, o) { Object.assign(story, { cap, pages, title: o.title || '', kick: o.kick, endLabel: o.endLabel, onClose: o.onClose, ending: !!o.ending, page: 0 }); for (const P of pages) storyImage(P.scene); $('story').classList.add('on'); showStoryPage(); }
+function closeStory() { cancelAnimationFrame(story.raf); story.ending = false; $('story').classList.remove('on'); (story.onClose || enterGame)(); }
 function drawStoryPage(t) {
   const cv = $('storyArt'), g = cv.getContext('2d'), k = cv.width / STORY_W;
   g.setTransform(k, 0, 0, k, 0, 0); g.clearRect(0, 0, STORY_W, STORY_H);
@@ -999,7 +999,7 @@ function showNewLandEnding() {
   setTimeout(() => {
     const cap = S.captain, E = ENDINGS, mine = E.captain[cap.id], t = S.stats;
     const rec = `\n항해 ${(t.dist / 1000).toFixed(1)}km · ${S.crossed}일째 · 구조 ${t.rescues || 0}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length} · 도감 ${Object.keys(S.seen).length}/${Object.keys(SPECIES).length}종\n만든 이 Danny Soft`;
-    startStory(cap, [E.arrival, mine, { ...E.crew, text: E.crew.text + rec }], { title: '', kick: `${S.ship.name}의 마지막 장`, endLabel: '이 바다에서 계속 항해', onClose: () => { S.ended = false; save(); openPort(); } });
+    startStory(cap, [E.arrival, mine, { ...E.crew, text: E.crew.text + rec }], { title: '', kick: `${S.ship.name}의 마지막 장`, endLabel: '이 바다에서 계속 항해', ending: true, onClose: () => { S.ended = false; save(); openPort(); } });
   }, 2000);
 }
 // 옛 엔딩(M3 "대양 앞에서"): 지금 쓰는 곳 없음(대양 어귀가 대양으로 이어져요). 옛 흐름 보존
@@ -1822,7 +1822,7 @@ function updateHud(dt) {
   if (S.region === 'sea' && !S.docked && S.clock > birdAt) { birdAt = S.clock + 12 + Math.random() * 16; if (worldOf('sea').landDist(S.boat.x, S.boat.y) < 80) snd.play('isleBird', 0, Math.random()); }
   const ty = !S.docked && S.weather.ty ? S.weather.ty.mix || 0 : 0; // 태풍 안: 굵은 비(×1.4)와 낮은 바람 울음(M3 B2)
   snd.ambient(S.docked ? w.speed * 0.6 : w.speed, S.docked ? 0 : b.spd, S.docked ? 0 : ty > 0.6 ? 1.4 : S.weather.stormOn ? 1 : S.weather.rain ? 0.55 : 0, !S.docked && !!b.motor, ty),
-  music.setMood(moodOf({ docked: !!S.docked, gustOn: S.weather.gustOn, gustSoon: S.weather.gustSoon, storm: !!(S.weather.stormOn || S.weather.stormSoon || S.weather.typhoonOn || S.weather.typhoonSoon) })); // S5: 폭풍은 예고부터 폭풍 곡
+  music.setMood(story.ending ? 'ending' : moodOf({ docked: !!S.docked, gustOn: S.weather.gustOn, gustSoon: S.weather.gustSoon, storm: !!(S.weather.stormOn || S.weather.stormSoon || S.weather.typhoonOn || S.weather.typhoonSoon) })); // S5: 폭풍은 예고부터 폭풍 곡
   syncButtons();
   // 상황 단추
   const ctxBox = $('context');

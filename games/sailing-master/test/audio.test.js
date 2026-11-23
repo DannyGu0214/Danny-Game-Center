@@ -7,7 +7,7 @@ import { readAudioPrefs, writeAudioPrefs, audible, AUDIO_GROUPS } from '../sound
 const seeded = (seed) => () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
 
 test('상황: 항구가 가장 먼저, 돌풍은 예고부터 폭풍 곡, 아니면 평소 항해', () => {
-  assert.deepEqual(MOODS, ['sail', 'port', 'storm']);
+  assert.deepEqual(MOODS, ['sail', 'port', 'storm', 'ending']);
   assert.equal(moodOf({}), 'sail');
   assert.equal(moodOf({ gustSoon: true }), 'storm');
   assert.equal(moodOf({ gustOn: true }), 'storm');
@@ -47,7 +47,7 @@ test('곡마다 틀 것이 있다: mp3가 없거나 못 읽어도 합성곡으�
   const all = new Set([...Object.values(SAIL_SETS).flat(), 'lively', 'port', 'storm']);
   for (const id of all) {
     assert.ok(FILES[id], `${id} mp3 이름`);
-    assert.ok(TRACKS[id] || id === 'sea', `${id} 합성곡(sea는 강 곡으로)`);
+    assert.ok(TRACKS[id] || ['sea', 'opensea', 'ocean'].includes(id), `${id} 합성곡(sea·opensea·ocean은 강 곡으로)`);
   }
   // 생동감은 선술집보다 조금 빠르고, 폭풍은 그보다 더 빠르다(박 기준. 6/8 지그는 점4분음표가 한 박)
   const tavern = Math.max(...['pond', 'lake', 'river'].map((k) => TRACKS[k].bpm));
