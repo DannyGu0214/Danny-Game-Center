@@ -1,5 +1,5 @@
 // 오프라인 실행용 서비스 워커(Animal World와 같은 방식). 게임 파일은 네트워크 우선 + 브라우저 캐시 건너뛰기, 안 되면 캐시로.
-const CACHE = 'sailing-master-v7'; // M3a 큰 바다·태풍·재료·발견지·생물(새 게임 파일 없음, 게임 파일이 바뀌어 올려요)
+const CACHE = 'sailing-master-v8'; // 태풍 날엔 무풍이 안 오게(게임 파일 logic.js가 바뀌어 올려요)
 const CORE = ['./', 'index.html', 'logic.js', 'data.js', 'world.js', 'themes.js', 'ship.js', 'art.js', 'art-ship.js', 'art-story.js', 'creatures.js', 'music.js', 'sound.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const NET_TIMEOUT_MS = 4000; // 신호가 약하면 기다리지 않고 캐시로
 

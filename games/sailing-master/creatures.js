@@ -421,7 +421,7 @@ export function drawSpeciesIcon(g, id, x, y, size) {
   const c = { h: 0, ph: 1, act: def.kind === 'fish' ? 0.45 : def.kind === 'flyfish' ? 0.8 : def.kind === 'manta' ? 0.65 : def.kind === 'dolphin' ? 0.55 : def.kind === 'perch' ? 1.25 : 0, life: 1, size: def.size || 1, n: 1, x: 0, y: 0 };
   // 종류마다 몸이 그려지는 높이가 달라 칸 안에 들어오게 크기와 기준 높이를 맞춘다
   const fit = { flyfish: [0.05, size * 0.4], fin: [0.07, size * 0.3], manta: [0.04, size * 0.3], fish: [0.05, size * 0.42], duck: [0.05 / (def.neck || 1) / (def.size || 1), size * 0.34], wader: [0.042, size * 0.72], frog: [0.08, size * 0.22], swimmer: [0.08, size * 0.14], turtle: [0.08, 0], bird: [0.05, 0], land: [0.075 / (def.height || 1), size * 0.5], dolphin: [0.06, size * 0.3], seal: [0.075, size * 0.12], seaturtle: [0.06, 0], jelly: [0.06, -size * 0.12], crab: [0.11, size * 0.12], pelican: [0.042, size * 0.3], perch: [0.05, size * 0.5] }[def.kind];
-  const k = size * fit[0], lift = def.kind === 'bird' ? 7 * z * k : fit[1];
+  const k = size * fit[0], lift = def.kind === 'bird' ? 7 * z * k * (def.high ? 1.7 : def.low ? 0.3 : 1) : fit[1]; // 나는 높이(high·low)만큼 되돌려 칸 안에
   g.save();
   g.translate(x, y + lift);
   g.scale(k, k);

@@ -41,6 +41,7 @@ export function dayWeather(seed, day) {
     else if (K.when === 'track') out[id] = hash(seed + K.salt, day) < p ? { side: hash(seed + K.salt + 1.7, day) < 0.5 ? -1 : 1, u: hash(seed + K.salt + 2.9, day), v: hash(seed + K.salt + 4.3, day), w: hash(seed + K.salt + 7.1, day), t0: (TYPHOON.enter[0] + (TYPHOON.enter[1] - TYPHOON.enter[0]) * hash(seed + K.salt + 5.8, day)) * CAL.day } : null;
     else out[id] = !!p && hash(seed + K.salt, day) < p;
   }
+  if (out.typhoon) out.calm = false; // 태풍이 오는 날엔 무풍이 안 와요(무풍 × 0.15가 태풍 바람까지 깎던 것)
   return out;
 }
 export function forecast(S) {
@@ -71,10 +72,12 @@ export function weatherAt(region, seed, clockT) {
   const day = Math.floor(clockT / CAL.day), w = dayWeather(seed, day), inDay = clockT % CAL.day, list = REGIONS[region].weather || [];
   const out = { heat: false, drought: false, gustOn: false, gustSoon: false, on: [], soon: [] };
   const fx = { windUp: 1, windDown: 1, rain: 0, spray: 0, swell: 0, strain: 0, fog: 0, sight: 1, flow: 1, depth: 1, flot: 1, heat: 0 };
+  const ty = liveTyphoon(region, seed, clockT);
   for (const id of WX_ORDER) {
     if (!list.includes(id)) continue;
     const K = WX[id];
-    if (K.when === 'track') continue; // 태풍은 아래에서(움직이는 원)
+    if (K.when === 'track') continue;
+    if (id === 'calm' && ty) continue; // 어제 온 태풍이 오늘로 넘어와도 무풍 배율은 안 걸어요 // 태풍은 아래에서(움직이는 원)
     let on = false, k = 1;
     if (K.when === 'event') {
       const t0 = w[id];
@@ -94,7 +97,6 @@ export function weatherAt(region, seed, clockT) {
     }
   }
   // 태풍(M3 B2): 살아 있는 태풍(오늘 것, 또는 날을 넘겨 건너오는 어제 것)과 들어오기 전 전조. 자리마다의 효과는 step의 typhoonTick이 더해요
-  const ty = liveTyphoon(region, seed, clockT);
   out.typhoonOn = !!ty; out.tyLive = ty; out.typhoonSoon = false;
   if (ty) out.on.unshift('typhoon');
   else if (list.includes('typhoon')) { const tr = dayWeather(seed, day).typhoon; if (tr && inDay < tr.t0 && tr.t0 - inDay <= TYPHOON.warn) { out.typhoonSoon = true; out.soon.push('typhoon'); } }
