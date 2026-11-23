@@ -409,8 +409,8 @@ export function applyPlan(S, name) {
 // 위임 규칙: reef 돌풍·폭풍이면 갑판원이 돛 줄이기, repair 선체 50% 아래면 목수가 고치기, storm 돌풍·폭풍 예고면 폭풍 편성으로, mend 돛이 찢어지면 갑판원이 꿰매기(S5)
 export const rulesOf = (S) => (S.rules ||= { reef: true, repair: true, storm: false, mend: true });
 export function setRule(S, k, on) { if (!(k in rulesOf(S))) return false; S.rules[k] = !!on; return true; }
-// 바다 품삯(M3 B4): 짠물 수역에서는 × 0.75(바다 교역 수입이 커서 상쇄)
-export const wageK = (S) => (REGIONS[S.region].salt ? 0.75 : 1);
+// 바다 품삯(M3 B4): 짠물 수역에서는 × 0.75(바다 교역 수입이 커서 상쇄). 큰 바다는 × 0.5(REGIONS.sea.wageK, M3b 밸런스: 봇 측정에서 0.75면 선원 판 절반이 금화 0에 빠져요)
+export const wageK = (S) => (REGIONS[S.region].salt ? REGIONS[S.region].wageK ?? 0.75 : 1); // 지역별 값(wageK)이 있으면 그것
 export const wageOf = (c) => Math.round((c.baseWage ?? c.wage) * (1 + CREW_GROW.wageStep * ((c.lv || 1) - 1)));
 // 일하면 숙련·피로가 쌓이고, 쉬면 풀린다. 사기는 굶주림·밀린 보수·무더위에 떨어지고 쉼·신선한 물고기에 오른다
 function crewTick(S, dt, wx, st) {

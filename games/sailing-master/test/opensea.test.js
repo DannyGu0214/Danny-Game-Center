@@ -523,7 +523,7 @@ test('B4 측후소: 예보 +4일(기압계 +2 대신), 설계도가 있어야 �
   const T = st({ id: 'station', col: 0, row: 1 }); assert.equal(G.stats(T).typhoonAhead, 4);
 });
 
-test('B4 옮겨 탈 때 선원이 남아요(정원 안), 정원이 줄 때만 숙련 낮은 사람부터 내려요, 바다 품삯 ×0.75', () => {
+test('B4 옮겨 탈 때 선원이 남아요(정원 안), 정원이 줄 때만 숙련 낮은 사람부터 내려요, 바다 품삯 ×0.75(큰 바다 ×0.5)', () => {
   const S = coastShip('sloop'); S.ship.hull = 'sloop2'; S.crew = [mate(1, 'deckhand', { lv: 3 }), mate(2, 'rower', { lv: 1 })];
   S.blueprints.schooner = 1; S.res = { ...S.res, oak: 300, canvas: 300, plate: 99, gear: 20, tar: 99, nail: 99, coin: 2000, wood: 99 }; G.dock(S, 'yard'); drain(S);
   assert.ok(G.buildHull(S, 'schooner').ok, JSON.stringify(G.buildStatus(S, 'schooner')));
@@ -534,11 +534,11 @@ test('B4 옮겨 탈 때 선원이 남아요(정원 안), 정원이 줄 때만 �
   const keep = HULLS.schooner.crew; HULLS.schooner.crew = 1;
   try { assert.ok(G.buildHull(R, 'schooner').ok); } finally { HULLS.schooner.crew = keep; }
   assert.deepEqual(R.crew.map((c) => c.id), [2], '숙련 높은 사람이 남아요'); assert.ok(drain(R).some((e) => e.type === 'crewLeft' && e.why === 'size'));
-  // 바다 품삯: 같은 선원·같은 시간에 쌓이는 보수가 짠물 수역에서 0.75배
+  // 바다 품삯: 같은 선원·같은 시간에 쌓이는 보수가 앞바다 0.75배, 큰 바다 0.5배
   const b = seaShip(); b.crew = [mate(1, 'deckhand', { wage: 4, baseWage: 4 })]; G.undock(b); b.owed = 0; b.food = 500; b.water = 20;
   for (let i = 0; i < 30 * 10; i++) { G.step(b, G.FIXED_DT); b.boat.spd = 0; }
-  assert.ok(Math.abs(b.owed - 4 * 10 / CAL.day * 0.75) < 0.01, `짠물 품삯 ${b.owed}`);
-  const fresh = G.newGame(1); fresh.region = 'river'; assert.equal(G.wageK(fresh), 1); assert.equal(G.wageK(b), 0.75);
+  assert.ok(Math.abs(b.owed - 4 * 10 / CAL.day * 0.5) < 0.01, `짠물 품삯 ${b.owed}`);
+  const fresh = G.newGame(1); fresh.region = 'river'; assert.equal(G.wageK(fresh), 1); assert.equal(G.wageK(b), 0.5); fresh.region = 'coast'; assert.equal(G.wageK(fresh), 0.75);
 });
 
 // ── B5 대양 탐사선 ──
@@ -557,11 +557,11 @@ test('B5 탐사선 선체 ★1~3: 칸 수·정원·내구도·값·기관·흘�
   const [a, b, c] = ['explorer', 'explorer2', 'explorer3'].map((id) => HULLS[id]);
   assert.deepEqual([a.crew, b.crew, c.crew], [12, 14, 16]); assert.deepEqual([a.hp, b.hp, c.hp], [400, 400, 520]);
   assert.deepEqual([a.len, b.len, c.len], [22, 27, 27]); assert.deepEqual([a.grade, a.yard, a.motor, a.draft, a.maxMasts, a.minCrew], [5, 5, 4.2, 1.3, 3, 6]);
-  assert.deepEqual(a.price, { teak: 120, synth: 60, steel: 24, syrope: 30, chip: 6, coin: 400 }); assert.deepEqual(b.price, { teak: 140, synth: 60, steel: 20, coin: 320 });
+  assert.deepEqual(a.price, { teak: 36, synth: 18, steel: 7, syrope: 9, chip: 2, coin: 120 }); assert.deepEqual(b.price, { teak: 140, synth: 60, steel: 20, coin: 320 });
   assert.deepEqual(c.price, { teak: 160, synth: 80, syrope: 40, steel: 30, chip: 4, coin: 450 });
   assert.equal(a.blueprint, 'explorer'); assert.equal(b.blueprint, undefined); assert.equal(c.perk, '항해 함교');
   assert.equal(HULL_TIERS[4].kind, 'explorer');
-  assert.deepEqual(MODULES.mast_l.cost, { teak: 18, synth: 24, syrope: 8, steel: 4, coin: 30 }); assert.deepEqual([MODULES.mast_l.sail, MODULES.mast_l.mastH, MODULES.mast_l.boom, MODULES.mast_l.need.grade], [1.6, 19, 6.5, 5]);
+  assert.deepEqual(MODULES.mast_l.cost, { teak: 5, synth: 7, syrope: 2, steel: 1, coin: 9 }); assert.deepEqual([MODULES.mast_l.sail, MODULES.mast_l.mastH, MODULES.mast_l.boom, MODULES.mast_l.need.grade], [1.6, 19, 6.5, 5]);
   // 돛 넓이: 가장 큰 돛 + 나머지 × 0.85 = 1.6 + 0.85 × (1.35 + 1) ≈ 3.6
   const S = explorerShip(); const st = G.stats(S); assert.equal(st.motor, 4.2); assert.ok(Math.abs(st.sailArea - (1.6 + 0.85 * (1.35 + 1))) < 1e-9, `돛 ${st.sailArea}`); assert.ok(st.sailArea > 3.5 && st.sailArea < 3.7);
   assert.equal(st.draft >= 1.3, true);
@@ -582,11 +582,11 @@ test('B5 탐사선 짓기: 보급항(조선소 5등급)에서만, 설계도·재
   assert.match(G.buildHull(S, 'explorer').why, /설계도|조선|보급/);
   S.blueprints.explorer = 1; assert.equal(G.buildHull(S, 'explorer').ok, false, '남쪽 등대 항은 조선소 4등급');
   G.dock(S, 'depot'); drain(S); assert.equal(G.yardOf(S), 5);
-  const miss = { ...S.res }; S.res.chip = 5; assert.equal(G.buildHull(S, 'explorer').ok, false, '전자 부품 6개가 모자라요'); S.res.chip = miss.chip;
+  const miss = { ...S.res }; S.res.chip = 1; assert.equal(G.buildHull(S, 'explorer').ok, false, '전자 부품 2개가 모자라요'); S.res.chip = miss.chip;
   const crew = [mate(1, 'deckhand', { lv: 2 }), mate(2, 'cook')]; S.crew = crew;
   const r = G.buildHull(S, 'explorer'); assert.ok(r.ok, JSON.stringify(r));
   assert.equal(S.ship.hull, 'explorer'); assert.ok(S.ach.explorer); assert.equal(S.crew.length, 2, '정원 12 안이라 선원이 남아요');
-  assert.equal(S.res.teak, 999 - 120); assert.equal(S.res.chip, 99 - 6);
+  assert.equal(S.res.teak, 999 - 36); assert.equal(S.res.chip, 99 - 2);
   assert.ok(G.buildHull(S, 'explorer2').ok && G.buildHull(S, 'explorer3').ok); assert.ok(G.stats(S).hull.bridge);
   // 슬루프에서는 한 번에 올라갈 수 없어요
   const T = seaShip(); T.ship.hull = 'sloop'; T.blueprints.explorer = 1; rich5(T); G.dock(T, 'depot'); assert.equal(G.buildHull(T, 'explorer').ok, false);

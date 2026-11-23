@@ -8,9 +8,10 @@ import * as SH from '../ship.js';
 import { worldOf } from '../world.js';
 import { HULLS, MODULES, ROLES, ITEMS, MAT_IDS, TRADE_IDS, WORKSHOP, WX, CAL, REGIONS } from '../data.js';
 
-// EXK=0.25: 탐사선 ★1과 큰 주돛대 값을 그 배율로 줄여 돌려 봐요(값 조정안 측정용, 게임 값은 그대로)
+// EXK=0.5: 탐사선 ★1과 큰 주돛대 값을 그 배율로 바꿔 돌려 봐요(값 조정안 측정용, 게임 값은 그대로). M3b 검토에서 게임 값을 옛 값 × 0.3으로 내렸어요
 const EXK = Number(process.env.EXK) || 1;
 if (EXK !== 1) { for (const o of [HULLS.explorer.price, MODULES.mast_l.cost]) for (const k of Object.keys(o)) o[k] = Math.max(1, Math.round(o[k] * EXK)); }
+if (process.env.WAGEK) REGIONS.sea.wageK = Number(process.env.WAGEK); // 큰 바다 품삯 배율 조정안 측정용
 const seed = Number(process.argv[2]) || 1, maxMin = Number(process.argv[3]) || 240, verbose = process.argv[4] === 'v', noCrew = process.argv.includes('nocrew'), reckless = process.argv.includes('reckless'); // nocrew: 선원 없이(배치 효과 비교용) · reckless: 너울을 무시(위협 확인용)
 const S = G.newGame(seed), log = {}, income = {};
 const mark = (k) => { if (!(k in log)) { log[k] = +(S.t / 60).toFixed(1); if (verbose) console.log(log[k], '분', k, JSON.stringify(S.res)); } };
