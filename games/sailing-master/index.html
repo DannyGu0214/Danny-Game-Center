@@ -808,6 +808,12 @@ $('audio').addEventListener('pointerdown', (e) => { if (e.target === $('audio'))
 
 // 키 슬라이더: 끄는 동안만 돌고, 놓으면 가운데로
 const wrap = $('rudderWrap'), knob = $('knob');
+// 키 칸 너비는 크기가 바뀔 때만 다시 재요(HUD 갱신마다 clientWidth를 읽으면 강제 레이아웃이 생겨요)
+let wrapW = wrap.clientWidth;
+new ResizeObserver(() => { wrapW = wrap.clientWidth; }).observe(wrap);
+// HUD 글자: 바뀐 때만 DOM에 써요(같은 값을 다시 쓰면 스타일 재계산·레이아웃이 생겨요)
+const setHTML = (e, v) => { if (e._html !== v) { e._html = v; e.innerHTML = v; } };
+const setText = (e, v) => { if (e.textContent !== v) e.textContent = v; };
 let rudderPtr = null;
 const KNOB_MARGIN = 20;
 function rudderFrom(e) { const r = wrap.getBoundingClientRect(), half = r.width / 2 - KNOB_MARGIN; return Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / half)); }
@@ -1727,8 +1733,8 @@ let hudT = 0, flapT = 0, creakT = 0, lastLuffHint = -99;
 const pct = (v) => Math.round(v * 100);
 function setGauge(id, v) {
   const bar = $(`${id}Bar`), num = $(`${id}Num`), n = pct(v), state = v < 0.3 ? 'low' : v < 0.6 ? 'mid' : '';
-  bar.style.width = `${n}%`; bar.className = state;
-  num.textContent = n; num.className = state === 'low' ? 'low' : '';
+  if (bar.style.width !== `${n}%`) bar.style.width = `${n}%`; if (bar.className !== state) bar.className = state;
+  setText(num, String(n)); const nc = state === 'low' ? 'low' : ''; if (num.className !== nc) num.className = nc;
 }
 const SEASON_COLOR = { spring: '#9ee07a', summer: '#ffd257', autumn: '#f0955a', winter: '#a9dcf2' };
 $('ticks').innerHTML = Array.from({ length: 12 }, (_, i) => `<line x1="25" y1="${i % 3 ? 5.5 : 5}" x2="25" y2="${i % 3 ? 8 : 10}" transform="rotate(${i * 30} 25 25)"/>`).join('');
@@ -1739,8 +1745,8 @@ function syncTop() {
   const sw = S.docked ? 0 : G.swellHere(S), swellAlert = sw > st.sea * 0.92 ? `너울 ${sw.toFixed(1)}m` : ''; // M2a: 내항성에 가까운 너울이 가장 먼저
   const tyq = !S.docked && S.weather.ty && S.weather.ty.zone !== undefined ? S.weather.ty : null, tyAlert = tyq ? `🌀 태풍 ${Math.round(tyq.d)}m` : (S.weather.typhoonSoon ? '🌀 태풍 예고' : '');
   const color = SEASON_COLOR[c.season.id], alert = tyAlert || swellAlert || (soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : '') || (!S.docked && S.boat.motor ? '⚙ 보조 기관' : ''); // 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저. 보조 기관(M2b)은 맨 나중
-  $('dateNum').innerHTML = `<i style="background:${color};color:${color}"></i>${c.season.name} ${c.dayOfSeason + 1}일`;
-  $('regionName').textContent = `${REGIONS[S.region].name}${alert ? ` · ${alert}` : ''}`;
+  setHTML($('dateNum'), `<i style="background:${color};color:${color}"></i>${c.season.name} ${c.dayOfSeason + 1}일`);
+  setText($('regionName'), `${REGIONS[S.region].name}${alert ? ` · ${alert}` : ''}`);
   $('regionName').classList.toggle('warn', !!alert && !alert.startsWith('⚙'));
   // 윗줄은 아이템, 배 상태는 조종부 위 게이지
   const item = (icon, text, cls = '') => `<span class="${cls}"><svg><use href="#i-${icon}"/></svg>${text}</span>`;
@@ -1748,9 +1754,9 @@ function syncTop() {
   const salt = REGIONS[S.region].salt, ti = G.tideInfo(S);
   const mats = MAT_IDS.filter((k) => S.res[k]).sort((a, b) => S.res[b] - S.res[a]).slice(0, salt ? 1 : 3); // 바다에선 식수·물때 칸 자리를 비워요
   const trade = TRADE_IDS.reduce((a, k) => a + (S.res[k] || 0) + (S.hold[k] || 0), 0);
-  $('chips').innerHTML = item('coin', S.res.coin || 0) + mats.map((k) => `<span>${icon(k)}${S.res[k]}</span>`).join('') + (trade ? `<span><i class="emo">✨</i>${trade}</span>` : '')
+  setHTML($('chips'), item('coin', S.res.coin || 0) + mats.map((k) => `<span>${icon(k)}${S.res[k]}</span>`).join('') + (trade ? `<span><i class="emo">✨</i>${trade}</span>` : '')
     + item('hold', `${G.holdUsed(S)}/${st.holdCap}`, 'gap') + item('food', S.food.toFixed(0), S.food < persons ? 'low' : '')
-    + (salt ? `<span class="${G.waterDays(S) < 0.5 ? 'low' : ''}"><i class="emo">💧</i>${S.water.toFixed(1)}</span>` : '') + (ti ? `<span class="tide"><i class="emo">🌊</i>${ti.name}${ti.rising ? '↑' : '↓'}</span>` : '');
+    + (salt ? `<span class="${G.waterDays(S) < 0.5 ? 'low' : ''}"><i class="emo">💧</i>${S.water.toFixed(1)}</span>` : '') + (ti ? `<span class="tide"><i class="emo">🌊</i>${ti.name}${ti.rising ? '↑' : '↓'}</span>` : ''));
   setGauge('hull', S.hull); setGauge('vigor', S.vigor);
 }
 function updateHud(dt) {
@@ -1759,14 +1765,14 @@ function updateHud(dt) {
   if (hudT > 0) return;
   hudT = 0.15;
   const b = S.boat, w = S.wind;
-  $('windNum').textContent = (w.speed * 1.94).toFixed(0);
-  $('windDir').textContent = `${compassName(w.from)}풍`;
+  setText($('windNum'), (w.speed * 1.94).toFixed(0));
+  setText($('windDir'), `${compassName(w.from)}풍`);
   $('arrow').style.transform = `rotate(${w.from * 180 / Math.PI + 270}deg)`;
-  $('spdNum').textContent = (b.spd * 1.94).toFixed(1);
+  setText($('spdNum'), (b.spd * 1.94).toFixed(1));
   syncTop();
   wrap.classList.toggle('auto', !!S.route);
   const shown = S.route ? b.rudder : (rudderPtr !== null ? b.rudder : 0);
-  knob.style.transform = `translateX(${shown * (wrap.clientWidth / 2 - KNOB_MARGIN)}px) rotate(${shown * 70}deg)`;
+  const kt = `translateX(${shown * (wrapW / 2 - KNOB_MARGIN)}px) rotate(${shown * 70}deg)`; if (knob.style.transform !== kt) knob.style.transform = kt;
   if (!S.route && !b.row && b.luff && b.spd < 2.2 && S.t - lastLuffHint > 9 && !S.docked) { lastLuffHint = S.t; showHint('맞바람이야! 옆으로 틀어!', 3); }
   if (b.stamina <= 0 && b.row && hintT <= 0) showHint('팔이 떨어지겠어! 노가 느려진다!', 3);
   if (rudderPtr !== null && !b.row && b.sailNow < 0.05 && !S.cap.then && b.spd < 0.5 && hintT <= 0) showHint(G.stats(S).sailArea ? '돛을 올리든 노를 젓든 해야 움직이지!' : '노를 저어야 움직이지!', 2.5);
