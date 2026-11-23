@@ -294,3 +294,127 @@ test('B2 index.html 모듈 스크립트가 문법 오류 없이 읽혀요(브라
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
   assert.doesNotThrow(() => new AsyncFunction(code), 'index.html 문법');
 });
+
+// ── B3 큰 바다 내용: 재료·발견지·생물·표류물·교역·도전과제 ──
+import { ITEMS, WORKSHOP, SPECIES, MAT_IDS, TIDE } from '../data.js';
+import { createCreatures } from '../creatures.js';
+const SEA_FINDS = ['volcanoRim', 'reefLagoon', 'expWreck', 'turtleBeach', 'seaArch', 'islandFalls', 'oldStation', 'glassFloats', 'farLight', 'palmShrine'];
+const SEA_SPECIES = ['flyingfish', 'tuna', 'shark', 'manta', 'albatross', 'frigatebird', 'shearwater', 'coconutcrab'];
+const NEW_MATS = ['teak', 'synth', 'syrope', 'steel', 'chip'];
+
+test('B3 발견지 10곳: 시드 1~8마다 자리가 유효하고(경계 70m·항구 45m·서로 40m), 무인 등대는 고정이에요', () => {
+  const w = worldOf('sea'), fixed = REGIONS.sea.finds.find((f) => f.fixed);
+  assert.deepEqual(REGIONS.sea.finds.map((f) => f.id), SEA_FINDS);
+  assert.equal(fixed.id, 'farLight');
+  const base = w.finds.find((f) => f.id === 'farLight');
+  assert.ok(Math.hypot(base.x - 900, base.y + 1200) < 45, '작은 섬 위');
+  const spots = new Set();
+  for (let seed = 1; seed <= 8; seed++) {
+    const S = G.newGame(seed); S.region = 'sea';
+    const list = G.findsOf(S, 'sea');
+    assert.equal(list.length, 10);
+    list.forEach((f, i) => {
+      assert.equal(f.id, SEA_FINDS[i]);
+      if (f.id === 'farLight') { assert.equal(f.x, base.x); assert.equal(f.y, base.y); return; } // 고정
+      assert.ok(w.edgeDist(f.x, f.y) >= 70, `${seed} ${f.id} 경계`);
+      for (const q of [...w.ports, ...w.gates]) assert.ok(Math.hypot(q.x - f.x, q.y - f.y) > 45, `${seed} ${f.id} 항구 ${q.id}`);
+      const def = REGIONS.sea.finds[i], d = w.dist(f.x, f.y);
+      if (def.where === 'water') assert.ok(d > 12 - 1e-9, `${seed} ${f.id} 물 위`);
+      else if (def.inland) assert.ok(Math.abs(-w.landDist(f.x, f.y) - def.inland) < 9, `${seed} ${f.id} 내륙 ${def.inland}m (${w.landDist(f.x, f.y).toFixed(1)})`);
+      else assert.ok(d <= 5 && d >= -9, `${seed} ${f.id} 물가 ${d.toFixed(1)}`);
+      spots.add(`${f.id}:${Math.round(f.x)},${Math.round(f.y)}`);
+      list.forEach((g, j) => { if (j !== i && g.id !== 'farLight') assert.ok(Math.hypot(g.x - f.x, g.y - f.y) > 40 - 1e-9, `${seed} ${f.id}-${g.id} 간격`); });
+    });
+  }
+  assert.ok(spots.size > 10, '판마다 자리가 달라요');
+  // 보상: PLAN 표 그대로(설계도 2장, 최고급 재료)
+  const F = Object.fromEntries(REGIONS.sea.finds.map((f) => [f.id, f]));
+  assert.deepEqual([F.expWreck.blueprint, F.oldStation.blueprint], ['explorer', 'station']);
+  assert.equal(F.expWreck.teak, 40); assert.equal(F.expWreck.steel, 8); assert.equal(F.oldStation.chip, 2); assert.equal(F.volcanoRim.steel, 6);
+  assert.equal(F.expWreck.size, 1.6);
+  // 장면 배치: 새 그림 6종이 표지로 서고, 등대는 발견지가 곧 불빛 표지예요(둘이 겹쳐 서지 않아요)
+  const marks = sceneLayout('sea');
+  for (const art of ['volcano', 'reef', 'turtlebeach', 'arch', 'falls', 'glassfloat']) assert.ok(marks.marks.some((m) => m.kind === art && m.find), art);
+  assert.equal(marks.marks.filter((m) => m.kind === 'lighthouse' && m.lamp).length, 2, '남쪽 등대 + 무인 등대');
+  assert.ok(marks.marks.some((m) => m.find?.id === 'farLight' && m.lamp));
+  // 임시 발견지 3곳은 정식 발견지로 바뀌었어요
+  for (const old of ['seaFall', 'seaCrater', 'seaLagoon']) assert.ok(!REGIONS.sea.finds.some((f) => f.id === old), old);
+});
+
+test('B3 발견지를 찾으면 보상·설계도·유물을 받고, 10곳을 다 찾으면 seaIsles', () => {
+  const S = seaShip(3); G.undock(S); drain(S);
+  const list = G.findsOf(S, 'sea'), coin0 = S.res.coin, wreck = list.find((f) => f.id === 'expWreck');
+  for (let i = 0; i < 20; i++) { S.boat.x = wreck.x; S.boat.y = wreck.y; S.boat.spd = 0; S.food = 500; S.water = 20; G.step(S, G.FIXED_DT); }
+  assert.ok(S.found.expWreck); assert.equal(S.res.teak, 40); assert.equal(S.res.steel, 8); assert.equal(S.res.coin, coin0 + 80);
+  assert.ok(S.blueprints.explorer && S.relics.expWreck); assert.ok(!S.ach.seaIsles);
+  for (const f of list) S.found[f.id] = 1;
+  G.checkAch(S);
+  assert.ok(S.ach.seaIsles); assert.ok(ACHIEVEMENTS.some((a) => a.id === 'seaIsles' && a.coin === 60));
+  assert.ok(S.blueprints.explorer);
+});
+
+test('B3 재료 5종: 창고 기본 0, 공방 최고급 짝(전자 부품 제외), 큰 바다 가게(shop:false·buyPort)', () => {
+  for (const k of NEW_MATS) assert.equal(G.newGame(1).res[k], 0, k);
+  const spec = { teak: [3, 4, 12, 'wood'], synth: [3, 6, 16, 'cloth'], syrope: [3, 5, 14, 'rope'], steel: [3, 8, 22, 'metal'], chip: [3, 12, 40, 'mech'] };
+  for (const [k, [tier, sell, buy, fam]] of Object.entries(spec)) { const I = ITEMS[k]; assert.deepEqual([I.tier, I.sell, I.buy, I.fam], [tier, sell, buy, fam], k); assert.ok(MAT_IDS.includes(k)); }
+  assert.equal(ITEMS.chip.buyPort, 'depot');
+  assert.deepEqual([WORKSHOP.pairs.oak, WORKSHOP.pairs.canvas, WORKSHOP.pairs.tar, WORKSHOP.pairs.plate], ['teak', 'synth', 'syrope', 'steel']);
+  assert.equal(Object.values(WORKSHOP.pairs).includes('chip'), false, '전자 부품은 공방으로 못 만들어요');
+  // 옛 저장(v7): 새 재료 칸이 0으로 채워져요
+  const o = JSON.parse(G.serialize(seaShip())); o.v = 7; for (const k of NEW_MATS) delete o.res[k];
+  const T = G.deserialize(JSON.stringify(o)); for (const k of NEW_MATS) assert.equal(T.res[k], 0, k);
+  // 공방: 참나무 3개 + 6닢 → 티크 1개(항구에서만)
+  const S = seaShip(); S.res.oak = 7; S.res.coin = 100; S.res.plate = 3; S.res.tar = 3; S.res.canvas = 3;
+  assert.equal(G.craft(S, 'oak', 2), 2); assert.equal(S.res.teak, 2); assert.equal(S.res.oak, 1); assert.equal(S.res.coin, 100 - 12);
+  assert.equal(G.craft(S, 'plate', 1), 1); assert.equal(S.res.steel, 1); assert.equal(G.craft(S, 'tar', 1), 1); assert.equal(G.craft(S, 'canvas', 1), 1); assert.equal(G.craft(S, 'gear', 1), 0);
+  // 가게: 큰 바다 항구는 최고급을 팔아요. 전자 부품은 보급항만, 야자섬 나루(shop:false)는 재료 가게가 없어요
+  const at = (port) => { const R = seaShip(); R.docked = port; R.res.coin = 500; return R; };
+  for (const port of ['southLight', 'depot', 'rockVillage']) for (const k of ['teak', 'synth', 'syrope', 'steel']) { const R = at(port); assert.ok(G.canBuyMat(R, k), `${port} ${k}`); assert.equal(G.buyMat(R, k, 2), 2); assert.equal(R.res[k], 2); assert.equal(R.res.coin, 500 - 2 * ITEMS[k].buy); }
+  assert.ok(G.canBuyMat(at('depot'), 'chip')); assert.equal(G.buyMat(at('depot'), 'chip', 1), 1);
+  for (const port of ['southLight', 'rockVillage', 'palm']) assert.equal(G.canBuyMat(at(port), 'chip'), false, `${port} chip`);
+  for (const k of ['wood', 'hemp', 'nail', 'teak', 'steel', 'chip']) { const R = at('palm'); assert.equal(G.canBuyMat(R, k), false, `palm ${k}`); assert.equal(G.buyMat(R, k, 1), 0); assert.equal(R.res.coin, 500); }
+  // 앞바다·강·호수 항구에서는 큰 바다 재료를 못 사요
+  const C = coastShip(); C.res.coin = 500; assert.ok(C.docked); for (const k of NEW_MATS) assert.equal(G.canBuyMat(C, k), false, `coast ${k}`);
+  assert.ok(G.canBuyMat(C, 'gear'), '앞바다 재료는 그대로 팔아요');
+  // 팔기는 야자섬에서도 돼요
+  const P = at('palm'); P.res.teak = 3; assert.equal(G.sell(P, 'teak', 3) >= 12, true);
+});
+
+test('B3 표류물·교역 표: 한도 36, 새 재료가 떠다니고 물통·반짝이는 곳은 그대로, 향신료·비단을 찾아요', () => {
+  const f = REGIONS.sea.flot, t = Object.fromEntries(f.table.map(([k, wgt, a, b]) => [k, [wgt, a, b]]));
+  assert.equal(f.cap, 36);
+  assert.deepEqual([t.wood[0], t.oak[0], t.teak[0], t.net[0], t.syrope[0], t.plate[0], t.steel[0], t.gear[0], t.water[0], t.shiny[0]], [1, 1.5, 0.8, 2, 0.8, 1, 0.4, 0.5, 3, 6]);
+  assert.deepEqual([t.water[1], t.water[2], t.shiny[1], t.shiny[2]], [2, 3, 1, 2]);
+  for (const [k] of f.table) assert.ok(ITEMS[k] || ['net', 'water', 'shiny'].includes(k), k);
+  const tr = Object.fromEntries(REGIONS.sea.trade);
+  assert.deepEqual([tr.porcelain, tr.silk, tr.painting, tr.spice], [3, 4, 1.2, 2]); assert.deepEqual(REGIONS.sea.demand, ['spice', 'silk']);
+  // 티크·합성 로프·강판은 건져서 화물칸에 담겨요
+  const S = seaShip(); G.undock(S); drain(S); S.food = 500; S.water = 20;
+  const fl = G.flotsamOf(S); fl.length = 0; fl.push({ x: S.boat.x, y: S.boat.y, k: 'teak', n: 2, ph: 0 }, { x: S.boat.x, y: S.boat.y, k: 'syrope', n: 1, ph: 0 }, { x: S.boat.x, y: S.boat.y, k: 'steel', n: 1, ph: 0 });
+  const bx = S.boat.x, by = S.boat.y; for (let i = 0; i < 20; i++) { S.boat.x = bx; S.boat.y = by; S.boat.spd = 0; G.step(S, G.FIXED_DT); } assert.deepEqual([S.hold.teak, S.hold.syrope, S.hold.steel], [2, 1, 1]);
+});
+
+test('B3 생물 8종: 큰 바다 도감, 야자집게는 밀물에도 남고, 박물학자 도전과제', () => {
+  assert.deepEqual(Object.keys(SPECIES).filter((id) => SPECIES[id].region === 'sea'), SEA_SPECIES);
+  const kinds = Object.fromEntries(SEA_SPECIES.map((id) => [id, SPECIES[id].kind]));
+  assert.deepEqual(kinds, { flyingfish: 'flyfish', tuna: 'fish', shark: 'fin', manta: 'manta', albatross: 'bird', frigatebird: 'bird', shearwater: 'bird', coconutcrab: 'crab' });
+  assert.equal(SPECIES.tuna.len, 1.2); assert.equal(SPECIES.tuna.school, 4); assert.equal(SPECIES.albatross.wing, 2.2); assert.equal(SPECIES.shearwater.wing, 1.2); assert.equal(SPECIES.coconutcrab.size, 1.6);
+  assert.equal(SPECIES.coconutcrab.tide, undefined, '밀물에도 안 사라져요'); assert.equal(SPECIES.crab.tide, 'low');
+  assert.ok(SEA_SPECIES.every((id) => SPECIES[id].sea));
+  // 큰 바다 생물 칸은 앞바다 칸과 따로 세요
+  const S = G.newGame(1); S.region = 'sea'; S.ship.mods.push({ id: 'telescope', col: 0, row: 3, rot: 0 });
+  for (const id of Object.keys(SPECIES).filter((k) => SPECIES[k].region === 'coast')) G.recordSpecies(S, id);
+  assert.ok(S.ach.seaAll); assert.ok(!S.ach.islandNaturalist);
+  for (const id of SEA_SPECIES.slice(0, 7)) G.recordSpecies(S, id);
+  assert.ok(!S.ach.islandNaturalist); G.recordSpecies(S, 'coconutcrab');
+  assert.ok(S.ach.islandNaturalist); assert.ok(ACHIEVEMENTS.some((a) => a.id === 'islandNaturalist' && a.coin === 60));
+  // 큰 바다에서 만나면 도감에 적혀요
+  const R = G.newGame(2); assert.equal(G.recordSpecies(R, 'shark'), true); assert.equal(R.seen.shark, 1);
+  // 야자집게는 높은 물때(밀물)에도 해변에 나타나요. 같은 자리에서 썰물 전용 게(앞바다)는 이 바다에 없어요
+  const w = worldOf('sea'), cr = createCreatures(w);
+  const tb = w.finds.find((f) => f.id === 'turtleBeach'), cam = { x: tb.x, y: tb.y, zoom: 8, cy: 200 };
+  const seen = new Set();
+  for (let i = 0; i < 4000; i++) { cr.update(0.2, cam, 400, 400, { x: -1100, y: 500, spd: 0 }, true, { tide: TIDE.amp, len: 14 }); for (const c of cr.list) seen.add(c.sp); }
+  assert.ok(seen.has('coconutcrab'), `밀물에도 야자집게가 보여야 해요: ${[...seen]}`); assert.ok(!seen.has('crab'));
+  for (const sp of seen) assert.equal(SPECIES[sp].region, 'sea', sp);
+});

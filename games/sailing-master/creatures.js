@@ -50,6 +50,12 @@ export function createCreatures(world) {
             if (c.kind === 'swimmer' && c.next < 0) { c.act = c.act > 0 ? 0 : 2.4; c.next = 3 + R() * 5; } else c.act -= dt;
             break;
           }
+          // 날치 떼(M3): 물속 그림자로 헤엄치다 4~9초마다 물 위로 뛰어 1.6초 미끄러져요. 배가 4m/s 넘게 달리면 뱃머리 가까이에서 자주 뛰어요
+          case 'flyfish': { c.x += Math.cos(c.h) * dt * 2.2; c.y += Math.sin(c.h) * dt * 2.2; if (R() < dt * 0.3) c.h += (R() - 0.5) * 1.4; const fast = (boat.spd || 0) > 4 && away < 60; if (c.next < 0 && c.act <= 0) { c.act = 1.6; c.next = fast ? 1 + R() * 2 : 4 + R() * 5; } c.act -= dt; if (c.act > 0) { c.x += Math.cos(c.h) * dt * 5; c.y += Math.sin(c.h) * dt * 5; } break; }
+          // 상어(M3): 등지느러미만 물을 가르며 큰 원을 돌아요. 공격하지 않아요
+          case 'fin': { c.h += dt * 0.18; c.x += Math.cos(c.h) * dt * 2.4; c.y += Math.sin(c.h) * dt * 2.4; break; }
+          // 만타가오리(M3): 넓은 그림자로 천천히, 가끔 물 위로 뛰어요
+          case 'manta': { c.x += Math.cos(c.h) * dt * 1.1; c.y += Math.sin(c.h) * dt * 1.1; if (R() < dt * 0.2) c.h += (R() - 0.5); if (c.next < 0 && c.act <= 0) { c.act = 1.3; c.next = 8 + R() * 10; } c.act -= dt; break; }
           case 'bird': { c.x += Math.cos(c.h) * dt * (def.wing > 1 ? 7 : 11); c.y += Math.sin(c.h) * dt * (def.wing > 1 ? 7 : 11); break; }
           // 돌고래: 빠르게 헤엄치다 2~4초마다 물 위로 활처럼 뛰어요. 배가 빠르게 지나가면 뱃머리 앞을 한동안 따라 타요(bow)
           case 'dolphin': {
@@ -225,13 +231,14 @@ const DRAW = {
   // 날짐승: 하늘을 가로지르고 물 위에 그림자가 진다
   bird(g, c, x, y, z, def) {
     const s = Math.max(0.8, z / 8) * (def.wing > 1 ? 1.5 : 0.9), flap = Math.sin(c.ph * (def.wing > 1 ? 5 : 15));
-    const alt = 14 * z * 0.5;
+    const alt = 14 * z * 0.5 * (def.high ? 1.7 : def.low ? 0.3 : 1); // 군함조는 높이, 슴새는 물 위 낮게(M3)
     g.fillStyle = 'rgba(14,50,70,.2)'; g.beginPath(); g.ellipse(x + alt * 0.2, y, 7 * s, 2.4 * s, 0, 0, TAU); g.fill();
     const py = y - alt;
     g.strokeStyle = def.color; g.lineWidth = 2 * s; g.lineCap = 'round';
     g.beginPath(); g.moveTo(x - 9 * s, py - flap * 4 * s); g.quadraticCurveTo(x - 4 * s, py - 2 * s - flap * 2 * s, x, py); g.quadraticCurveTo(x + 4 * s, py - 2 * s - flap * 2 * s, x + 9 * s, py - flap * 4 * s); g.stroke();
     if (def.tip) { g.strokeStyle = def.tip; g.lineWidth = 2.1 * s; for (const d of [-1, 1]) { g.beginPath(); g.moveTo(x + d * 6.6 * s, py - flap * 3.2 * s - 0.6 * s); g.lineTo(x + d * 9 * s, py - flap * 4 * s); g.stroke(); } } // 갈매기 날개 끝
     g.fillStyle = def.color; g.beginPath(); g.ellipse(x, py, 2.2 * s, 1.5 * s, 0, 0, TAU); g.fill();
+    if (def.pouch) { g.fillStyle = def.pouch; g.beginPath(); g.arc(x + 2.4 * s, py + 1.2 * s, 1.15 * s, 0, TAU); g.fill(); } // 군함조 붉은 목주머니
     if (def.tip) { g.fillStyle = '#e6b23c'; g.beginPath(); g.moveTo(x + 2 * s, py - 0.3 * s); g.lineTo(x + 3.4 * s, py); g.lineTo(x + 2 * s, py + 0.4 * s); g.closePath(); g.fill(); }
   },
   // ── M2b 바다 생물 ──
@@ -309,7 +316,7 @@ const DRAW = {
   },
   // 게: 썰물 해변을 옆으로 종종. 집게 둘을 들었다 놨다
   crab(g, c, x, y, z, def) {
-    const s = Math.max(0.7, z / 8) * 0.8, n = c.n || 1;
+    const s = Math.max(0.7, z / 8) * 0.8 * (def.size || 1), n = c.n || 1;
     for (let i = 0; i < n; i++) {
       const px = x + (i - (n - 1) / 2) * 5 * s + Math.sin(i * 3.1) * 2 * s, py = y + Math.cos(i * 2.3) * 1.6 * s, walk = c.act > 0 ? Math.sin(c.ph * 18 + i) : 0, claw = Math.sin(c.ph * 3 + i * 2) * 0.4;
       g.fillStyle = 'rgba(60,40,20,.22)'; g.beginPath(); g.ellipse(px, py + 0.4 * s, 3 * s, 0.9 * s, 0, 0, TAU); g.fill();
@@ -320,6 +327,46 @@ const DRAW = {
       g.fillStyle = 'rgba(255,220,200,.35)'; g.beginPath(); g.ellipse(px - 0.6 * s, py - 1.5 * s, 1 * s, 0.4 * s, 0, 0, TAU); g.fill();
       g.fillStyle = '#1d1a18'; for (const sd of [-0.6, 0.6]) { g.beginPath(); g.arc(px + sd * s, py - 2.4 * s, 0.32 * s, 0, TAU); g.fill(); }
     }
+  },
+  // 날치(M3): 평소엔 물속 그림자 다섯, act 동안 가슴지느러미를 활짝 펴고 물 위로 미끄러져요
+  flyfish(g, c, x, y, z, def) {
+    const n = def.group || 5, L = Math.max(4, 1.5 * z);
+    for (let i = 0; i < n; i++) {
+      const ox = Math.cos(i * 2.3) * (1.2 + i * 0.5) * z, oy = Math.sin(i * 2.3) * (1.0 + i * 0.35) * z * 0.6, wig = Math.sin(c.ph * 9 + i) * 0.2;
+      if (c.act > 0) {
+        const p = 1 - c.act / 1.6, h = Math.sin(p * Math.PI) * 1.3 * z + (i % 2) * 0.3 * z;
+        g.save(); g.translate(x + ox, y + oy - h); g.rotate(c.h);
+        g.fillStyle = def.color; g.beginPath(); g.ellipse(0, 0, L * 0.5, L * 0.12, 0, 0, TAU); g.fill();
+        g.fillStyle = def.wingc; g.beginPath(); g.moveTo(L * 0.1, 0); g.lineTo(-L * 0.15, L * 0.55); g.lineTo(-L * 0.3, 0); g.lineTo(-L * 0.15, -L * 0.55); g.closePath(); g.fill();
+        g.restore();
+      } else {
+        g.save(); g.translate(x + ox, y + oy); g.scale(1, VIEW.tiltY); g.rotate(c.h);
+        g.fillStyle = 'rgba(14,50,72,.4)'; g.beginPath(); g.ellipse(0, 0, L * 0.5, L * 0.1, 0, 0, TAU); g.fill();
+        g.beginPath(); g.moveTo(-L * 0.42, 0); g.lineTo(-L * 0.7, L * (0.12 + wig * 0.2)); g.lineTo(-L * 0.7, -L * (0.12 - wig * 0.2)); g.closePath(); g.fill();
+        g.restore();
+      }
+    }
+    if (c.act > 0) drops(g, x, y, 1.4 * z, 0.5);
+  },
+  // 상어(M3): 등지느러미 하나가 물을 가르고 뒤에 V자 물결이 남아요
+  fin(g, c, x, y, z, def) {
+    const s = Math.max(0.8, z / 8) * (def.size || 1), f = Math.cos(c.h) >= 0 ? 1 : -1;
+    g.strokeStyle = 'rgba(240,250,250,.55)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x - f * 3 * s, y + 1 * s); g.lineTo(x - f * 16 * s, y - 4 * s); g.moveTo(x - f * 3 * s, y + 1 * s); g.lineTo(x - f * 16 * s, y + 6 * s); g.stroke();
+    g.fillStyle = 'rgba(14,50,72,.35)'; g.beginPath(); g.ellipse(x, y + 2 * s, 9 * s, 2.2 * s, 0, 0, TAU); g.fill();
+    g.fillStyle = def.color; g.beginPath(); g.moveTo(x - f * 3 * s, y + 1.2 * s); g.quadraticCurveTo(x - f * 1 * s, y - 6 * s, x + f * 2.5 * s, y - 8 * s); g.quadraticCurveTo(x + f * 3.5 * s, y - 3 * s, x + f * 4.5 * s, y + 1.2 * s); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.moveTo(x - f * 1.5 * s, y + 0.6 * s); g.quadraticCurveTo(x - f * 0.5 * s, y - 4 * s, x + f * 1.5 * s, y - 6 * s); g.lineTo(x + f * 0.8 * s, y + 0.6 * s); g.closePath(); g.fill();
+  },
+  // 만타가오리(M3): 넓은 마름모 그림자가 날개를 저으며 떠가고, act 동안 물 위로 솟아 배가 하얗게 보여요
+  manta(g, c, x, y, z, def) {
+    const s = Math.max(0.8, z / 8) * (def.size || 1), flap = Math.sin(c.ph * 2.2) * 0.25;
+    const body = (lift, col, a) => {
+      g.save(); g.translate(x, y - lift); g.scale(1, VIEW.tiltY + 0.15); g.rotate(c.h);
+      g.fillStyle = col; g.globalAlpha *= a; g.beginPath(); g.moveTo(8 * s, 0); g.quadraticCurveTo(1 * s, -(8 + flap * 4) * s, -3 * s, -11 * s * (1 + flap)); g.quadraticCurveTo(-3 * s, -3 * s, -7 * s, 0); g.quadraticCurveTo(-3 * s, 3 * s, -3 * s, 11 * s * (1 + flap)); g.quadraticCurveTo(1 * s, (8 + flap * 4) * s, 8 * s, 0); g.closePath(); g.fill();
+      g.strokeStyle = col; g.lineWidth = 1.2 * s; g.beginPath(); g.moveTo(-6 * s, 0); g.lineTo(-13 * s, 0.6 * s); g.stroke();
+      g.restore();
+    };
+    if (c.act > 0) { const p = 1 - c.act / 1.3, h = Math.sin(p * Math.PI) * 1.4 * z; body(0, 'rgba(14,50,72,.3)', 1); body(h, def.belly, 1); drops(g, x, y, (0.6 + p) * z, 0.8 * (1 - p)); }
+    else body(0, 'rgba(14,50,72,.5)', 1);
   },
   // 펠리컨: 물에 둥둥, 노란 큰 부리와 목주머니. act 동안 부리를 물에 박아요
   pelican(g, c, x, y, z, def) {
@@ -371,9 +418,9 @@ const shadeHex = (hex, k) => { const n = parseInt(hex.slice(1), 16), f = (v) => 
 // 도감 그림: 한 칸에 맞춰 그린다
 export function drawSpeciesIcon(g, id, x, y, size) {
   const def = SPECIES[id], z = 8;
-  const c = { h: 0, ph: 1, act: def.kind === 'fish' ? 0.45 : def.kind === 'dolphin' ? 0.55 : def.kind === 'perch' ? 1.25 : 0, life: 1, size: def.size || 1, n: 1, x: 0, y: 0 };
+  const c = { h: 0, ph: 1, act: def.kind === 'fish' ? 0.45 : def.kind === 'flyfish' ? 0.8 : def.kind === 'manta' ? 0.65 : def.kind === 'dolphin' ? 0.55 : def.kind === 'perch' ? 1.25 : 0, life: 1, size: def.size || 1, n: 1, x: 0, y: 0 };
   // 종류마다 몸이 그려지는 높이가 달라 칸 안에 들어오게 크기와 기준 높이를 맞춘다
-  const fit = { fish: [0.05, size * 0.42], duck: [0.05 / (def.neck || 1) / (def.size || 1), size * 0.34], wader: [0.042, size * 0.72], frog: [0.08, size * 0.22], swimmer: [0.08, size * 0.14], turtle: [0.08, 0], bird: [0.05, 0], land: [0.075 / (def.height || 1), size * 0.5], dolphin: [0.06, size * 0.3], seal: [0.075, size * 0.12], seaturtle: [0.06, 0], jelly: [0.06, -size * 0.12], crab: [0.11, size * 0.12], pelican: [0.042, size * 0.3], perch: [0.05, size * 0.5] }[def.kind];
+  const fit = { flyfish: [0.05, size * 0.4], fin: [0.07, size * 0.3], manta: [0.04, size * 0.3], fish: [0.05, size * 0.42], duck: [0.05 / (def.neck || 1) / (def.size || 1), size * 0.34], wader: [0.042, size * 0.72], frog: [0.08, size * 0.22], swimmer: [0.08, size * 0.14], turtle: [0.08, 0], bird: [0.05, 0], land: [0.075 / (def.height || 1), size * 0.5], dolphin: [0.06, size * 0.3], seal: [0.075, size * 0.12], seaturtle: [0.06, 0], jelly: [0.06, -size * 0.12], crab: [0.11, size * 0.12], pelican: [0.042, size * 0.3], perch: [0.05, size * 0.5] }[def.kind];
   const k = size * fit[0], lift = def.kind === 'bird' ? 7 * z * k : fit[1];
   g.save();
   g.translate(x, y + lift);

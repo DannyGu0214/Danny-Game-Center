@@ -296,9 +296,10 @@ export function createWorld(def) {
   const ports = def.ports.map(snap).map(dockSpot), gates = def.gates.map(snap);
   // 2등급 이상 맵: 처음 들어갈 때 발견지 자리를 정한다. 목록과 개수는 표 그대로이고 자리만 달라진다
   function randomFinds(rnd) {
-    const taken = [...ports, ...gates], out = [];
-    const clear = (x, y) => taken.every((q) => Math.hypot(q.x - x, q.y - y) > 45) && out.every((q) => Math.hypot(q.x - x, q.y - y) > 40);
+    const taken = [...ports, ...gates], out = def.finds.map((f, i) => (f.fixed ? finds[i] : null)); // fixed(M3): 자리가 정해진 발견지는 건너뛰고 그대로 둬요
+    const clear = (x, y) => taken.every((q) => Math.hypot(q.x - x, q.y - y) > 45) && out.every((q) => !q || Math.hypot(q.x - x, q.y - y) > 40);
     def.finds.forEach((f, i) => {
+      if (f.fixed) return;
       let done = null;
       for (let t = 0; t < 600 && !done; t++) {
         const x = bx0 + rnd() * (bx1 - bx0), y = by0 + rnd() * (by1 - by0), d = dist(x, y);
@@ -311,7 +312,7 @@ export function createWorld(def) {
         if (q > -depth + 1 || q < -depth - 8 || !clear(px, py)) continue;
         done = { ...f, x: px, y: py, where };
       }
-      out.push(done || finds[i]);
+      out[i] = done || finds[i];
     });
     return out;
   }

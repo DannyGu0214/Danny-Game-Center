@@ -252,6 +252,12 @@ export const ITEMS = {
   // M2b 앞바다부터: 철판(금속 고급, 쇠못 3개로 공방에서도 만들어요)·톱니·베어링(기계 부품, 스쿠너 보조 기관). buyAt: 그 수역 항구에서만 사요(앞바다 항구는 참나무·범포·철판도 팔아요: 교역으로 번 금화가 배가 돼요)
   plate: { name: '철판', icon: '🔳', kind: 'mat', fam: 'metal', tier: 2, vol: 1, sell: 4, buy: 10, buyAt: 'coast' },
   gear: { name: '톱니·베어링', icon: '⚙️', kind: 'mat', fam: 'mech', tier: 2, vol: 1, sell: 6, buy: 16, buyAt: 'coast' },
+  // M3 B3 큰 바다부터: 최고급 5종(3등급). buyAt: 큰 바다 항구에서 사요(재료 가게가 없는 shop:false 항구는 빼요). buyPort: 그 항구에서만(전자 부품은 보급항만, 공방으로 못 만들어요)
+  teak: { name: '티크', icon: '🌲', kind: 'mat', fam: 'wood', tier: 3, vol: 1, sell: 4, buy: 12, buyAt: 'sea' },
+  synth: { name: '합성 돛천', icon: '🪁', kind: 'mat', fam: 'cloth', tier: 3, vol: 1, sell: 6, buy: 16, buyAt: 'sea' },
+  syrope: { name: '합성 로프', icon: '➿', kind: 'mat', fam: 'rope', tier: 3, vol: 1, sell: 5, buy: 14, buyAt: 'sea' },
+  steel: { name: '강판', icon: '⬛', kind: 'mat', fam: 'metal', tier: 3, vol: 1, sell: 8, buy: 22, buyAt: 'sea' },
+  chip: { name: '전자 부품', icon: '🔌', kind: 'mat', fam: 'mech', tier: 3, vol: 1, sell: 12, buy: 40, buyAt: 'sea', buyPort: 'depot' },
   coffee: { name: '커피', icon: '☕', kind: 'trade', vol: 1, price: 8 },
   spice: { name: '향신료', icon: '🌶', kind: 'trade', vol: 1, price: 14 },
   porcelain: { name: '도자기', icon: '🏺', kind: 'trade', vol: 1, price: 22 },
@@ -263,7 +269,7 @@ export const RES = ITEMS; // 예전 이름
 export const MAT_IDS = Object.keys(ITEMS).filter((k) => ITEMS[k].kind === 'mat');
 export const TRADE_IDS = Object.keys(ITEMS).filter((k) => ITEMS[k].kind === 'trade');
 // 공방: 같은 계열 낮은 등급 3개 + 금화를 높은 등급 1개로(막힘 방지용이라 비싸요)
-export const WORKSHOP = { ratio: 3, fee: 6, pairs: { wood: 'oak', cloth: 'canvas', hemp: 'tar', nail: 'plate' } };
+export const WORKSHOP = { ratio: 3, fee: 6, pairs: { wood: 'oak', cloth: 'canvas', hemp: 'tar', nail: 'plate', oak: 'teak', canvas: 'synth', tar: 'syrope', plate: 'steel' } };
 // 교역: 공간마다 찾는 품목은 1.5배. 같은 공간의 기항지는 값이 같아요
 export const TRADE = { demandK: 1.5 };
 // 보급품. keep: 며칠 뒤 상하나(없으면 안 상함), vigor: 먹으면 기력이 빨리 돌아옴
@@ -305,6 +311,15 @@ export const SPECIES = {
   seaturtle: { name: '바다거북', kind: 'seaturtle', region: 'coast', color: '#6a7d4c', shell: '#7c6a3e', sea: true },
   jelly: { name: '해파리 떼', kind: 'jelly', region: 'coast', color: '#f0b9da', group: 7, sea: true },
   crab: { name: '게', kind: 'crab', region: 'coast', color: '#c9573c', tide: 'low', sea: true },
+  // 큰 바다(M3 B3, region 'sea'): 날치·상어·가오리는 새 모양, 참치·새는 앞바다 틀을 바꿔 써요. 야자집게는 tide가 없어 밀물에도 남아요
+  flyingfish: { name: '날치 떼', kind: 'flyfish', region: 'sea', color: '#4f7aa0', wingc: '#d6e8f2', group: 5, sea: true },
+  tuna: { name: '참치 떼', kind: 'fish', region: 'sea', color: '#33526e', len: 1.2, school: 4, sea: true },
+  shark: { name: '상어', kind: 'fin', region: 'sea', color: '#5d6b75', size: 1.2, sea: true },
+  manta: { name: '만타가오리', kind: 'manta', region: 'sea', color: '#2c4152', belly: '#dfe7ea', size: 1.6, sea: true },
+  albatross: { name: '앨버트로스', kind: 'bird', region: 'sea', color: '#f2f0ea', tip: '#2c3135', wing: 2.2, sea: true },
+  frigatebird: { name: '군함조', kind: 'bird', region: 'sea', color: '#1e2326', pouch: '#d6402f', wing: 2, high: true, sea: true },
+  shearwater: { name: '슴새', kind: 'bird', region: 'sea', color: '#4a5058', wing: 1.2, low: true, sea: true },
+  coconutcrab: { name: '야자집게', kind: 'crab', region: 'sea', color: '#7a4f3a', size: 1.6, sea: true },
 };
 
 // theme: 풍경 테마 이름(themes.js THEMES)
@@ -426,19 +441,27 @@ export const REGIONS = {
       { x: -600, y: -1100, r: 32, ph: 0.3 }, { x: 900, y: -1200, r: 40, ph: 1.4 }, { x: -900, y: 0, r: 28, ph: 2.6 }, { x: 1700, y: -300, r: 36, ph: 3.8 },
       { x: 600, y: 1000, r: 24, ph: 4.9 }, { x: -300, y: 300, r: 22, ph: 6.0 }, { x: 1200, y: 200, r: 30, ph: 0.6 }, { x: -1700, y: 1200, r: 45, ph: 1.9 },
     ],
-    lights: [{ x: -200, y: 1322, r: 300 }],
+    lights: [{ x: -200, y: 1322, r: 300 }, { x: 900, y: -1200, r: 260, find: 'farLight' }], // 무인 등대(farLight) 불빛
     start: 'southLight',
     ports: [{ id: 'southLight', name: '남쪽 등대 항', x: -200, y: 1322, water: 2 }, { id: 'depot', name: '큰 섬 보급항', x: 300, y: -40, water: 1, yard: 5 }, { id: 'palm', name: '야자섬 나루', x: -1130, y: 500, water: 3, shop: false }, { id: 'rockVillage', name: '바위섬 어촌', x: -1380, y: -800, water: 2 }],
     gates: [{ id: 'toCoast', name: '남쪽 물목', x: 0, y: 1560, to: 'coast', entry: 'light', req: {}, open: true }, { id: 'toOcean', name: '대양 어귀', x: 0, y: -1560, to: null, req: { grade: 5 }, open: true }],
+    // 발견지 10곳(M3 B3, PLAN-M3.md 4-2절). 좌표는 기본 자리이고 2등급 이상 맵은 판마다 randomFinds가 다시 골라요(경계 70m 안은 빼요). fixed는 자리가 고정(작은 섬 위의 등대)
     finds: [
-      { id: 'seaFall', name: '큰 섬 폭포', x: 300, y: -730, inland: 30, coin: 80, canvas: 20, relic: '폭포 바위의 조개 화석', art: 'stone' },
-      { id: 'seaCrater', name: '화산 분화구', x: 1400, y: 480, coin: 90, nail: 10, relic: '분화구의 검은 유리', art: 'rocks' },
-      { id: 'seaLagoon', name: '산호 석호', x: -300, y: 300, coin: 70, cloth: 20, relic: '석호의 진주 조각', art: 'tidepool', where: 'beach', tide: 'low' },
+      { id: 'volcanoRim', name: '화산 분화구 전망대', x: 1400, y: 520, inland: 40, coin: 90, steel: 6, relic: '흑요석 조각', art: 'volcano' },
+      { id: 'reefLagoon', name: '산호초 석호', x: -300, y: 300, where: 'water', coin: 70, synth: 10, chip: 1, relic: '분홍 산호 가지', art: 'reef' },
+      { id: 'expWreck', name: '옛 탐험대 난파선', x: 700, y: -900, where: 'water', size: 1.6, coin: 80, teak: 40, steel: 8, blueprint: 'explorer', relic: '탐험대 항해 일지', art: 'wreck' },
+      { id: 'turtleBeach', name: '거북 알 해변', x: -1300, y: 650, where: 'beach', coin: 50, syrope: 6, relic: '거북 등무늬 조약돌', art: 'turtlebeach' },
+      { id: 'seaArch', name: '해식 아치', x: -1500, y: -690, coin: 60, synth: 15, relic: '아치 밑 소라 나팔', art: 'arch' },
+      { id: 'islandFalls', name: '큰 섬 폭포', x: 300, y: -690, inland: 50, coin: 80, teak: 30, relic: '폭포 뒤 이끼 낀 종', art: 'falls' },
+      { id: 'oldStation', name: '버려진 측후소', x: 520, y: -300, inland: 30, coin: 60, chip: 2, blueprint: 'station', relic: '깨진 기압계', art: 'tower' },
+      { id: 'glassFloats', name: '떠도는 유리 부표', x: 1000, y: 1100, where: 'water', coin: 40, syrope: 6, relic: '초록 유리 공', art: 'glassfloat' },
+      { id: 'farLight', name: '무인 등대', x: 900, y: -1200, fixed: true, coin: 60, steel: 4, relic: '등대의 렌즈 파편', art: 'lighthouse' },
+      { id: 'palmShrine', name: '야자 숲 옛 제단', x: -1300, y: 500, inland: 35, coin: 65, teak: 15, relic: '조개 박은 나무 가면', art: 'shrine' },
     ],
     // 산호초 고리(PLAN-M3.md 2-1절): 스쿠너(흘수 0.85)는 밀물에만 넘어가요
     shoals: [{ x: -300, y: 230, r: 40, depth: 1 }, { x: -230, y: 300, r: 40, depth: 1.1 }, { x: -300, y: 370, r: 40, depth: 0.9 }, { x: -370, y: 300, r: 40, depth: 1.2 }],
-    flot: { cap: 36, table: [['wood', 2, 3, 6], ['oak', 2, 2, 5], ['net', 2.5, 3, 6], ['hemp', 1.2, 2, 4], ['nail', 1, 2, 4], ['tar', 1, 2, 3], ['plate', 0.9, 1, 2], ['gear', 0.35, 1, 1], ['water', 2.5, 2, 3], ['shiny', 5, 1, 2]] },
-    trade: [['spice', 3], ['porcelain', 3], ['silk', 4], ['painting', 0.4]], demand: ['spice', 'silk'],
+    flot: { cap: 36, table: [['wood', 1, 3, 6], ['oak', 1.5, 2, 5], ['teak', 0.8, 1, 3], ['net', 2, 3, 6], ['syrope', 0.8, 1, 3], ['plate', 1, 1, 2], ['steel', 0.4, 1, 2], ['gear', 0.5, 1, 1], ['water', 3, 2, 3], ['shiny', 6, 1, 2]] },
+    trade: [['porcelain', 3], ['silk', 4], ['painting', 1.2], ['spice', 2]], demand: ['spice', 'silk'],
   },
 };
 export const REGION_ORDER = ['pond', 'lake', 'river', 'coast', 'sea'];
@@ -469,6 +492,9 @@ export const ACHIEVEMENTS = [
   // M3 B0: 앞바다 북쪽 경계 너머가 큰 바다예요(예전엔 엔딩이었어요). 엔딩은 대양 어귀로 옮겨요(B7)
   // M3 B2 태풍: 바다 위에서 태풍 하루를 태풍 피해 없이 넘기기
   { id: 'typhoonSafe', name: '태풍을 비켜 가다', desc: '바다 위에서 태풍을 피해 없이 넘기기', coin: 40 },
+  // M3 B3 큰 바다: 발견지 10곳과 바다 생물 8종
+  { id: 'seaIsles', name: '섬과 섬 사이', desc: '큰 바다 발견지 모두 찾기', coin: 60 },
+  { id: 'islandNaturalist', name: '섬 바다 박물학자', desc: '큰 바다 생물 모두 기록', coin: 60 },
   { id: 'openSea', name: '큰 바다로', desc: '4등급 배로 앞바다 북쪽 경계를 넘어 큰 바다에 들어가기', coin: 80 },
 ];
 

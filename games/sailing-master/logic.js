@@ -229,7 +229,7 @@ export function newGame(seed = 1) {
     mend: null, wet: 0,
     cap: { x: HULLS.raft.helmX, at: 'helm', to: null, then: null },
     route: null, docked: 'reed', disaster: null, events: [],
-    res: { wood: 15, cloth: 0, coin: 10 }, hold: {},
+    res: { wood: 15, cloth: 0, coin: 10, ...NEW_MATS }, hold: {},
     food: HULLS.raft.foodBase, pantry: [{ k: 'bread', n: HULLS.raft.foodBase, exp: SUPPLY.bread.keep }], herb: 0, water: 0, hull: 1, vigor: 1, relics: {}, letters: {},
     ship: { hull: 'raft', mods: [{ id: 'oar', col: 1, row: 1, rot: 0 }], name: '새벽호', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] },
     crew: [], hiredEver: {}, owed: 0, wageDay: 0,
@@ -710,7 +710,16 @@ export function craft(S, from, times = 1) {
   return n;
 }
 // 사는 재료: buy 값이 있고, buyAt이 있으면 그 수역 항구에서만(M2b 톱니·베어링은 앞바다)
-export const canBuyMat = (S, k) => !!ITEMS[k]?.buy && (!ITEMS[k].buyAt || ITEMS[k].buyAt === S.region);
+// M3 B3: buyAt은 수역 하나나 목록(M4 대양), shop:false 항구(야자섬 나루 등)는 재료 가게가 없고, buyPort가 있으면 그 항구에서만 사요
+export function canBuyMat(S, k) {
+  const I = ITEMS[k];
+  if (!I?.buy) return false;
+  if (I.buyAt && ![].concat(I.buyAt).includes(S.region)) return false;
+  const port = S.docked ? worldOf(S.region).ports.find((p) => p.id === S.docked) : null;
+  if (port && port.shop === false) return false;
+  if (I.buyPort && port?.id !== I.buyPort) return false;
+  return true;
+}
 export function buyMat(S, k, n = 1) {
   const P = ITEMS[k]?.buy;
   if (!S.docked || !canBuyMat(S, k)) return 0;
@@ -947,6 +956,8 @@ function giveAch(S, id) {
   S.ach[id] = 1; S.res.coin += a.coin || 0;
   emit(S, 'ach', { id });
 }
+// M3 B3 최고급 재료 5종(창고 기본값 0)
+const NEW_MATS = { teak: 0, synth: 0, syrope: 0, steel: 0, chip: 0 };
 const worldDone = (S, region) => worldOf(region).def.finds.every((f) => S.found[f.id]);
 // 다음 배의 재료가 모이면 한 번 알려 준다(창고 + 화물칸). 2등급부터는 ★2가 먼저다
 export function nextHull(S) {
@@ -978,7 +989,9 @@ export function checkAch(S) {
   c('crew3', Object.keys(S.hiredEver).length >= 3);
   c('sloop', HULLS[S.ship.hull].grade >= 3);
   c('schooner', HULLS[S.ship.hull].grade >= 4);
-  c('seaAll', Object.keys(SPECIES).every((id) => !SPECIES[id].sea || S.seen[id]));
+  c('seaAll', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'coast' || S.seen[id])); // 앞바다 생물(큰 바다 생물은 islandNaturalist)
+  c('islandNaturalist', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'sea' || S.seen[id]));
+  c('seaIsles', worldDone(S, 'sea'));
   c('lakeAll', worldDone(S, 'lake'));
   const nSeen = Object.keys(S.seen).length;
   c('species5', nSeen >= 5);
@@ -1584,6 +1597,7 @@ export function deserialize(raw) {
     if (o.ended && o.region === 'coast') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'light'); }
     if (o.region === 'coast' && o.route?.target?.type === 'gate' && o.route.target.id === 'toOcean') o.route = null; // 옛 관문 id
     o.stats.typhoons ??= 0; o.stats.typhoonHurt ??= 0; o.stats.calmDays ??= 0;
+    for (const k of Object.keys(NEW_MATS)) o.res[k] ??= 0; // M3 B3 최고급 재료 5종: 창고 기본 0
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
     o.v = 8;
     o.best ??= JSON.parse(JSON.stringify(o.ship));

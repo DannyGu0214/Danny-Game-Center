@@ -180,11 +180,11 @@ function sharedArt() {
       willow: [willowSprite(0.2), willowSprite(0.8)], reedbed: [reedbedSprite(0.2), reedbedSprite(0.7)], flowers: [flowersSprite(0.1), flowersSprite(0.5), flowersSprite(0.9)],
       pebbles: [pebblesSprite(0.3), pebblesSprite(0.8)], boulder: [boulderSprite(0.2), boulderSprite(0.7)], windmill: windmillSprite(), thatch: [thatchSprite(0.2), thatchSprite(0.7)], haystack: haystackSprite(), bridge: bridgeSprite(),
       // 앞바다(M2b): 발견지 5종, 바다 관문 표지, 등대, 어촌 항구 집, 해안 풍경
-      ruins: ruinsSprite(), cave: caveSprite(), rocks: rocksSprite(), tidepool: tidepoolSprite(), buoy: buoySprite(), seamark: seamarkSprite(), lighthouse: lighthouseSprite(), seahut: hutSprite('seahut'),
+      ruins: ruinsSprite(), cave: caveSprite(), rocks: rocksSprite(), tidepool: tidepoolSprite(), buoy: buoySprite(), seamark: seamarkSprite(), lighthouse: lighthouseSprite(), volcano: volcanoSprite(), reef: reefSprite(), turtlebeach: turtlebeachSprite(), arch: archSprite(), falls: fallsSprite(), glassfloat: glassfloatSprite(), seahut: hutSprite('seahut'),
       seapine: [seapineSprite(0.2), seapineSprite(0.8)], seagrass: [seagrassSprite(0.2), seagrassSprite(0.7)], fishhut: [fishhutSprite(0.2), fishhutSprite(0.8)], netrack: netrackSprite(), breakwater: breakwaterSprite(),
       pier: pierSprite(), hut: hutSprite(), sign: signSprite(), stone: stoneSprite(), stump: stumpSprite(), wreck: wreckSprite(), tower: towerSprite(), cabin: cabinSprite(), mill: millSprite(), shrine: shrineSprite(), camp: campSprite(), logpile: logpileSprite(), beacon: beaconSprite(), shelter: shelterSprite(), beached: beachedSprite(),
     },
-    flot: Object.fromEntries(['wood', 'oak', 'cloth', 'canvas', 'hemp', 'tar', 'nail', 'shiny', 'bottle', 'coin', 'water', 'net'].map((k) => [k, flotSprite(k)])),
+    flot: Object.fromEntries(['wood', 'oak', 'cloth', 'canvas', 'hemp', 'tar', 'nail', 'shiny', 'bottle', 'coin', 'water', 'net', 'teak', 'syrope', 'steel', 'plate', 'gear'].map((k) => [k, flotSprite(k)])),
   };
   return shared;
 }
@@ -205,8 +205,9 @@ export function sceneLayout(regionId, finds = worldOf(regionId).finds) {
     marks.push({ kind: theme.hut, x: x - gx * 3.5 + gy * side * 3.6, y: y - gy * 3.5 - gx * side * 3.6, size: 1, name: p.name, port: p }); const d = w.dist(p.x, p.y) + 0.4, len = Math.max(5, Math.min(PIER_MAX, d - 4.5)), x0 = p.x - gx * d, y0 = p.y - gy * d;
     marks.push({ kind: 'pier', x: x0 + gx * len / 2, y: y0 + gy * len / 2, x0, y0, len, size: 1, ang: Math.atan2(gy, gx) }); }
   for (const g of w.gates) { const [x, y] = g.open ? [g.x, g.y] : shore(g); marks.push({ kind: g.open ? 'seamark' : 'sign', x, y, size: 1, name: g.name, gate: g }); } // 바다 관문(M2b)은 물 위 그 자리에 방위 표지 부표를 띄워요
-  for (const L of w.def.lights || []) marks.push({ kind: 'lighthouse', x: L.x, y: L.y, size: 1, v: 0, lamp: L }); // 등대섬 등대(M2b): 해무 때 불빛이 멀리 보이고 빛줄기가 돌아요
-  for (const f of finds) marks.push({ kind: f.art, x: f.x, y: f.y, size: 1, find: f });
+  for (const L of w.def.lights || []) if (!L.find) marks.push({ kind: 'lighthouse', x: L.x, y: L.y, size: 1, v: 0, lamp: L }); // 등대섬 등대(M2b): 해무 때 불빛이 멀리 보이고 빛줄기가 돌아요
+  const lampOf = (f) => (w.def.lights || []).find((L) => L.find === f.id); // 등대 발견지(M3 무인 등대)는 그 자리가 곧 등대라 불빛 표지를 따로 세우지 않아요
+  for (const f of finds) marks.push({ kind: f.art, x: f.x, y: f.y, size: f.size || 1, find: f, ...(lampOf(f) ? { lamp: lampOf(f) } : {}) });
   const { props: land, decals, zones } = dressLand(w, theme, marks);
   return { world: w, theme, marks, decals, zones, props: [...land, ...marks].sort((a, b) => a.y - b.y) };
 }
@@ -1451,6 +1452,80 @@ function lighthouseSprite() {
   g.fillStyle = '#3f4448'; g.beginPath(); g.arc(...P(0, TOP - 2.92), 0.15 * S, 0, TAU); g.fill();
   return { c, W: 9, H: 17, ox: 4.5, oy: 16.2, glow: [0, TOP - 0.78], sweep: [0, TOP - 0.78] };
 }
+// ── 큰 바다 발견지 그림 6종(M3 B3) ──
+// 화산: 검은 바위 원뿔, 분화구 붉은 빛, 꼭대기 연기
+function volcanoSprite() {
+  const { S, c, g, P } = spriteBox(10, 9, 0.8);
+  shadowAt(g, P, S, 0.4, 4.4, 0.7, 0.3);
+  const poly = (pts, fill) => { g.beginPath(); for (const q of pts) g.lineTo(...P(...q)); g.closePath(); g.fillStyle = fill; g.fill(); };
+  poly([[-4.4, 0], [-1.0, -5.6], [1.0, -5.6], [4.6, 0]], '#3a3836'); poly([[0.2, -5.6], [1.0, -5.6], [4.6, 0], [1.4, 0]], '#2a2927');
+  poly([[-3.0, 0], [-0.9, -4.4], [-0.3, -4.2], [-1.6, 0]], '#4f4c48');
+  for (let i = 0; i < 7; i++) wetRock(g, P, S, -3.6 + i * 1.2, -0.1 - (i % 2) * 0.2, 0.55 + hash(i, 5) * 0.3, 0.36, i + 140, i);
+  g.fillStyle = '#d0472b'; g.beginPath(); g.ellipse(...P(0, -5.6), 1.15 * S, 0.3 * S, 0, 0, TAU); g.fill(); g.fillStyle = '#ffb347'; g.beginPath(); g.ellipse(...P(0, -5.62), 0.7 * S, 0.17 * S, 0, 0, TAU); g.fill();
+  g.strokeStyle = '#e8602c'; g.lineWidth = 1.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(...P(0.4, -5.4)); g.bezierCurveTo(...P(0.8, -4.2), ...P(0.3, -3.0), ...P(1.0, -1.6)); g.stroke();
+  for (const [x, y, r, a] of [[0.2, -6.5, 0.9, 0.5], [0.7, -7.4, 1.2, 0.4], [1.5, -8.2, 1.45, 0.3]]) { g.fillStyle = `rgba(96,92,90,${a})`; g.beginPath(); g.arc(...P(x, y), r * S * 0.55, 0, TAU); g.fill(); }
+  return { c, W: 10, H: 9, ox: 5, oy: 8.2, glow: [0, -5.6] };
+}
+// 산호초 석호: 물 위에 청록 고리 모양 산호, 가운데 맑은 물
+function reefSprite() {
+  const { S, c, g, P } = spriteBox(10, 4, 1.5);
+  g.fillStyle = 'rgba(14,90,110,.35)'; g.beginPath(); g.ellipse(...P(0, 0.2), 4.6 * S, 1.45 * S, 0, 0, TAU); g.fill();
+  g.fillStyle = '#e2d6a8'; g.beginPath(); g.ellipse(...P(0, 0), 4.0 * S, 1.2 * S, 0, 0, TAU); g.fill();
+  g.fillStyle = '#58c9c0'; g.beginPath(); g.ellipse(...P(0, 0.05), 3.1 * S, 0.88 * S, 0, 0, TAU); g.fill();
+  g.fillStyle = '#9ae6df'; g.beginPath(); g.ellipse(...P(-0.4, -0.1), 2.0 * S, 0.5 * S, 0, 0, TAU); g.fill();
+  const cols = ['#e86a8a', '#f09a5a', '#c15fc2', '#f5c04a', '#7a63d4'];
+  for (let i = 0; i < 22; i++) { const a = i / 22 * TAU, x = Math.cos(a) * 3.55 + (hash(i, 2) - 0.5) * 0.4, y = Math.sin(a) * 1.04 + (hash(i, 7) - 0.5) * 0.12, r = 0.2 + hash(i, 3) * 0.24; g.fillStyle = cols[i % 5]; g.beginPath(); g.ellipse(...P(x, y - 0.1), r * S, r * S * 0.75, 0, 0, TAU); g.fill(); g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 1; g.beginPath(); g.arc(...P(x - r * 0.2, y - 0.14), r * S * 0.4, 3.4, 5); g.stroke(); }
+  return { c, W: 10, H: 4, ox: 5, oy: 2.5, bob: true, ripple: [4, 1.1] };
+}
+// 거북 알 해변: 모래 위 둥지 구덩이와 작은 발자국 줄
+function turtlebeachSprite() {
+  const { S, c, g, P } = spriteBox(8, 3.6, 1);
+  blob(g, P, S, 0, 0.1, 3.7, 0.95, 31, '#cdb77f', 14, 0.1); blob(g, P, S, -0.2, -0.05, 3.5, 0.8, 32, '#e6d49a', 14, 0.1);
+  blob(g, P, S, -0.6, -0.12, 1.1, 0.3, 33, '#a8935d', 10, 0.18); blob(g, P, S, -0.62, -0.18, 0.85, 0.2, 33, '#8a7547', 10, 0.18);
+  for (const [x, y] of [[-0.9, -0.2], [-0.5, -0.24], [-0.2, -0.16], [-0.6, -0.1]]) { g.fillStyle = '#f4efe0'; g.beginPath(); g.ellipse(...P(x, y), 0.13 * S, 0.1 * S, 0, 0, TAU); g.fill(); }
+  g.fillStyle = 'rgba(120,98,56,.55)'; for (let i = 0; i < 9; i++) { const x = 0.8 + i * 0.32, y = -0.1 + Math.sin(i * 0.9) * 0.12 + (i % 2 ? 0.1 : -0.1); g.beginPath(); g.ellipse(...P(x, y), 0.1 * S, 0.06 * S, 0.4, 0, TAU); g.fill(); }
+  g.strokeStyle = 'rgba(120,98,56,.4)'; g.lineWidth = 3; g.beginPath(); g.moveTo(...P(0.7, -0.08)); g.bezierCurveTo(...P(1.6, 0.2), ...P(2.4, -0.2), ...P(3.2, 0.1)); g.stroke();
+  grassTuft(g, P, S, -3.0, 4);
+  return { c, W: 8, H: 3.6, ox: 4, oy: 2.6 };
+}
+// 해식 아치: 물가 바위가 파도에 뚫려 생긴 아치
+function archSprite() {
+  const { S, c, g, P } = spriteBox(9, 7, 0.8);
+  shadowAt(g, P, S, 0, 3.8, 0.6, 0.28);
+  const rock = (x, y, rx, ry, sd, a, b) => { blob(g, P, S, x + 0.15, y + 0.12, rx, ry, sd, 'rgba(30,38,40,.35)', 12, 0.1); blob(g, P, S, x, y, rx, ry, sd, a, 12, 0.1); blob(g, P, S, x - rx * 0.25, y - ry * 0.3, rx * 0.6, ry * 0.5, sd + 1, b, 10, 0.14); };
+  rock(-2.6, -2.0, 1.4, 2.2, 51, '#7a7468', '#9a9384'); rock(2.7, -1.8, 1.3, 2.0, 52, '#6f695d', '#8f8878');
+  g.fillStyle = '#7a7468'; g.beginPath(); g.moveTo(...P(-3.9, -2.4)); g.bezierCurveTo(...P(-3.2, -5.9), ...P(3.2, -5.9), ...P(3.9, -2.2)); g.lineTo(...P(2.2, -2.3)); g.bezierCurveTo(...P(1.7, -4.0), ...P(-1.7, -4.0), ...P(-2.2, -2.4)); g.closePath(); g.fill();
+  g.fillStyle = '#9a9384'; g.beginPath(); g.moveTo(...P(-3.7, -3.2)); g.bezierCurveTo(...P(-2.9, -5.6), ...P(0, -5.8), ...P(1.2, -5.4)); g.lineTo(...P(0.8, -4.7)); g.bezierCurveTo(...P(-1, -5.0), ...P(-2.6, -4.6), ...P(-3.3, -3.0)); g.closePath(); g.fill();
+  g.fillStyle = '#7fc6d6'; g.beginPath(); g.moveTo(...P(-1.9, -0.2)); g.bezierCurveTo(...P(-1.9, -3.0), ...P(1.9, -3.0), ...P(1.9, -0.2)); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(...P(0, -0.5), 1.2 * S, 0.22 * S, 0, 0, TAU); g.fill();
+  grassTuft(g, P, S, 0.4, 5); wetRock(g, P, S, -2.9, -0.15, 0.7, 0.4, 53, 1); wetRock(g, P, S, 3.0, -0.1, 0.8, 0.4, 54, 2);
+  return { c, W: 9, H: 7, ox: 4.5, oy: 6.2 };
+}
+// 큰 섬 폭포: 절벽에서 쏟아지는 흰 물줄기와 물보라
+function fallsSprite() {
+  const { S, c, g, P } = spriteBox(9, 9, 0.8);
+  shadowAt(g, P, S, 0, 3.6, 0.6, 0.28);
+  g.fillStyle = '#5b5a52'; g.beginPath(); g.moveTo(...P(-4.2, 0)); g.lineTo(...P(-3.6, -6.2)); g.lineTo(...P(-1.4, -7.8)); g.lineTo(...P(1.6, -7.8)); g.lineTo(...P(3.8, -6.0)); g.lineTo(...P(4.3, 0)); g.closePath(); g.fill();
+  g.fillStyle = '#76756a'; g.beginPath(); g.moveTo(...P(-4.2, 0)); g.lineTo(...P(-3.6, -6.2)); g.lineTo(...P(-1.4, -7.8)); g.lineTo(...P(-1.8, -3)); g.lineTo(...P(-2.6, 0)); g.closePath(); g.fill();
+  blob(g, P, S, -2.2, -7.5, 2.4, 0.9, 61, '#3f7a3a', 11, 0.16); blob(g, P, S, 2.6, -7.2, 2.0, 0.8, 62, '#4a8a42', 11, 0.16);
+  const grad = g.createLinearGradient(...P(0, -7.2), ...P(0, 0)); grad.addColorStop(0, 'rgba(236,248,252,.95)'); grad.addColorStop(1, 'rgba(190,226,238,.85)');
+  g.fillStyle = grad; g.beginPath(); g.moveTo(...P(-0.8, -7.4)); g.lineTo(...P(0.9, -7.4)); g.lineTo(...P(1.2, -0.4)); g.lineTo(...P(-1.2, -0.4)); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 1.4; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(...P(i * 0.28, -7.2)); g.lineTo(...P(i * 0.34, -0.6)); g.stroke(); }
+  for (const [x, y, r] of [[-0.9, -0.3, 0.9], [0.2, -0.1, 1.2], [1.1, -0.4, 0.8], [-0.2, -0.6, 0.9]]) { g.fillStyle = 'rgba(240,250,252,.6)'; g.beginPath(); g.arc(...P(x, y), r * S * 0.55, 0, TAU); g.fill(); }
+  g.fillStyle = '#6fb6c8'; g.beginPath(); g.ellipse(...P(0, 0.1), 2.0 * S, 0.34 * S, 0, 0, TAU); g.fill();
+  return { c, W: 9, H: 9, ox: 4.5, oy: 8.2, ripple: [1.6, 0.35] };
+}
+// 유리 부표: 그물에 엮인 초록 유리 공 무더기가 물 위에 떠 있어요
+function glassfloatSprite() {
+  const { S, c, g, P } = spriteBox(5, 3.4, 0.8);
+  g.fillStyle = 'rgba(14,60,70,.3)'; g.beginPath(); g.ellipse(...P(0, 0.1), 2.1 * S, 0.5 * S, 0, 0, TAU); g.fill();
+  g.strokeStyle = '#8a6e42'; g.lineWidth = 2; g.lineCap = 'round'; for (let i = 0; i < 7; i++) { g.beginPath(); g.moveTo(...P(-1.9 + i * 0.64, 0)); g.bezierCurveTo(...P(-1.4 + i * 0.5, -1.2), ...P(-0.5 + i * 0.3, -1.6), ...P(-0.6 + i * 0.2, -0.3)); g.stroke(); }
+  for (const [x, y, r] of [[-0.9, -0.55, 0.62], [0.7, -0.5, 0.7], [-0.1, -1.2, 0.58], [1.5, -0.2, 0.42], [-1.7, -0.2, 0.4]]) {
+    g.fillStyle = '#2f8f64'; g.beginPath(); g.arc(...P(x, y), r * S, 0, TAU); g.fill(); g.fillStyle = '#58c795'; g.beginPath(); g.arc(...P(x - r * 0.15, y - r * 0.15), r * S * 0.78, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(...P(x - r * 0.35, y - r * 0.4), r * S * 0.22, r * S * 0.13, -0.6, 0, TAU); g.fill();
+  }
+  return { c, W: 5, H: 3.4, ox: 2.5, oy: 2.6, bob: true, ripple: [2, 0.5] };
+}
 // 해송: 바닷바람에 기운 줄기, 납작하게 층진 솔잎 머리(v로 기운 쪽이 달라요)
 function seapineSprite(v) {
   const { S, c, g, P } = spriteBox(8, 10, 0.6), d = v < 0.5 ? 1 : -1;
@@ -1678,21 +1753,26 @@ function bridgeSprite() {
 function flotSprite(k) {
   const [c, g] = canvas(128, 96), cx = 64, cy = 58;
   g.fillStyle = 'rgba(14,50,70,.3)'; g.beginPath(); g.ellipse(cx, cy + 10, 44, 13, 0, 0, TAU); g.fill();
-  if (k === 'wood' || k === 'oak') {
-    // 통나무 두 개: 껍질 결과 밝은 단면(참나무는 짙고 굵다)
-    const oak = k === 'oak';
-    for (const [y, x0, len, col] of oak ? [[2, -42, 80, '#5a3f24'], [-13, -36, 74, '#6b4c2c']] : [[2, -40, 76, '#7d5a35'], [-12, -34, 70, '#94703f']]) {
+  if (k === 'wood' || k === 'oak' || k === 'teak') {
+    // 통나무 두 개: 껍질 결과 밝은 단면(참나무는 짙고 굵다, 티크는 붉은 금빛)
+    const oak = k === 'oak' || k === 'teak';
+    for (const [y, x0, len, col] of k === 'teak' ? [[2, -42, 80, '#8a5a2a'], [-13, -36, 74, '#a8742f']] : oak ? [[2, -42, 80, '#5a3f24'], [-13, -36, 74, '#6b4c2c']] : [[2, -40, 76, '#7d5a35'], [-12, -34, 70, '#94703f']]) {
       g.fillStyle = col; g.beginPath(); g.roundRect(cx + x0, cy + y - 8, len, 16, 8); g.fill();
       g.fillStyle = 'rgba(255,236,200,.22)'; g.fillRect(cx + x0 + 6, cy + y - 6, len - 14, 3);
       g.strokeStyle = 'rgba(60,40,20,.45)'; g.lineWidth = 1.4; for (let i = 0; i < 5; i++) { const xx = cx + x0 + 10 + i * 12; g.beginPath(); g.moveTo(xx, cy + y - 2 + (i % 2) * 3); g.lineTo(xx + 9, cy + y - 1 + (i % 2) * 3); g.stroke(); }
       g.fillStyle = '#d8bb8a'; g.beginPath(); g.ellipse(cx + x0 + len - 4, cy + y, 5, 8, 0, 0, TAU); g.fill();
       g.strokeStyle = 'rgba(140,100,55,.7)'; g.lineWidth = 1; g.beginPath(); g.ellipse(cx + x0 + len - 4, cy + y, 2.4, 4, 0, 0, TAU); g.stroke();
     }
-  } else if (k === 'hemp' || k === 'tar') {
-    // 밧줄 사리
-    const dark = k === 'tar';
-    for (const [r, w] of [[26, 7], [17, 7], [8, 6]]) { g.strokeStyle = dark ? '#3a2e22' : '#a88a55'; g.lineWidth = w; g.beginPath(); g.ellipse(cx, cy - 4, r, r * 0.55, 0, 0, TAU); g.stroke(); g.strokeStyle = dark ? '#5a4a36' : '#d9c79a'; g.lineWidth = w * 0.45; g.beginPath(); g.ellipse(cx - 1, cy - 5, r, r * 0.55, 0, PI * 1.1, PI * 1.9); g.stroke(); }
-    g.strokeStyle = dark ? '#3a2e22' : '#a88a55'; g.lineWidth = 6; g.beginPath(); g.moveTo(cx + 24, cy - 2); g.quadraticCurveTo(cx + 40, cy + 2, cx + 46, cy - 8); g.stroke();
+  } else if (k === 'plate' || k === 'steel' || k === 'gear') {
+    // 금속 판 두 장(강판은 푸른빛, 톱니는 톱니바퀴)
+    const blue = k === 'steel';
+    if (k === 'gear') { g.fillStyle = '#8a8f94'; g.beginPath(); for (let i = 0; i < 16; i++) { const a = i / 16 * TAU, r = i % 2 ? 17 : 23; g.lineTo(cx + Math.cos(a) * r, cy - 6 + Math.sin(a) * r * 0.62); } g.closePath(); g.fill(); g.fillStyle = '#5d6266'; g.beginPath(); g.ellipse(cx, cy - 6, 7, 4.4, 0, 0, TAU); g.fill(); }
+    else for (const [y, x0, col, hi] of blue ? [[2, -34, '#59707f', '#8fa6b4'], [-12, -28, '#6b8493', '#a4bccb']] : [[2, -34, '#6d6d6a', '#9b9b95'], [-12, -28, '#7d7d78', '#aeaea6']]) { g.fillStyle = col; g.beginPath(); g.roundRect(cx + x0, cy + y - 8, 66, 16, 3); g.fill(); g.fillStyle = hi; g.fillRect(cx + x0 + 3, cy + y - 6, 60, 3); g.fillStyle = 'rgba(30,30,30,.5)'; for (const dx of [6, 58]) { g.beginPath(); g.arc(cx + x0 + dx, cy + y, 2, 0, TAU); g.fill(); } }
+  } else if (k === 'hemp' || k === 'tar' || k === 'syrope') {
+    // 밧줄 사리(합성 로프는 푸른 빛)
+    const dark = k === 'tar', syn = k === 'syrope';
+    for (const [r, w] of [[26, 7], [17, 7], [8, 6]]) { g.strokeStyle = dark ? '#3a2e22' : syn ? '#2f6f9f' : '#a88a55'; g.lineWidth = w; g.beginPath(); g.ellipse(cx, cy - 4, r, r * 0.55, 0, 0, TAU); g.stroke(); g.strokeStyle = dark ? '#5a4a36' : syn ? '#9fd0ea' : '#d9c79a'; g.lineWidth = w * 0.45; g.beginPath(); g.ellipse(cx - 1, cy - 5, r, r * 0.55, 0, PI * 1.1, PI * 1.9); g.stroke(); }
+    g.strokeStyle = dark ? '#3a2e22' : syn ? '#2f6f9f' : '#a88a55'; g.lineWidth = 6; g.beginPath(); g.moveTo(cx + 24, cy - 2); g.quadraticCurveTo(cx + 40, cy + 2, cx + 46, cy - 8); g.stroke();
   } else if (k === 'nail') {
     // 쇠못 상자
     g.fillStyle = '#6b5032'; g.fillRect(cx - 22, cy - 18, 44, 26); g.fillStyle = '#86653e'; g.fillRect(cx - 22, cy - 24, 44, 8);

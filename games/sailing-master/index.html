@@ -1628,7 +1628,7 @@ const dexCanvas = () => { const cv = el('canvas'), dpr = Math.min(2.5, devicePix
 function renderSpecies(body) {
   const seen = Object.keys(S.seen).length, all = Object.keys(SPECIES).length;
   const coin = (id) => ACHIEVEMENTS.find((a) => a.id === id).coin;
-  const ms = [['5종', 'species5'], ['10종', 'species10'], ['민물 전체', 'speciesAll'], ['바다 전체', 'seaAll']].map(([n, id]) => `<span class="${S.ach[id] ? 'on' : ''}">${n}<em class="cost"><svg><use href="#i-coin"/></svg>${coin(id)}</em></span>`).join('');
+  const ms = [['5종', 'species5'], ['10종', 'species10'], ['민물 전체', 'speciesAll'], ['앞바다 전체', 'seaAll'], ['큰 바다 전체', 'islandNaturalist']].map(([n, id]) => `<span class="${S.ach[id] ? 'on' : ''}">${n}<em class="cost"><svg><use href="#i-coin"/></svg>${coin(id)}</em></span>`).join('');
   body.append(dexHead('만난 생물', seen, all, `<div class="tip"><div>지나가는 놈들을 탭하면 적어 둔다!</div><div>사슴·곰 같은 뭍짐승은 망원경이 있어야 보여.</div><div>게는 썰물 해변에만, 돌고래는 뱃머리를 탈 때 탭하면 좋은 일이 있지!</div></div><div class="ms">${ms}</div>`));
   for (const r of REGION_ORDER) {
     const ids = Object.keys(SPECIES).filter((id) => SPECIES[id].region === r);
@@ -1639,7 +1639,7 @@ function renderSpecies(body) {
       const known = S.seen[id], def = SPECIES[id], cell = el('div', `sp${known ? '' : ' unk'}`);
       if (known) {
         const [cv, dpr] = dexCanvas(), g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-        if (['fish', 'duck', 'turtle', 'swimmer', 'frog', 'dolphin', 'seaturtle', 'jelly', 'pelican'].includes(def.kind)) { g.fillStyle = 'rgba(60,150,180,.3)'; g.fillRect(0, 0, 108, 66); }
+        if (['fish', 'duck', 'turtle', 'swimmer', 'frog', 'dolphin', 'seaturtle', 'jelly', 'pelican', 'flyfish', 'fin', 'manta'].includes(def.kind)) { g.fillStyle = 'rgba(60,150,180,.3)'; g.fillRect(0, 0, 108, 66); }
         drawSpeciesIcon(g, id, 54, 33, 42);
         cell.append(cv);
       } else cell.append(el('div', 'q', '?'));
