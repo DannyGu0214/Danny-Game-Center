@@ -56,7 +56,7 @@ test('S5 계절: 안개는 봄에 잦고, 폭풍은 여름·가을에만, 홍수
   const d = { day: 9, storm: 50, gust: 40, squall: 60, fog: true, heat: true, flood: true, drought: true };
   assert.deepEqual(G.kindsOf('pond', d), ['gust', 'squall', 'fog']);
   assert.deepEqual(G.kindsOf('lake', d), ['storm', 'gust', 'squall', 'fog', 'heat']);
-  assert.deepEqual(G.kindsOf('river', d), WX_ORDER.filter((id) => id !== 'bigswell' && id !== 'seafog'));
+  assert.deepEqual(G.kindsOf('river', d), WX_ORDER.filter((id) => id !== 'bigswell' && id !== 'seafog' && id !== 'calm' && id !== 'typhoon'));
 });
 
 test('S5 예보: 날씨 칸은 심한 것부터, 안개는 내일까지만 보이고 기압계로 폭풍을 더 멀리 본다', () => {
@@ -257,11 +257,11 @@ test('저장 v4 → v5: 돛은 멀쩡, 꿰매기 규칙은 켬, 옛 날씨 칸�
   o.v = 4; delete o.boat.torn; delete o.boat.strain; delete o.mend; delete o.rules?.mend; o.rules = { reef: true, repair: true, storm: false };
   o.weather = { heat: false, drought: false, gustOn: true, gustSoon: false };
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 7); assert.equal(T.boat.torn, false); assert.equal(T.boat.strain, 0); assert.equal(T.rules.mend, true);
+  assert.equal(T.v, 8); assert.equal(T.boat.torn, false); assert.equal(T.boat.strain, 0); assert.equal(T.rules.mend, true);
   assert.ok(T.weather.fx); assert.equal(T.weather.gustOn, true, '돌풍이 끝나는 것도 알아챈다');
   run(T, 2);
   assert.ok(T.weather.fx && Array.isArray(T.weather.on));
-  assert.equal(G.newGame(1).v, 7);
+  assert.equal(G.newGame(1).v, 8);
 });
 
 test('여울: 가뭄에 여울을 기어가도 여울 피해만으로는 가라앉지 않는다(내구도 25%에서 멈춤)', () => {

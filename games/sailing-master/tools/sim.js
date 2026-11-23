@@ -105,7 +105,7 @@ function daysBack(st) {
   if (S.t - backT < 5) return backDays;
   backT = S.t;
   const w = worldOf(S.region), L = Math.min(...w.ports.map((p) => pathLen(p.x, p.y)));
-  backDays = L / Math.max(2, st.maxSpeed * 0.45) / CAL.day;
+  backDays = G.tripDays(S, L, 0.45); // 같은 계산(G.tripDays)을 쓰되, 봇은 평균 속도를 최고 속도의 0.45배로 넉넉히 잡아요
   return backDays;
 }
 function think() {
@@ -176,7 +176,9 @@ for (let i = 0; i < ticks && !S.ended; i++) {
     shop();
     // 오늘 폭풍이 아직 안 왔으면 하루 묵어 간다(조심스러운 사람처럼)
     const o = G.outlook(S)[0], inDay = S.clock % CAL.day;
-    if (o.ids.includes('storm') && inDay < o.storm + WX.storm.len && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; G.waitDay(S); log.waits = (log.waits || 0) + 1; shop(); }
+    // 태풍(M3 B2)은 지나갈 때까지(날을 넘기면 다음 날 새벽까지) 항구에서 기다린다. reckless 봇은 무시해요
+    if (!reckless && G.typhoonLeft(S) > 0 && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; G.waitDay(S); log.typhoonWaits = (log.typhoonWaits || 0) + 1; shop(); }
+    else if (o.ids.includes('storm') && inDay < o.storm + WX.storm.len && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; G.waitDay(S); log.waits = (log.waits || 0) + 1; shop(); }
     // 앞바다: 갈 데가 모두 너울 너머면 하루 묵는다(하루에 한 번)
     else if (waitRough && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; waitRough = false; G.waitDay(S); log.swellWaits = (log.swellWaits || 0) + 1; shop(); }
     waitRough = false;

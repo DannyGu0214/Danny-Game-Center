@@ -1,4 +1,4 @@
-import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, WX, WX_ORDER, SAILCLOTH, WET, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB, TRAITS, CREW_GROW, TIDE, WATER, DESAL } from './data.js';
+import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, WX, WX_ORDER, SAILCLOTH, WET, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB, TRAITS, CREW_GROW, TIDE, WATER, DESAL, TYPHOON } from './data.js';
 import { worldOf } from './world.js';
 import * as SH from './ship.js';
 // 게임 규칙 전부. 화면이 없고, 시드와 고정 시간 단계만으로 결과가 같다.
@@ -37,6 +37,8 @@ export function dayWeather(seed, day) {
     const K = WX[id], p = K.calmFirst && day < 1 ? 0 : K.chance?.[sea] || 0;
     if (K.when === 'event') out[id] = hash(seed + K.salt, day) < p ? (K.at + K.span * hash(seed + (K.salt2 ?? K.salt + 4.6), day)) * CAL.day : null;
     else if (K.when === 'cal') out[id] = !!K.days[sea]?.includes(dos);
+    // track(태풍): 그날 오면 경로를 담아요. side −1 서쪽에서 · +1 동쪽에서 들어옴, u·v 지도 가운데 60% 안의 지나는 점, w 들어오는 높이, t0 들어오는 때(초)
+    else if (K.when === 'track') out[id] = hash(seed + K.salt, day) < p ? { side: hash(seed + K.salt + 1.7, day) < 0.5 ? -1 : 1, u: hash(seed + K.salt + 2.9, day), v: hash(seed + K.salt + 4.3, day), w: hash(seed + K.salt + 7.1, day), t0: (TYPHOON.enter[0] + (TYPHOON.enter[1] - TYPHOON.enter[0]) * hash(seed + K.salt + 5.8, day)) * CAL.day } : null;
     else out[id] = !!p && hash(seed + K.salt, day) < p;
   }
   return out;
@@ -49,11 +51,18 @@ export function forecast(S) {
 // 그 수역에 그날 오는 날씨 종류(심한 것부터). ahead: 며칠 앞 예보인가(fc보다 멀면 안 보여요)
 export function kindsOf(region, d, ahead = 0) {
   const list = REGIONS[region].weather || [];
-  return WX_ORDER.filter((id) => list.includes(id) && (WX[id].when === 'event' ? d[id] !== null && d[id] !== undefined : d[id]) && (WX[id].fc ?? 99) >= ahead);
+  return WX_ORDER.filter((id) => list.includes(id) && (WX[id].when === 'event' || WX[id].when === 'track' ? d[id] !== null && d[id] !== undefined && d[id] !== false : d[id]) && (WX[id].fc ?? 99) >= ahead);
 }
 // 예보 칸: 날마다 보이는 날씨 종류와 가장 심한 것
 export function outlook(S) {
-  return forecast(S).map((d, i) => { const ids = kindsOf(S.region, d, i); return { ...d, ids, worst: ids[0] || null, sev: ids.length ? WX[ids[0]].sev : 0, swell: daySwell(S.region, S.seed, d.day) }; });
+  const list = forecast(S).map((d, i) => { const ids = kindsOf(S.region, d, i); return { ...d, ids, worst: ids[0] || null, sev: ids.length ? WX[ids[0]].sev : 0, swell: daySwell(S.region, S.seed, d.day) }; });
+  // 태풍은 다른 날씨보다 멀리(기본 2일 앞, 기압계 +1, 측후소 +2) 보여요. 예보 창 밖 날은 태풍만 보이고 나머지는 모르는 날(blind)이에요
+  if ((REGIONS[S.region].weather || []).includes('typhoon')) {
+    const st = stats(S), today = clock(S).day, reach = st.typhoonAhead ?? TYPHOON.ahead, base = list.length;
+    for (let i = base; i <= reach; i++) { const d = dayWeather(S.seed, today + i), ids = kindsOf(S.region, d, i).filter((id) => id === 'typhoon'); list.push({ ...d, ids, worst: ids[0] || null, sev: ids.length ? WX.typhoon.sev : 0, swell: 0, blind: true }); }
+    while (list.length > base && !list[list.length - 1].ids.length) list.pop();
+  }
+  return list;
 }
 // 안개 짙기: 새벽에 짙고 len의 60%부터 걷혀요. 처음 6초는 서서히 끼어요
 const fogAt = (inDay, len) => (inDay >= len ? 0 : Math.min(1, inDay / 6, (len - inDay) / (len * 0.4)));
@@ -65,6 +74,7 @@ export function weatherAt(region, seed, clockT) {
   for (const id of WX_ORDER) {
     if (!list.includes(id)) continue;
     const K = WX[id];
+    if (K.when === 'track') continue; // 태풍은 아래에서(움직이는 원)
     let on = false, k = 1;
     if (K.when === 'event') {
       const t0 = w[id];
@@ -83,6 +93,11 @@ export function weatherAt(region, seed, clockT) {
       else fx[q] = Math.max(fx[q], v * k);
     }
   }
+  // 태풍(M3 B2): 살아 있는 태풍(오늘 것, 또는 날을 넘겨 건너오는 어제 것)과 들어오기 전 전조. 자리마다의 효과는 step의 typhoonTick이 더해요
+  const ty = liveTyphoon(region, seed, clockT);
+  out.typhoonOn = !!ty; out.tyLive = ty; out.typhoonSoon = false;
+  if (ty) out.on.unshift('typhoon');
+  else if (list.includes('typhoon')) { const tr = dayWeather(seed, day).typhoon; if (tr && inDay < tr.t0 && tr.t0 - inDay <= TYPHOON.warn) { out.typhoonSoon = true; out.soon.push('typhoon'); } }
   // 너울(M2a): 바깥 바다 너울 높이. 수역 swell 표가 없으면(담수) 0이에요. 자리마다의 배율은 world.swellAt
   const SW = REGIONS[region].swell;
   fx.swell = SW ? daySwell(region, seed, day) + (out.gustOn ? SW.gust : 0) + (out.stormOn ? SW.storm : 0) : 0;
@@ -111,13 +126,89 @@ export function tideInfo(S, clockT = S.clock) {
   const name = h > TIDE.amp * 0.7 ? '밀물' : h < -TIDE.amp * 0.7 ? '썰물' : rising ? '들물' : '날물';
   return { h, rising, name, toLow, toHigh };
 }
+// ── 태풍(M3 B2) ──
+// 경로: 서쪽(side −1)이나 동쪽(+1) 끝 밖 start m에서 들어와, 지도 가운데 60% 안의 점 P를 지나 반대쪽으로 빠져나가요(P는 경로 한가운데). cross초에 건너요
+export function typhoonTrack(region, tr) {
+  const sh = REGIONS[region].shape, cx = (sh.x0 + sh.x1) / 2, cy = (sh.y0 + sh.y1) / 2, W0 = sh.x1 - sh.x0, H0 = sh.y1 - sh.y0;
+  const sx = tr.side < 0 ? sh.x0 - TYPHOON.start : sh.x1 + TYPHOON.start, sy = cy + (tr.w - 0.5) * 1.2 * H0;
+  const px = cx + (tr.u - 0.5) * 0.6 * W0, py = cy + (tr.v - 0.5) * 0.6 * H0;
+  return { sx, sy, ex: sx + 2 * (px - sx), ey: sy + 2 * (py - sy), dur: TYPHOON.cross };
+}
+export function typhoonPos(region, tr, s) { const T = typhoonTrack(region, tr), k = s / T.dur; return [T.sx + (T.ex - T.sx) * k, T.sy + (T.ey - T.sy) * k]; }
+// 그 시각에 건너는 중인 태풍. 하루가 180초라 어제 들어온 태풍이 오늘 새벽까지 이어질 수 있어요
+export function liveTyphoon(region, seed, clockT) {
+  if (!(REGIONS[region].weather || []).includes('typhoon')) return null;
+  const day = Math.floor(clockT / CAL.day);
+  for (const d of [day, day - 1]) {
+    if (d < 0) continue;
+    const tr = dayWeather(seed, d).typhoon;
+    if (!tr) continue;
+    const s = clockT - d * CAL.day - tr.t0;
+    if (s >= 0 && s <= TYPHOON.cross) return { tr, s, day: d };
+  }
+  return null;
+}
+// 그 자리에서 받는 태풍 효과(없으면 null). zone: eye · storm · outer · null(원 밖). windUp·windDown 바람 배율, swell 더하는 너울(m), rain·strain·sight, from·mix 바람 방향 섞기
+export function typhoonAt(region, seed, clockT, x, y) {
+  const ty = liveTyphoon(region, seed, clockT);
+  if (!ty) return null;
+  const [cx, cy] = typhoonPos(region, ty.tr, ty.s), d = Math.hypot(x - cx, y - cy), R = REGIONS[region], SW = R.swell;
+  const out = { d, cx, cy, zone: null, windUp: 1, windDown: 1, swell: 0, rain: 0, strain: 0, sight: 1, from: null, mix: 0 };
+  if (d >= TYPHOON.outer) return out;
+  out.from = Math.atan2(x - cx, -(y - cy)); // 중심을 반시계로 도는 바람(북반구처럼): 중심 동쪽에선 북풍 쪽으로 불어요
+  if (d < TYPHOON.eye) { out.zone = 'eye'; out.windDown = TYPHOON.eyeWind; out.swell = TYPHOON.eyeSwell; return out; }
+  if (d < TYPHOON.storm) { out.zone = 'storm'; out.windUp = TYPHOON.wind; out.swell = TYPHOON.swell; out.rain = 1; out.strain = TYPHOON.strain; out.sight = TYPHOON.sight; out.mix = 1; return out; }
+  const f = 1 - (d - TYPHOON.storm) / (TYPHOON.outer - TYPHOON.storm);
+  out.zone = 'outer'; out.windUp = 1 + ((R.stormK || R.gustK * 1.2) - 1) * f; out.swell = (SW?.storm || 0) * f; out.rain = f > 0.15 ? 1 : 0;
+  out.strain = WX.storm.fx.strain * f; out.sight = 1 - (1 - WX.storm.fx.sight) * f; out.mix = f;
+  return out;
+}
+// 태풍이 위협하는 남은 초(오늘 것·어제 것 중 가장 긴 것). 0이면 지금은 안전해요(봇·항구 기다리기용)
+export function typhoonLeft(S) {
+  if (!(REGIONS[S.region].weather || []).includes('typhoon')) return 0;
+  const day = clock(S).day; let left = 0;
+  for (const d of [day - 1, day]) { if (d < 0) continue; const tr = dayWeather(S.seed, d).typhoon; if (tr) left = Math.max(left, d * CAL.day + tr.t0 + TYPHOON.cross - S.clock); }
+  return Math.max(0, left);
+}
+// 해도에 그릴 것: 오늘(또는 지금 건너는) 태풍의 경로와 지금 자리. 없으면 null
+export function typhoonView(S) {
+  if (!(REGIONS[S.region].weather || []).includes('typhoon')) return null;
+  const live = liveTyphoon(S.region, S.seed, S.clock), day = clock(S).day, tr = live ? live.tr : dayWeather(S.seed, day).typhoon;
+  if (!tr || (!live && S.clock >= day * CAL.day + tr.t0 + TYPHOON.cross)) return null;
+  return { track: typhoonTrack(S.region, tr), pos: live ? typhoonPos(S.region, live.tr, live.s) : null, s: live ? live.s : null, tr };
+}
+// 한 틱: 지금 태풍 효과를 날씨 fx에 합치고(바람은 큰 것 하나, 너울은 더하고, 보는 거리는 곱해요) 전조·고비·파국 알림을 내요. 항구에 대 있으면 step이 여기까지 오지 않아요
+function typhoonTick(S, wx, prev) {
+  if (wx.typhoonSoon && !prev.typhoonSoon) emit(S, 'typhoonSoon');
+  if (!wx.typhoonOn) {
+    if (prev.typhoonOn && S.ty) {
+      S.stats.typhoons = (S.stats.typhoons || 0) + 1; if (S.ty.hurt) S.stats.typhoonHurt = (S.stats.typhoonHurt || 0) + 1;
+      emit(S, 'typhoonDone', { hurt: S.ty.hurt }); S.ty = null; checkAch(S);
+    }
+    return;
+  }
+  const b = S.boat, live = wx.tyLive, q = typhoonAt(S.region, S.seed, S.clock, b.x, b.y);
+  if (!S.ty || S.ty.key !== live.day) S.ty = { key: live.day, hull0: S.hull, hurt: false, in: false, near: false };
+  const T = S.ty; if (S.hull < T.hull0 - 0.005) T.hurt = true;
+  wx.ty = q;
+  // 고비: 아직 바깥 원 밖인데 60초 안에 닿을 것 같으면 한 번 "비켜!"
+  if (!T.near && !q.zone) for (let t = 5; t <= TYPHOON.near; t += 5) { const [cx, cy] = typhoonPos(S.region, live.tr, live.s + t); if (Math.hypot(b.x - cx, b.y - cy) < TYPHOON.outer) { T.near = true; emit(S, 'typhoonNear', { d: q.d, eta: t }); break; } }
+  wx.tyBrace = !!(T.near || q.zone);
+  if (!q.zone) { if (T.in) { T.in = false; emit(S, 'typhoonOff'); } return; }
+  if (!T.in) { T.in = true; emit(S, 'typhoonIn', { zone: q.zone }); }
+  const fx = wx.fx;
+  fx.windUp = Math.max(fx.windUp, q.windUp); fx.windDown *= q.windDown; fx.swell += q.swell; fx.rain = Math.max(fx.rain, q.rain); fx.strain = Math.max(fx.strain, q.strain); fx.sight *= q.sight;
+  wx.rain = fx.rain > 0; wx.rough = true;
+}
 // 날씨가 없을 때(새 게임·옛 저장)
 export const calmWeather = () => ({ heat: false, drought: false, gustOn: false, gustSoon: false, stormOn: false, stormSoon: false, squallOn: false, squallSoon: false, flood: false, fog: 0, rain: false, rough: false, worst: null, on: [], soon: [], fx: { windUp: 1, windDown: 1, rain: 0, spray: 0, swell: 0, strain: 0, fog: 0, sight: 1, flow: 1, depth: 1, flot: 1, heat: 0 } });
 // 날씨가 바꾼 바람: 돌풍·폭풍은 세게(폭풍은 숨 쉬듯 출렁여요), 안개는 잔잔하게
 export function windNow(S, wx = S.weather) {
   const w = windAt(S), fx = wx?.fx;
   if (!fx) { if (wx?.gustOn) w.speed *= REGIONS[S.region].gustK; return w; }
-  w.speed *= fx.windUp * fx.windDown * (wx.stormOn ? 1 + 0.14 * Math.sin(S.t * 1.3) + 0.08 * Math.sin(S.t * 3.1) : 1);
+  w.speed *= fx.windUp * fx.windDown * (wx.stormOn || wx.ty?.zone === 'storm' ? 1 + 0.14 * Math.sin(S.t * 1.3) + 0.08 * Math.sin(S.t * 3.1) : 1);
+  // 태풍(M3 B2): 원 안에서는 바람이 중심을 도는 방향으로 돌아요(바깥 원 끝에서 수역 바람과 섞어요)
+  const ty = wx.ty; if (ty && ty.mix > 0 && ty.from != null) w.from += Math.atan2(Math.sin(ty.from - w.from), Math.cos(ty.from - w.from)) * ty.mix;
   return w;
 }
 export function windAt(S) {
@@ -130,7 +221,7 @@ export function windAt(S) {
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 7, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 8, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: calmWeather(),
@@ -138,12 +229,12 @@ export function newGame(seed = 1) {
     mend: null, wet: 0,
     cap: { x: HULLS.raft.helmX, at: 'helm', to: null, then: null },
     route: null, docked: 'reed', disaster: null, events: [],
-    res: { wood: 15, cloth: 0, coin: 10 }, hold: {},
+    res: { wood: 15, cloth: 0, coin: 10, ...NEW_MATS }, hold: {},
     food: HULLS.raft.foodBase, pantry: [{ k: 'bread', n: HULLS.raft.foodBase, exp: SUPPLY.bread.keep }], herb: 0, water: 0, hull: 1, vigor: 1, relics: {}, letters: {},
     ship: { hull: 'raft', mods: [{ id: 'oar', col: 1, row: 1, rot: 0 }], name: '새벽호', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] },
     crew: [], hiredEver: {}, owed: 0, wageDay: 0,
     flot: {}, fog: {}, found: {}, blueprints: {}, seen: {}, photos: {}, ach: {},
-    stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0 },
+    stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0, typhoons: 0, typhoonHurt: 0, calmDays: 0 },
     ended: false, rev: 0,
   };
   S.best = JSON.parse(JSON.stringify(S.ship));
@@ -462,6 +553,17 @@ export function departureCheck(S, days = 2) {
   if (has('drought') && st.draft > shoalFloor(S.region, WX.drought.fx.depth)) warns.push('가뭄 예보: 배가 깊어서 여울에 걸린다!'); // S5: 예전 기준 0.75는 슬루프(0.68~)를 놓쳤어요
   if (has('flood')) warns.push('강물이 불었다: 물살이 세니 물가 조심해!');
   if (has('seafog')) warns.push('해무 예보: 새벽 바다는 하얗게 덮인다! 등대 불빛을 봐 둬');
+  // 태풍(M3 B2): 오늘이면 항구에서 기다리라고, 앞날이면 며칠 뒤인지
+  { const tl = typhoonLeft(S), idx = fc.findIndex((d, i) => d.ids.includes('typhoon') && !(i === 0 && !tl));
+    if (tl > 0 || idx >= 0) warns.push(tl > 0 || idx === 0 ? '오늘 태풍 — 항구에서 기다리자고!' : `태풍이 ${idx}일 뒤에 온다! 대피할 항구를 봐 둬`); }
+  if (has('calm')) warns.push(st.motor ? '무풍 — 바람이 거의 없어! 보조 기관이나 노로 가야 해!' : '무풍 — 바람이 거의 없어! 노로 가야 해!');
+  // 항속(M3 B1): 큰 바다·대양은 항구가 멀어요. 가장 가까운 항구까지 가는 날수가 실은 것(식량·식수)보다 길면 알려 줘요(출항은 막지 않아요)
+  if (REGIONS[S.region].order >= 4) {
+    const near = W(S).ports.filter((p) => p.id !== S.docked).map((p) => ({ p, d: Math.hypot(p.x - S.boat.x, p.y - S.boat.y) })).sort((a, q) => a.d - q.d).slice(0, 2);
+    let best = null;
+    for (const { p } of near) { const L = tripLength(S, p.x, p.y); if (L != null && (best == null || L < best.L)) best = { p, L }; }
+    if (best) { const n = tripDays(S, best.L), m = rangeDays(S); if (n > m) warns.push(`가장 가까운 항구(${best.p.name})까지 약 ${n.toFixed(1)}일인데 실은 건 ${m.toFixed(1)}일치뿐이야!`); }
+  }
   // 너울(M2a): 예보의 그날 바깥 바다 너울이 내항성을 넘으면
   const big = fc.reduce((m, d) => Math.max(m, d.swell || 0), 0);
   if (big > st.sea) warns.push(`너울 예보 ${big.toFixed(1)}m: 이 배(${st.sea.toFixed(1)}m)엔 버거워! 만 안쪽으로 다니자고`);
@@ -523,6 +625,34 @@ export function buyFood(S, n = 1, k = 'bread') {
 export const drinkPerDay = (S, wx = S.weather) => (REGIONS[S.region].salt ? (1 + S.crew.length) * WATER.perDay * (wx?.heat ? WATER.heatK : 1) : 0);
 // 남은 식수로 며칠 버티나(무더위면 그날 기준)
 export const waterDays = (S) => { const d = drinkPerDay(S, null) || 1; return (S.water || 0) / d; };
+// ── 항속 계획(M3 B1) ──
+// 식량 일수: 실은 식량 ÷ 사람 수(하루 1인 1개). 항속 rangeDays = min(식량 일수, 식수 일수). 식수는 조수기가 하루에 만드는 양을 빼고 계산하고, 민물 수역은 무한으로 봐요
+export const foodDays = (S) => S.food / (1 + S.crew.length);
+export function rangeDays(S) {
+  const f = foodDays(S);
+  if (!REGIONS[S.region].salt) return f;
+  const st = stats(S), net = drinkPerDay(S, null) - (st.desal ? st.desal * DESAL.perDay : 0);
+  return Math.min(f, net > 1e-9 ? (S.water || 0) / net : Infinity);
+}
+// 지금 배의 평균 항해 속도(m/s). 돛 배는 최고 속도의 k배(기본 0.7: 맞바람 태킹·돛 줄임·바람 변화까지 넉넉히), 노 배는 노 속도의 0.9배
+export function avgSpeed(S, k = 0.7) { const st = stats(S); return Math.max(1.2, st.sailArea ? st.maxSpeed * k : st.rowSpeed * 0.9); }
+// 길이 len(m)를 가는 데 걸리는 날수
+export const tripDays = (S, len, k = 0.7) => len / avgSpeed(S, k) / CAL.day;
+// 지금 자리에서 (x, y)까지 항로 길이(m). 길이 없으면 null
+export function tripLength(S, x, y) {
+  const b = S.boat, [dx, dy] = W(S).nearestWater(x, y), pts = pathFor(S, b.x, b.y, dx, dy);
+  if (!pts) return null;
+  let L = 0, px = b.x, py = b.y;
+  for (const p of pts) { L += Math.hypot(p.x - px, p.y - py); px = p.x; py = p.y; }
+  return L;
+}
+// 해도 항해 계획: 가는 데 n일 · 실은 것 m일. n > m × 0.8이면 warn(주황), n > m이면 bad(빨강)
+export function tripPlan(S, x, y) {
+  const len = tripLength(S, x, y);
+  if (len == null) return null;
+  const n = tripDays(S, len), m = rangeDays(S);
+  return { len, n, m, level: n > m ? 'bad' : n > m * 0.8 ? 'warn' : 'ok' };
+}
 export const waterPrice = (S) => W(S).ports.find((p) => p.id === S.docked)?.water ?? WATER.price;
 export function buyWater(S, n = 1) {
   if (!S.docked || !REGIONS[S.region].salt) return 0;
@@ -580,7 +710,16 @@ export function craft(S, from, times = 1) {
   return n;
 }
 // 사는 재료: buy 값이 있고, buyAt이 있으면 그 수역 항구에서만(M2b 톱니·베어링은 앞바다)
-export const canBuyMat = (S, k) => !!ITEMS[k]?.buy && (!ITEMS[k].buyAt || ITEMS[k].buyAt === S.region);
+// M3 B3: buyAt은 수역 하나나 목록(M4 대양), shop:false 항구(야자섬 나루 등)는 재료 가게가 없고, buyPort가 있으면 그 항구에서만 사요
+export function canBuyMat(S, k) {
+  const I = ITEMS[k];
+  if (!I?.buy) return false;
+  if (I.buyAt && ![].concat(I.buyAt).includes(S.region)) return false;
+  const port = S.docked ? worldOf(S.region).ports.find((p) => p.id === S.docked) : null;
+  if (port && port.shop === false) return false;
+  if (I.buyPort && port?.id !== I.buyPort) return false;
+  return true;
+}
 export function buyMat(S, k, n = 1) {
   const P = ITEMS[k]?.buy;
   if (!S.docked || !canBuyMat(S, k)) return 0;
@@ -772,13 +911,14 @@ export const decorOpen = (S, id) => ACHIEVEMENTS.some((a) => a.decor === id && S
 // 수문: 조건을 보여 주고 넘어간다
 export function gateStatus(S, gate) {
   const r = gate.req, list = [];
-  if (r.grade) list.push({ text: `${r.grade}등급(${HULL_TIERS[r.grade - 1].name}) 이상`, ok: HULLS[S.ship.hull].grade >= r.grade });
+  if (r.grade) list.push({ text: `${r.grade}등급(${HULL_TIERS[r.grade - 1]?.name ?? '대양 탐사선'}) 이상`, ok: HULLS[S.ship.hull].grade >= r.grade });
   return { list, ok: list.every((x) => x.ok) };
 }
 export function passGate(S, gate) {
   if (!gateStatus(S, gate).ok) return false;
   // 이번 단계의 엔딩(M2a): 앞바다의 큰 바다 경계(4등급). 강 끝은 이제 앞바다로 이어져요
-  if (!gate.to) { S.ended = true; S.ach.openSea || giveAch(S, 'openSea'); emit(S, 'ended'); return true; }
+  // M3 B0: 앞바다 → 큰 바다(toSea)는 이제 일반 관문이고, 큰 바다 북쪽 대양 어귀(to null)가 이 단계의 끝이에요(엔딩 글은 B7에서)
+  if (!gate.to) { S.ended = true; emit(S, 'ended'); return true; }
   const from = S.region, first = !S.visited[gate.to];
   // 화물은 그대로 싣고 넘어간다. 도착 항구에 들르면 창고로 옮겨요
   S.region = gate.to; S.visited[gate.to] = 1;
@@ -816,6 +956,8 @@ function giveAch(S, id) {
   S.ach[id] = 1; S.res.coin += a.coin || 0;
   emit(S, 'ach', { id });
 }
+// M3 B3 최고급 재료 5종(창고 기본값 0)
+const NEW_MATS = { teak: 0, synth: 0, syrope: 0, steel: 0, chip: 0 };
 const worldDone = (S, region) => worldOf(region).def.finds.every((f) => S.found[f.id]);
 // 다음 배의 재료가 모이면 한 번 알려 준다(창고 + 화물칸). 2등급부터는 ★2가 먼저다
 export function nextHull(S) {
@@ -842,17 +984,21 @@ export function checkAch(S) {
   c('paint', t.painted);
   c('gustSafe', t.gusts - t.gustHurt >= 1);
   c('stormSafe', (t.storms || 0) - (t.stormHurt || 0) >= 1);
+  c('typhoonSafe', (t.typhoons || 0) - (t.typhoonHurt || 0) >= 1);
   c('heatSafe', t.heatDays >= 1);
   c('crew3', Object.keys(S.hiredEver).length >= 3);
   c('sloop', HULLS[S.ship.hull].grade >= 3);
   c('schooner', HULLS[S.ship.hull].grade >= 4);
-  c('seaAll', Object.keys(SPECIES).every((id) => !SPECIES[id].sea || S.seen[id]));
+  c('seaAll', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'coast' || S.seen[id])); // 앞바다 생물(큰 바다 생물은 islandNaturalist)
+  c('islandNaturalist', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'sea' || S.seen[id]));
+  c('seaIsles', worldDone(S, 'sea'));
   c('lakeAll', worldDone(S, 'lake'));
   const nSeen = Object.keys(S.seen).length;
   c('species5', nSeen >= 5);
   c('species10', nSeen >= 10);
   c('speciesAll', Object.keys(SPECIES).every((id) => SPECIES[id].sea || S.seen[id])); // 민물 생물만(바다 생물은 C3에서 따로)
   c('riverEnd', !!S.visited.coast);
+  c('openSea', !!S.visited.sea);
 }
 
 // ── 안개 걷기 ──
@@ -1076,7 +1222,7 @@ export function dockHere(S, port) { S.stats.docks = (S.stats.docks || 0) + 1; do
 
 // ── 날씨(S5) ──
 // 선원이 폭풍 편성·축범으로 버티는 때: 돌풍 중, 폭풍 예고부터 폭풍이 끝날 때까지
-const braced = (wx) => !!(wx.gustOn || wx.stormOn || wx.stormSoon);
+const braced = (wx) => !!(wx.gustOn || wx.stormOn || wx.stormSoon || wx.tyBrace);
 function weatherEvents(S, wx, prev, st) {
   const b = S.boat, R = rulesOf(S);
   if (wx.gustSoon && !prev.gustSoon) emit(S, 'gustSoon');
@@ -1242,6 +1388,7 @@ export function step(S, dt) {
   S.clock += dt;
   const b = S.boat, st = stats(S), w = W(S), wx = weatherNow(S), prev = S.weather?.fx ? S.weather : calmWeather();
   S.weather = wx;
+  typhoonTick(S, wx, prev);
   S.wind = windNow(S, wx);
   const { from, speed: wspd } = S.wind;
   const sea = seaHere(S, wx, st, w);
@@ -1415,7 +1562,7 @@ export function serialize(S) { const { events, ...rest } = S; return JSON.string
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || ![1, 2, 3, 4, 5, 6, 7].includes(o.v) || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2, 3, 4, 5, 6, 7, 8].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
     // v2 → v3(S2 아이템): 목재·천은 잡목·마포로 이어 받는다. 화물칸의 금화는 창고로, 식량은 빵으로(5일 뒤 상함), 찾은 발견지의 유물을 준다
     if (o.v < 3) {
@@ -1446,8 +1593,13 @@ export function deserialize(raw) {
     // v6 → v7(M2b 앞바다 내용): 정해 둔 발견지 자리는 지금 표에 맞춰요(그림·보상·자리 규칙은 표에서, 자리 x·y는 그대로). 새로 생긴 발견지(바다 동굴 등)만 새 자리를 받아요
     o.boat.motor = false;
     refreshFindPos(o);
+    // v7 → v8(M3 큰 바다): 큰 바다 경계는 이제 엔딩이 아니라 큰 바다로 가는 문이에요. 스쿠너로 그 경계에서 엔딩을 본 저장은 엔딩을 풀고 앞바다 등대섬에 대 둬요(북쪽으로 가면 큰 바다. 도전과제는 그대로라 금화는 다시 안 줘요)
+    if (o.ended && o.region === 'coast') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'light'); }
+    if (o.region === 'coast' && o.route?.target?.type === 'gate' && o.route.target.id === 'toOcean') o.route = null; // 옛 관문 id
+    o.stats.typhoons ??= 0; o.stats.typhoonHurt ??= 0; o.stats.calmDays ??= 0;
+    for (const k of Object.keys(NEW_MATS)) o.res[k] ??= 0; // M3 B3 최고급 재료 5종: 창고 기본 0
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
-    o.v = 7;
+    o.v = 8;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
     if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다
