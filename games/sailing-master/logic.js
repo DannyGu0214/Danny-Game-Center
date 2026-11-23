@@ -44,9 +44,11 @@ export function dayWeather(seed, day) {
   if (out.typhoon) out.calm = false; // 태풍이 오는 날엔 무풍이 안 와요(무풍 × 0.15가 태풍 바람까지 깎던 것)
   return out;
 }
+// 기상사(M4 O2): 측후소·기압계 자리에 앉으면 예보 +1일(태풍 예고도 +1일)
+export const officerDays = (S) => (roleWork(S, 'weather') > 0 ? 1 : 0);
 export function forecast(S) {
   const st = stats(S), today = clock(S).day, out = [];
-  for (let d = 0; d <= st.forecast; d++) out.push(dayWeather(S.seed, today + d));
+  for (let d = 0; d <= st.forecast + officerDays(S); d++) out.push(dayWeather(S.seed, today + d));
   return out;
 }
 // 그 수역에 그날 오는 날씨 종류(심한 것부터). ahead: 며칠 앞 예보인가(fc보다 멀면 안 보여요)
@@ -59,7 +61,7 @@ export function outlook(S) {
   const list = forecast(S).map((d, i) => { const ids = kindsOf(S.region, d, i); return { ...d, ids, worst: ids[0] || null, sev: ids.length ? WX[ids[0]].sev : 0, swell: daySwell(S.region, S.seed, d.day) }; });
   // 태풍은 다른 날씨보다 멀리(기본 2일 앞, 기압계 +1, 측후소 +2) 보여요. 예보 창 밖 날은 태풍만 보이고 나머지는 모르는 날(blind)이에요
   if ((REGIONS[S.region].weather || []).includes('typhoon')) {
-    const st = stats(S), today = clock(S).day, reach = st.typhoonAhead ?? TYPHOON.ahead, base = list.length;
+    const st = stats(S), today = clock(S).day, reach = (st.typhoonAhead ?? TYPHOON.ahead) + officerDays(S), base = list.length;
     for (let i = base; i <= reach; i++) { const d = dayWeather(S.seed, today + i), ids = kindsOf(S.region, d, i).filter((id) => id === 'typhoon'); list.push({ ...d, ids, worst: ids[0] || null, sev: ids.length ? WX.typhoon.sev : 0, swell: 0, blind: true }); }
     while (list.length > base && !list[list.length - 1].ids.length) list.pop();
   }
@@ -144,8 +146,9 @@ export function fastCheck(S) {
 // 경로: 서쪽(side −1)이나 동쪽(+1) 끝 밖 start m에서 들어와, 지도 가운데 60% 안의 점 P를 지나 반대쪽으로 빠져나가요(P는 경로 한가운데). cross초에 건너요
 export function typhoonTrack(region, tr) {
   const sh = REGIONS[region].shape, cx = (sh.x0 + sh.x1) / 2, cy = (sh.y0 + sh.y1) / 2, W0 = sh.x1 - sh.x0, H0 = sh.y1 - sh.y0;
-  const sx = tr.side < 0 ? sh.x0 - TYPHOON.start : sh.x1 + TYPHOON.start, sy = cy + (tr.w - 0.5) * 1.2 * H0;
-  const px = cx + (tr.u - 0.5) * 0.6 * W0, py = cy + (tr.v - 0.5) * 0.6 * H0;
+  // 대양(shape.ty = [ya, yb]): 12km 띠라 경로를 가로로 눕혀요. 한가운데 점의 y는 ya~yb 안, 들어오는 y는 그 위아래 ±(w − 0.5) × 1.2km
+  const sx = tr.side < 0 ? sh.x0 - TYPHOON.start : sh.x1 + TYPHOON.start, sy = sh.ty ? sh.ty[0] + tr.v * (sh.ty[1] - sh.ty[0]) + (tr.w - 0.5) * 2400 : cy + (tr.w - 0.5) * 1.2 * H0;
+  const px = cx + (tr.u - 0.5) * 0.6 * W0, py = sh.ty ? sh.ty[0] + tr.v * (sh.ty[1] - sh.ty[0]) : cy + (tr.v - 0.5) * 0.6 * H0;
   return { sx, sy, ex: sx + 2 * (px - sx), ey: sy + 2 * (py - sy), dur: TYPHOON.cross };
 }
 export function typhoonPos(region, tr, s) { const T = typhoonTrack(region, tr), k = s / T.dur; return [T.sx + (T.ex - T.sx) * k, T.sy + (T.ey - T.sy) * k]; }
@@ -188,7 +191,11 @@ export function typhoonLeft(S) {
 export function typhoonView(S) {
   if (!(REGIONS[S.region].weather || []).includes('typhoon')) return null;
   const live = liveTyphoon(S.region, S.seed, S.clock), day = clock(S).day, tr = live ? live.tr : dayWeather(S.seed, day).typhoon;
-  if (!tr || (!live && S.clock >= day * CAL.day + tr.t0 + TYPHOON.cross)) return null;
+  if (!tr || (!live && S.clock >= day * CAL.day + tr.t0 + TYPHOON.cross)) {
+    // 기상사(M4 O2): 내일 태풍의 예상 경로를 하루 전부터 해도에 그려요
+    const nx = officerDays(S) ? dayWeather(S.seed, day + 1).typhoon : null;
+    return nx ? { track: typhoonTrack(S.region, nx), pos: null, s: null, tr: nx, tomorrow: true } : null;
+  }
   return { track: typhoonTrack(S.region, tr), pos: live ? typhoonPos(S.region, live.tr, live.s) : null, s: live ? live.s : null, tr };
 }
 // 한 틱: 지금 태풍 효과를 날씨 fx에 합치고(바람은 큰 것 하나, 너울은 더하고, 보는 거리는 곱해요) 전조·고비·파국 알림을 내요. 항구에 대 있으면 step이 여기까지 오지 않아요
@@ -321,6 +328,7 @@ export function seatsOf(S) {
   const key = shipKey(S), hit = seatCache.get(S);
   if (hit && hit.key === key) return hit.seats;
   const H = HULLS[S.ship.hull], seats = [{ key: 'helm', type: 'helm', x: H.helmX, y: 0.4 }];
+  if (H.bridgeAt) seats.push({ key: 'bridge', type: 'bridge', x: H.bridgeAt[0], y: H.bridgeAt[1] }); // 함교 자리(탐사선, M4 O2)
   if (H.engineAt) seats.push({ key: 'engine', type: 'engine', x: H.engineAt[0], y: H.engineAt[1] }); // 기관 자리는 모듈 없이 생겨요(조타 자리처럼, M3 B4)
   for (const m of S.ship.mods) {
     const M = MODULES[m.id];
@@ -350,7 +358,7 @@ function ensureSeats(S) {
   if (S.crew.some((c) => c.seat === undefined || (c.seat && !seats.some((q) => q.key === c.seat)))) autoSeat(S);
 }
 // 그 자리에 앉아 일하는 선원(없으면 null)
-export function workerAt(S, type) { ensureSeats(S); return S.crew.find((c) => seatType(S, c) === type) || null; }
+export function workerAt(S, type) { ensureSeats(S); return S.crew.find((c) => seatType(S, c) === type) || (type === 'helm' ? S.crew.find((c) => c.role === 'mate' && seatType(S, c) === 'bridge') : null) || null; } // 일등 항해사(함교)는 조타수 몫도 해요(M4 O2)
 // 효과 배율: 기본 × (0.7 + 0.15 × 숙련), 맞지 않는 자리는 50%, 피로가 쌓이면 최대 절반, 사기가 바닥이면 80%
 export function crewEff(S, c, type = seatType(S, c)) {
   if (!c || !type) return 0;
@@ -358,7 +366,7 @@ export function crewEff(S, c, type = seatType(S, c)) {
   return (0.7 + 0.15 * lv) * apt * (1 - 0.5 * (c.fatigue || 0)) * ((c.morale ?? 0.7) < 0.3 ? 0.8 : 1);
 }
 const BASE_EFF = 0.85; // 숙련 1, 맞는 자리, 쌩쌩할 때
-const work = (S, type) => { const c = workerAt(S, type); return c ? crewEff(S, c, type) / BASE_EFF * (c.trait === 'strong' && (type === 'oar' || type === 'carpenter') ? 1.2 : 1) * (type === 'sail' ? bosunK(S) : 1) : 0; };
+const work = (S, type) => { const c = workerAt(S, type); return c ? crewEff(S, c, type) / BASE_EFF * (c.trait === 'strong' && (type === 'oar' || type === 'carpenter') ? 1.2 : 1) * (type === 'sail' ? bosunK(S) : 1) * (type === 'bridge' ? 1 : 1 + 0.1 * roleWork(S, 'mate')) : 0; }; // 일등 항해사: 다른 선원 효과 +10%(M4 O2)
 // M3 B4 역할 효과: 그 역할 선원이 제 자리에 앉아 있을 때의 일솜씨(숙련 1·쌩쌩하면 1). 없으면 0
 export function roleWork(S, role) {
   ensureSeats(S);
@@ -413,7 +421,7 @@ function crewTick(S, dt, wx, st) {
     const type = seatType(S, c);
     c.lv ||= 1; c.xp ||= 0; c.fatigue ??= 0; c.morale ??= 0.7;
     if (type && type !== 'rest') {
-      const k = (c.trait === 'diligent' ? 0.7 : 1) * (c.trait === 'seasick' && wx.gustOn ? 2 : 1);
+      const k = (c.trait === 'diligent' ? 0.7 : 1) * (c.trait === 'seasick' && wx.gustOn ? 2 : 1) * (type === 'bridge' ? 1 : 1 - 0.2 * roleWork(S, 'mate')); // 일등 항해사: 피로 −20%
       c.fatigue = Math.min(1, c.fatigue + dt / (g.tireDays * day) * k);
       if (ROLES[c.role]?.seat === type && c.lv < g.maxLv) {
         c.xp += dt;
@@ -474,12 +482,13 @@ function applyAction(S, a) {
     else walkTo(S, 'oar');
   } else if (a.type === 'row') { b.row = a.on; if (!a.on) walkTo(S, 'helm'); }
 }
-const canSteer = (S) => !!workerAt(S, 'helm') || S.cap.to === null && (S.cap.at === 'helm' || S.cap.at === 'oar');
+const helmed = (S) => !!workerAt(S, 'helm') || !!stats(S).autohelm; // 조타수·일등 항해사·자동 조타(M4 O2)
+const canSteer = (S) => helmed(S) || S.cap.to === null && (S.cap.at === 'helm' || S.cap.at === 'oar');
 export function setRudder(S, r) {
   if (S.docked) return;
   S.boat.rudder = clamp(r, -1, 1);
   S.route = null;
-  if (!workerAt(S, 'helm') && S.cap.at !== 'helm' && S.cap.at !== 'oar' && !S.cap.to) walkTo(S, 'helm');
+  if (!helmed(S) && S.cap.at !== 'helm' && S.cap.at !== 'oar' && !S.cap.to) walkTo(S, 'helm');
 }
 export function setSail(S, level) {
   if (!stats(S).sailArea) return false;
@@ -516,7 +525,7 @@ export function setDest(S, x, y, target = null) {
     if (st.sailArea) setSail(S, b.lastSail);
     else if (st.oars) setRow(S, true);
   }
-  if (!workerAt(S, 'helm') && !S.cap.to && S.cap.at === 'mast') walkTo(S, 'helm');
+  if (!helmed(S) && !S.cap.to && S.cap.at === 'mast') walkTo(S, 'helm');
   return true;
 }
 
@@ -1496,7 +1505,8 @@ export function step(S, dt) {
   const onShoal = st.draft > depth;
   let target = Math.max(sailT, rowT) + 0.25 * Math.min(sailT, rowT);
   // 보조 기관(M2b 스쿠너): 연료 없이 느리게. 노를 젓지 않고 돛을 올렸거나 항로가 있을 때, 돛이 기관보다 약하면(바람이 죽거나 맞바람) 저절로 돌아요. 돛 힘에 더하지는 않아요
-  const engW = roleWork(S, 'engineer'), motorV = st.motor * (1 + 0.15 * engW), calmEng = engW > 0 && wx.on.includes('calm'); // 기관사: 기관 +15%, 무풍 날엔 돛보다 기관을 먼저 돌려요
+  const sun = st.solar ? 0.5 * st.solar * (wx.rain || wx.fog || S.ty?.in ? 0.5 : 1) : 0, engW = roleWork(S, 'engineer'), motorV = (st.motor + (st.motor > 0 ? sun : 0)) * (1 + 0.15 * engW), // 태양광(M4 O2): 보조 기관 +0.5m/s(2장까지), 비·해무·태풍엔 절반
+    calmEng = engW > 0 && wx.on.includes('calm'); // 기관사: 기관 +15%, 무풍 날엔 돛보다 기관을 먼저 돌려요
   const motorOn = st.motor > 0 && !b.row && (b.sailLevel > 0 || !!S.route) && sailT < motorV * (calmEng ? 1.5 : 1);
   if (motorOn) target = Math.max(target, motorV);
   if (motorOn !== !!b.motor) { b.motor = motorOn; emit(S, motorOn ? 'motorOn' : 'motorOff'); }

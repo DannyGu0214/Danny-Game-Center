@@ -95,3 +95,75 @@ test('O1 사는 재료: 큰 바다 재료는 대양 항구에서도 사요(전�
   assert.equal(G.canBuyMat(S, 'chip'), false);
   const A = openWater('ocean', 0, -3900); A.docked = 'atollA'; assert.equal(G.canBuyMat(A, 'teak'), false, '산호섬 나루는 가게가 없어요');
 });
+
+// ── O2 장비·역할·대양 태풍 ──
+import { ROLES, MODULES, HULLS, SEATS, TYPHOON } from '../data.js';
+const hire = (S, role, lv = 1) => { S.crewSeq = (S.crewSeq || 0) + 1; const c = { id: S.crewSeq, role, name: role, lv, xp: 0, fatigue: 0, morale: 0.7, wage: 1, baseWage: 1, skill: 1, humor: 1, drink: 1, trait: null }; S.crew.push(c); G.autoSeat(S); return c; };
+const bigShip = (mods, hull = 'explorer3', seed = 1) => { const S = openWater('ocean', 0, -2000, seed); S.ship.hull = hull; S.ship.mods = mods.map((m, i) => ({ rot: 0, ...m })); S.rev++; S.water = 5; S.food = 99; return S; };
+
+test('O2 기상사·일등 항해사: 큰 바다부터 후보가 오고, 함교 자리(탐사선)와 기상 자리가 생겨요', () => {
+  for (const r of ['weather', 'mate']) assert.ok(!ROLES[r].future && ROLES[r].region === 'sea' && ROLES[r].grade === 5, r);
+  assert.deepEqual([ROLES.weather.hire, ROLES.weather.wage, ROLES.mate.hire, ROLES.mate.wage], [35, 3, 50, 4]);
+  assert.equal(SEATS.bridge, '함교');
+  const S = bigShip([{ id: 'station', col: 3, row: 4 }]);
+  const seats = G.seatsOf(S); assert.ok(seats.some((q) => q.type === 'bridge' && q.x > 8) && seats.some((q) => q.type === 'weather'));
+  assert.ok(HULLS.explorer.bridgeAt && HULLS.explorer2.bridgeAt && HULLS.explorer3.bridgeAt);
+  const m = hire(S, 'mate'), w = hire(S, 'weather');
+  assert.equal(S.crew.find((c) => c.id === m.id).seat, 'bridge'); assert.match(S.crew.find((c) => c.id === w.id).seat, /^station@/);
+  assert.ok(G.roleWork(S, 'mate') > 0.9 && G.roleWork(S, 'weather') > 0.9);
+});
+
+test('O2 기상사: 예보 +1일, 태풍 예고 +1일, 태풍 예상 경로를 하루 전부터 해도에', () => {
+  const S = bigShip([{ id: 'station', col: 3, row: 4 }]);
+  const base = G.forecast(S).length; hire(S, 'weather'); assert.equal(G.forecast(S).length, base + 1); assert.equal(G.officerDays(S), 1);
+  // 태풍이 있는 날 전날: 기상사가 있으면 내일 경로가 보여요
+  const seed = 5; S.seed = seed; let day = -1; for (let d = 1; d < 400 && day < 0; d++) if (G.dayWeather(seed, d).typhoon && REGIONS.ocean.weather.includes('typhoon')) day = d;
+  assert.ok(day > 0, '대양에 태풍이 오는 날이 있어야 해요');
+  S.clock = (day - 1) * 180 + 20; const v = G.typhoonView(S); assert.ok(v && v.tomorrow && !v.pos, '전날 경로');
+  const T = bigShip([{ id: 'station', col: 3, row: 4 }]); T.seed = seed; T.clock = (day - 1) * 180 + 20; assert.equal(G.typhoonView(T), null, '기상사 없으면 안 보여요');
+});
+
+test('O2 일등 항해사: 다른 선원 효과 +10%, 피로 −20%, 조타수 몫(선장이 키를 떠나도 돼요)', () => {
+  const mk = () => bigShip([{ id: 'mast_l', col: 2, row: 3 }, { id: 'mast_d', col: 2, row: 9 }, { id: 'hammock', col: 0, row: 14 }, { id: 'hammock', col: 4, row: 14 }]);
+  const A = mk(), B = mk(); const da = hire(A, 'deckhand'), db = hire(B, 'deckhand'); hire(B, 'mate');
+  assert.ok(Math.abs(G.crewWork(B, 'sail') / G.crewWork(A, 'sail') - 1.1) < 0.01, `+10% ${G.crewWork(B, 'sail') / G.crewWork(A, 'sail')}`);
+  for (const T of [A, B]) { G.undock(T); T.boat.sailLevel = 2; }
+  for (let i = 0; i < 30 * 60; i++) { G.step(A, G.FIXED_DT); G.step(B, G.FIXED_DT); A.food = B.food = 99; }
+  const fa = A.crew.find((c) => c.id === da.id).fatigue, fb = B.crew.find((c) => c.id === db.id).fatigue;
+  assert.ok(fa > 0 && Math.abs(fb / fa - 0.8) < 0.03, `피로 ${fb}/${fa}`);
+  // 조타수 몫: 일등 항해사가 있으면 선장이 키를 떠나도 배가 말을 들어요
+  assert.ok(G.workerAt(B, 'helm') && G.workerAt(B, 'helm').role === 'mate'); assert.equal(G.workerAt(A, 'helm'), null);
+});
+
+test('O2 자동 조타: 사람 없이 항로를 지켜요(선장이 키를 떠나도 됨)', () => {
+  const S = bigShip([{ id: 'autohelm', col: 2, row: 17 }]); G.undock(S);
+  assert.ok(MODULES.autohelm.need.grade === 5 && MODULES.autohelm.cost.steel === 4 && MODULES.autohelm.cost.chip === 2);
+  assert.equal(G.stats(S).autohelm, true); assert.equal(G.workerAt(S, 'helm'), null);
+  S.cap.at = 'mast'; S.cap.to = null; S.cap.x = 0; G.setSail(S, 2); assert.equal(S.cap.to, null, '자동 조타가 있으면 선장이 키로 돌아가지 않아도 돼요');
+  const N = bigShip([]); G.undock(N); assert.equal(G.stats(N).autohelm, false);
+});
+
+test('O2 태양광 패널: 보조 기관 +0.5m/s(2장까지), 비·해무·태풍엔 절반', () => {
+  assert.deepEqual([MODULES.solar.w, MODULES.solar.h, MODULES.solar.cost], [2, 1, { chip: 2, steel: 2, synth: 4 }]);
+  const calm = (() => { for (let d = 1; d < 400; d++) { const ok = (t) => { const w = G.weatherAt('ocean', 3, t); return !w.rain && !w.fog && !w.gustOn && !w.stormOn && !w.on.length && !w.gustSoon && !w.stormSoon && !w.typhoonSoon; }; if ([0, 20, 40, 60, 80].every((x) => ok(d * 180 + 40 + x))) return d * 180 + 40; } throw new Error('맑은 날'); })();
+  const top = (n) => { const S = bigShip([{ id: 'mast_l', col: 2, row: 3 }, ...Array.from({ length: n }, (_, i) => ({ id: 'solar', col: 0 + (i ? 3 : 0), row: 12 }))], 'explorer', 3); G.undock(S); S.seed = 3; S.clock = calm; S.boat.sailLevel = 1; S.boat.h = -Math.PI / 2; S.boat.y = -5800; S.wind = { from: 0, speed: 0 }; let m = 0; for (let i = 0; i < 30 * 60; i++) { G.step(S, G.FIXED_DT); S.boat.y = -5800; S.food = 99; S.boat.sailLevel = 1; S.hull = 1; m = Math.max(m, S.boat.spd); } return [m, S]; };
+  const [m0] = top(0), [m1, S1] = top(1), [m2, S2] = top(2), [m3] = top(3);
+  assert.equal(G.stats(S1).solar, 1); assert.equal(G.stats(S2).solar, 2);
+  assert.ok(m0 > 3.9 && m0 < 4.4, `무풍대 기관 ${m0}`); assert.ok(m1 > m0 + 0.35 && m1 < m0 + 0.65, `1장 ${m1}`); assert.ok(m2 > m0 + 0.85 && m2 < m0 + 1.15, `2장 ${m2}`); assert.ok(Math.abs(m3 - m2) < 0.05, '세 장째는 안 늘어요');
+});
+
+test('O2 대양 태풍: 폭 3.6km 띠를 가로질러 가고(대피 항구 없음, 비켜 가야 해요), 크기·세기는 큰 바다와 같아요', () => {
+  assert.ok(REGIONS.ocean.weather.includes('typhoon'));
+  const seed = 5; let tr = null, d = 0; for (d = 1; d < 400 && !tr; d++) tr = G.dayWeather(seed, d).typhoon;
+  assert.ok(tr); const T = G.typhoonTrack('ocean', tr);
+  const sh = REGIONS.ocean.shape; assert.ok(T.sx < sh.x0 || T.sx > sh.x1, '옆 끝 밖에서 들어와요');
+  const [ya, yb] = sh.ty; for (const y of [T.sy, T.ey]) assert.ok(y > ya - 2000 && y < yb + 2000, `경로 y ${y}`);
+  const px = (T.sx + T.ex) / 2, py = (T.sy + T.ey) / 2; assert.ok(Math.abs(px) < 0.31 * (sh.x1 - sh.x0) && py >= ya && py <= yb, `한가운데 ${px},${py}`);
+  // 태풍 속도: 모양 비율이 비슷해야 해요(150초에 3km 안팎, 큰 바다는 약 5km)
+  const speed = Math.hypot(T.ex - T.sx, T.ey - T.sy) / T.dur; assert.ok(speed > 12 && speed < 45, `속도 ${speed}`);
+  // 같은 시드·날짜면 같은 경로
+  assert.deepEqual(G.typhoonTrack('ocean', G.dayWeather(seed, d - 1).typhoon), T);
+  // 태풍 안 효과는 큰 바다와 같은 표
+  const live = (() => { const S = openWater('ocean', 0, -6000, seed); for (let t = 0; t < 180 * 3; t += 1) { const q = G.typhoonAt('ocean', seed, (d - 1) * 180 + tr.t0 + t, G.typhoonPos('ocean', tr, t)[0], G.typhoonPos('ocean', tr, t)[1]); if (q && q.zone === 'eye') return q; } return null; })();
+  assert.ok(live && live.windDown === TYPHOON.eyeWind);
+});
