@@ -231,6 +231,18 @@ export function createWorld(def) {
 
   // 물살(강에서 중심선을 따라 흐른다)
   function flowAt(x, y) {
+    // 큰 바다(isles, M3 B1): 조류 선분 [x0, y0, x1, y1, 폭, 세기]. 선분까지 거리 < 폭이면 선분 방향으로 세기 × (1 − (d/폭)²)를 더해요
+    if (isles) {
+      let fx = 0, fy = 0;
+      for (const [x0, y0, x1, y1, w, k] of def.currents || []) {
+        const sx = x1 - x0, sy = y1 - y0, L2 = sx * sx + sy * sy || 1, t = Math.max(0, Math.min(1, ((x - x0) * sx + (y - y0) * sy) / L2));
+        const d = Math.hypot(x - (x0 + sx * t), y - (y0 + sy * t));
+        if (d >= w) continue;
+        const m = k * (1 - (d / w) ** 2), L = Math.sqrt(L2);
+        fx += sx / L * m; fy += sy / L * m;
+      }
+      return [fx, fy];
+    }
     if (!river || !def.flow) return [0, 0];
     const [i, d] = riverNear(x, y);
     const a = line[Math.max(0, i - 2)], b = line[Math.min(line.length - 1, i + 2)], m = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
@@ -245,6 +257,13 @@ export function createWorld(def) {
   }
   // 너울 자리 배율(0~1): 바깥 바다(남쪽 기준선에서 북쪽으로 ramp m)에서 커지고, 두 곶 사이 만 안쪽은 잔잔해요
   function swellAt(x, y) {
+    // 큰 바다(isles, M3 B1): 어디나 1이고, 항구 둘레 calmR m 안만 잔잔해요(× calmK, 가장자리 40m는 서서히)
+    if (isles) {
+      const q = sh.swell || {}, R = q.calmR ?? 180, K = q.calmK ?? 0.3;
+      let k = 1;
+      for (const p of ports) k = Math.min(k, K + (1 - K) * smooth01((Math.hypot(x - p.x, y - p.y) - (R - 40)) / 40));
+      return k;
+    }
     const q = sh.swell;
     if (!q) return 0;
     const open = smooth01((q.y - y) / q.ramp), bay = smooth01((x - q.bay[0]) / 70) * smooth01((q.bay[1] - x) / 70) * smooth01((y - q.bay[2]) / 90);

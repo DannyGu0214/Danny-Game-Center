@@ -462,6 +462,14 @@ export function departureCheck(S, days = 2) {
   if (has('drought') && st.draft > shoalFloor(S.region, WX.drought.fx.depth)) warns.push('가뭄 예보: 배가 깊어서 여울에 걸린다!'); // S5: 예전 기준 0.75는 슬루프(0.68~)를 놓쳤어요
   if (has('flood')) warns.push('강물이 불었다: 물살이 세니 물가 조심해!');
   if (has('seafog')) warns.push('해무 예보: 새벽 바다는 하얗게 덮인다! 등대 불빛을 봐 둬');
+  if (has('calm')) warns.push(st.motor ? '무풍 — 바람이 거의 없어! 보조 기관이나 노로 가야 해!' : '무풍 — 바람이 거의 없어! 노로 가야 해!');
+  // 항속(M3 B1): 큰 바다·대양은 항구가 멀어요. 가장 가까운 항구까지 가는 날수가 실은 것(식량·식수)보다 길면 알려 줘요(출항은 막지 않아요)
+  if (REGIONS[S.region].order >= 4) {
+    const near = W(S).ports.filter((p) => p.id !== S.docked).map((p) => ({ p, d: Math.hypot(p.x - S.boat.x, p.y - S.boat.y) })).sort((a, q) => a.d - q.d).slice(0, 2);
+    let best = null;
+    for (const { p } of near) { const L = tripLength(S, p.x, p.y); if (L != null && (best == null || L < best.L)) best = { p, L }; }
+    if (best) { const n = tripDays(S, best.L), m = rangeDays(S); if (n > m) warns.push(`가장 가까운 항구(${best.p.name})까지 약 ${n.toFixed(1)}일인데 실은 건 ${m.toFixed(1)}일치뿐이야!`); }
+  }
   // 너울(M2a): 예보의 그날 바깥 바다 너울이 내항성을 넘으면
   const big = fc.reduce((m, d) => Math.max(m, d.swell || 0), 0);
   if (big > st.sea) warns.push(`너울 예보 ${big.toFixed(1)}m: 이 배(${st.sea.toFixed(1)}m)엔 버거워! 만 안쪽으로 다니자고`);
@@ -523,6 +531,34 @@ export function buyFood(S, n = 1, k = 'bread') {
 export const drinkPerDay = (S, wx = S.weather) => (REGIONS[S.region].salt ? (1 + S.crew.length) * WATER.perDay * (wx?.heat ? WATER.heatK : 1) : 0);
 // 남은 식수로 며칠 버티나(무더위면 그날 기준)
 export const waterDays = (S) => { const d = drinkPerDay(S, null) || 1; return (S.water || 0) / d; };
+// ── 항속 계획(M3 B1) ──
+// 식량 일수: 실은 식량 ÷ 사람 수(하루 1인 1개). 항속 rangeDays = min(식량 일수, 식수 일수). 식수는 조수기가 하루에 만드는 양을 빼고 계산하고, 민물 수역은 무한으로 봐요
+export const foodDays = (S) => S.food / (1 + S.crew.length);
+export function rangeDays(S) {
+  const f = foodDays(S);
+  if (!REGIONS[S.region].salt) return f;
+  const st = stats(S), net = drinkPerDay(S, null) - (st.desal ? st.desal * DESAL.perDay : 0);
+  return Math.min(f, net > 1e-9 ? (S.water || 0) / net : Infinity);
+}
+// 지금 배의 평균 항해 속도(m/s). 돛 배는 최고 속도의 k배(기본 0.7: 맞바람 태킹·돛 줄임·바람 변화까지 넉넉히), 노 배는 노 속도의 0.9배
+export function avgSpeed(S, k = 0.7) { const st = stats(S); return Math.max(1.2, st.sailArea ? st.maxSpeed * k : st.rowSpeed * 0.9); }
+// 길이 len(m)를 가는 데 걸리는 날수
+export const tripDays = (S, len, k = 0.7) => len / avgSpeed(S, k) / CAL.day;
+// 지금 자리에서 (x, y)까지 항로 길이(m). 길이 없으면 null
+export function tripLength(S, x, y) {
+  const b = S.boat, [dx, dy] = W(S).nearestWater(x, y), pts = pathFor(S, b.x, b.y, dx, dy);
+  if (!pts) return null;
+  let L = 0, px = b.x, py = b.y;
+  for (const p of pts) { L += Math.hypot(p.x - px, p.y - py); px = p.x; py = p.y; }
+  return L;
+}
+// 해도 항해 계획: 가는 데 n일 · 실은 것 m일. n > m × 0.8이면 warn(주황), n > m이면 bad(빨강)
+export function tripPlan(S, x, y) {
+  const len = tripLength(S, x, y);
+  if (len == null) return null;
+  const n = tripDays(S, len), m = rangeDays(S);
+  return { len, n, m, level: n > m ? 'bad' : n > m * 0.8 ? 'warn' : 'ok' };
+}
 export const waterPrice = (S) => W(S).ports.find((p) => p.id === S.docked)?.water ?? WATER.price;
 export function buyWater(S, n = 1) {
   if (!S.docked || !REGIONS[S.region].salt) return 0;

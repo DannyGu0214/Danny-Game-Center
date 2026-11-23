@@ -105,7 +105,7 @@ function daysBack(st) {
   if (S.t - backT < 5) return backDays;
   backT = S.t;
   const w = worldOf(S.region), L = Math.min(...w.ports.map((p) => pathLen(p.x, p.y)));
-  backDays = L / Math.max(2, st.maxSpeed * 0.45) / CAL.day;
+  backDays = G.tripDays(S, L, 0.45); // 같은 계산(G.tripDays)을 쓰되, 봇은 평균 속도를 최고 속도의 0.45배로 넉넉히 잡아요
   return backDays;
 }
 function think() {

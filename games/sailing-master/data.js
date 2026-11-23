@@ -80,6 +80,8 @@ export const WX = {
   fog: { name: '짙은 안개', short: '안개', icon: '🌫', sev: 1, calmFirst: true, when: 'dawn', chance: { spring: 0.5, summer: 0.05, autumn: 0.25, winter: 0.3 }, len: 75, fc: 1, salt: 31.7, fx: { fog: 1, wind: 0.6 } },
   // 해무(M2a): 바다 안개. 담수 안개보다 자주, 오래 껴요(봄 새벽이 가장 짙어요). 등대·항구 불빛 가까이는 옅어요
   seafog: { name: '해무', icon: '🌁', sev: 1, calmFirst: true, when: 'dawn', chance: { spring: 0.6, summer: 0.3, autumn: 0.3, winter: 0.35 }, len: 110, fc: 1, salt: 47.3, fx: { fog: 1, wind: 0.75 } },
+  // M3 B1 무풍: 하루 내내 바람이 15%예요(돛으론 거의 못 가요). 큰 바다·대양 수역 목록에만 있어요. 심함 1끼리는 앞의 것이 이름이 돼요(fog·seafog 뒤, heat 앞)
+  calm: { name: '무풍', icon: '🪶', sev: 1, calmFirst: true, when: 'day', chance: { spring: 0.1, summer: 0.25, autumn: 0.1, winter: 0.05 }, salt: 57.1, fx: { wind: 0.15 } },
   heat: { name: '무더위', icon: '🥵', sev: 1, when: 'day', chance: { summer: 0.6 }, salt: 11.3, fx: { heat: 1 } },
   flood: { name: '홍수', icon: '🌊', sev: 1, when: 'cal', days: { spring: [0, 1, 2, 3] }, fx: { flow: 1.6, depth: 1.5, flot: 1.4 } },
   drought: { name: '가뭄', icon: '🏜', sev: 1, when: 'cal', days: { summer: [3, 4, 5, 6], autumn: [0, 1, 2] }, fx: { depth: WEATHER.droughtDepth } },
@@ -407,9 +409,11 @@ export const REGIONS = {
   // shape.kind 'isles': 섬(islands)은 해안선 혹 bumps [각도(도), 폭(rad), 높이(m, 음수면 만)]를 받아요. 발견지 셋은 자리 표시용 임시예요(B3에서 열 곳으로 늘려요)
   sea: {
     id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, tide: true, edgeFog: 120,
-    wind: { from: -80 * D, speed: 11, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['storm', 'gust', 'squall', 'seafog', 'heat', 'bigswell'],
+    wind: { from: -80 * D, speed: 11, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
     swell: { base: 1.3, day: 0.4, gust: 0.4, storm: 1.2 },
-    shape: { kind: 'isles', x0: -2000, x1: 2000, y0: -1600, y1: 1600, cell: 8 },
+    // swell(shape): 항구 둘레 calmR m 안은 너울 × calmK(그 밖은 어디나 1). currents(M3 B1): 조류 선분 [x0, y0, x1, y1, 폭 m, 세기 m/s]
+    shape: { kind: 'isles', x0: -2000, x1: 2000, y0: -1600, y1: 1600, cell: 8, swell: { calmR: 180, calmK: 0.3 } },
+    currents: [[800, 320, 1250, 320, 160, 0.8], [-700, 650, -700, 150, 140, 0.6], [-1300, -950, -1300, -500, 120, 0.7]],
     islands: [
       { x: 300, y: -300, r: 420, ph: 0.9, bumps: [[90, 0.5, -160]] },
       { x: -200, y: 1350, r: 30, ph: 2.2 }, { x: -1300, y: 500, r: 160, ph: 3.4 }, { x: 1400, y: 700, r: 200, ph: 4.6 }, { x: -1500, y: -800, r: 110, ph: 5.7 },

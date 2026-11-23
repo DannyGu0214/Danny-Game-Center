@@ -1512,6 +1512,17 @@ function renderChart(body) {
       const rr = q.r * Math.sqrt(Math.max(0, (0.05 - q.depth - tide) / 0.7)); // 썰물에 드러난 모래톱
       if (rr > 1) { g.fillStyle = '#e6d39a'; g.beginPath(); g.arc(toX(q.x), toY(q.y), rr * k, 0, Math.PI * 2); g.fill(); }
     }
+    // 조류(M3 B1): 큰 바다의 물 흐름 띠를 화살표로(해도에서만 보여요)
+    for (const [cx0, cy0, cx1, cy1, cw2, ck] of w.def.currents || []) {
+      const L = Math.hypot(cx1 - cx0, cy1 - cy0), ux = (cx1 - cx0) / L, uy = (cy1 - cy0) / L, n = Math.max(2, Math.round(L / 120));
+      g.save(); g.strokeStyle = 'rgba(190,240,250,.55)'; g.fillStyle = 'rgba(190,240,250,.7)'; g.lineWidth = 1.6; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(toX(cx0), toY(cy0)); g.lineTo(toX(cx1), toY(cy1)); g.stroke();
+      for (let i = 1; i <= n; i++) {
+        const t = (i - 0.5) / n, px = toX(cx0 + (cx1 - cx0) * t), py = toY(cy0 + (cy1 - cy0) * t), a = Math.atan2(uy, ux), r = 4.5 + ck * 5;
+        g.beginPath(); g.moveTo(px + Math.cos(a) * r, py + Math.sin(a) * r); g.lineTo(px + Math.cos(a + 2.5) * r, py + Math.sin(a + 2.5) * r); g.lineTo(px + Math.cos(a - 2.5) * r, py + Math.sin(a - 2.5) * r); g.closePath(); g.fill();
+      }
+      g.restore();
+    }
     // 큰 바다 경계(M2a): 지도 끝 짙은 안개 띠는 빗금, 그 바깥은 못 가는 바다
     if (w.coast || w.isles) {
       // 앞바다는 남쪽이 뭍이라 위·옆 세 면, 큰 바다(isles)는 네 면이 모두 경계예요
@@ -1574,7 +1585,7 @@ function renderChart(body) {
     const tl = tideLine(); if (tl) rest.append(tl);
     if (!chartPick) { info.append(rest); return; }
     const dist = Math.hypot(chartPick.x - S.boat.x, chartPick.y - S.boat.y), spd = Math.max(1.2, st.sailArea ? st.maxSpeed * 0.55 : st.rowSpeed * 0.9), sec = dist / spd, persons = 1 + S.crew.length, needFood = persons * sec / CAL.day;
-    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div><div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${REGIONS[S.region].salt ? (() => { const nw = G.drinkPerDay(S, null) * sec / CAL.day, ok = S.water >= nw * 1.2; return `<div class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'} 식수 ${nw.toFixed(1)}통 필요(${S.water.toFixed(1)})</div>`; })() : ''}${(() => { const sw = Math.max(0, ...fc.map((d) => d.swell || 0)) * worldOf(S.region).swellAt(chartPick.x, chartPick.y); return sw > st.sea ? `<div class="warn">⚠ 목적지 너울 ${sw.toFixed(1)}m: 이 배(${st.sea.toFixed(1)}m)엔 버거워!</div>` : ''; })()}${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어!</div>' : ''}${fc.some((d) => d.ids.includes('storm')) ? '<div class="warn">⚠ 폭풍 예보다! 대피할 항구를 봐 둬!</div>' : ''}${fc.some((d) => d.ids.includes('gust')) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보다! 돛 줄일 준비 해!</div>' : ''}${fc.some((d) => d.ids.includes('heat')) && !st.awning ? '<div class="warn">⚠ 무더위 예보인데 그늘막이 없잖아!</div>' : ''}${fc.some((d) => d.ids.includes('storm') || d.ids.includes('squall')) && !st.awning ? '<div class="warn">⚠ 비 예보다! 그늘막이 없으면 식량이 젖어</div>' : ''}${S.boat.torn ? '<div class="warn">⚠ 돛이 찢어졌어! 꿰매고 가!</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
+    const chk = el('div', 'check', `<div>${chartPick.name ? `<b>${chartPick.name}</b> · ` : ''}약 ${Math.round(dist)}m · ${Math.max(1, Math.round(sec / 60))}분</div>${(() => { const tp = G.tripPlan(S, chartPick.x, chartPick.y); return tp ? `<div class="${tp.level === 'bad' ? 'no' : tp.level === 'warn' ? 'warn' : 'ok'}">${tp.level === 'ok' ? '✓' : tp.level === 'warn' ? '⚠' : '✗'} 가는 데 ${tp.n.toFixed(1)}일 · 실은 것 ${Number.isFinite(tp.m) ? tp.m.toFixed(1) : '넉넉'}일치</div>` : ''; })()}<div class="${S.food >= needFood * 1.2 ? 'ok' : 'no'}">${S.food >= needFood * 1.2 ? '✓' : '✗'} 식량 ${needFood.toFixed(1)}개 필요(${S.food.toFixed(1)})</div>${REGIONS[S.region].salt ? (() => { const nw = G.drinkPerDay(S, null) * sec / CAL.day, ok = S.water >= nw * 1.2; return `<div class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'} 식수 ${nw.toFixed(1)}통 필요(${S.water.toFixed(1)})</div>`; })() : ''}${(() => { const sw = Math.max(0, ...fc.map((d) => d.swell || 0)) * worldOf(S.region).swellAt(chartPick.x, chartPick.y); return sw > st.sea ? `<div class="warn">⚠ 목적지 너울 ${sw.toFixed(1)}m: 이 배(${st.sea.toFixed(1)}m)엔 버거워!</div>` : ''; })()}${S.hull < 0.5 ? '<div class="warn">⚠ 선체가 많이 상했어!</div>' : ''}${fc.some((d) => d.ids.includes('storm')) ? '<div class="warn">⚠ 폭풍 예보다! 대피할 항구를 봐 둬!</div>' : ''}${fc.some((d) => d.ids.includes('gust')) && st.sailArea ? '<div class="warn">⚠ 돌풍 예보다! 돛 줄일 준비 해!</div>' : ''}${fc.some((d) => d.ids.includes('heat')) && !st.awning ? '<div class="warn">⚠ 무더위 예보인데 그늘막이 없잖아!</div>' : ''}${fc.some((d) => d.ids.includes('storm') || d.ids.includes('squall')) && !st.awning ? '<div class="warn">⚠ 비 예보다! 그늘막이 없으면 식량이 젖어</div>' : ''}${S.boat.torn ? '<div class="warn">⚠ 돛이 찢어졌어! 꿰매고 가!</div>' : ''}${chartPick.gate ? G.gateStatus(S, chartPick.gate).list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : ''}`);
     const plan = el('div', 'planCard', '<div class="l">항해 계획</div>'); plan.append(chk);
     const go = el('button', 'big', S.docked ? '이 항로로 출항!' : '이 항로로 가자!');
     go.addEventListener('click', () => {
