@@ -1171,7 +1171,7 @@ const starText = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
 function yardStep(H) {
   const C = HULLS[S.ship.hull], st = G.buildStatus(S, H.id), up = H.kind !== C.kind, card = el('div', 'step');
   const title = up ? `새 배: ${H.name} ★1` : `★${H.star} ${STAR_STEPS[H.star].name}`;
-  const what = up ? `칸 ${SH.validCells(H.id).length} · 내구도 ${H.hp} · 정원 ${H.crew}명 · 옛 모듈은 값 절반 돌려받고 선원은 내려` : H.star === 3 ? `${STAR_STEPS[3].desc} · <b>${H.perk}</b>: ${H.perkDesc}` : `${STAR_STEPS[2].desc} · 칸 ${SH.validCells(C.id).length} → ${SH.validCells(H.id).length} · 길이 ${C.len} → ${H.len}m`;
+  const what = up ? `칸 ${SH.validCells(H.id).length} · 내구도 ${H.hp} · 정원 ${H.crew}명 · 옛 모듈은 값 절반 돌려받고 선원은 정원 안이면 그대로 타` : H.star === 3 ? `${STAR_STEPS[3].desc} · <b>${H.perk}</b>: ${H.perkDesc}` : `${STAR_STEPS[2].desc} · 칸 ${SH.validCells(C.id).length} → ${SH.validCells(H.id).length} · 길이 ${C.len} → ${H.len}m`;
   card.innerHTML = `<div class="l">${title}${costHtml(H.price)}</div><div class="ds">${what}</div><div class="need">${st.list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('')}</div>`;
   if (S.docked) {
     const b = el('button', st.ok ? '' : 'off', up ? `${H.name} 짓기` : `★${H.star} 올리기`);
