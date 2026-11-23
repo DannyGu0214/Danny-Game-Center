@@ -31,9 +31,9 @@ function tryPlace(id) {
 // 다음 목표 칸: 뗏목 → 나룻배 → 나룻배 ★2 → 슬루프. 슬루프 다음은 ★2·★3을 키우면 짓고, 강 끝까지 간다
 // 앞바다에서는 슬루프 ★3(내구 +30%, 내항성 +0.15)까지 키운다
 // M2b: 앞바다에선 슬루프 ★3 다음 스쿠너(조선 항구)
-const goal = () => { const H = HULLS[S.ship.hull]; return H.kind === 'raft' ? HULLS.rowboat : H.kind === 'rowboat' ? (H.star < 2 ? HULLS.rowboat2 : HULLS.sloop) : H.kind === 'schooner' ? (S.region === 'sea' && S.blueprints.explorer ? HULLS.explorer : null) : H.kind === 'explorer' ? null : H.star < 2 ? HULLS.sloop2 : S.region === 'coast' ? HULLS.schooner : null; }; // M2b: 슬루프 ★3은 건너뛰고 스쿠너로(★2면 지을 수 있어요)
+const goal = () => { const H = HULLS[S.ship.hull]; return H.kind === 'raft' ? HULLS.rowboat : H.kind === 'rowboat' ? (H.star < 2 ? HULLS.rowboat2 : HULLS.sloop) : H.kind === 'schooner' ? (H.star < 2 ? HULLS.schooner2 : S.region === 'sea' && S.blueprints.explorer ? HULLS.explorer : null) : H.kind === 'explorer' ? null : H.star < 2 ? HULLS.sloop2 : S.region === 'coast' ? HULLS.schooner : null; }; // M2b: 슬루프 ★3은 건너뛰고 스쿠너로(★2면 지을 수 있어요)
 // 새 등급 ★1을 지을 때 같이 모아 두는 모듈 값(슬루프: 돛대, 스쿠너: 주돛대·돛대·타륜)
-const rigFor = (g) => (!g || g.star !== 1 ? [] : g.kind === 'sloop' ? ['mast_m'] : g.kind === 'schooner' ? ['mast_d', 'mast_m', 'wheel'] : g.kind === 'explorer' ? ['mast_l', 'mast_d', 'mast_m', 'wheel'] : []);
+const rigFor = (g) => (!g || g.star !== 1 ? [] : g.kind === 'sloop' ? ['mast_m'] : g.kind === 'schooner' ? ['mast_d', 'mast_m', 'wheel'] : g.kind === 'explorer' ? ['mast_l'] : []);
 // 배 값 + 함께 달 모듈 값이 창고 + 화물칸에 다 있나(조선 항구로 가도 되나)
 const needOf = (g) => { const n = { ...(g?.price || {}) }; for (const id of rigFor(g)) for (const [k, v] of Object.entries(MODULES[id].cost)) n[k] = (n[k] || 0) + v; return n; };
 const haveAll = (g) => !!g && G.canAffordHull(S, g) && Object.entries(needOf(g)).every(([k, v]) => (S.res[k] || 0) + (S.hold[k] || 0) >= v);
@@ -75,6 +75,7 @@ function shop0() {
   if (S.boat.torn && G.mendSail(S).ok) log.mendPort = (log.mendPort || 0) + 1; // 찢어진 돛은 항구에서 꿰맨다
   // 슬루프는 돛대 값까지 있을 때 짓는다(돛대 없이 강을 다니면 노로만 가야 한다)
   const ready = g && (g.star > 1 || g.grade < 3 || ((g.kind !== 'sloop' || S.blueprints.mast_m) && Object.entries(need).every(([k, v]) => (S.res[k] || 0) >= v)));
+  if (process.env.SEA && g && S.region === 'sea' && S.docked === 'depot') console.log('  at depot', (S.t / 60).toFixed(0), 'ready', !!ready, JSON.stringify(G.buildHull(S, g.id).why || 'ok'), JSON.stringify(G.buildStatus ? G.buildStatus(S, g.id).list.filter((q) => !q.ok) : 0), JSON.stringify(G.canAffordHull(S, g)));
   if (ready && G.buildHull(S, g.id).ok) mark(g.star > 1 ? `${g.name} ★${g.star}` : g.name);
   const H2 = HULLS[S.ship.hull]; // 방금 지었으면 새 배 기준으로
   const list = H2.kind === 'raft' ? [] : H2.kind === 'rowboat' ? ['mast_s', 'telescope', 'hold', 'food', 'hammock', 'awning'] : H2.kind === 'explorer' ? ['mast_l', 'mast_d', 'mast_m', 'wheel', 'hammock', 'hammock', 'hammock', 'hammock', 'hammock', 'hammock', 'telescope', 'water', 'water', 'water', 'galley', 'hold', 'hold', 'food', 'food', 'awning', 'bulkhead', 'ballast'] : H2.kind === 'schooner' ? ['mast_d', 'mast_m', 'wheel', 'hammock', 'hammock', 'hammock', 'crowsnest', 'telescope', 'water', 'water', 'desal', 'hold', 'food', 'awning', 'bulkhead', 'ballast'] : ['mast_m', 'telescope', 'hold', 'food', 'hammock', 'awning', 'ballast', 'net', 'water', 'water', 'bulkhead', 'desal'];
@@ -144,7 +145,7 @@ function think() {
   // 작은 호수와 큰 호수를 다 돌고 나룻배를 지은 뒤에 강으로 가고, 강에서는 슬루프 ★2와 돛대를 갖춰야 끝으로 간다
   const gate = S.region === 'coast' ? w.gates.find((q) => q.id === 'toSea') : S.region === 'sea' ? w.gates.find((q) => !q.to) : w.gates[0], status = G.gateStatus(S, gate), kind = HULLS[S.ship.hull].kind, left = G.findsOf(S).some((f) => !S.found[f.id] && (!f.inland || st.telescope));
   // 앞바다에선 강으로 돌아가지 않아요. 스쿠너에 돛대 둘과 일손을 갖추면 큰 바다 경계로(이번 단계의 엔딩)
-  const goOn = S.region === 'pond' ? kind !== 'raft' : S.region === 'lake' ? kind !== 'raft' && S.blueprints.mast_m && !left : S.region === 'river' ? !goal() && st.sailArea : S.region === 'sea' ? kind === 'explorer' && st.masts.length >= 3 && (noCrew || S.crew.length >= (st.minCrew || 0)) : kind === 'schooner' && st.masts.length >= 2 && (noCrew || S.crew.length >= (st.minCrew || 0)); // 큰 바다에서는 탐사선을 짓고 돛대 셋·일손을 갖춰야 대양 어귀(M3 엔딩)로
+  const goOn = S.region === 'pond' ? kind !== 'raft' : S.region === 'lake' ? kind !== 'raft' && S.blueprints.mast_m && !left : S.region === 'river' ? !goal() && st.sailArea : S.region === 'sea' ? kind === 'explorer' && st.masts.length >= 2 && (noCrew || S.crew.length >= (st.minCrew || 0)) : kind === 'schooner' && HULLS[S.ship.hull].star >= 2 && st.masts.length >= 2 && (noCrew || S.crew.length >= (st.minCrew || 0)); // 큰 바다에서는 탐사선을 짓고 돛대 셋·일손을 갖춰야 대양 어귀(M3 엔딩)로
   if (status.ok && goOn && salt() && (rough(gate.x, gate.y) || rough((gate.x + b.x) / 2, (gate.y + b.y) / 2))) { const p = nearestPort(true); G.setDest(S, p.x, p.y, { type: 'port', id: p.id }); waitRough = true; return; } // 경계 쪽이 거칠면 하루 묵어요
   if (status.ok && goOn) {
     if (Math.hypot(gate.x - b.x, gate.y - b.y) < 30) { G.passGate(S, gate); return; }
@@ -197,6 +198,7 @@ for (let i = 0; i < ticks && !S.ended; i++) {
   { const c0 = S.res.coin; G.step(S, G.FIXED_DT); track('step', c0); if (process.env.PROG && S.res.coin !== c0 && S.region === 'coast') console.log('  step', (S.t / 60).toFixed(1), c0, '->', S.res.coin, S.events.map((e) => e.type).join(',')); }
   if (process.env.PROG && S.region === 'coast' && i % (30 * 60 * 5) === 0) console.log((S.t / 60).toFixed(0), 'coin', S.res.coin, 'oak', S.res.oak, 'canvas', S.res.canvas, 'plate', S.res.plate, 'gear', S.res.gear, 'tar', S.res.tar, 'wood', S.res.wood, 'cloth', S.res.cloth, 'hull', S.ship.hull, 'crew', S.crew.length, 'hp', S.hull.toFixed(2), 'day', G.clock(S).day, S.docked || '-', S.route?.target?.type);
   if (process.env.SEA && S.region === 'sea' && i % (30 * 60 * 10) === 0) console.log((S.t / 60).toFixed(0), 'coin', Math.round(S.res.coin), 'crew', S.crew.length, 'owed', S.owed.toFixed(1), 'food', S.food.toFixed(1), 'hull', S.hull.toFixed(2), 'hold', G.holdUsed(S), 'trade', JSON.stringify(Object.fromEntries(TRADE_IDS.map((k) => [k, (S.res[k] || 0) + (S.hold[k] || 0)]).filter((q) => q[1]))), S.docked || (S.route?.target?.type ?? 'idle'));
+  if (process.env.SEA && S.region === 'sea' && S.blueprints.explorer && i % (30 * 60 * 20) === 0) console.log('  need', JSON.stringify(Object.fromEntries(Object.entries(needOf(HULLS.explorer)).filter(([k, v]) => (S.res[k] || 0) + (S.hold[k] || 0) < v).map(([k, v]) => [k, `${(S.res[k] || 0) + (S.hold[k] || 0)}/${v}`]))));
   if (process.env.TRACE && S.region === 'coast' && S.route && (S.route.target?.type || 'find') === process.env.TRACE && i % 600 === 0) console.log((S.t / 60).toFixed(1), 'pos', S.boat.x | 0, S.boat.y | 0, 'dest', S.route.dx | 0, S.route.dy | 0, 'spd', S.boat.spd.toFixed(1), 'sail', S.boat.sailLevel, S.boat.sailNow.toFixed(2), 'row', S.boat.row, 'cap', S.cap.at, S.cap.to, 'twa', S.boat.twa.toFixed(2), 'shoal', S.boat.shoal, 'gr', S.boat.grounded, 'i', S.route.i, S.route.pts.length, S.route.noShoal);
   if (S.region === 'coast' && verbose) { const k = S.docked ? 'docked' : S.route ? (S.route.target?.type || 'find') : 'idle'; (log.tc ||= {})[k] = (log.tc[k] || 0) + G.FIXED_DT / 60; }
   for (const e of S.events) {

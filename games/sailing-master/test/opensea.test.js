@@ -649,3 +649,20 @@ test('B6 소리: 섬 새소리는 효과음에 있고 두 소리 모두 틀려�
   const calls = []; const ac = { currentTime: 0, createOscillator: () => ({ type: '', frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, start() {}, stop() { calls.push(1); } }), createGain: () => ({ gain: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }) };
   FX.isleBird(ac, null, {}, 0, 0.1); FX.isleBird(ac, null, {}, 0, 0.9); assert.equal(calls.length, 4);
 });
+
+// ── B7 마감 ──
+test('B7 대양 어귀: 탐사선으로 넘으면 엔딩(ended)과 oceanGate 100닢, 스쿠너로는 못 넘어요', () => {
+  const gate = worldOf('sea').gates.find((g) => !g.to);
+  const T = seaShip(); assert.equal(G.passGate(T, gate), false); assert.ok(!T.ended);
+  const S = explorerShip(); S.region = 'sea'; G.undock(S); const c0 = S.res.coin; drain(S);
+  assert.equal(G.passGate(S, gate), true); assert.ok(S.ended); assert.ok(S.ach.oceanGate); assert.equal(S.res.coin, c0 + 100);
+  assert.ok(drain(S).some((e) => e.type === 'ended'));
+  // 엔딩 뒤 저장을 불러오면 엔딩이 풀리고 보급항에 대 있어요(v8 그대로)
+  const o = JSON.parse(G.serialize(S)); assert.equal(o.v, 8);
+  const L = G.deserialize(JSON.stringify(o)); assert.equal(L.ended, false); assert.equal(L.docked, 'depot'); assert.equal(L.region, 'sea');
+});
+test('B7 저장 v8 호환: B4~B5가 저장 모양을 안 바꿔요(탐사선·역할 선원도 그대로 불러와져요)', () => {
+  const S = explorerShip('explorer3'); S.crew = [mate(1, 'cook'), mate(2, 'medic')];
+  const L = G.deserialize(G.serialize(S));
+  assert.equal(L.v, 8); assert.equal(L.ship.hull, 'explorer3'); assert.equal(L.crew.length, 2); assert.equal(G.stats(L).forecast, G.stats(S).forecast);
+});

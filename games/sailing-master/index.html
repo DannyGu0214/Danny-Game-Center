@@ -976,7 +976,7 @@ function showDisaster(cause) {
 // 이번 단계의 엔딩(M3): 큰 바다 북쪽 대양 어귀를 5등급 배로 넘을 때(그림·글은 B7에서 새로 써요)
 function showEnding() {
   closeSheet();
-  overlay(`<h3>🌊 대양 앞에서</h3><p>${S.ship.name}이(가) 작은 호수의 뗏목에서 시작해 큰 바다 끝까지 왔다! 이제 돛대 셋 ${HULLS[S.ship.hull].name}다!</p><p>저 안개 너머 대양은 다음 항해에서 만나자고, 친구! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 바다에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
+  overlay(`<h3>🌊 대양 앞에서</h3><p>${S.ship.name}이(가) 작은 호수의 뗏목에서 시작해 큰 바다를 지나 대양 어귀까지 왔다! 돛대 셋 달린 ${HULLS[S.ship.hull].name}이야!</p><p>저 안개 너머가 대양이야, 친구. 길고 긴 항해는 다음 이야기에서 만나자고! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 바다에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
 }
 
 // ── 시트 ──

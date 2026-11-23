@@ -506,6 +506,7 @@ export const ACHIEVEMENTS = [
   { id: 'seaIsles', name: '섬과 섬 사이', desc: '큰 바다 발견지 모두 찾기', coin: 60 },
   { id: 'islandNaturalist', name: '섬 바다 박물학자', desc: '큰 바다 생물 모두 기록', coin: 60 },
   { id: 'explorer', name: '대양 탐사선', desc: '대양 탐사선 짓기', coin: 60 },
+  { id: 'oceanGate', name: '대양 앞에서', desc: '5등급 대양 탐사선으로 큰 바다 북쪽 대양 어귀 넘기', coin: 100 },
   { id: 'openSea', name: '큰 바다로', desc: '4등급 배로 앞바다 북쪽 경계를 넘어 큰 바다에 들어가기', coin: 80 },
 ];
 

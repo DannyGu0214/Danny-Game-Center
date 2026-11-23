@@ -948,7 +948,7 @@ export function passGate(S, gate) {
   if (!gateStatus(S, gate).ok) return false;
   // 이번 단계의 엔딩(M2a): 앞바다의 큰 바다 경계(4등급). 강 끝은 이제 앞바다로 이어져요
   // M3 B0: 앞바다 → 큰 바다(toSea)는 이제 일반 관문이고, 큰 바다 북쪽 대양 어귀(to null)가 이 단계의 끝이에요(엔딩 글은 B7에서)
-  if (!gate.to) { S.ended = true; emit(S, 'ended'); return true; }
+  if (!gate.to) { S.ended = true; giveAch(S, 'oceanGate'); emit(S, 'ended'); return true; }
   const from = S.region, first = !S.visited[gate.to];
   // 화물은 그대로 싣고 넘어간다. 도착 항구에 들르면 창고로 옮겨요
   S.region = gate.to; S.visited[gate.to] = 1;
@@ -1630,6 +1630,7 @@ export function deserialize(raw) {
     // v7 → v8(M3 큰 바다): 큰 바다 경계는 이제 엔딩이 아니라 큰 바다로 가는 문이에요. 스쿠너로 그 경계에서 엔딩을 본 저장은 엔딩을 풀고 앞바다 등대섬에 대 둬요(북쪽으로 가면 큰 바다. 도전과제는 그대로라 금화는 다시 안 줘요)
     if (o.ended && o.region === 'coast') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'light'); }
     if (o.region === 'coast' && o.route?.target?.type === 'gate' && o.route.target.id === 'toOcean') o.route = null; // 옛 관문 id
+    if (o.ended && o.region === 'sea') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'depot'); } // M3 엔딩을 본 저장: 엔딩을 풀고 큰 바다 보급항에 대 둬요(M4에서 관문이 대양으로 이어져도 안전)
     o.stats.typhoons ??= 0; o.stats.typhoonHurt ??= 0; o.stats.calmDays ??= 0;
     for (const k of Object.keys(NEW_MATS)) o.res[k] ??= 0; // M3 B3 최고급 재료 5종: 창고 기본 0
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
