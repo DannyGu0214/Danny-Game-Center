@@ -901,7 +901,7 @@ export function buildSteps(S) {
   if (up) out.push(up);
   return out;
 }
-const yardName = (n) => (n >= 4 ? '앞바다 조선' : n >= 3 ? '강' : n === 2 ? '큰 호수' : '호수');
+const yardName = (n) => (n >= 5 ? '큰 섬 보급' : n >= 4 ? '앞바다 조선' : n >= 3 ? '강' : n === 2 ? '큰 호수' : '호수');
 // 지금 조선소 등급: 같은 수역은 어디서나 같고(F13), 항구 표에 yard가 있으면 그 항구만 달라요(M2b 앞바다 조선 항구 4등급)
 export const yardOf = (S) => W(S).ports.find((p) => p.id === S.docked)?.yard ?? REGIONS[S.region].yard;
 // 설계도가 나오는 수역 이름(조선소 안내용)
