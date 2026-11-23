@@ -540,3 +540,90 @@ test('B4 옮겨 탈 때 선원이 남아요(정원 안), 정원이 줄 때만 �
   assert.ok(Math.abs(b.owed - 4 * 10 / CAL.day * 0.75) < 0.01, `짠물 품삯 ${b.owed}`);
   const fresh = G.newGame(1); fresh.region = 'river'; assert.equal(G.wageK(fresh), 1); assert.equal(G.wageK(b), 0.75);
 });
+
+// ── B5 대양 탐사선 ──
+import { atlasBounds, pxOf } from '../art-ship.js';
+import * as SH from '../ship.js';
+import { HULL_TIERS } from '../data.js';
+const EXP = [{ id: 'mast_l', col: 2, row: 3, rot: 0 }, { id: 'mast_d', col: 2, row: 9, rot: 0 }, { id: 'mast_m', col: 2, row: 15, rot: 0 }, { id: 'oar', col: 0, row: 12, rot: 0 }];
+const rich5 = (S) => { S.res = { ...S.res, teak: 999, synth: 999, steel: 999, syrope: 999, chip: 99, oak: 999, canvas: 999, plate: 99, tar: 99, nail: 99, coin: 5000 }; };
+function explorerShip(hull = 'explorer', seed = 1) {
+  const S = seaShip(seed); S.ship.hull = hull; S.ship.mods = EXP.map((m) => ({ ...m })); S.rev++;
+  S.blueprints.explorer = 1; S.cap.x = HULLS[hull].helmX; S.cap.at = 'helm'; return S;
+}
+
+test('B5 탐사선 선체 ★1~3: 칸 수·정원·내구도·값·기관·흘수·돛대 셋', () => {
+  assert.deepEqual(['explorer', 'explorer2', 'explorer3'].map((id) => SH.validCells(id).length), [84, 116, 116]);
+  const [a, b, c] = ['explorer', 'explorer2', 'explorer3'].map((id) => HULLS[id]);
+  assert.deepEqual([a.crew, b.crew, c.crew], [12, 14, 16]); assert.deepEqual([a.hp, b.hp, c.hp], [400, 400, 520]);
+  assert.deepEqual([a.len, b.len, c.len], [22, 27, 27]); assert.deepEqual([a.grade, a.yard, a.motor, a.draft, a.maxMasts, a.minCrew], [5, 5, 4.2, 1.3, 3, 6]);
+  assert.deepEqual(a.price, { teak: 120, synth: 60, steel: 24, syrope: 30, chip: 6, coin: 400 }); assert.deepEqual(b.price, { teak: 140, synth: 60, steel: 20, coin: 320 });
+  assert.deepEqual(c.price, { teak: 160, synth: 80, syrope: 40, steel: 30, chip: 4, coin: 450 });
+  assert.equal(a.blueprint, 'explorer'); assert.equal(b.blueprint, undefined); assert.equal(c.perk, '항해 함교');
+  assert.equal(HULL_TIERS[4].kind, 'explorer');
+  assert.deepEqual(MODULES.mast_l.cost, { teak: 18, synth: 24, syrope: 8, steel: 4, coin: 30 }); assert.deepEqual([MODULES.mast_l.sail, MODULES.mast_l.mastH, MODULES.mast_l.boom, MODULES.mast_l.need.grade], [1.6, 19, 6.5, 5]);
+  // 돛 넓이: 가장 큰 돛 + 나머지 × 0.85 = 1.6 + 0.85 × (1.35 + 1) ≈ 3.6
+  const S = explorerShip(); const st = G.stats(S); assert.equal(st.motor, 4.2); assert.ok(Math.abs(st.sailArea - (1.6 + 0.85 * (1.35 + 1))) < 1e-9, `돛 ${st.sailArea}`); assert.ok(st.sailArea > 3.5 && st.sailArea < 3.7);
+  assert.equal(st.draft >= 1.3, true);
+});
+
+test('B5 돛대 셋 규칙: 셋까지(MAST_GAP 3.6m 이상), 넷째는 many, 가까우면 near', () => {
+  const d = { hull: 'explorer', mods: [] };
+  for (const m of EXP.slice(0, 3)) { assert.equal(SH.mastProblem(d, m), null); d.mods.push(m); }
+  assert.equal(SH.mastProblem(d, { id: 'mast_m', col: 4, row: 19, rot: 0 }), 'many');
+  const e = { hull: 'explorer', mods: [EXP[0]] }; assert.equal(SH.mastProblem(e, { id: 'mast_m', col: 2, row: 6, rot: 0 }), 'near');
+  assert.equal(SH.mastProblem({ hull: 'schooner', mods: [{ id: 'mast_m', col: 2, row: 2, rot: 0 }, { id: 'mast_d', col: 2, row: 7, rot: 0 }] }, { id: 'mast_m', col: 4, row: 12, rot: 0 }), 'many', '스쿠너는 둘까지');
+  const S = explorerShip(); rich5(S); assert.ok(G.isUnlocked(S, 'mast_l')); assert.ok(!G.isUnlocked(seaShip(), 'mast_l'), '큰 주돛대는 5등급부터');
+});
+
+test('B5 탐사선 짓기: 보급항(조선소 5등급)에서만, 설계도·재료가 있어야 해요', () => {
+  const S = seaShip(); S.ship.hull = 'schooner3'; S.rev++; rich5(S);
+  G.dock(S, 'southLight'); drain(S);
+  assert.match(G.buildHull(S, 'explorer').why, /설계도|조선/);
+  S.blueprints.explorer = 1; assert.equal(G.buildHull(S, 'explorer').ok, false, '남쪽 등대 항은 조선소 4등급');
+  G.dock(S, 'depot'); drain(S); assert.equal(G.yardOf(S), 5);
+  const miss = { ...S.res }; S.res.chip = 5; assert.equal(G.buildHull(S, 'explorer').ok, false, '전자 부품 6개가 모자라요'); S.res.chip = miss.chip;
+  const crew = [mate(1, 'deckhand', { lv: 2 }), mate(2, 'cook')]; S.crew = crew;
+  const r = G.buildHull(S, 'explorer'); assert.ok(r.ok, JSON.stringify(r));
+  assert.equal(S.ship.hull, 'explorer'); assert.ok(S.ach.explorer); assert.equal(S.crew.length, 2, '정원 12 안이라 선원이 남아요');
+  assert.equal(S.res.teak, 999 - 120); assert.equal(S.res.chip, 99 - 6);
+  assert.ok(G.buildHull(S, 'explorer2').ok && G.buildHull(S, 'explorer3').ok); assert.ok(G.stats(S).hull.bridge);
+  // 슬루프에서는 한 번에 올라갈 수 없어요
+  const T = seaShip(); T.ship.hull = 'sloop'; T.blueprints.explorer = 1; rich5(T); G.dock(T, 'depot'); assert.equal(G.buildHull(T, 'explorer').ok, false);
+});
+
+test('B5 그림: 탐사선 ★1~3 아틀라스가 64방향 모두 칸 안에 들고, 배율은 10·8px/m', () => {
+  for (const id of ['explorer', 'explorer2', 'explorer3']) {
+    const b = atlasBounds({ hull: id, mods: EXP });
+    assert.ok(b.x0 >= 0 && b.y0 >= 0 && b.x1 <= b.cell && b.y1 <= b.cell, `${id} ${JSON.stringify(b)}`); assert.ok(b.layer < b.cell / 2);
+  }
+  assert.equal(pxOf(HULLS.explorer), 10); assert.equal(pxOf(HULLS.explorer2), 8);
+});
+
+test('B5 보조 기관 4.2m/s와 기관 자리, 항해 함교(★3: 예보 +2일, 조타 자리에서 돛 바꾸기)', () => {
+  const calm = dayWith(2, (q) => q.calm, 1), S = explorerShip('explorer', 2); G.undock(S);
+  S.clock = calm * CAL.day + 60; S.boat.x = 0; S.boat.y = 0; S.boat.h = 0; S.food = 500; S.water = 20; let m = 0;
+  for (let i = 0; i < 30 * 70; i++) { G.step(S, G.FIXED_DT); S.boat.sailLevel = 1; S.boat.row = false; m = Math.max(m, S.boat.spd); if (S.boat.x > 500) S.boat.x = 0; S.boat.rudder = 0; }
+  assert.ok(m > 3.9 && m <= 4.25, `탐사선 기관 ${m}`);
+  assert.ok(G.seatsOf(S).some((q) => q.type === 'engine' && Math.abs(q.x + 8.4) < 1e-9));
+  // 함교
+  const F = (hull) => { const T = explorerShip(hull); G.undock(T); T.cap.x = HULLS[hull].helmX; T.cap.at = 'helm'; T.crew = []; return T; };
+  const a = F('explorer2'), b = F('explorer3');
+  G.setSail(a, 2); G.setSail(b, 2);
+  assert.ok(a.cap.to === 'mast', '함교 없는 배는 돛대까지 걸어가요'); assert.equal(a.boat.sailLevel, 0);
+  assert.equal(b.cap.to, null); assert.equal(b.boat.sailLevel, 2, '함교: 조타 자리에서 바로');
+  assert.equal(G.stats(b).forecast, G.stats(a).forecast + 2);
+});
+
+test('B5 강·호수 관문 maxGrade 4: 탐사선은 앞바다까지만, 스쿠너는 그대로', () => {
+  const gates = [['pond', 'toLake'], ['lake', 'toRiver'], ['lake', 'toPond'], ['river', 'toLake'], ['coast', 'toRiver']];
+  for (const [region, id] of gates) { const gate = worldOf(region).gates.find((g) => g.id === id); assert.equal(gate.maxGrade, 4, `${region}.${id}`); }
+  for (const [region, id] of [['river', 'toSea'], ['coast', 'toSea'], ['sea', 'toCoast']]) assert.equal(worldOf(region).gates.find((g) => g.id === id).maxGrade, undefined, `${region}.${id}`);
+  const S = coastShip('schooner3'); S.ship.hull = 'explorer'; S.rev++;
+  const gate = worldOf('coast').gates.find((g) => g.id === 'toRiver');
+  const st = G.gateStatus(S, gate); assert.equal(st.ok, false); assert.ok(st.list.some((q) => q.text.includes('배가 너무 커')));
+  assert.equal(G.passGate(S, gate), false); assert.equal(S.region, 'coast');
+  const T = coastShip('schooner3'); assert.equal(G.passGate(T, gate), true);
+  // 앞바다 ↔ 큰 바다는 탐사선도 다녀요
+  assert.equal(G.passGate(S, worldOf('coast').gates.find((g) => g.id === 'toSea')), true);
+});

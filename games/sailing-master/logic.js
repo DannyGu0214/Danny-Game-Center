@@ -422,6 +422,7 @@ function placeAtPort(S, portId) {
 // ── 조작 ──
 const stationX = (S, where) => {
   const st = stats(S);
+  if (where === 'mast' && st.hull.bridge) return st.hull.helmX; // 항해 함교(★3): 조타 자리에서 돛을 바꿔요
   if (where === 'mast' && st.mast) { const x = st.mastX - 0.55; return st.hull.winch ? (x + st.hull.helmX) / 2 : x; } // 윈치가 있으면 반만 걷는다
   if (where === 'oar') { const o = S.ship.mods.find((m) => m.id === 'oar'); if (o) return SH.modulePos(S.ship.hull, o)[0]; }
   return HULLS[S.ship.hull].helmX;
@@ -938,6 +939,7 @@ export const decorOpen = (S, id) => ACHIEVEMENTS.some((a) => a.decor === id && S
 export function gateStatus(S, gate) {
   const r = gate.req, list = [];
   if (r.grade) list.push({ text: `${r.grade}등급(${HULL_TIERS[r.grade - 1]?.name ?? '대양 탐사선'}) 이상`, ok: HULLS[S.ship.hull].grade >= r.grade });
+  if (gate.maxGrade) list.push({ text: '배가 너무 커! 이 물길엔 못 들어가', ok: HULLS[S.ship.hull].grade <= gate.maxGrade }); // 탐사선(흘수 1.3m)은 강·호수 여울에 걸려요(M3 B5)
   return { list, ok: list.every((x) => x.ok) };
 }
 export function passGate(S, gate) {
@@ -1015,6 +1017,7 @@ export function checkAch(S) {
   c('crew3', Object.keys(S.hiredEver).length >= 3);
   c('sloop', HULLS[S.ship.hull].grade >= 3);
   c('schooner', HULLS[S.ship.hull].grade >= 4);
+  c('explorer', HULLS[S.ship.hull].grade >= 5);
   c('seaAll', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'coast' || S.seen[id])); // 앞바다 생물(큰 바다 생물은 islandNaturalist)
   c('islandNaturalist', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'sea' || S.seen[id]));
   c('seaIsles', worldDone(S, 'sea'));

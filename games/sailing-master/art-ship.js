@@ -9,8 +9,9 @@ const CELL = 256, COLS = 8, DIRS = 64, PX = 20; // 아틀라스 한 칸 256px, 1
 // 선체마다 굽는 배율(M2b): 12m가 넘는 배(스쿠너 14~16.5m)는 1m를 덜 써서 칸 256px 안에 들어가게 해요. 그릴 때 k = zoom / px로 되돌려요
 export const pxOf = (H) => Math.min(PX, Math.floor(230 / H.len));
 // 갑판 위 사람이 서는 높이: 슬루프·스쿠너는 고물 조종석 바닥, 나룻배는 바닥 판, 뗏목은 갑판
-export const floorOf = (H) => (H.kind === 'sloop' ? 0.72 : H.kind === 'schooner' ? H.deck - 0.28 : H.kind === 'rowboat' ? 0.22 : H.deck);
-const big = (H) => H.kind === 'sloop' || H.kind === 'schooner';
+export const floorOf = (H) => (H.kind === 'sloop' ? 0.72 : H.kind === 'schooner' || H.kind === 'explorer' ? H.deck - 0.28 : H.kind === 'rowboat' ? 0.22 : H.deck);
+const big = (H) => H.kind === 'sloop' || H.kind === 'schooner' || H.kind === 'explorer';
+const headroom = (H) => (H.kind === 'explorer' ? 1.7 : big(H) ? 0.45 : 0.1); // 모듈 위로 더 굽는 높이(탐사선은 갑판실·함교가 1.55m까지)
 const CENTER_Y = CELL / 2 + 22; // 수면 기준점(높이만큼 위로 그려서 아래로 내려 둠)
 const DZ = 0.075;
 const WOOD = { deck: '#c79c63', deckDark: '#a97f4b', cap: '#8a5b34', floor: '#7f5a36', log: '#a07a4c', logDark: '#7a5a35', logLit: '#bd9767' };
@@ -114,13 +115,15 @@ function sliceRowboat(g, z, paint, H) {
 }
 // 슬루프·스쿠너 선체. 스쿠너(M2b)는 갑판이 높아(1.35m) 띠 높이를 갑판 비율로 맞추고, 갑판 둘레에 뱃전 벽(bulwark), 두 줄 띠, 구리 밑판, 갑판 승강구를 더해요
 function sliceSloop(g, z, paint, H) {
-  const DECK = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap, [ck0, ck1] = H.cockpit, sch = H.kind === 'schooner', u = z / DECK, hw = H.beam / 2;
+  const DECK = H.deck, cap = H.star === 3 ? '#b98f45' : WOOD.cap, [ck0, ck1] = H.cockpit, sch = H.kind === 'schooner' || H.kind === 'explorer', exp = H.kind === 'explorer', u = z / DECK, hw = H.beam / 2;
   let from = -1;
   if (z > DECK) from = Math.pow((z - DECK) / 0.42, 1 / 2.2);
   if (from >= 0.98) return;
   const strake = (u - 0.17) / 0.11, seam = strake % 1 < 0.35 && u > 0.2;
   const side = seam ? shade(paint, -0.16) : Math.floor(strake) % 2 ? shade(paint, -0.05) : paint;
-  const color = u < 0.08 ? (sch ? '#b5683f' : BOTTOM) : u < 0.17 ? BOOT : u < 0.72 ? side : u < 0.83 ? STRIPE : sch && u > 0.88 && u < 0.92 ? '#e7c46a' : z < DECK - 0.05 ? side : cap;
+  // 탐사선(M3 B5): 쇠띠 둘을 두른 나무 선체 — 선체 중간과 뱃전 아래에 검은 철띠
+  const iron = exp && ((u > 0.36 && u < 0.43) || (u > 0.66 && u < 0.72));
+  const color = iron ? '#3a4046' : u < 0.08 ? (sch ? '#b5683f' : BOTTOM) : u < 0.17 ? BOOT : u < 0.72 ? side : u < 0.83 ? STRIPE : sch && u > 0.88 && u < 0.92 ? '#e7c46a' : z < DECK - 0.05 ? side : cap;
   hullPath(g, H.id, z, 0, from);
   g.fillStyle = color; g.fill();
   if (z > DECK - 0.05) {
@@ -137,7 +140,7 @@ function sliceSloop(g, z, paint, H) {
       g.fillStyle = '#5a5e62'; for (const [x, y] of [[H.len / 2 - 1.2, 0.55], [H.len / 2 - 1.2, -0.55], [ck0 - 0.3, hw * 0.6], [ck0 - 0.3, -hw * 0.6]]) { g.beginPath(); roundRect(g, x - 0.12, y - 0.04, x + 0.12, y + 0.04, 0.03); g.fill(); }
       // 스쿠너: 갑판 승강구 둘(격자 뚜껑)과 닻 감는 양묘기
       if (sch) {
-        for (const [x0, x1] of [[H.len / 2 - 2.6, H.len / 2 - 1.7], [ck1 + 0.5, ck1 + 1.3]]) {
+        for (const [x0, x1] of exp ? [[ck1 + 0.5, ck1 + 1.3]] : [[H.len / 2 - 2.6, H.len / 2 - 1.7], [ck1 + 0.5, ck1 + 1.3]]) {
           g.fillStyle = '#7f5a36'; g.beginPath(); roundRect(g, x0, -0.45, x1, 0.45, 0.06); g.fill();
           g.strokeStyle = 'rgba(40,24,10,.55)'; g.lineWidth = 0.03; for (let x = x0 + 0.12; x < x1; x += 0.15) { g.beginPath(); g.moveTo(x, -0.4); g.lineTo(x, 0.4); g.stroke(); } for (let y = -0.33; y < 0.4; y += 0.15) { g.beginPath(); g.moveTo(x0 + 0.05, y); g.lineTo(x1 - 0.05, y); g.stroke(); }
         }
@@ -161,6 +164,23 @@ function sliceSloop(g, z, paint, H) {
     for (let x = ck0 + 0.05; x < ck1 + 0.1; x += 0.2) { g.beginPath(); g.moveTo(x, -cw); g.lineTo(x, cw); g.stroke(); }
   }
   if (H.star === 3 && z > DECK && z < DECK + 0.16) drawPerk(g, H);
+}
+
+// 탐사선 갑판 위 구조물(M3 B5): 뱃전 벽 높이를 넘는 부분이라 선체 단면과 따로 그려요 — 흰 갑판실, 굴뚝, ★3 항해 함교
+function sliceExplorerTop(g, z, H) {
+  const DECK = H.deck, [, ck1] = H.cockpit, hw = H.beam / 2;
+  // 탐사선: 뱃머리 낮은 흰 갑판실(앞 갑판 위 1m)과 뱃전 쪽 굴뚝(기관)
+  if (z > DECK && z < DECK + 1.05) {
+    const hx0 = H.len / 2 - 3.6, hx1 = H.len / 2 - 1.9, top = z > DECK + 0.95;
+    g.fillStyle = top ? '#f1ece0' : z > DECK + 0.78 ? '#c9c3b4' : '#eee8d8'; g.beginPath(); roundRect(g, hx0, -1.05, hx1, 1.05, 0.2); g.fill();
+    if (z > DECK + 0.3 && z < DECK + 0.62) { g.fillStyle = '#3f5f78'; for (let k = -1; k <= 1; k += 1) { g.beginPath(); roundRect(g, hx0 + 0.15, k * 0.6 - 0.13, hx1 - 0.15, k * 0.6 + 0.13, 0.05); g.fill(); } }
+  }
+  if (z > DECK && z < DECK + 1.1) {
+    const fx = ck1 + 1.4, fy = -hw * 0.62, r = 0.3;
+    g.fillStyle = z > DECK + 0.95 ? '#252a2e' : z > DECK + 0.6 && z < DECK + 0.8 ? '#c0453a' : '#4a5258'; g.beginPath(); g.ellipse(fx, fy, r, r * 0.85, 0, 0, TAU); g.fill();
+  }
+  // 탐사선 ★3 항해 함교: 갑판실 지붕 위 작은 유리 조타실
+  if (H.bridge && z > DECK + 1.05 && z < DECK + 1.55) { const hx1 = H.len / 2 - 1.9, hx0 = H.len / 2 - 3.1; g.fillStyle = z > DECK + 1.45 ? '#f1ece0' : '#9fc3d6'; g.beginPath(); roundRect(g, hx0, -0.7, hx1 - 0.2, 0.7, 0.12); g.fill(); }
 }
 
 // 모듈 단면: z는 갑판에서 잰 높이
@@ -318,13 +338,13 @@ function sliceDecor(g, ship, z) {
 // 설계가 바뀔 때 방향마다 층을 쌓아 한 장에 굽는다. 조명은 세상 기준이라 칸마다 입힌다
 export function bakeShip(ship, reuse = null) {
   const H = HULLS[ship.hull], paint = PAINTS.hull[ship.paint?.hull ?? 0] || PAINTS.hull[0];
-  const tall = Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + (big(H) ? 0.45 : 0.1);
+  const tall = Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + headroom(H);
   const zMax = H.deck + tall, layers = [], size = CELL, px = pxOf(H);
   for (let z = 0; z <= zMax; z += DZ) {
     const c = document.createElement('canvas'); c.width = c.height = size;
     const g = c.getContext('2d');
     g.setTransform(px, 0, 0, px, size / 2, size / 2);
-    if (H.kind === 'raft') sliceRaft(g, z, H); else if (H.kind === 'rowboat') sliceRowboat(g, z, paint, H); else sliceSloop(g, z, paint, H);
+    if (H.kind === 'raft') sliceRaft(g, z, H); else if (H.kind === 'rowboat') sliceRowboat(g, z, paint, H); else { sliceSloop(g, z, paint, H); if (H.kind === 'explorer') sliceExplorerTop(g, z, H); }
     for (const m of ship.mods) sliceModule(g, m, ship.hull, z - H.deck);
     sliceDecor(g, ship, z - H.deck);
     layers.push({ c, z });
@@ -367,7 +387,7 @@ export function bakeShip(ship, reuse = null) {
 
 // 아틀라스 칸 안에 들어가나(M2b): 선체 윤곽 점을 굽기와 같은 변환으로 64방향 모두 돌려 칸 좌표의 범위를 돌려줘요(화면 없이, 테스트용)
 export function atlasBounds(ship) {
-  const H = HULLS[ship.hull], px = pxOf(H), zMax = H.deck + Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + (big(H) ? 0.45 : 0.1);
+  const H = HULLS[ship.hull], px = pxOf(H), zMax = H.deck + Math.max(...ship.mods.map((m) => MODULES[m.id].z), 0.1) + headroom(H);
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (let d = 0; d < DIRS; d++) {
     const a = d / DIRS * TAU, c = Math.cos(a), n = Math.sin(a);
