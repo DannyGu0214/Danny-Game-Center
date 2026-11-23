@@ -293,3 +293,16 @@ test('산호섬 나루: 식수·빵·건어는 사고(식수 3닢), 재료 가�
   }
   assert.equal(SUPPLY.bread.keep, 5); assert.equal(SUPPLY.dfish.keep, undefined);
 });
+
+// ── M4b 지도 정리: 둘째 산호섬을 무풍대 한가운데로 당겨 산호섬 사이가 2.5km 안팎이에요(전엔 4km라 무풍대를 한 번에 건너다 갈증·더위로 멈췄어요) ──
+test('산호섬 사이 2.5km 안팎, 둘째 산호섬은 무풍대 안, 큰 바다·대양 품삯은 같아요', () => {
+  const w = worldOf('ocean'), A = w.ports.find((p) => p.id === 'atollA'), B = w.ports.find((p) => p.id === 'atollB'), N = w.ports.find((p) => p.id === 'newLand');
+  const gap = Math.hypot(B.x - A.x, B.y - A.y);
+  assert.ok(gap > 2300 && gap < 2700, `산호섬 사이 ${gap | 0}m`);
+  const band = REGIONS.ocean.windBands.find((b) => b.id === 'doldrums');
+  assert.ok(B.y < band.y0 && B.y > band.y1, '둘째 산호섬은 무풍대 안');
+  assert.ok(A.y > B.y && B.y > N.y, '남→북 순서');
+  for (const isl of REGIONS.ocean.islands.filter((q) => Math.abs(q.y - B.y) < 400)) assert.ok(Math.hypot(isl.x - B.x, isl.y - B.y) < 200, '섬이 나루 곁에 있어요');
+  assert.equal(REGIONS.ocean.wageK, REGIONS.sea.wageK);
+  for (const s of REGIONS.ocean.shoals.filter((q) => Math.abs(q.y - B.y) < 400)) assert.ok(Math.hypot(s.x - B.x, s.y - B.y) < 260, '산호초가 나루 곁에 있어요');
+});
