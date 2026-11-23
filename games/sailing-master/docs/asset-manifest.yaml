@@ -233,3 +233,94 @@ assets:
     status: done
     license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
     note: "선장 crafter · 여정 배경(길·경로·인물은 게임이 위에 그림) · Google AI Studio gemini-3.1-flash-image · 해당 선장 초상화를 참고 이미지로 사용(여정 그림은 화풍 참고만, 인물 없음) · 3:2 생성 후 가운데 36:25 크롭 · 화풍: 일본 극장 애니메이션풍(정밀 배경·역광), 2026-11-08 대니님 확정"
+  # M4 대양·엔딩(PLAN-M3.md 10-3절). 파일이 없으면 합성곡·캔버스 장면으로 대신해요
+  - id: bgm-opensea
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/opensea.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental sea-shanty folk in 6/8, about 96 BPM, G major. Fiddle and accordion carry a broad, rolling melody, tin whistle answers, plucked mandolin, upright bass, bodhran and soft foot stomps, a sustained low accordion drone like a horizon. Open sea between scattered tropical islands, steady trade wind, sunlight on long swells, confident and free. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 섬과 섬 사이(큰 바다 항해, sea.mp3와 번갈아)"
+  - id: bgm-ocean
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/ocean.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:30~3:30, 끊김 없는 루프, 4MB 이하, 보컬 없음"
+    prompt: "Instrumental slow folk ballad in 3/4, about 72 BPM, D dorian. Solo fiddle sings a long, lonely melody over a quiet accordion drone, plucked mandolin arpeggios, upright bass on the downbeats, very soft bodhran like distant waves. Crossing an endless ocean at dawn, small ship under a huge sky, solitary but hopeful, grand and calm. Gentle wooden-room reverb, a little wider than a tavern. Not orchestral, not cute. No vocals. Seamless loop: the ending leads naturally back into the beginning."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 끝없는 물(대양 항해, opensea와 번갈아)"
+  - id: bgm-ending
+    kind: music
+    source: generate
+    path: games/sailing-master/assets/music/ending.mp3
+    spec: "mp3 스테레오 128kbps, 44.1kHz, 2:30~3:00, 루프 아님(분명한 끝맺음), 4MB 이하, 보컬 없음"
+    prompt: "Instrumental folk finale, starts slow in 3/4 at about 70 BPM with solo fiddle and accordion recalling a simple sea-shanty theme, then gathers into a joyful 6/8 reel at about 120 BPM with tin whistle, mandolin, upright bass, bodhran, foot stomps and clinking mugs, and ends on a warm held major chord. A small crew finally reaching a new continent after crossing the ocean, celebration on the docks at sunset, proud and tender. Wooden-room reverb. Not orchestral, not cute. No vocals."
+    url: ""
+    status: pending
+    license: ""
+    note: "곡 이름: 건너편 부두(엔딩, 한 번 재생)"
+  - id: story-endArrival
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/endArrival.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Japanese theatrical animation film style with richly detailed painted backgrounds and backlighting, wide landscape composition 36:25. Age of Sail fantasy. A three-masted wooden ocean exploration ship with white deckhouse and a small funnel, sails weathered from a long voyage, gliding into a large stone harbor of an unknown new continent at golden sunset; tall cliffs, a lighthouse, colorful stucco houses and a bell tower above the quay, gulls, people waving small cloths on the pier. Warm, triumphant, emotional mood. Keep the bottom 12% of the frame calm and simple (a text panel overlaps it). No readable text or letters anywhere, no logo, no watermark, no border, no weapons, no cannons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "엔딩 1쪽(공통) · 배는 게임의 대양 탐사선(돛대 셋, 흰 갑판실, 작은 굴뚝) · 1440×1000 WebP 반영(M4 O6, 캔버스 장면은 파일이 없을 때만)"
+  - id: story-endSailor
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/endSailor.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Japanese theatrical animation film style with richly detailed painted backgrounds and backlighting, wide landscape composition 36:25. The young sailor captain (twenties, short dark brown hair, tanned, light stubble, deep sea-blue #25506f coat), once a postal courier, sits on a crate at a new-continent harbor at dusk writing a letter to his mother, a sealed envelope and an old leather mail bag beside him, the ocean exploration ship moored behind, lanterns lighting up. Quiet, warm, a little homesick but proud. Keep the bottom 12% of the frame calm and simple. No readable text or letters anywhere (papers show only illegible scribbles), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "엔딩 2쪽 선장 sailor · 해당 초상화를 참고 이미지로 · 1440×1000 WebP 반영(M4 O6, 캔버스 장면은 파일이 없을 때만)"
+  - id: story-endLucky
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/endLucky.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Japanese theatrical animation film style with richly detailed painted backgrounds and backlighting, wide landscape composition 36:25. The young lucky captain (twenties, long brown hair, teal #2f6b5a coat), once a lost-and-found clerk, stands on a cliff above a new continent harbor in morning light, holding open an old worn sea chart and drawing the last missing coastline onto it with a pencil, wind in her hair, the ocean exploration ship small in the bay below. Hopeful, curious, bright. Keep the bottom 12% of the frame calm and simple. No readable text or letters anywhere (the chart shows only coastlines and illegible marks), no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "엔딩 2쪽 선장 lucky · 해당 초상화를 참고 이미지로 · 1440×1000 WebP 반영(M4 O6, 캔버스 장면은 파일이 없을 때만)"
+  - id: story-endTrader
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/endTrader.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Japanese theatrical animation film style with richly detailed painted backgrounds and backlighting, wide landscape composition 36:25. The trader captain (woman in her fifties, grey wavy permed hair, plum #7a4a5e coat), a former spice merchant, haggles happily at a busy open-air market stall in a new continent harbor town, holding a small brass scale, unfamiliar colorful fruits, woven baskets and strange shells on the stall, local vendors laughing with her, afternoon sun through awnings. Lively, warm, humorous. Keep the bottom 12% of the frame calm and simple. No readable text or letters anywhere, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "엔딩 2쪽 선장 trader · 해당 초상화를 참고 이미지로 · 1440×1000 WebP 반영(M4 O6, 캔버스 장면은 파일이 없을 때만)"
+  - id: story-endCrafter
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/endCrafter.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Japanese theatrical animation film style with richly detailed painted backgrounds and backlighting, wide landscape composition 36:25. The crafter captain (man in his fifties, bald with grey sides and beard, a magnifying loupe on a cord around his neck, ochre-brown #6b5a3a coat), a former clockmaker, sits on the deck of the moored ocean exploration ship at sunset carving a small wooden model of that same ship for his grandchild, a toolbag open beside him, wood shavings, the new continent harbor glowing behind. Tender, satisfied, gentle humor. Keep the bottom 12% of the frame calm and simple. No readable text or letters anywhere, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "엔딩 2쪽 선장 crafter · 해당 초상화를 참고 이미지로 · 1440×1000 WebP 반영(M4 O6, 캔버스 장면은 파일이 없을 때만)"
+  - id: story-endCrew
+    kind: image
+    source: generate
+    path: games/sailing-master/assets/story/endCrew.webp
+    spec: "1440x1000 WebP(품질 82, 350KB 이하), 불투명 배경, 원본 PNG는 커밋하지 않음"
+    prompt: "Japanese theatrical animation film style with richly detailed painted backgrounds and backlighting, wide landscape composition 36:25. A festive evening on a stone pier of a new continent harbor: a diverse crew of about ten sailors in Age of Sail clothes (headscarves, knit caps, flat caps) sitting around a long table with bread, fish and mugs, one playing a fiddle and one an accordion, a ship's cat on a barrel, string lanterns, the three-masted ocean exploration ship moored behind under the first stars. Joyful, warm, the feeling of a long journey's end and a new beginning. No main captain in the center (the player's captain varies). Keep the bottom 12% of the frame calm and simple. No readable text or letters anywhere, no logo, no watermark, no border, no weapons."
+    url: ""
+    status: done
+    license: "AI 생성(Google Gemini 3.1 Flash Image), Google은 생성물 소유권을 주장하지 않음 — 프로젝트 자유 사용"
+    note: "엔딩 3쪽(공통) · 선장은 넣지 않아요(선장 4명 공통) · 1440×1000 WebP 반영(M4 O6, 캔버스 장면은 파일이 없을 때만)"
