@@ -115,6 +115,8 @@ input { font: inherit; user-select: text; -webkit-user-select: text; }
 .seg .lab { display: flex; align-items: center; padding: 0 3px 0 5px; font-size: 13px; }
 .seg button { font-size: 11.5px; border-left: 1px solid var(--line); }
 .seg button.on { background: var(--on); color: #203038; font-weight: 700; }
+#fast { flex: none; width: 44px; font-size: 13px; border-radius: 12px; padding: 0; line-height: 1.05; }
+#fast.on { background: var(--on); color: #203038; font-weight: 700; }
 #oar { flex: none; width: 44px; font-size: 13px; border-radius: 12px; padding: 0; line-height: 1.05; }
 #oar small { display: block; font-size: 10.5px; }
 #oar.on { background: var(--on); color: #203038; font-weight: 700; border-color: var(--on); }
@@ -496,6 +498,7 @@ body.intro #hud, body.intro #panel, body.intro #tabs { visibility: hidden; }
       <button data-lv="0">내림</button><button data-lv="1">줄임</button><button data-lv="2">전체</button>
     </div>
     <button class="card" id="oar" aria-label="노">🚣<small>노</small></button>
+    <button class="card" id="fast" aria-label="빨리 가기" style="display:none">⏩<small>×1</small></button>
     <div class="card" id="rudderWrap" aria-label="키">
       <span class="lab" style="left:5px">좌</span><span class="lab" style="right:5px">우</span>
       <div id="track"><div id="notch"></div></div>
@@ -760,7 +763,18 @@ function syncButtons() {
   $('sailSeg').classList.toggle('torn', !!S.boat.torn); $('sailSeg').title = S.boat.torn ? '돛이 찢어졌어! 반쯤밖에 안 펴져' : '';
   $('oar').classList.toggle('on', S.boat.row || !!(S.cap.then && S.cap.then.type === 'row'));
   $('oar').disabled = !st.oars;
+  const fastOn = !!REGIONS[S.region].fast && !S.docked;
+  $('fast').style.display = fastOn ? '' : 'none'; $('fast').classList.toggle('on', fastMul > 1); $('fast').querySelector('small').textContent = `×${fastMul}`;
 }
+// 빨리 가기(M4 O0): ×1 → ×2 → ×4. 켤 수 없으면 이유를 알려 줘요. 저장하지 않고 늘 ×1로 시작해요
+let fastMul = 1;
+const FAST_WARN = new Set(['gustSoon', 'stormSoon', 'squallSoon', 'typhoonSoon', 'typhoonNear', 'typhoonIn', 'gustOn', 'stormOn', 'disaster', 'sailTorn', 'ground', 'shoal', 'shoalRisk', 'waterLow', 'waterOut', 'foodLow', 'found', 'species', 'arrive', 'atGate', 'region', 'docked', 'edge']);
+function fastBreak(why) { if (fastMul > 1) { fastMul = 1; if (why) showHint(why, 2.5, true); syncButtons(); } }
+$('fast').addEventListener('pointerdown', () => {
+  if (fastMul > 1) { fastMul = fastMul === 2 ? 4 : 1; syncButtons(); return; }
+  const r = G.fastCheck(S); if (!r.ok) { if (r.why) showHint(r.why, 2.5, true); return; }
+  fastMul = 2; syncButtons();
+});
 $('sailSeg').addEventListener('pointerdown', (e) => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   if (G.setSail(S, Number(b.dataset.lv))) { snd.play(Number(b.dataset.lv) ? 'sail' : 'flap'); if (G.workerAt(S, 'sail')) snd.play('pipe'); syncButtons(); } // 갑판원에게 지시하는 호루라기
@@ -1481,9 +1495,10 @@ function crewPlanUI() {
 }
 
 // ── 해도 ──
-let chartPick = null;
+let chartPick = null, chartMid = null; // chartMid: 띠 모양 바다(대양)에서 해도 창의 가운데 y(없으면 내 배)
 function renderChart(body) {
-  const w = worldOf(S.region), [x0, y0, x1, y1] = w.bounds, cw = Math.min(window.innerWidth, 560) - 28, wide = x1 - x0, tall = y1 - y0;
+  const w = worldOf(S.region), full = w.bounds, win = w.def.shape.window || (w.def.shape.y1 - w.def.shape.y0 > 5000 ? 2000 : 0); // 대양: 지금 위치 ±2,000m 창 + 오른쪽 전체 띠 막대(M4 O0)
+  const mid = win ? Math.max(full[1] + win, Math.min(full[3] - win, chartMid ?? S.boat.y)) : 0, [x0, y0, x1, y1] = win ? [full[0], mid - win, full[2], mid + win] : full, cw = Math.min(window.innerWidth, 560) - 28, wide = x1 - x0, tall = y1 - y0;
   const maxH = Math.max(220, Math.min(window.innerHeight * 0.4, cw * 1.25));
   const k = Math.min(cw / wide, maxH / tall), ch = tall * k, dpr = Math.min(2.5, devicePixelRatio || 1);
   const cv = el('canvas'); cv.id = 'chart'; cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); cv.style.height = `${ch}px`;
@@ -1586,8 +1601,18 @@ function renderChart(body) {
     g.save(); g.translate(toX(S.boat.x), toY(S.boat.y)); g.rotate(S.boat.h);
     g.fillStyle = '#fff'; g.strokeStyle = '#0d2a38'; g.lineWidth = 1.6; g.lineJoin = 'round'; g.beginPath(); g.moveTo(10, 0); g.lineTo(-6.5, 5.5); g.lineTo(-3.5, 0); g.lineTo(-6.5, -5.5); g.closePath(); g.fill(); g.stroke();
     g.restore();
+    // 전체 띠 막대(대양): 오른쪽 가장자리. 내 위치·항구·태풍, 지금 창. 누르면 그 자리로 창이 옮겨 가요
+    if (win) {
+      const bx = cw - 10, top = 44, bot = ch - 8, yy = (y) => top + (y - full[1]) / (full[3] - full[1]) * (bot - top);
+      g.fillStyle = 'rgba(10,32,44,.6)'; g.fillRect(bx - 5, top - 4, 10, bot - top + 8);
+      g.fillStyle = 'rgba(120,210,235,.4)'; g.fillRect(bx - 3, top, 6, bot - top);
+      g.strokeStyle = '#fff'; g.lineWidth = 1.4; g.strokeRect(bx - 5, yy(y0), 10, yy(y1) - yy(y0));
+      for (const p of w.ports) { g.fillStyle = '#f4e6bb'; g.beginPath(); g.arc(bx, yy(p.y), 2.6, 0, Math.PI * 2); g.fill(); }
+      const tvb = G.typhoonView(S); if (tvb?.pos) { g.fillStyle = '#ff7a64'; g.beginPath(); g.arc(bx, yy(tvb.pos[1]), 3.4, 0, Math.PI * 2); g.fill(); }
+      g.fillStyle = '#fff'; g.beginPath(); g.moveTo(bx - 8, yy(S.boat.y)); g.lineTo(bx - 3, yy(S.boat.y) - 3); g.lineTo(bx - 3, yy(S.boat.y) + 3); g.closePath(); g.fill();
+    }
     // 나침반
-    const rx = cw - 19, ry = 21;
+    const rx = cw - 19 - (win ? 14 : 0), ry = 21;
     g.fillStyle = 'rgba(10,32,44,.55)'; g.beginPath(); g.arc(rx, ry, 14, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#e8604a'; g.beginPath(); g.moveTo(rx, ry - 11); g.lineTo(rx + 3.4, ry); g.lineTo(rx - 3.4, ry); g.closePath(); g.fill();
     g.fillStyle = '#eef7f8'; g.beginPath(); g.moveTo(rx, ry + 9); g.lineTo(rx + 3.4, ry); g.lineTo(rx - 3.4, ry); g.closePath(); g.fill();
@@ -1620,6 +1645,7 @@ function renderChart(body) {
     plan.scrollIntoView({ block: 'nearest' });
   };
   cv.addEventListener('pointerdown', (e) => {
+    if (win) { const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top; if (px > cw - 22 && py > 36) { chartMid = full[1] + (py - 44) / (ch - 52) * (full[3] - full[1]); draw(); return; } }
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left - ox) / k + x0, y = (e.clientY - r.top) / k + y0, R = 16 / k;
     const p = w.ports.find((q) => Math.hypot(q.x - x, q.y - y) < R), gt = w.gates.find((q) => Math.hypot(q.x - x, q.y - y) < R);
     if (p) chartPick = { x: p.x, y: p.y, name: p.name, target: { type: 'port', id: p.id } };
@@ -1802,6 +1828,7 @@ let acc = 0, last = performance.now();
 function tick() {
   const b = S.boat;
   G.step(S, STEP);
+  if (fastMul > 1) { const r = G.fastCheck(S); if (!r.ok || S.events.some((e) => FAST_WARN.has(e.type))) fastBreak(r.why || '앗, 무슨 일이야! 천천히 가자고'); }
   const ch = Math.cos(b.h), sh = Math.sin(b.h), L = sprite.hull.len / 2;
   if (b.spd > 0.25) wake.update(STEP, b, b.x - ch * L, b.y - sh * L);
   else wake.update(STEP, { ...b, spd: 0 }, b.x, b.y);
@@ -1968,10 +1995,10 @@ function frame(now) {
   if (paused || !W || !H) return; // 창 크기가 0이면 그릴 곳이 없다(숨은 창에서 열릴 때)
   const hold = !started || !!sheet || overlayOpen() || audioOpen() || $('picker').classList.contains('on') || $('story').classList.contains('on');
   if (!hold) {
-    acc += raw;
+    acc += raw * fastMul;
     let n = 0;
-    while (acc >= STEP && n < 12) { tick(); acc -= STEP; n++; }
-    if (n === 12) acc = 0;
+    while (acc >= STEP && n < 12 * fastMul) { tick(); acc -= STEP; n++; if (fastMul === 1 && acc > STEP * 12) break; }
+    if (n >= 12 * fastMul) acc = 0;
     drainEvents();
     fxTimers(raw);
     creatures.update(raw, cam, W, H, S.boat, G.stats(S).telescope, { tide: G.tideAt(S.region, S.clock), len: sprite.hull.len, docked: !!S.docked });

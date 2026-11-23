@@ -49,8 +49,8 @@ test('지도: 수역마다 항구·수문·발견지가 물 위에 있고 서로
       else if (f.where === 'beach') assert.ok(d > 0 && d < 6, `${f.id} 조간대 ${d}`);
       else if (f.where === 'shore') { assert.ok(d < 0 && d > -7, `${f.id} 물가 ${d}`); assert.ok(gap < 24, `${f.id} 맨눈 ${gap}`); } else { assert.ok(d < -12, `${f.id} 내륙 ${d}`); assert.ok(gap < 66, `${f.id} 망원경 ${gap}`); }
     }
-    assert.ok(w.finds.some((f) => f.where === 'inland'), `${id} 내륙 발견지`);
-    assert.ok(w.finds.some((f) => f.where === 'shore'), `${id} 물가 발견지`);
+    if (w.finds.length) assert.ok(w.finds.some((f) => f.where === 'inland'), `${id} 내륙 발견지`); // 대양은 발견지가 O3에서 생겨요
+    if (w.finds.length) assert.ok(w.finds.some((f) => f.where === 'shore'), `${id} 물가 발견지`);
     for (const I of REGIONS[id].islands) assert.equal(w.isWater(I.x, I.y), false, `${id} 섬`);
   }
   assert.equal(worldOf('pond').isWater(0, 400), false);
@@ -191,14 +191,15 @@ test('자동 항로: 세 수역 어디서 어디로 가든 도착하고 땅에 �
   for (const id of REGION_ORDER) {
     const w = worldOf(id), pts = [...w.ports, ...w.gates, ...w.finds.map((f) => { const [x, y] = w.nearestWater(f.x, f.y); return { id: f.id, x, y }; })];
     worst[id] = 0;
-    for (const seed of [1, 2]) for (let i = 0; i < pts.length; i++) {
+    for (const seed of id === 'ocean' ? [1] : [1, 2]) for (let i = 0; i < pts.length; i++) {
       const a = pts[i], b = pts[(i + 2) % pts.length];
+      if (id === 'ocean' && Math.hypot(a.x - b.x, a.y - b.y) > 4500) continue; // 12km 띠는 가까운 짝만(범선 속도로 두 시간 넘게 걸려요)
       const S = id === 'pond' ? (() => { const T = G.newGame(seed); G.undock(T); return T; })() : sloopAt(id, seed);
       S.boat.x = a.x; S.boat.y = a.y; S.food = 500;
       if (id !== 'pond') { S.boat.sailLevel = 2; S.boat.sailNow = 1; }
       assert.ok(G.setDest(S, b.x, b.y), `${id} 길`);
       let sec = 0;
-      while (S.route && sec < (id === 'sea' ? 2600 : 900)) { // 큰 바다는 앞바다의 8배 넓이예요
+      while (S.route && sec < (id === 'ocean' ? 4500 : id === 'sea' ? 2600 : 900)) { // 큰 바다는 앞바다의 8배, 대양은 12km 띠예요
         G.step(S, G.FIXED_DT); sec += G.FIXED_DT; S.hull = 1; S.vigor = 1; S.boat.stamina = 1;
         assert.ok(w.dist(S.boat.x, S.boat.y) > 0);
       }
@@ -841,7 +842,7 @@ test('저장 v1 → v3: 예전 배는 ★1, 슬루프로 있던 판도 그대로
   const old = JSON.parse(G.serialize(sloopAt('lake')));
   old.v = 1; delete old.best; old.found = { mill2: 1 };
   const T = G.deserialize(JSON.stringify(old));
-  assert.equal(T.v, 8);
+  assert.equal(T.v, 9);
   assert.equal(T.ship.hull, 'sloop');
   assert.equal(HULLS[T.ship.hull].star, 1);
   assert.equal(T.best.hull, 'sloop');
@@ -1029,7 +1030,7 @@ test('저장 v2 → v3: 화물칸 금화는 창고로, 식량은 빵으로, 찾�
   o.v = 2; o.hold = { wood: 3, cloth: 0, coin: 7 }; o.res = { wood: 1, cloth: 2, coin: 5 }; o.food = 4; delete o.pantry; delete o.relics; delete o.letters; delete o.herb;
   o.found = { logpile: 1 }; o.flot = { pond: [{ x: 0, y: 0, k: 'coin', n: 3, ph: 0 }] };
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 8); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
+  assert.equal(T.v, 9); assert.equal(T.res.coin, 12); assert.equal(T.hold.coin, undefined); assert.equal(T.hold.wood, 3);
   assert.equal(T.pantry[0].k, 'bread'); assert.equal(T.pantry[0].n, 4);
   assert.ok(T.relics.logpile); assert.equal(T.flot.pond[0].k, 'shiny');
 });
@@ -1120,7 +1121,7 @@ test('저장 v3 → v4: 예전 선원은 숙련 1·지금 보수를 기본 보�
   const S = sloopAt('lake', 1, [{ id: 'hammock', col: 0, row: 5, rot: 0 }]); const o = JSON.parse(G.serialize(S));
   o.v = 3; o.crew = [{ id: 5, role: 'deckhand', name: '빌럼', gender: '남', wage: 2, skill: 100, humor: 100, drink: 100 }]; delete o.rules;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 8); assert.equal(T.crew[0].lv, 1); assert.equal(T.crew[0].baseWage, 2); assert.ok(T.crew[0].trait); assert.ok(T.rules.reef);
+  assert.equal(T.v, 9); assert.equal(T.crew[0].lv, 1); assert.equal(T.crew[0].baseWage, 2); assert.ok(T.crew[0].trait); assert.ok(T.rules.reef);
   assert.equal(G.workerAt(T, 'sail')?.name, '빌럼');
 });
 

@@ -128,6 +128,18 @@ export function tideInfo(S, clockT = S.clock) {
   const name = h > TIDE.amp * 0.7 ? '밀물' : h < -TIDE.amp * 0.7 ? '썰물' : rising ? '들물' : '날물';
   return { h, rising, name, toLow, toHigh };
 }
+// ── 빨리 가기(M4 O0, PLAN-M3.md 7-4절): 큰 바다·대양(fast)에서 탁 트인 곳만 ×2·×4. 규칙은 그대로고 index.html이 프레임마다 step을 여러 번 불러요 ──
+// 깨지면 index.html이 ×1로 돌려 놓고 why를 한 번 알려요
+export function fastCheck(S) {
+  const R = REGIONS[S.region];
+  if (!R.fast) return { ok: false, why: '여기선 빨리 못 가! 탁 트인 바다에서만 된다고' };
+  if (S.docked || S.disaster || S.ended) return { ok: false, why: '' };
+  if (worldOf(S.region).landDist(S.boat.x, S.boat.y) < 200) return { ok: false, why: '물가가 가까워! 천천히 가자고' };
+  const w = S.weather || {};
+  if ((w.on || []).concat(w.soon || []).some((id) => (WX[id]?.sev || 0) >= 2)) return { ok: false, why: '바람이 수상해! 천천히 가자고' };
+  if (R.weather?.includes('typhoon')) { const q = typhoonAt(S.region, S.seed, S.clock, S.boat.x, S.boat.y); if (q && q.d < TYPHOON.outer + 300) return { ok: false, why: '태풍이 가까워! 천천히 가자고' }; }
+  return { ok: true, why: '' };
+}
 // ── 태풍(M3 B2) ──
 // 경로: 서쪽(side −1)이나 동쪽(+1) 끝 밖 start m에서 들어와, 지도 가운데 60% 안의 점 P를 지나 반대쪽으로 빠져나가요(P는 경로 한가운데). cross초에 건너요
 export function typhoonTrack(region, tr) {
@@ -223,7 +235,7 @@ export function windAt(S) {
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 8, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 9, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: calmWeather(),
@@ -236,8 +248,8 @@ export function newGame(seed = 1) {
     ship: { hull: 'raft', mods: [{ id: 'oar', col: 1, row: 1, rot: 0 }], name: '새벽호', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] },
     crew: [], hiredEver: {}, owed: 0, wageDay: 0,
     flot: {}, fog: {}, found: {}, blueprints: {}, seen: {}, photos: {}, ach: {},
-    stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0, typhoons: 0, typhoonHurt: 0, calmDays: 0 },
-    ended: false, rev: 0,
+    stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0, typhoons: 0, typhoonHurt: 0, calmDays: 0, crossDays: 0 },
+    ended: false, rev: 0, crossed: null, // M4: 새 대륙 항구에 처음 닿은 날짜(없으면 null, O4)
   };
   S.best = JSON.parse(JSON.stringify(S.ship));
   S.wind = windAt(S);
@@ -948,7 +960,7 @@ export function passGate(S, gate) {
   if (!gateStatus(S, gate).ok) return false;
   // 이번 단계의 엔딩(M2a): 앞바다의 큰 바다 경계(4등급). 강 끝은 이제 앞바다로 이어져요
   // M3 B0: 앞바다 → 큰 바다(toSea)는 이제 일반 관문이고, 큰 바다 북쪽 대양 어귀(to null)가 이 단계의 끝이에요(엔딩 글은 B7에서)
-  if (!gate.to) { S.ended = true; giveAch(S, 'oceanGate'); emit(S, 'ended'); return true; }
+  if (!gate.to) { S.ended = true; emit(S, 'ended'); return true; } // 지금 쓰는 곳 없음(M4 O0부터 대양 어귀는 대양으로 이어져요). 옛 엔딩 흐름 보존
   const from = S.region, first = !S.visited[gate.to];
   // 화물은 그대로 싣고 넘어간다. 도착 항구에 들르면 창고로 옮겨요
   S.region = gate.to; S.visited[gate.to] = 1;
@@ -1030,6 +1042,7 @@ export function checkAch(S) {
   c('speciesAll', Object.keys(SPECIES).every((id) => SPECIES[id].sea || S.seen[id])); // 민물 생물만(바다 생물은 C3에서 따로)
   c('riverEnd', !!S.visited.coast);
   c('openSea', !!S.visited.sea);
+  c('oceanGate', !!S.visited.ocean);
 }
 
 // ── 안개 걷기 ──
@@ -1596,7 +1609,7 @@ export function serialize(S) { const { events, ...rest } = S; return JSON.string
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || ![1, 2, 3, 4, 5, 6, 7, 8].includes(o.v) || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
     // v2 → v3(S2 아이템): 목재·천은 잡목·마포로 이어 받는다. 화물칸의 금화는 창고로, 식량은 빵으로(5일 뒤 상함), 찾은 발견지의 유물을 준다
     if (o.v < 3) {
@@ -1634,7 +1647,8 @@ export function deserialize(raw) {
     o.stats.typhoons ??= 0; o.stats.typhoonHurt ??= 0; o.stats.calmDays ??= 0;
     for (const k of Object.keys(NEW_MATS)) o.res[k] ??= 0; // M3 B3 최고급 재료 5종: 창고 기본 0
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
-    o.v = 8;
+    o.crossed ??= null; o.stats.crossDays ??= 0; // v8 → v9(M4 대양): 대양 관련 값 기본
+    o.v = 9;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
     if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다

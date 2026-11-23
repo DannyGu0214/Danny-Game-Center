@@ -439,7 +439,7 @@ export const REGIONS = {
   // M3 B0 큰 바다(2026-11-23, PLAN-M3.md 2절): 섬만 뭍이고 네 끝이 모두 경계예요. 큰 섬의 보급항이 중간 기점(5등급 조선소), 북쪽 끝은 대양 어귀(5등급 관문)
   // shape.kind 'isles': 섬(islands)은 해안선 혹 bumps [각도(도), 폭(rad), 높이(m, 음수면 만)]를 받아요. 발견지 셋은 자리 표시용 임시예요(B3에서 열 곳으로 늘려요)
   sea: {
-    id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, tide: true, edgeFog: 120,
+    id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, tide: true, edgeFog: 120, fast: true,
     wind: { from: -80 * D, speed: 11, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['typhoon', 'storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
     swell: { base: 1.3, day: 0.4, gust: 0.4, storm: 1.2 },
     // swell(shape): 항구 둘레 calmR m 안은 너울 × calmK(그 밖은 어디나 1). currents(M3 B1): 조류 선분 [x0, y0, x1, y1, 폭 m, 세기 m/s]
@@ -454,7 +454,7 @@ export const REGIONS = {
     lights: [{ x: -200, y: 1322, r: 300 }, { x: 900, y: -1200, r: 260, find: 'farLight' }], // 무인 등대(farLight) 불빛
     start: 'southLight',
     ports: [{ id: 'southLight', name: '남쪽 등대 항', x: -200, y: 1322, water: 2 }, { id: 'depot', name: '큰 섬 보급항', x: 300, y: -40, water: 1, yard: 5 }, { id: 'palm', name: '야자섬 나루', x: -1130, y: 500, water: 3, shop: false }, { id: 'rockVillage', name: '바위섬 어촌', x: -1380, y: -800, water: 2 }],
-    gates: [{ id: 'toCoast', name: '남쪽 물목', x: 0, y: 1560, to: 'coast', entry: 'light', req: {}, open: true }, { id: 'toOcean', name: '대양 어귀', x: 0, y: -1560, to: null, req: { grade: 5 }, open: true }],
+    gates: [{ id: 'toCoast', name: '남쪽 물목', x: 0, y: 1560, to: 'coast', entry: 'light', req: {}, open: true }, { id: 'toOcean', name: '대양 어귀', x: 0, y: -1560, to: 'ocean', entry: 'lastLight', req: { grade: 5 }, open: true }],
     // 발견지 10곳(M3 B3, PLAN-M3.md 4-2절). 좌표는 기본 자리이고 2등급 이상 맵은 판마다 randomFinds가 다시 골라요(경계 70m 안은 빼요). fixed는 자리가 고정(작은 섬 위의 등대)
     finds: [
       { id: 'volcanoRim', name: '화산 분화구 전망대', x: 1400, y: 520, inland: 40, coin: 90, steel: 6, relic: '흑요석 조각', art: 'volcano' },
@@ -473,8 +473,27 @@ export const REGIONS = {
     flot: { cap: 36, table: [['wood', 1, 3, 6], ['oak', 1.5, 2, 5], ['teak', 0.8, 1, 3], ['net', 2, 3, 6], ['syrope', 0.8, 1, 3], ['plate', 1, 1, 2], ['steel', 0.4, 1, 2], ['gear', 0.5, 1, 1], ['water', 3, 2, 3], ['shiny', 6, 1, 2]] },
     trade: [['porcelain', 3], ['silk', 4], ['painting', 1.2], ['spice', 2]], demand: ['spice', 'silk'],
   },
+  // M4 O0 대양(2026-11-24, PLAN-M3.md 7절): 남북으로 긴 바다 한 장(1.8 × 12.4km). 동·서·남 끝은 안개 경계, 북쪽은 새 대륙 해안선(shape.north).
+  // 항구 넷: 마지막 등대(남) · 산호섬 둘(−4,000, −8,000) · 새 대륙 항구(북, 처음 닿으면 엔딩은 O4). 바람 띠·무풍대는 O1, 대양 태풍은 O2, 발견지·생물은 O3
+  ocean: {
+    id: 'ocean', name: '대양', order: 5, grade: 5, theme: 'sea', yard: 5, zoom: 5.5, salt: true, tide: false, edgeFog: 150, fast: true,
+    wind: { from: -80 * D, speed: 10, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
+    swell: { base: 1.8, day: 0.5, gust: 0.4, storm: 1.3 },
+    shape: { kind: 'isles', x0: -900, x1: 900, y0: -12400, y1: 400, cell: 16, nav: 24, swell: { calmR: 180, calmK: 0.3 }, north: { base: -11600, bumps: [[-500, 220, 120], [300, 160, -90], [650, 200, 70]], wig: [[14, 160, 0.4], [7, 55, 1.7]] } },
+    currents: [],
+    islands: [{ x: 0, y: 285, r: 34, ph: 1.1 }, { x: -250, y: -4000, r: 100, ph: 2.3 }, { x: 300, y: -8000, r: 110, ph: 4.1 }],
+    lights: [{ x: 0, y: 252, r: 320 }],
+    start: 'lastLight',
+    ports: [{ id: 'lastLight', name: '마지막 등대', x: 0, y: 252, water: 2 }, { id: 'atollA', name: '첫째 산호섬 나루', x: -250, y: -3893, water: 3, shop: false }, { id: 'atollB', name: '둘째 산호섬 나루', x: 300, y: -7888, water: 3, shop: false }, { id: 'newLand', name: '새 대륙 항구', x: 0, y: -11570, water: 2, yard: 5 }],
+    gates: [{ id: 'toSea', name: '남쪽 물목', x: 0, y: 360, to: 'sea', entry: 'depot', req: {}, open: true }],
+    finds: [],
+    // 산호초 고리: 수심 1.6~2.0m라 탐사선(흘수 1.3m)도 지나가요. 해도에서 얕은 물로 보여요
+    shoals: [{ x: -250, y: -3860, r: 60, depth: 1.8 }, { x: -180, y: -3990, r: 60, depth: 1.7 }, { x: -320, y: -3990, r: 60, depth: 1.9 }, { x: 300, y: -7860, r: 60, depth: 1.8 }, { x: 390, y: -8000, r: 60, depth: 1.7 }, { x: 230, y: -8090, r: 60, depth: 2 }],
+    flot: { cap: 40, table: [['wood', 0.6, 3, 6], ['teak', 1.2, 1, 3], ['net', 1.6, 3, 6], ['syrope', 1, 1, 3], ['steel', 0.6, 1, 2], ['water', 3.5, 2, 3], ['shiny', 8, 1, 2]] },
+    trade: [['spice', 2], ['porcelain', 2], ['silk', 3], ['painting', 2]], demand: ['coffee', 'porcelain'],
+  },
 };
-export const REGION_ORDER = ['pond', 'lake', 'river', 'coast', 'sea'];
+export const REGION_ORDER = ['pond', 'lake', 'river', 'coast', 'sea', 'ocean'];
 
 // 도전과제. check는 logic.js가 S로 판단하고, 보상은 코인과 꾸미기 해금이에요
 export const ACHIEVEMENTS = [
@@ -506,12 +525,12 @@ export const ACHIEVEMENTS = [
   { id: 'seaIsles', name: '섬과 섬 사이', desc: '큰 바다 발견지 모두 찾기', coin: 60 },
   { id: 'islandNaturalist', name: '섬 바다 박물학자', desc: '큰 바다 생물 모두 기록', coin: 60 },
   { id: 'explorer', name: '대양 탐사선', desc: '대양 탐사선 짓기', coin: 60 },
-  { id: 'oceanGate', name: '대양 앞에서', desc: '5등급 대양 탐사선으로 큰 바다 북쪽 대양 어귀 넘기', coin: 100 },
+  { id: 'oceanGate', name: '대양 앞에서', desc: '5등급 대양 탐사선으로 대양 어귀를 넘어 대양에 처음 닿기', coin: 100 },
   { id: 'openSea', name: '큰 바다로', desc: '4등급 배로 앞바다 북쪽 경계를 넘어 큰 바다에 들어가기', coin: 80 },
 ];
 
 // 칭호(수역 도달)
-export const TITLES = ['뱃사공', '사공', '강 안내인', '연안 뱃사람', '먼바다 항해사'];
+export const TITLES = ['뱃사공', '사공', '강 안내인', '연안 뱃사람', '먼바다 항해사', '대양 항해사'];
 
 export const DECOR = {
   lantern: { name: '랜턴', icon: '🏮' },
