@@ -756,7 +756,7 @@ test('등급 올리기: 뗏목은 바로, 2등급부터 ★2가 먼저고, 슬�
   const wood = S.res.wood;
   assert.ok(G.buildHull(S, 'sloop').ok);
   assert.equal(S.res.wood, wood - HULLS.sloop.price.wood + 2 + Math.ceil(MODULES.food.cost.wood / 2), '옮겨 타면 모듈은 값 절반');
-  assert.equal(S.crew.length, 0);
+  assert.equal(S.crew.length, 1, '정원(슬루프 2) 안이라 선원은 그대로 타요(M3 B4)');
   assert.equal(S.ship.mods.length, 1);
   assert.ok(S.ach.sloop);
   assert.equal(G.buildHull(S, 'sloop3').ok, false);
@@ -878,7 +878,7 @@ test('도감: 동물을 기록해도 자원이 늘지 않고, 달성 보상만 �
   for (const id of ids) G.recordSpecies(S, id);
   assert.ok(S.ach.species10 && S.ach.speciesAll && S.ach.seaAll && S.ach.islandNaturalist);
   assert.equal(S.res.coin, res.coin + 30 + 50 + 80 + 60 + 60);
-  assert.equal(ACHIEVEMENTS.length, 24);
+  assert.equal(ACHIEVEMENTS.length, 26);
   for (const d of Object.values(SPECIES)) assert.equal(d.reward, undefined);
 });
 

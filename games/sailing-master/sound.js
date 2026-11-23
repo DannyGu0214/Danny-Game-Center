@@ -49,9 +49,20 @@ export function buildAmbient(ac, dest, noise) {
   const rainF = filter('highpass', 2600, 0.5), rainG = gain(0);
   loop(1.7, 3.1).connect(rainF); rainF.connect(rainG); rainG.connect(dest);
 
+  // 태풍 바람(M3 B2): 낮은 울부짖음. 세기 howl(0~1)에 따라 커지고 느리게 출렁여요. 태풍 밖에서는 0이라 이전 측정과 같은 소리예요
+  const howlF = filter('bandpass', 210, 3.2), howlG = gain(0);
+  loop(0.7, 2.7).connect(howlF); howlF.connect(howlG); howlG.connect(dest);
+  lfo(0.16, 70, howlF.frequency); lfo(0.07, 0.04, howlG.gain);
+  // 보조 기관 허밍(M3 B5): 기관이 돌 때만 낮은 엔진 소리(톱니파 46Hz를 낮은 필터로 뭉개고 떨림을 줘요)
+  const engO = ac.createOscillator(), engF = filter('lowpass', 150, 0.8), engG = gain(0);
+  engO.type = 'sawtooth'; engO.frequency.value = 46; engO.connect(engF); engF.connect(engG); engG.connect(dest); engO.start();
+  lfo(11, 0.012, engG.gain); lfo(0.4, 3, engO.frequency);
+
   return {
-    set(windSpeed, boatSpeed, rain = 0) {
+    set(windSpeed, boatSpeed, rain = 0, engine = 0, howl = 0) {
       const t = ac.currentTime, w = Math.min(1.4, windSpeed / 10), b = Math.min(1, boatSpeed / 7.5);
+      engG.gain.setTargetAtTime(engine ? 0.03 + b * 0.025 : 0, t, 0.6);
+      howlG.gain.setTargetAtTime(howl * 0.13, t, 1.2);
       rainG.gain.setTargetAtTime(rain * 0.11, t, 1.5);
       swellG.gain.setTargetAtTime(0.28 + w * 0.1, t, 1.2);
       windG.gain.setTargetAtTime(0.02 + w * w * 0.045, t, 0.8); // 2026-11-02 대니님 요청으로 줄임(노 소리는 그대로)
@@ -111,6 +122,11 @@ export const FX = {
   thunder(ac, noise, d, t) { burst(ac, noise, d, t, { type: 'lowpass', f: 380, to: 70, q: 0.6, dur: 2.6, peak: 0.24, attack: 0.04 }); burst(ac, noise, d, t + 0.35, { type: 'lowpass', f: 240, to: 60, q: 0.5, dur: 2, peak: 0.14, attack: 0.3 }); },
   tear(ac, noise, d, t) { for (const [at, f] of [[0, 2400], [0.07, 1900], [0.15, 2800], [0.24, 1500]]) burst(ac, noise, d, t + at, { f, to: f * 0.6, q: 2.2, dur: 0.09, peak: 0.12 }); },
   bell(ac, noise, d, t) { tone(ac, d, t, { f: 660, type: 'triangle', dur: 1.8, peak: 0.035 }); tone(ac, d, t, { f: 1584, dur: 1.1, peak: 0.012 }); },
+  // 섬 새소리(M3 B6): 군함조의 짧은 꽥 + 슴새의 높은 두 음. v로 어느 쪽인지 골라요
+  isleBird(ac, noise, d, t, v = 0) {
+    if (v < 0.5) { tone(ac, d, t, { f: 1500, to: 900, type: 'triangle', dur: 0.22, peak: 0.05, attack: 0.02 }); tone(ac, d, t + 0.26, { f: 1350, to: 800, type: 'triangle', dur: 0.2, peak: 0.04, attack: 0.02 }); }
+    else { tone(ac, d, t, { f: 2300, to: 2700, dur: 0.12, peak: 0.04, attack: 0.01 }); tone(ac, d, t + 0.16, { f: 2700, to: 2100, dur: 0.16, peak: 0.035, attack: 0.01 }); }
+  },
   gust(ac, noise, d, t) { burst(ac, noise, d, t, { f: 500, to: 1300, q: 0.5, dur: 2.2, peak: 0.13, attack: 0.9 }); tone(ac, d, t + 0.3, { f: 58, to: 38, dur: 1.5, peak: 0.1, attack: 0.1 }); },
   warn(ac, _n, d, t) { for (const at of [0, 0.3]) tone(ac, d, t + at, { f: 392, dur: 0.24, peak: 0.05 }); },
   disaster(ac, noise, d, t) { tone(ac, d, t, { f: 196, to: 98, type: 'triangle', dur: 1.4, peak: 0.12 }); burst(ac, noise, d, t, { type: 'lowpass', f: 900, to: 200, dur: 1.2, peak: 0.2 }); },
@@ -195,7 +211,7 @@ export function createSound() {
     setOn(v, k) { for (const g of k ? [k] : ['fx', 'amb']) { grp[g].on = !!v; level(g); } },
     // 슬라이더(0~1). 끄는 동안 바로 들리게 빠르게 따라가요
     setVolume(k, v) { grp[k].v = Math.max(0, Math.min(1, Number(v) || 0)); level(k, true); },
-    ambient(windSpeed, boatSpeed, rain = 0) { if (amb) amb.set(windSpeed, boatSpeed, rain); },
+    ambient(windSpeed, boatSpeed, rain = 0, engine = 0, howl = 0) { if (amb) amb.set(windSpeed, boatSpeed, rain, engine, howl); },
     // at: 지금부터 몇 초 뒤(오프라인 측정에서 씀). 효과음이 0이면 소리 마디를 만들지도 않아요
     play(name, at = 0, ...args) { if (ac && target('fx') > 0 && FX[name]) FX[name](ac, noise, fxBus, ac.currentTime + 0.005 + at, ...args); },
     pause() { if (ac && ac.suspend) ac.suspend(); },

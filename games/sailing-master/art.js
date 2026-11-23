@@ -181,7 +181,7 @@ function sharedArt() {
       pebbles: [pebblesSprite(0.3), pebblesSprite(0.8)], boulder: [boulderSprite(0.2), boulderSprite(0.7)], windmill: windmillSprite(), thatch: [thatchSprite(0.2), thatchSprite(0.7)], haystack: haystackSprite(), bridge: bridgeSprite(),
       // 앞바다(M2b): 발견지 5종, 바다 관문 표지, 등대, 어촌 항구 집, 해안 풍경
       ruins: ruinsSprite(), cave: caveSprite(), rocks: rocksSprite(), tidepool: tidepoolSprite(), buoy: buoySprite(), seamark: seamarkSprite(), lighthouse: lighthouseSprite(), volcano: volcanoSprite(), reef: reefSprite(), turtlebeach: turtlebeachSprite(), arch: archSprite(), falls: fallsSprite(), glassfloat: glassfloatSprite(), seahut: hutSprite('seahut'),
-      seapine: [seapineSprite(0.2), seapineSprite(0.8)], seagrass: [seagrassSprite(0.2), seagrassSprite(0.7)], fishhut: [fishhutSprite(0.2), fishhutSprite(0.8)], netrack: netrackSprite(), breakwater: breakwaterSprite(),
+      seapine: [seapineSprite(0.2), seapineSprite(0.8)], seagrass: [seagrassSprite(0.2), seagrassSprite(0.7)], fishhut: [fishhutSprite(0.2), fishhutSprite(0.8)], palm: [palmSprite(0.2, false), palmSprite(0.8, false)], palm2: [palmSprite(0.3, true), palmSprite(0.75, true)], islehut: [islehutSprite(0.2), islehutSprite(0.8)], netrack: netrackSprite(), breakwater: breakwaterSprite(),
       pier: pierSprite(), hut: hutSprite(), sign: signSprite(), stone: stoneSprite(), stump: stumpSprite(), wreck: wreckSprite(), tower: towerSprite(), cabin: cabinSprite(), mill: millSprite(), shrine: shrineSprite(), camp: campSprite(), logpile: logpileSprite(), beacon: beaconSprite(), shelter: shelterSprite(), beached: beachedSprite(),
     },
     flot: Object.fromEntries(['wood', 'oak', 'cloth', 'canvas', 'hemp', 'tar', 'nail', 'shiny', 'bottle', 'coin', 'water', 'net', 'teak', 'syrope', 'steel', 'plate', 'gear'].map((k) => [k, flotSprite(k)])),
@@ -1537,6 +1537,39 @@ function seapineSprite(v) {
   const pad = (x, y, rx, ry, seed) => { blob(g, P, S, x + 0.15, y + 0.15, rx, ry, seed, '#1f3f2c', 12, 0.18); blob(g, P, S, x, y, rx, ry, seed, '#2e5a3c', 12, 0.18); blob(g, P, S, x - rx * 0.2, y - ry * 0.35, rx * 0.7, ry * 0.45, seed + 1, '#4a7e4c', 10, 0.22); blob(g, P, S, x - rx * 0.35, y - ry * 0.55, rx * 0.3, ry * 0.18, seed + 2, 'rgba(170,210,140,.45)', 8, 0.25); };
   pad(-2.6 * d, -4.9, 1.5, 0.55, v * 10 + 1); pad(3 * d, -6.3, 1.6, 0.55, v * 10 + 2); pad(1.2 * d, -7.3, 2.4, 0.8, v * 10 + 3); pad(0.4 * d, -8.3, 1.5, 0.55, v * 10 + 4);
   return { c, W: 8, H: 10, ox: 4, oy: 9.4 };
+}
+// 야자수(M3 B6): 기운 줄기에 깃털 잎이 부채처럼 퍼져요. low면 키가 작고 더 휜 해변 야자
+function palmSprite(v, low) {
+  const { S, c, g, P } = spriteBox(7, 11, 0.6), d = v < 0.5 ? 1 : -1, hh = low ? 5.2 : 8.8, lean = (low ? 2.2 : 1.2) * d;
+  shadowAt(g, P, S, 0.8 * d, 2.2, 0.55, 0.24);
+  g.lineCap = 'round'; g.strokeStyle = '#7a5a38'; g.lineWidth = 0.46 * S;
+  g.beginPath(); g.moveTo(...P(0, 0)); g.bezierCurveTo(...P(0.25 * d, -hh * 0.35), ...P(lean * 0.7, -hh * 0.7), ...P(lean, -hh)); g.stroke();
+  g.strokeStyle = 'rgba(60,40,20,.45)'; g.lineWidth = 0.1 * S; for (let i = 1; i < 7; i++) { const f = i / 7, x = lean * f * f * 1.05, y = -hh * f; g.beginPath(); g.moveTo(...P(x - 0.2, y)); g.lineTo(...P(x + 0.2, y - 0.08)); g.stroke(); }
+  const tx = lean, ty = -hh;
+  for (let i = 0; i < 8; i++) {
+    const a = -Math.PI * 0.95 + (i / 7) * Math.PI * 0.9 + (hash(i, v * 9) - 0.5) * 0.25, len = (low ? 2.3 : 2.8) + hash(v * 5, i) * 0.5, ex = tx + Math.cos(a) * len, ey = ty + Math.sin(a) * len * 0.55 + len * 0.55 * (Math.abs(Math.cos(a)) > 0.5 ? 0.9 : 0);
+    g.strokeStyle = i % 2 ? '#2f7a3f' : '#3d9150'; g.lineWidth = 0.3 * S;
+    g.beginPath(); g.moveTo(...P(tx, ty)); g.quadraticCurveTo(...P(tx + Math.cos(a) * len * 0.55, ty + Math.sin(a) * len * 0.75 - 0.5), ...P(ex, ey)); g.stroke();
+    g.strokeStyle = '#276a36'; g.lineWidth = 0.1 * S; g.beginPath(); g.moveTo(...P(tx, ty)); g.quadraticCurveTo(...P(tx + Math.cos(a) * len * 0.55, ty + Math.sin(a) * len * 0.75 - 0.5), ...P(ex, ey)); g.stroke();
+  }
+  g.fillStyle = '#5a3d1e'; for (const [x, y] of [[-0.2, 0.25], [0.2, 0.3], [0, 0.55]]) { g.beginPath(); g.arc(...P(tx + x, ty + y), 0.2 * S, 0, TAU); g.fill(); }
+  return { c, W: 7, H: 11, ox: 3.5, oy: 10.4 };
+}
+// 섬 항구 집: 분홍·노랑 회벽, 붉은 기와, 덧창
+function islehutSprite(v) {
+  const { S, c, g, P } = spriteBox(7, 6, 0.6), wall = v < 0.5 ? ['#f0b8bd', '#d79aa2'] : ['#f2d98a', '#d9bd6a'];
+  shadowAt(g, P, S, 0.4, 3, 0.55, 0.26);
+  const poly = (pts, fill) => { g.beginPath(); for (const q of pts) g.lineTo(...P(...q)); g.closePath(); g.fillStyle = fill; g.fill(); };
+  poly([[-2.4, 0], [1.2, 0], [1.2, -2], [-2.4, -2]], wall[0]); poly([[1.2, 0], [2.4, -0.6], [2.4, -2.5], [1.2, -2]], wall[1]);
+  poly([[-2.4, 0], [1.2, 0], [1.2, -0.3], [-2.4, -0.3]], 'rgba(90,60,50,.3)');
+  poly([[-2.8, -1.9], [-0.6, -3.8], [1.6, -1.9]], '#c4553a'); poly([[-0.6, -3.8], [1.6, -1.9], [2.8, -2.4], [0.6, -4.3]], '#a6432d');
+  g.strokeStyle = 'rgba(70,20,15,.35)'; g.lineWidth = 1; for (let i = 1; i < 5; i++) { g.beginPath(); g.moveTo(...P(-2.8 + i * 0.44, -1.9 - i * 0.38)); g.lineTo(...P(1.6 - i * 0.44, -1.9)); g.stroke(); }
+  g.fillStyle = '#5a3a24'; g.fillRect(...P(-0.5, -1.5), 0.75 * S, 1.5 * S);
+  g.fillStyle = '#ffe3a0'; g.fillRect(...P(-2, -1.6), 0.7 * S, 0.65 * S);
+  g.fillStyle = '#3f8a8a'; g.fillRect(...P(-2.25, -1.6), 0.22 * S, 0.65 * S); g.fillRect(...P(-1.3, -1.6), 0.22 * S, 0.65 * S); // 덧창
+  g.fillStyle = '#e8836a'; g.beginPath(); g.arc(...P(1.6, -0.1), 0.2 * S, 0, TAU); g.fill(); // 문 옆 화분
+  g.fillStyle = '#8a4a35'; g.fillRect(...P(0.2, -4.6), 0.34 * S, 0.8 * S);
+  return { c, W: 7, H: 6, ox: 3.5, oy: 5.4, smoke: [0.37, -4.8] };
 }
 // 갯풀: 모래언덕의 마른 띠풀 무더기
 function seagrassSprite(v) {
