@@ -280,3 +280,16 @@ test('O5 소리·음악: 뱃고동·고래 노래·물기둥 효과음이 있고
   assert.deepEqual([FALLBACK.opensea, FALLBACK.ocean, FALLBACK.ending], ['sea', 'opensea', 'ocean']);
   assert.ok(MOODS.includes('ending')); assert.equal(trackFor('ending', startSail('ocean')), 'ending'); assert.equal(startSail('ocean').track, 'ocean');
 });
+
+// ── M4b 보급: 산호섬 나루는 재료 가게만 닫고 식수·식량은 팔아요(빵은 5일이면 상하니 긴 구간엔 건어) ──
+import { SUPPLY } from '../data.js';
+test('산호섬 나루: 식수·빵·건어는 사고(식수 3닢), 재료 가게는 닫혀 있어요. 빵은 5일이면 상하고 건어는 안 상해요', () => {
+  for (const id of ['atollA', 'atollB']) {
+    const S = openWater('ocean', 0, -2000); S.ship.hull = 'explorer'; S.ship.mods = [{ id: 'water', col: 1, row: 8, rot: 0 }, { id: 'galley', col: 3, row: 8, rot: 0 }]; S.rev++;
+    const p = worldOf('ocean').ports.find((q) => q.id === id); S.boat.x = p.x; S.boat.y = p.y; G.dock(S, id); S.res.coin = 200; S.water = 0; S.food = 0;
+    assert.equal(G.waterPrice(S), 3); assert.ok(G.buyWater(S, 5) === 5 && S.res.coin === 185, `${id} 식수`);
+    assert.ok(G.buyFood(S, 4, 'dfish') === 4 && S.res.coin === 185 - 4 * SUPPLY.dfish.price, `${id} 건어`); assert.ok(G.buyFood(S, 3, 'bread') === 3);
+    for (const k of ['teak', 'steel', 'chip', 'synth', 'syrope']) assert.equal(G.canBuyMat(S, k), false, `${id} ${k} 재료 가게는 닫힘`);
+  }
+  assert.equal(SUPPLY.bread.keep, 5); assert.equal(SUPPLY.dfish.keep, undefined);
+});
