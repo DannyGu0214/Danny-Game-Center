@@ -897,7 +897,7 @@ function drainEvents() {
       case 'spoiled': toast(`🤢 ${Object.entries(ev.gone).map(([k, n]) => `${SUPPLY[k].name} ${Math.round(n * 10) / 10}`).join(', ')} 상해서 버렸어!`); break;
       case 'herb': toast(`🌿 약초 씹고 기운 차렸다!${ev.left ? ` (남은 ${ev.left})` : ' 이제 없어!'}`); break;
       case 'holdFull': showHint('화물칸이 꽉 찼어! 항구로 돌아가자!', 3); break;
-      case 'found': snd.play('found'); overlay(`<h3>🗺 ${ev.name}</h3><p>으하하! 새로운 곳을 찾았다!</p><p>${fmt(ev.give || {})}${ev.relic ? `</p><p>🏺 유물: <b>${ev.relic}</b> (도감에 모았다!)` : ''}${ev.blueprint ? `<br>📜 설계도: ${(MODULES[ev.blueprint] || HULLS[ev.blueprint]).name}` : ''}</p>`, '계속 가자!', null); break;
+      case 'found': snd.play('found'); overlay(`<h3>🗺 ${ev.name}</h3><p>으하하! 새로운 곳을 찾았다!</p><p>${fmt(ev.give || {})}${ev.relic ? `</p><p>🏺 유물: <b>${ev.relic}</b> (도감에 모았다!)` : ''}${ev.blueprint ? `<br>📜 설계도: ${(MODULES[ev.blueprint] || HULLS[ev.blueprint])?.name ?? (ev.blueprint === 'explorer' ? '대양 탐사선' : ev.blueprint)}` : ''}</p>`, '계속 가자!', null); break;
       case 'species': showHint(`📖 ${SPECIES[ev.id].name}! 도감에 적어 뒀어!`, 2.4); break;
       case 'ach': { snd.play('ach'); const a = ACHIEVEMENTS.find((q) => q.id === ev.id); toast(`🏆 ${a.name} 🪙+${a.coin}`); showHint(`🏆 ${a.name}${a.decor ? ` · ${DECOR[a.decor].name} 꾸미기 열림` : ''}`, 3); break; }
       case 'gustSoon': snd.play('warn'); showHint('돌풍이 온다! 돛 줄여, 어서!', 4, true); break;
