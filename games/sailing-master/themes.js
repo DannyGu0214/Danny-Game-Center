@@ -75,6 +75,15 @@ export const THEMES = {
       },
     ],
   },
+  // 4등급 큰 바다(M3 B0 임시): 앞바다 바위 해안을 한 구역으로 복사하고 야자수는 없이. 본 풍경은 B6에서 새로 그려요
+  sea: {
+    name: '큰 바다', water: ['#1a6f7f', '#1f8290'], hut: 'seahut', seed: 41, strict: true, scatter: { k: 1.2, cap: 2200, tries: 60000 },
+    layers: layers(['rgba(110,210,196,.15)', 'rgba(132,220,200,.2)', 'rgba(176,230,206,.3)', 'rgba(226,228,186,.66)']),
+    wet: '#8c897c', shore: { tile: 'gravel', base: '#9c968a' }, bank: { tile: 'cliff', base: '#6d685e' }, ground: { tile: 'rocky', base: '#6f8650' }, lift: 2.4,
+    mix: [[6, [['pebbles', 0.35], ['rock', 0.75], ['boulder', 1]]], [Infinity, [['seapine', 0.42], ['pine', 0.52], ['boulder', 0.66], ['rock', 0.8], ['bush', 1]]]],
+    decals: [{ kind: 'crag', n: 30, r: [3, 7], depth: [5, 80] }],
+    pieces: [{ kind: 'boulder', n: 40, depth: [2.2, 8], small: true }, { kind: 'pebbles', n: 50, depth: [1.8, 5], small: true }],
+  },
 };
 // 지역 → 테마. 표에 없으면 호수 테마예요
 export const themeOf = (def) => THEMES[def.theme] || THEMES.lake;

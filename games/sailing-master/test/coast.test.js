@@ -192,8 +192,8 @@ test('M2b 보조 기관: 돛이 약할 때(맞바람·무풍)만 느리게 돌�
   assert.equal(SH.statsOf({ hull: 'schooner', mods: SCH }).turnK, 1.3); assert.equal(SH.statsOf({ hull: 'schooner', mods: [] }).turnK, 1);
 });
 
-test('M2b 엔딩: 스쿠너로 북쪽 큰 바다 경계를 넘으면 이번 단계가 끝나요(슬루프는 못 넘어요)', () => {
-  const ocean = worldOf('coast').gates.find((g) => g.id === 'toOcean');
+test('M3 B0 관문: 스쿠너로 북쪽 큰 바다 경계를 넘으면 큰 바다 남쪽 등대 항이에요(엔딩 아님, 슬루프는 못 넘어요)', () => {
+  const ocean = worldOf('coast').gates.find((g) => g.id === 'toSea');
   const T = coastShip('sloop3'); assert.equal(G.passGate(T, ocean), false);
   const S = coastShip('schooner', SCH); S.crew = crewOf(3);
   atSea(S, ...worldOf('coast').nearestWater(ocean.x, ocean.y + 30));
@@ -202,8 +202,8 @@ test('M2b 엔딩: 스쿠너로 북쪽 큰 바다 경계를 넘으면 이번 단�
   assert.ok(at, '경계 표지까지 배로 가요');
   assert.ok(G.gateStatus(S, ocean).ok);
   assert.ok(G.passGate(S, ocean));
-  assert.ok(S.ended && S.ach.openSea && drain(S).some((e) => e.type === 'ended'));
-  G.step(S, 1); assert.ok(S.ended, '엔딩 뒤엔 멈춰요');
+  assert.ok(!S.ended && S.ach.openSea && drain(S).some((e) => e.type === 'region'));
+  assert.equal(S.region, 'sea'); assert.equal(S.docked, 'southLight');
 });
 
 test('M2b 너울 방향은 그 바다에 늘 부는 바람을 따르고, 구명정은 가라앉아도 화물 절반을 건진다', () => {
@@ -241,7 +241,7 @@ test('M2b 저장 v6 → v7: 정해 둔 앞바다 발견지 자리는 그대로 �
   S.findPos.coast = old; S.found.fishRuin = 1;
   const o = JSON.parse(G.serialize(S)); o.v = 6; delete o.boat.motor;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 7); assert.equal(T.boat.motor, false);
+  assert.equal(T.v, 8); assert.equal(T.boat.motor, false);
   const list = T.findPos.coast, by = Object.fromEntries(list.map((f) => [f.id, f]));
   assert.equal(list.length, 10);
   for (const f of old) { assert.equal(by[f.id].x, f.x); assert.equal(by[f.id].y, f.y); }

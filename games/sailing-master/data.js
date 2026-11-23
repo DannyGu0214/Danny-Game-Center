@@ -383,7 +383,7 @@ export const REGIONS = {
     start: 'fisher',
     // water: 식수 1통 값(금화). 등대섬은 비싸요. yard: 이 항구만 조선소 등급이 달라요(M2b: 조선 항구는 4등급, 스쿠너를 지어요)
     ports: [{ id: 'fisher', name: '하구 어촌', x: -215, y: 262, water: 1 }, { id: 'yard', name: '조선 항구', x: 130, y: 236, water: 1, yard: 4 }, { id: 'cape', name: '곶 마을', x: 478, y: 70, water: 1 }, { id: 'light', name: '등대섬', x: -250, y: -338, water: 3 }],
-    gates: [{ id: 'toRiver', name: '강 하구', x: -150, y: 438, to: 'river', entry: 'mouth', req: {} }, { id: 'toOcean', name: '큰 바다 경계', x: 0, y: -665, to: null, req: { grade: 4 }, open: true }],
+    gates: [{ id: 'toRiver', name: '강 하구', x: -150, y: 438, to: 'river', entry: 'mouth', req: {} }, { id: 'toSea', name: '큰 바다 경계', x: 0, y: -665, to: 'sea', entry: 'southLight', req: { grade: 4 }, open: true }],
     // where: 놓이는 자리(water 물 위 · shore 물가 뭍 · beach 물가 바로 위 젖은 모래), inland: 내륙 m. tide: 'low'면 썰물에만 들어가요(hide면 그때만 보여요)
     finds: [
       { id: 'lightCape', name: '작은 등대 곶', x: -460, y: -60, coin: 50, canvas: 15, relic: '곶 등대의 렌즈 조각', art: 'tower' },
@@ -403,8 +403,35 @@ export const REGIONS = {
     flot: { cap: 30, table: [['wood', 2, 3, 6], ['oak', 2, 2, 5], ['net', 2.5, 3, 6], ['hemp', 1.2, 2, 4], ['nail', 1, 2, 4], ['tar', 1, 2, 3], ['plate', 0.9, 1, 2], ['gear', 0.35, 1, 1], ['water', 2.5, 2, 3], ['shiny', 5, 1, 2]] },
     trade: [['spice', 3], ['porcelain', 4], ['silk', 3], ['painting', 0.4]], demand: ['coffee', 'porcelain'],
   },
+  // M3 B0 큰 바다(2026-11-23, PLAN-M3.md 2절): 섬만 뭍이고 네 끝이 모두 경계예요. 큰 섬의 보급항이 중간 기점(5등급 조선소), 북쪽 끝은 대양 어귀(5등급 관문)
+  // shape.kind 'isles': 섬(islands)은 해안선 혹 bumps [각도(도), 폭(rad), 높이(m, 음수면 만)]를 받아요. 발견지 셋은 자리 표시용 임시예요(B3에서 열 곳으로 늘려요)
+  sea: {
+    id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, tide: true, edgeFog: 120,
+    wind: { from: -80 * D, speed: 11, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['storm', 'gust', 'squall', 'seafog', 'heat', 'bigswell'],
+    swell: { base: 1.3, day: 0.4, gust: 0.4, storm: 1.2 },
+    shape: { kind: 'isles', x0: -2000, x1: 2000, y0: -1600, y1: 1600, cell: 8 },
+    islands: [
+      { x: 300, y: -300, r: 420, ph: 0.9, bumps: [[90, 0.5, -160]] },
+      { x: -200, y: 1350, r: 30, ph: 2.2 }, { x: -1300, y: 500, r: 160, ph: 3.4 }, { x: 1400, y: 700, r: 200, ph: 4.6 }, { x: -1500, y: -800, r: 110, ph: 5.7 },
+      { x: -600, y: -1100, r: 32, ph: 0.3 }, { x: 900, y: -1200, r: 40, ph: 1.4 }, { x: -900, y: 0, r: 28, ph: 2.6 }, { x: 1700, y: -300, r: 36, ph: 3.8 },
+      { x: 600, y: 1000, r: 24, ph: 4.9 }, { x: -300, y: 300, r: 22, ph: 6.0 }, { x: 1200, y: 200, r: 30, ph: 0.6 }, { x: -1700, y: 1200, r: 45, ph: 1.9 },
+    ],
+    lights: [{ x: -200, y: 1322, r: 300 }],
+    start: 'southLight',
+    ports: [{ id: 'southLight', name: '남쪽 등대 항', x: -200, y: 1322, water: 2 }, { id: 'depot', name: '큰 섬 보급항', x: 300, y: -40, water: 1, yard: 5 }, { id: 'palm', name: '야자섬 나루', x: -1130, y: 500, water: 3, shop: false }, { id: 'rockVillage', name: '바위섬 어촌', x: -1380, y: -800, water: 2 }],
+    gates: [{ id: 'toCoast', name: '남쪽 물목', x: 0, y: 1560, to: 'coast', entry: 'light', req: {}, open: true }, { id: 'toOcean', name: '대양 어귀', x: 0, y: -1560, to: null, req: { grade: 5 }, open: true }],
+    finds: [
+      { id: 'seaFall', name: '큰 섬 폭포', x: 300, y: -730, inland: 30, coin: 80, canvas: 20, relic: '폭포 바위의 조개 화석', art: 'stone' },
+      { id: 'seaCrater', name: '화산 분화구', x: 1400, y: 480, coin: 90, nail: 10, relic: '분화구의 검은 유리', art: 'rocks' },
+      { id: 'seaLagoon', name: '산호 석호', x: -300, y: 300, coin: 70, cloth: 20, relic: '석호의 진주 조각', art: 'tidepool', where: 'beach', tide: 'low' },
+    ],
+    // 산호초 고리(PLAN-M3.md 2-1절): 스쿠너(흘수 0.85)는 밀물에만 넘어가요
+    shoals: [{ x: -300, y: 230, r: 40, depth: 1 }, { x: -230, y: 300, r: 40, depth: 1.1 }, { x: -300, y: 370, r: 40, depth: 0.9 }, { x: -370, y: 300, r: 40, depth: 1.2 }],
+    flot: { cap: 36, table: [['wood', 2, 3, 6], ['oak', 2, 2, 5], ['net', 2.5, 3, 6], ['hemp', 1.2, 2, 4], ['nail', 1, 2, 4], ['tar', 1, 2, 3], ['plate', 0.9, 1, 2], ['gear', 0.35, 1, 1], ['water', 2.5, 2, 3], ['shiny', 5, 1, 2]] },
+    trade: [['spice', 3], ['porcelain', 3], ['silk', 4], ['painting', 0.4]], demand: ['spice', 'silk'],
+  },
 };
-export const REGION_ORDER = ['pond', 'lake', 'river', 'coast'];
+export const REGION_ORDER = ['pond', 'lake', 'river', 'coast', 'sea'];
 
 // 도전과제. check는 logic.js가 S로 판단하고, 보상은 코인과 꾸미기 해금이에요
 export const ACHIEVEMENTS = [
@@ -429,12 +456,12 @@ export const ACHIEVEMENTS = [
   { id: 'bowRide', name: '뱃머리의 돌고래', desc: '배 앞을 타는 돌고래 기록하기', coin: 30 },
   { id: 'seaAll', name: '바다 박물학자', desc: '바다 생물 모두 기록', coin: 60 },
   { id: 'schooner', name: '두 돛대의 배', desc: '스쿠너 짓기', coin: 40 },
-  // 이번 단계의 엔딩(4등급 배로 큰 바다 경계 넘기)
-  { id: 'openSea', name: '큰 바다 앞에서', desc: '4등급 배로 큰 바다 경계 넘기', coin: 80 },
+  // M3 B0: 앞바다 북쪽 경계 너머가 큰 바다예요(예전엔 엔딩이었어요). 엔딩은 대양 어귀로 옮겨요(B7)
+  { id: 'openSea', name: '큰 바다로', desc: '4등급 배로 앞바다 북쪽 경계를 넘어 큰 바다에 들어가기', coin: 80 },
 ];
 
 // 칭호(수역 도달)
-export const TITLES = ['뱃사공', '사공', '강 안내인', '연안 뱃사람'];
+export const TITLES = ['뱃사공', '사공', '강 안내인', '연안 뱃사람', '먼바다 항해사'];
 
 export const DECOR = {
   lantern: { name: '랜턴', icon: '🏮' },

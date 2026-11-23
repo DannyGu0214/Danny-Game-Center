@@ -963,10 +963,10 @@ function showDisaster(cause) {
     overlay(`<h3>살았다!</h3><p>잃은 화물: ${lost}</p>${r.broke.length ? `<p>부서진 모듈: ${r.broke.map((m) => MODULES[m].name).join(', ')}</p>` : ''}${r.left ? `<p>${r.left}이(가) 배에서 내렸어.</p>` : ''}<p>구조 비용 🪙${r.fee} · 선체 35%</p>`, '항구로', () => openPort());
   });
 }
-// 이번 단계의 엔딩(M2a): 앞바다의 큰 바다 경계를 4등급 배로 넘을 때. 강 끝은 이제 앞바다로 이어져요
+// 이번 단계의 엔딩(M3): 큰 바다 북쪽 대양 어귀를 5등급 배로 넘을 때(그림·글은 B7에서 새로 써요)
 function showEnding() {
   closeSheet();
-  overlay(`<h3>🌊 큰 바다 앞에서</h3><p>${S.ship.name}이(가) 작은 호수의 뗏목에서 시작해 강을 따라 앞바다 끝까지 왔다! 이제 돛대 둘 ${HULLS[S.ship.hull].name}다!</p><p>저 안개 너머 큰 바다는 다음 항해에서 만나자고, 친구! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 바다에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
+  overlay(`<h3>🌊 대양 앞에서</h3><p>${S.ship.name}이(가) 작은 호수의 뗏목에서 시작해 큰 바다 끝까지 왔다! 이제 돛대 셋 ${HULLS[S.ship.hull].name}다!</p><p>저 안개 너머 대양은 다음 항해에서 만나자고, 친구! 으하하!</p><p>항해 ${(S.stats.dist / 1000).toFixed(1)}km · ${G.clock(S).day + 1}일째 · 구조 ${S.stats.rescues}번 · 도전과제 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</p>`, '이 바다에서 계속 항해', () => { S.ended = false; G.dock(S, S.lastPort.id); drainEvents(); });
 }
 
 // ── 시트 ──
@@ -1513,10 +1513,11 @@ function renderChart(body) {
       if (rr > 1) { g.fillStyle = '#e6d39a'; g.beginPath(); g.arc(toX(q.x), toY(q.y), rr * k, 0, Math.PI * 2); g.fill(); }
     }
     // 큰 바다 경계(M2a): 지도 끝 짙은 안개 띠는 빗금, 그 바깥은 못 가는 바다
-    if (w.coast) {
-      const [ex0, ex1, ey0] = [w.def.shape.x0, w.def.shape.x1, w.def.shape.y0], band = REGIONS[S.region].edgeFog || 0;
-      g.save(); g.beginPath(); g.rect(ox, 0, wide * k, ch); g.rect(toX(ex1), toY(ey0), toX(ex0) - toX(ex1), toY(y1) - toY(ey0)); g.fillStyle = 'rgba(12,36,48,.55)'; g.fill('evenodd');
-      g.beginPath(); g.rect(toX(ex0), toY(ey0), toX(ex1) - toX(ex0), toY(y1) - toY(ey0)); g.rect(toX(ex1 - band), toY(ey0 + band), toX(ex0 + band) - toX(ex1 - band), toY(y1) - toY(ey0 + band)); g.clip('evenodd');
+    if (w.coast || w.isles) {
+      // 앞바다는 남쪽이 뭍이라 위·옆 세 면, 큰 바다(isles)는 네 면이 모두 경계예요
+      const [ex0, ex1, ey0] = [w.def.shape.x0, w.def.shape.x1, w.def.shape.y0], ey1 = w.isles ? w.def.shape.y1 : y1, ib = w.isles ? ey1 - (REGIONS[S.region].edgeFog || 0) : ey1, band = REGIONS[S.region].edgeFog || 0;
+      g.save(); g.beginPath(); g.rect(ox, 0, wide * k, ch); g.rect(toX(ex1), toY(ey0), toX(ex0) - toX(ex1), toY(ey1) - toY(ey0)); g.fillStyle = 'rgba(12,36,48,.55)'; g.fill('evenodd');
+      g.beginPath(); g.rect(toX(ex0), toY(ey0), toX(ex1) - toX(ex0), toY(ey1) - toY(ey0)); g.rect(toX(ex1 - band), toY(ey0 + band), toX(ex0 + band) - toX(ex1 - band), toY(ib) - toY(ey0 + band)); g.clip('evenodd');
       g.strokeStyle = 'rgba(226,238,240,.22)'; g.lineWidth = 1; g.beginPath(); for (let d = -ch; d < cw + ch; d += 7) { g.moveTo(d, 0); g.lineTo(d + ch, ch); } g.stroke(); g.restore();
     }
     // 안개
@@ -1668,10 +1669,10 @@ function renderAch(body) {
 
 // ── 수문·수역 ──
 function openGate(gate) {
-  const st = G.gateStatus(S, gate), name = gate.to ? REGIONS[gate.to].name : '큰 바다';
+  const st = G.gateStatus(S, gate), name = gate.to ? REGIONS[gate.to].name : '대양';
   sheet = null;
   openSheet(`${gate.name}: ${name}`, [{ id: 'g', name: '', render(body) {
-    body.append(el('p', 'note', gate.to === 'coast' ? '강이 넓어지며 짠내가 난다! 이 너머는 앞바다야. 바닷물은 못 마시니 식수를 챙기라고!' : gate.to ? `이 물길을 지나면 ${name}(으)로 간다! 그쪽 항구에 닿을 거야.` : '짙은 안개 너머가 큰 바다다! 4등급 배(스쿠너)라야 넘어간다고.'));
+    body.append(el('p', 'note', gate.to === 'coast' ? '강이 넓어지며 짠내가 난다! 이 너머는 앞바다야. 바닷물은 못 마시니 식수를 챙기라고!' : gate.to ? `이 물길을 지나면 ${name}(으)로 간다! 그쪽 항구에 닿을 거야.` : gate.to === 'sea' ? '짙은 안개 너머가 큰 바다다! 4등급 배(스쿠너)라야 넘어간다고. 바람이 세고 섬 사이가 멀어, 식수와 식량을 넉넉히 챙겨!' : '짙은 안개 너머가 대양이다! 5등급 대양 탐사선이라야 넘어간다고.'));
     body.append(el('div', 'check', st.list.length ? st.list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : '<div class="ok">✓ 어떤 배든 지나갈 수 있어</div>'));
     if (!st.ok) body.append(el('p', 'note', '<br>배가 작아서 못 들어가! 항구 조선소에서 키워 오라고.'));
   } }], 'g', () => {
@@ -1683,7 +1684,7 @@ function openGate(gate) {
 function openRegion(ev) {
   snd.play('found');
   const R = REGIONS[ev.to];
-  const tips = { lake: '나룻배부터는 돛을 달 수 있다! 항구 설계에서 작은 돛대를 올려 봐. 돌풍이 오면 돛을 줄이고, 여름 무더위엔 그늘막을 챙기라고!', river: '물살이 북쪽 하류로 흐른다! 밝은 곳은 여울이니 조심해. 슬루프 설계도는 이 강 어딘가에 있어!', coast: '바다다! 짠물은 못 마시니 항구에서 식수를 사고 물통을 달아. 곶 밖 바깥 바다는 너울이 높고, 썰물엔 모래톱이 드러난다고. 새벽 해무엔 등대 불빛을 찾아!' };
+  const tips = { lake: '나룻배부터는 돛을 달 수 있다! 항구 설계에서 작은 돛대를 올려 봐. 돌풍이 오면 돛을 줄이고, 여름 무더위엔 그늘막을 챙기라고!', river: '물살이 북쪽 하류로 흐른다! 밝은 곳은 여울이니 조심해. 슬루프 설계도는 이 강 어딘가에 있어!', coast: '바다다! 짠물은 못 마시니 항구에서 식수를 사고 물통을 달아. 곶 밖 바깥 바다는 너울이 높고, 썰물엔 모래톱이 드러난다고. 새벽 해무엔 등대 불빛을 찾아!', sea: '큰 바다다! 섬 사이가 멀고 바람이 세다. 큰 섬 보급항이 중간 기점이야. 북쪽 끝은 대양 어귀(5등급 배만)! 식수와 식량을 넉넉히 챙기라고!' };
   overlay(`<h3>🌊 ${R.name}</h3><p>${ev.first ? tips[ev.to] || '' : '돌아왔구먼! 여긴 아직 건질 게 남았을걸?'}</p>`, '입항', () => openPort());
 }
 

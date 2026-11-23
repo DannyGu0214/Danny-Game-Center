@@ -130,7 +130,7 @@ export function windAt(S) {
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 7, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 8, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: calmWeather(),
@@ -143,7 +143,7 @@ export function newGame(seed = 1) {
     ship: { hull: 'raft', mods: [{ id: 'oar', col: 1, row: 1, rot: 0 }], name: '새벽호', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] },
     crew: [], hiredEver: {}, owed: 0, wageDay: 0,
     flot: {}, fog: {}, found: {}, blueprints: {}, seen: {}, photos: {}, ach: {},
-    stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0 },
+    stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0, typhoons: 0, typhoonHurt: 0, calmDays: 0 },
     ended: false, rev: 0,
   };
   S.best = JSON.parse(JSON.stringify(S.ship));
@@ -772,13 +772,14 @@ export const decorOpen = (S, id) => ACHIEVEMENTS.some((a) => a.decor === id && S
 // 수문: 조건을 보여 주고 넘어간다
 export function gateStatus(S, gate) {
   const r = gate.req, list = [];
-  if (r.grade) list.push({ text: `${r.grade}등급(${HULL_TIERS[r.grade - 1].name}) 이상`, ok: HULLS[S.ship.hull].grade >= r.grade });
+  if (r.grade) list.push({ text: `${r.grade}등급(${HULL_TIERS[r.grade - 1]?.name ?? '대양 탐사선'}) 이상`, ok: HULLS[S.ship.hull].grade >= r.grade });
   return { list, ok: list.every((x) => x.ok) };
 }
 export function passGate(S, gate) {
   if (!gateStatus(S, gate).ok) return false;
   // 이번 단계의 엔딩(M2a): 앞바다의 큰 바다 경계(4등급). 강 끝은 이제 앞바다로 이어져요
-  if (!gate.to) { S.ended = true; S.ach.openSea || giveAch(S, 'openSea'); emit(S, 'ended'); return true; }
+  // M3 B0: 앞바다 → 큰 바다(toSea)는 이제 일반 관문이고, 큰 바다 북쪽 대양 어귀(to null)가 이 단계의 끝이에요(엔딩 글은 B7에서)
+  if (!gate.to) { S.ended = true; emit(S, 'ended'); return true; }
   const from = S.region, first = !S.visited[gate.to];
   // 화물은 그대로 싣고 넘어간다. 도착 항구에 들르면 창고로 옮겨요
   S.region = gate.to; S.visited[gate.to] = 1;
@@ -853,6 +854,7 @@ export function checkAch(S) {
   c('species10', nSeen >= 10);
   c('speciesAll', Object.keys(SPECIES).every((id) => SPECIES[id].sea || S.seen[id])); // 민물 생물만(바다 생물은 C3에서 따로)
   c('riverEnd', !!S.visited.coast);
+  c('openSea', !!S.visited.sea);
 }
 
 // ── 안개 걷기 ──
@@ -1415,7 +1417,7 @@ export function serialize(S) { const { events, ...rest } = S; return JSON.string
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || ![1, 2, 3, 4, 5, 6, 7].includes(o.v) || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2, 3, 4, 5, 6, 7, 8].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
     // v2 → v3(S2 아이템): 목재·천은 잡목·마포로 이어 받는다. 화물칸의 금화는 창고로, 식량은 빵으로(5일 뒤 상함), 찾은 발견지의 유물을 준다
     if (o.v < 3) {
@@ -1446,8 +1448,12 @@ export function deserialize(raw) {
     // v6 → v7(M2b 앞바다 내용): 정해 둔 발견지 자리는 지금 표에 맞춰요(그림·보상·자리 규칙은 표에서, 자리 x·y는 그대로). 새로 생긴 발견지(바다 동굴 등)만 새 자리를 받아요
     o.boat.motor = false;
     refreshFindPos(o);
+    // v7 → v8(M3 큰 바다): 큰 바다 경계는 이제 엔딩이 아니라 큰 바다로 가는 문이에요. 스쿠너로 그 경계에서 엔딩을 본 저장은 엔딩을 풀고 앞바다 등대섬에 대 둬요(북쪽으로 가면 큰 바다. 도전과제는 그대로라 금화는 다시 안 줘요)
+    if (o.ended && o.region === 'coast') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'light'); }
+    if (o.region === 'coast' && o.route?.target?.type === 'gate' && o.route.target.id === 'toOcean') o.route = null; // 옛 관문 id
+    o.stats.typhoons ??= 0; o.stats.typhoonHurt ??= 0; o.stats.calmDays ??= 0;
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
-    o.v = 7;
+    o.v = 8;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
     if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다

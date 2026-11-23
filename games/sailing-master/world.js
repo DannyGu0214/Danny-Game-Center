@@ -7,7 +7,13 @@ const TAU = Math.PI * 2;
 const lakeShape = (a, ph = 0) => 1
   + 0.13 * Math.sin(2 * a + 0.9 + ph) + 0.09 * Math.sin(3 * a + 2.4 + ph * 2)
   + 0.06 * Math.sin(5 * a + 0.7 + ph) + 0.035 * Math.sin(8 * a + 4.1) + 0.018 * Math.sin(13 * a + 1.3);
-const isleShape = (I, a) => I.r * (1 + 0.2 * Math.sin(2 * a + I.ph) + 0.12 * Math.sin(3 * a + I.ph * 2) + 0.06 * Math.sin(5 * a + I.ph * 3));
+const isleBase = (I, a) => I.r * (1 + 0.2 * Math.sin(2 * a + I.ph) + 0.12 * Math.sin(3 * a + I.ph * 2) + 0.06 * Math.sin(5 * a + I.ph * 3));
+// 섬 해안선 혹(M3 B0): [각도(도, 동쪽 0 · 남쪽 90), 폭(rad), 높이(m, 음수면 안으로 파인 만)]. 둥근 섬에도 만과 곶이 생겨요
+const isleShape = (I, a) => {
+  let r = isleBase(I, a);
+  for (const [deg, w, dr] of I.bumps || []) { const da = Math.atan2(Math.sin(a - deg * Math.PI / 180), Math.cos(a - deg * Math.PI / 180)); r += dr * Math.exp(-((da / w) ** 2)); }
+  return r;
+};
 
 // 강 중심선: 점 사이를 부드럽게 이어(Catmull-Rom) 촘촘한 점으로 만든다
 function smoothLine(pts, seg = 14) {
@@ -34,7 +40,7 @@ const coastLine = (sh) => (x) => {
 const smooth01 = (t) => { const v = Math.max(0, Math.min(1, t)); return v * v * (3 - 2 * v); };
 
 export function createWorld(def) {
-  const sh = def.shape, river = sh.kind === 'river', coast = sh.kind === 'coast';
+  const sh = def.shape, river = sh.kind === 'river', coast = sh.kind === 'coast', isles = sh.kind === 'isles'; // isles(M3 큰 바다): 섬만 뭍이고 네 끝이 모두 경계
   const line = river ? smoothLine(sh.pts) : null, coastY = coast ? coastLine(sh) : null;
   const halfW = (i) => sh.width * (1 + 0.16 * Math.sin(i * 0.11) + 0.1 * Math.sin(i * 0.037 + 1));
 
@@ -44,7 +50,7 @@ export function createWorld(def) {
     return [bi, Math.sqrt(best)];
   }
   function rawWater(x, y) {
-    if (coast) { if (y >= coastY(x)) return false; } else if (river) { const [i, d] = riverNear(x, y); if (d >= halfW(i)) return false; } else {
+    if (coast) { if (y >= coastY(x)) return false; } else if (isles) { /* 사각 바다: 뭍은 섬뿐 */ } else if (river) { const [i, d] = riverNear(x, y); if (d >= halfW(i)) return false; } else {
       const u = x / sh.ax, v = y / sh.ay;
       if (Math.hypot(u, v) >= lakeShape(Math.atan2(v, u), sh.ph)) return false;
     }
@@ -57,11 +63,11 @@ export function createWorld(def) {
 
   // 범위와 격자
   let bx0, bx1, by0, by1;
-  if (coast) { bx0 = sh.x0 - 80; bx1 = sh.x1 + 80; by0 = sh.y0 - 80; by1 = sh.y1; } else if (river) {
+  if (coast) { bx0 = sh.x0 - 80; bx1 = sh.x1 + 80; by0 = sh.y0 - 80; by1 = sh.y1; } else if (isles) { bx0 = sh.x0 - 80; bx1 = sh.x1 + 80; by0 = sh.y0 - 80; by1 = sh.y1 + 80; } else if (river) {
     bx0 = Math.min(...line.map((p) => p[0])) - sh.width * 2 - 90; bx1 = Math.max(...line.map((p) => p[0])) + sh.width * 2 + 90;
     by0 = Math.min(...line.map((p) => p[1])) - 130; by1 = Math.max(...line.map((p) => p[1])) + 130;
   } else { bx0 = -sh.ax * 1.42 - 110; bx1 = sh.ax * 1.42 + 110; by0 = -sh.ay * 1.42 - 110; by1 = sh.ay * 1.42 + 110; }
-  const CELL = coast ? 5 : river ? 4 : 3, X0 = bx0, Y0 = by0, GW = Math.ceil((bx1 - bx0) / CELL) + 1, GH = Math.ceil((by1 - by0) / CELL) + 1;
+  const CELL = coast ? 5 : isles ? (sh.cell || 8) : river ? 4 : 3, X0 = bx0, Y0 = by0, GW = Math.ceil((bx1 - bx0) / CELL) + 1, GH = Math.ceil((by1 - by0) / CELL) + 1;
   const field = new Float32Array(GW * GH);
   (() => {
     const INF = 1e6, a = new Float32Array(GW * GH), b = new Float32Array(GW * GH);
@@ -94,8 +100,8 @@ export function createWorld(def) {
     const i = fx | 0, j = fy | 0, u = fx - i, v = fy - j, k = j * GW + i;
     return (field[k] * (1 - u) + field[k + 1] * u) * (1 - v) + (field[k + GW] * (1 - u) + field[k + GW + 1] * u) * v;
   }
-  const edgeDist = coast ? (x, y) => Math.min(x - sh.x0, sh.x1 - x, y - sh.y0) : () => Infinity;
-  const dist = coast ? (x, y) => Math.min(landDist(x, y), edgeDist(x, y)) : landDist;
+  const edgeDist = coast ? (x, y) => Math.min(x - sh.x0, sh.x1 - x, y - sh.y0) : isles ? (x, y) => Math.min(x - sh.x0, sh.x1 - x, y - sh.y0, sh.y1 - y) : () => Infinity;
+  const dist = coast || isles ? (x, y) => Math.min(landDist(x, y), edgeDist(x, y)) : landDist;
   function gradient(x, y) {
     const e = CELL, gx = dist(x + e, y) - dist(x - e, y), gy = dist(x, y + e) - dist(x, y - e), m = Math.hypot(gx, gy) || 1;
     return [gx / m, gy / m];
@@ -168,6 +174,8 @@ export function createWorld(def) {
       for (let x = bx0 - 40; x <= bx1 + 40; x += 3) pts.push([x, coastY(x)]);
       const off = pts.map((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], tx = b[0] - a[0], ty = b[1] - a[1], m = Math.hypot(tx, ty) || 1; return [p[0] - ty / m * d, p[1] + tx / m * d]; });
       out.push([[-2990, off[0][1]], ...off, [2990, off[off.length - 1][1]], [2990, -2990], [-2990, -2990]]);
+    } else if (isles) {
+      out.push([[-2990, -2990], [2990, -2990], [2990, 2990], [-2990, 2990]]); // 사방이 바다예요. 섬은 아래에서 구멍으로 더해요
     } else if (river) {
       const L = [], R = [];
       for (let i = 0; i < line.length; i++) {
@@ -276,7 +284,7 @@ export function createWorld(def) {
       for (let t = 0; t < 600 && !done; t++) {
         const x = bx0 + rnd() * (bx1 - bx0), y = by0 + rnd() * (by1 - by0), d = dist(x, y);
         if (d < 12) continue; // 물 위에서 고른 뒤
-        if (coast && edgeDist(x, y) < 70) continue; // 해안 지도: 큰 바다 경계(짙은 안개 띠) 근처는 빼요
+        if ((coast || isles) && edgeDist(x, y) < 70) continue; // 해안·바다 지도: 경계(짙은 안개 띠) 근처는 빼요
         const where = whereOf(f);
         if (where === 'water') { if (clear(x, y)) done = { ...f, x, y, where }; continue; }
         if (d > 34) continue; // 물가 가까이에서 뭍으로 들어간다
@@ -289,7 +297,7 @@ export function createWorld(def) {
     return out;
   }
 
-  return { id: def.id, def, randomFinds, whereOf, dist, landDist, edgeDist, isWater: (x, y) => dist(x, y) > 0, gradient, lineClear, nearestWater, findPath, outlines, scatter, flowAt, depthAt, swellAt, ports, gates, finds, bounds: [bx0, by0, bx1, by1], river, coast, cell: CELL, grid: [GW, GH], coastY };
+  return { id: def.id, def, randomFinds, whereOf, dist, landDist, edgeDist, isWater: (x, y) => dist(x, y) > 0, gradient, lineClear, nearestWater, findPath, outlines, scatter, flowAt, depthAt, swellAt, ports, gates, finds, bounds: [bx0, by0, bx1, by1], river, coast, isles, cell: CELL, grid: [GW, GH], coastY };
 }
 
 const cache = {};

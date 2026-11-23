@@ -75,11 +75,11 @@ test('M2a 관문: 강 끝 → 앞바다 하구 어촌, 앞바다 강 하구 → 
   // 나룻배는 앞바다에 못 들어가요
   S.ship.hull = 'rowboat2'; assert.equal(G.passGate(S, toSea), false);
   // 큰 바다 경계: 슬루프 ★3도 못 넘어요(4등급 스쿠너는 C4)
-  const T = coastSloop(1, [], 'sloop3'), ocean = worldOf('coast').gates.find((g) => g.id === 'toOcean');
+  const T = coastSloop(1, [], 'sloop3'), ocean = worldOf('coast').gates.find((g) => g.id === 'toSea');
   assert.equal(G.gateStatus(T, ocean).ok, false); assert.equal(G.passGate(T, ocean), false); assert.ok(!T.ended);
-  // 시험용 4등급 선체로 넘으면 이번 단계의 엔딩
+  // 시험용 4등급 선체로 넘으면 큰 바다(M3 B0부터 엔딩이 아니에요)
   HULLS.__g4 = { ...HULLS.sloop3, id: '__g4', grade: 4 };
-  try { T.ship.hull = '__g4'; assert.ok(G.passGate(T, ocean)); assert.ok(T.ended && T.ach.openSea); assert.ok(drain(T).some((e) => e.type === 'ended')); } finally { delete HULLS.__g4; }
+  try { T.ship.hull = '__g4'; assert.ok(G.passGate(T, ocean)); assert.ok(!T.ended && T.ach.openSea && T.region === 'sea'); assert.ok(drain(T).some((e) => e.type === 'region')); } finally { delete HULLS.__g4; }
   assert.ok(ACHIEVEMENTS.some((a) => a.id === 'openSea') && ACHIEVEMENTS.some((a) => a.id === 'riverEnd'));
   // 경계 띠: 지도 끝 100m는 짙은 안개, 4등급이 아니면 알려 줘요
   const E = atSea(coastSloop(), 0, -660); E.clock = calmDay(1) * CAL.day + 120; G.step(E, G.FIXED_DT);
@@ -212,7 +212,7 @@ test('M2a 저장 v5 → v6: 식수 0, 강 끝 엔딩을 본 저장은 엔딩을 
   S.ended = true; S.ach.riverEnd = 1;
   const o = JSON.parse(G.serialize(S)); o.v = 5; delete o.water;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 7); assert.equal(T.water, 0); assert.equal(T.ended, false);
+  assert.equal(T.v, 8); assert.equal(T.water, 0); assert.equal(T.ended, false);
   assert.equal(T.region, 'river'); assert.equal(T.docked, 'mouth'); assert.ok(T.ach.riverEnd);
   const p = worldOf('river').ports.find((q) => q.id === 'mouth');
   assert.ok(Math.hypot(T.boat.x - p.x, T.boat.y - p.y) < 1);
