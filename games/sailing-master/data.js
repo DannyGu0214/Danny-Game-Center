@@ -117,7 +117,7 @@ const schooner = { id: 'schooner', kind: 'schooner', star: 1, grade: 4, name: '�
 const schooner2 = star2(schooner, { len: 16.5, beam: 4.4, rows: 16, x0: 6.7, rowOff: 0, buoy: 220, crew: 7, helmX: -6.9, cockpit: [-7.7, -6.2], engineAt: [-5.3, 0.9], price: { oak: 90, canvas: 50, plate: 16, coin: 160 } });
 // 5등급 대양 탐사선(M3 B5, PLAN-M3.md 6절): 22~27m, 돛대 셋(maxMasts 3), 보조 기관 4.2m/s(연료 없음), 흘수 1.3m라 강·호수 여울엔 못 들어가요(관문 maxGrade 4).
 // 큰 섬 보급항(조선소 5등급)에서 옛 탐험대 난파선 설계도로 지어요. bridge(★3 항해 함교): 예보 +2일, 선장이 조타 자리에서 돛을 바꿔요(돛대까지 안 걸어요)
-const explorer = { id: 'explorer', kind: 'explorer', star: 1, grade: 5, name: '대양 탐사선', len: 22, beam: 5.8, deck: 1.8, cols: 6, rows: 21, cell: 0.9, x0: 10.4, drag: 1.1, row: 2, turn: 0.3, stability: 2.4, buoy: 420, draft: 1.3, crew: 12, minCrew: 6, foodBase: 24, holdBase: 80, waterBase: 20, helmX: -9, cockpit: [-10.2, -7.8], engineAt: [-8.4, 0.9], hp: 400, yard: 5, speed: 1.7, motor: 4.2, maxMasts: 3, sprit: 2.6, blueprint: 'explorer', price: { teak: 120, synth: 60, steel: 24, syrope: 30, chip: 6, coin: 400 } };
+const explorer = { id: 'explorer', kind: 'explorer', star: 1, grade: 5, name: '대양 탐사선', len: 22, beam: 5.8, deck: 1.8, cols: 6, rows: 21, cell: 0.9, x0: 10.4, drag: 1.1, row: 2, turn: 0.3, stability: 2.4, buoy: 420, draft: 1.3, crew: 12, minCrew: 6, foodBase: 24, holdBase: 80, waterBase: 20, helmX: -9, cockpit: [-10.2, -7.8], engineAt: [-8.4, 0.9], hp: 400, yard: 5, speed: 1.7, motor: 4.2, maxMasts: 3, sprit: 2.6, blueprint: 'explorer', price: { teak: 36, synth: 18, steel: 7, syrope: 9, chip: 2, coin: 120 } };
 const explorer2 = star2(explorer, { len: 27, beam: 6, rows: 28, x0: 12.9, rowOff: 2, buoy: 520, crew: 14, helmX: -11.5, cockpit: [-12.7, -10.3], engineAt: [-10.9, 0.9], price: { teak: 140, synth: 60, steel: 20, coin: 320 } });
 export const HULLS = {
   raft, raft2,
@@ -166,7 +166,7 @@ export const MODULES = {
   wheel: { name: '타륜', icon: '☸️', fam: 'helm', mk: 2, seat: 'helm', w: 1, h: 1, kg: 2, z: 0.9, color: '#6b4a2e', cost: { oak: 6, plate: 2, gear: 1 }, desc: '큰 배는 타륜으로 몬다! 키가 30% 잘 듣는다고', need: { grade: 4 }, turnK: 1.3 },
   autohelm: { name: '자동 조타', icon: '🧭', fam: 'helm', mk: 3, seat: 'helm', w: 1, h: 1, kg: 2, z: 0.6, color: '#5a6a72', cost: {}, desc: '사람 없이 항로를 지킨다. 대양 탐사선', need: { grade: 5 }, future: true },
   // M3 B5: 큰 주돛대(대양 탐사선). 큰 주돛대 + 주돛대 + 돛대 = 돛 약 3.6(가장 큰 돛 + 나머지 × 0.85)
-  mast_l: { name: '큰 주돛대', icon: '⛵', fam: 'sail', mk: 4, seat: 'sail', w: 1, h: 2, kg: 20, z: 0.3, color: '#6b4a2e', cost: { teak: 18, synth: 24, syrope: 8, steel: 4, coin: 30 }, desc: '탐사선의 가장 큰 돛대! 돛 셋을 세우면 바람을 세 번 먹지', need: { grade: 5 }, sail: 1.6, mastH: 19, boom: 6.5 },
+  mast_l: { name: '큰 주돛대', icon: '⛵', fam: 'sail', mk: 4, seat: 'sail', w: 1, h: 2, kg: 20, z: 0.3, color: '#6b4a2e', cost: { teak: 5, synth: 7, syrope: 2, steel: 1, coin: 9 }, desc: '탐사선의 가장 큰 돛대! 돛 셋을 세우면 바람을 세 번 먹지', need: { grade: 5 }, sail: 1.6, mastH: 19, boom: 6.5 },
   mast_d: { name: '주돛대', icon: '⛵', fam: 'sail', mk: 3, seat: 'sail', w: 1, h: 2, kg: 14, z: 0.25, color: '#6b4a2e', cost: { oak: 14, canvas: 20, tar: 6, plate: 3, coin: 15 }, desc: '스쿠너의 큰 돛대! 앞돛대(돛대)랑 둘을 세우면 바람을 두 배로 먹지', need: { grade: 4 }, sail: 1.35, mastH: 15.5, boom: 5.6 },
   oar2: { name: '큰 노 자리', icon: '🚣', fam: 'oar', mk: 2, seat: 'oar', w: 1, h: 1, kg: 2, z: 0.12, color: '#7a4e2c', cost: {}, desc: '둘이 젓는 큰 노', need: { grade: 4 }, future: true },
   water: { name: '물통', icon: '🛢', fam: 'supply', mk: 1, w: 1, h: 1, kg: 4, z: 0.5, color: '#4a7f95', cost: { wood: 8, nail: 2 }, desc: '식수 4통! 짠물 바다에선 이게 목숨이라고', need: { grade: 3, region: 'coast' } },
@@ -439,7 +439,7 @@ export const REGIONS = {
   // M3 B0 큰 바다(2026-11-23, PLAN-M3.md 2절): 섬만 뭍이고 네 끝이 모두 경계예요. 큰 섬의 보급항이 중간 기점(5등급 조선소), 북쪽 끝은 대양 어귀(5등급 관문)
   // shape.kind 'isles': 섬(islands)은 해안선 혹 bumps [각도(도), 폭(rad), 높이(m, 음수면 만)]를 받아요. 발견지 셋은 자리 표시용 임시예요(B3에서 열 곳으로 늘려요)
   sea: {
-    id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, tide: true, edgeFog: 120,
+    id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, wageK: 0.5, tide: true, edgeFog: 120,
     wind: { from: -80 * D, speed: 11, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['typhoon', 'storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
     swell: { base: 1.3, day: 0.4, gust: 0.4, storm: 1.2 },
     // swell(shape): 항구 둘레 calmR m 안은 너울 × calmK(그 밖은 어디나 1). currents(M3 B1): 조류 선분 [x0, y0, x1, y1, 폭 m, 세기 m/s]
