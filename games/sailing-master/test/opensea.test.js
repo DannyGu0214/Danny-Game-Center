@@ -627,3 +627,25 @@ test('B5 강·호수 관문 maxGrade 4: 탐사선은 앞바다까지만, 스쿠�
   // 앞바다 ↔ 큰 바다는 탐사선도 다녀요
   assert.equal(G.passGate(S, worldOf('coast').gates.find((g) => g.id === 'toSea')), true);
 });
+
+// ── B6 큰 바다 풍경 ──
+import { BOX, markBoxes } from '../themes.js';
+import { FX } from '../sound.js';
+test('B6 큰 바다 풍경: 야자수·섬 항구 집이 판마다 항구·부두·관문·등대·발견지와 겹치지 않고 모두 뭍 위에 있다(시드 1~8)', () => {
+  assert.equal(THEMES.sea.hut, 'seahut'); assert.ok(THEMES.sea.strict);
+  const k = 0.62, box = (p) => { const [w, h] = BOX[p.kind], s = p.size || 1; return [p.x - w * s / 2, p.x + w * s / 2, p.y * k - h * s, p.y * k + 0.6]; };
+  const hit = (a, b) => a[0] < b[1] && b[0] < a[1] && a[2] < b[3] && b[2] < a[3];
+  const kinds = new Set();
+  for (let seed = 1; seed <= 8; seed++) {
+    const S = G.newGame(seed), L = sceneLayout('sea', G.findsOf(S, 'sea')), mb = markBoxes(L.marks), w = worldOf('sea');
+    const land = L.props.filter((p) => !L.marks.includes(p));
+    for (const p of land) { kinds.add(p.kind); for (let i = 0; i < mb.length; i++) assert.ok(!hit(box(p), mb[i]), `시드 ${seed}: ${p.kind} (${p.x | 0}, ${p.y | 0}) × ${L.marks[i].kind}`); assert.ok(w.landDist(p.x, p.y) < 0, `${p.kind} 뭍`); }
+    for (const q of L.decals) for (const m of L.marks) assert.ok(Math.hypot(q.x - m.x, q.y - m.y) > q.r + 5, `시드 ${seed}: ${q.kind} × ${m.kind}`);
+  }
+  for (const kk of ['palm', 'palm2', 'islehut']) assert.ok(kinds.has(kk), `${kk} 이 한 번도 안 놓였어요`);
+});
+test('B6 소리: 섬 새소리는 효과음에 있고 두 소리 모두 틀려요(오프라인 컨텍스트 없이 호출만 확인)', () => {
+  assert.equal(typeof FX.isleBird, 'function');
+  const calls = []; const ac = { currentTime: 0, createOscillator: () => ({ type: '', frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, start() {}, stop() { calls.push(1); } }), createGain: () => ({ gain: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }) };
+  FX.isleBird(ac, null, {}, 0, 0.1); FX.isleBird(ac, null, {}, 0, 0.9); assert.equal(calls.length, 4);
+});

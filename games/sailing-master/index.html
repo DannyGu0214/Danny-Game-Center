@@ -593,6 +593,7 @@ function save() { if (!started) return; try { localStorage.setItem(SAVE_KEY, G.s
 
 const saved = loadSave();
 let S = saved || G.newGame(Number(query.get('seed')) || (Date.now() % 100000));
+let birdAt = 0;
 let sc = A.createScene(S.region, G.findsOf(S)), creatures = createCreatures(worldOf(S.region)), sprite = SA.bakeShip(S.ship), bakedRev = S.rev;
 const wake = new A.Wake();
 const snd = createSound(), music = createMusic();
@@ -1769,6 +1770,8 @@ function updateHud(dt) {
   if (!S.route && !b.row && b.luff && b.spd < 2.2 && S.t - lastLuffHint > 9 && !S.docked) { lastLuffHint = S.t; showHint('맞바람이야! 옆으로 틀어!', 3); }
   if (b.stamina <= 0 && b.row && hintT <= 0) showHint('팔이 떨어지겠어! 노가 느려진다!', 3);
   if (rudderPtr !== null && !b.row && b.sailNow < 0.05 && !S.cap.then && b.spd < 0.5 && hintT <= 0) showHint(G.stats(S).sailArea ? '돛을 올리든 노를 젓든 해야 움직이지!' : '노를 저어야 움직이지!', 2.5);
+  // 섬 새소리(M3 B6): 큰 바다에서 뭍 가까이(80m 안)에 있으면 12~28초마다 한 번
+  if (S.region === 'sea' && !S.docked && S.clock > birdAt) { birdAt = S.clock + 12 + Math.random() * 16; if (worldOf('sea').landDist(S.boat.x, S.boat.y) < 80) snd.play('isleBird', 0, Math.random()); }
   const ty = !S.docked && S.weather.ty ? S.weather.ty.mix || 0 : 0; // 태풍 안: 굵은 비(×1.4)와 낮은 바람 울음(M3 B2)
   snd.ambient(S.docked ? w.speed * 0.6 : w.speed, S.docked ? 0 : b.spd, S.docked ? 0 : ty > 0.6 ? 1.4 : S.weather.stormOn ? 1 : S.weather.rain ? 0.55 : 0, !S.docked && !!b.motor, ty),
   music.setMood(moodOf({ docked: !!S.docked, gustOn: S.weather.gustOn, gustSoon: S.weather.gustSoon, storm: !!(S.weather.stormOn || S.weather.stormSoon || S.weather.typhoonOn || S.weather.typhoonSoon) })); // S5: 폭풍은 예고부터 폭풍 곡

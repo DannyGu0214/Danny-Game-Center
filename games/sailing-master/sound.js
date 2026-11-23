@@ -122,6 +122,11 @@ export const FX = {
   thunder(ac, noise, d, t) { burst(ac, noise, d, t, { type: 'lowpass', f: 380, to: 70, q: 0.6, dur: 2.6, peak: 0.24, attack: 0.04 }); burst(ac, noise, d, t + 0.35, { type: 'lowpass', f: 240, to: 60, q: 0.5, dur: 2, peak: 0.14, attack: 0.3 }); },
   tear(ac, noise, d, t) { for (const [at, f] of [[0, 2400], [0.07, 1900], [0.15, 2800], [0.24, 1500]]) burst(ac, noise, d, t + at, { f, to: f * 0.6, q: 2.2, dur: 0.09, peak: 0.12 }); },
   bell(ac, noise, d, t) { tone(ac, d, t, { f: 660, type: 'triangle', dur: 1.8, peak: 0.035 }); tone(ac, d, t, { f: 1584, dur: 1.1, peak: 0.012 }); },
+  // 섬 새소리(M3 B6): 군함조의 짧은 꽥 + 슴새의 높은 두 음. v로 어느 쪽인지 골라요
+  isleBird(ac, noise, d, t, v = 0) {
+    if (v < 0.5) { tone(ac, d, t, { f: 1500, to: 900, type: 'triangle', dur: 0.22, peak: 0.05, attack: 0.02 }); tone(ac, d, t + 0.26, { f: 1350, to: 800, type: 'triangle', dur: 0.2, peak: 0.04, attack: 0.02 }); }
+    else { tone(ac, d, t, { f: 2300, to: 2700, dur: 0.12, peak: 0.04, attack: 0.01 }); tone(ac, d, t + 0.16, { f: 2700, to: 2100, dur: 0.16, peak: 0.035, attack: 0.01 }); }
+  },
   gust(ac, noise, d, t) { burst(ac, noise, d, t, { f: 500, to: 1300, q: 0.5, dur: 2.2, peak: 0.13, attack: 0.9 }); tone(ac, d, t + 0.3, { f: 58, to: 38, dur: 1.5, peak: 0.1, attack: 0.1 }); },
   warn(ac, _n, d, t) { for (const at of [0, 0.3]) tone(ac, d, t + at, { f: 392, dur: 0.24, peak: 0.05 }); },
   disaster(ac, noise, d, t) { tone(ac, d, t, { f: 196, to: 98, type: 'triangle', dur: 1.4, peak: 0.12 }); burst(ac, noise, d, t, { type: 'lowpass', f: 900, to: 200, dur: 1.2, peak: 0.2 }); },
