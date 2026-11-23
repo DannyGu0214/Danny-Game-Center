@@ -17,6 +17,7 @@
 | `test/logic.test.js` | 규칙 테스트 |
 | `tools/sim.js` | 균형 측정용 봇 시뮬레이션 |
 | `title.js` | 시작 화면: Danny Soft 로고 → 픽셀 아트 쿼터뷰 타이틀 |
+| `cutscene.js` | 본부 레벨업 컷씬: 2~9레벨 중간 장면, 10레벨 엔딩(시작 화면과 같은 픽셀 아트) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | 독립 실행(PWA): 홈 화면 설치·오프라인 실행 |
 
 ## 휴대폰에 설치
