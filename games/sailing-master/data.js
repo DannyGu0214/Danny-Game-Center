@@ -71,7 +71,13 @@ export const WATER = { name: '식수', icon: '💧', perDay: 1, heatK: 2, price:
 // fx 효과: wind 풍속 배율(gust·storm은 수역의 gustK·stormK) · rain 비(그늘막 없으면 식량이 젖어요) · spray 물보라(방수 격벽이 막아요, 앞바다부터)
 //   swell 너울 높이 m(더해요. 수역 swell 표가 있을 때만, M2a) · strain 돛을 다 펴고 있으면 1초에 쌓이는 찢어짐(1이면 찢어져요) · fog 안개 짙기(0~1) · sight 보는 거리 배율
 //   flow 물살 배율 · depth 여울 수심 배율 · flot 표류물 한도 배율 · heat 무더위(그늘막 없으면 기력이 빠져요)
+// 태풍(M3 B2, PLAN-M3.md 3-4절): 움직이는 원. 그날 한쪽 끝(서·동) 밖 start m에서 들어와 지도 가운데 쪽 한 점을 지나 cross초 동안 건너가요(하루가 180초라 날을 넘길 수 있어요)
+// eye·storm·outer: 눈·폭풍 원·바깥 원 반지름(m). 폭풍 원은 바람 × wind · 너울 +swell m · 비 · 돛 찢어짐 strain · 보는 거리 × sight, 눈은 바람 × eyeWind · 너울 +eyeSwell m,
+// 바깥 원은 폭풍(storm)과 같은 효과를 (1 − (d − storm)/(outer − storm))만큼. warn: 들어오기 이만큼 초 전부터 전조 · near: 이 안에 바깥 원에 닿을 것 같으면 "비켜!"
+export const TYPHOON = { start: 300, cross: 150, enter: [0.2, 0.4], eye: 80, storm: 650, outer: 1300, wind: 2.6, eyeWind: 0.2, swell: 2.4, eyeSwell: 1.5, strain: 1 / 8, sight: 0.5, warn: 60, near: 60, ahead: 2 };
 export const WX = {
+  // when 'track': dayWeather가 그날 경로({ side, u, v, w, t0 })를 정해 둬요. 새 최고 단계 sev 4, 목록 맨 앞(WX_ORDER)이에요. 큰 바다·대양 수역 목록에만 있어요
+  typhoon: { name: '태풍', icon: '🌀', sev: 4, calmFirst: true, when: 'track', chance: { summer: 0.1, autumn: 0.12 }, salt: 61.7, fx: {} },
   storm: { name: '폭풍', icon: '⛈', sev: 3, calmFirst: true, rough: true, when: 'event', chance: { summer: 0.12, autumn: 0.14 }, at: 0.3, span: 0.45, len: 75, warn: 50, salt: 41.3, fx: { wind: 'storm', rain: 1, strain: 1 / 12, sight: 0.7 } },
   gust: { name: '돌풍', icon: '💨', sev: 2, rough: true, when: 'event', chance: { spring: 0.45, summer: 0.25, autumn: 0.55, winter: 0.35 }, at: 0.12, span: 0.76, len: 40, warn: 25, salt: 3.1, salt2: 7.7, fx: { wind: 'gust', strain: 1 / 30 } },
   squall: { name: '소나기', icon: '🌧', sev: 1, calmFirst: true, when: 'event', chance: { spring: 0.3, summer: 0.35, autumn: 0.2, winter: 0.1 }, at: 0.15, span: 0.7, len: 55, warn: 25, salt: 23.9, fx: { wind: 1.15, rain: 1, sight: 0.85 } },
@@ -409,7 +415,7 @@ export const REGIONS = {
   // shape.kind 'isles': 섬(islands)은 해안선 혹 bumps [각도(도), 폭(rad), 높이(m, 음수면 만)]를 받아요. 발견지 셋은 자리 표시용 임시예요(B3에서 열 곳으로 늘려요)
   sea: {
     id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, tide: true, edgeFog: 120,
-    wind: { from: -80 * D, speed: 11, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
+    wind: { from: -80 * D, speed: 11, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['typhoon', 'storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
     swell: { base: 1.3, day: 0.4, gust: 0.4, storm: 1.2 },
     // swell(shape): 항구 둘레 calmR m 안은 너울 × calmK(그 밖은 어디나 1). currents(M3 B1): 조류 선분 [x0, y0, x1, y1, 폭 m, 세기 m/s]
     shape: { kind: 'isles', x0: -2000, x1: 2000, y0: -1600, y1: 1600, cell: 8, swell: { calmR: 180, calmK: 0.3 } },
@@ -461,6 +467,8 @@ export const ACHIEVEMENTS = [
   { id: 'seaAll', name: '바다 박물학자', desc: '바다 생물 모두 기록', coin: 60 },
   { id: 'schooner', name: '두 돛대의 배', desc: '스쿠너 짓기', coin: 40 },
   // M3 B0: 앞바다 북쪽 경계 너머가 큰 바다예요(예전엔 엔딩이었어요). 엔딩은 대양 어귀로 옮겨요(B7)
+  // M3 B2 태풍: 바다 위에서 태풍 하루를 태풍 피해 없이 넘기기
+  { id: 'typhoonSafe', name: '태풍을 비켜 가다', desc: '바다 위에서 태풍을 피해 없이 넘기기', coin: 40 },
   { id: 'openSea', name: '큰 바다로', desc: '4등급 배로 앞바다 북쪽 경계를 넘어 큰 바다에 들어가기', coin: 80 },
 ];
 

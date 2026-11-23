@@ -176,7 +176,9 @@ for (let i = 0; i < ticks && !S.ended; i++) {
     shop();
     // 오늘 폭풍이 아직 안 왔으면 하루 묵어 간다(조심스러운 사람처럼)
     const o = G.outlook(S)[0], inDay = S.clock % CAL.day;
-    if (o.ids.includes('storm') && inDay < o.storm + WX.storm.len && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; G.waitDay(S); log.waits = (log.waits || 0) + 1; shop(); }
+    // 태풍(M3 B2)은 지나갈 때까지(날을 넘기면 다음 날 새벽까지) 항구에서 기다린다. reckless 봇은 무시해요
+    if (!reckless && G.typhoonLeft(S) > 0 && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; G.waitDay(S); log.typhoonWaits = (log.typhoonWaits || 0) + 1; shop(); }
+    else if (o.ids.includes('storm') && inDay < o.storm + WX.storm.len && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; G.waitDay(S); log.waits = (log.waits || 0) + 1; shop(); }
     // 앞바다: 갈 데가 모두 너울 너머면 하루 묵는다(하루에 한 번)
     else if (waitRough && waitedDay !== G.clock(S).day) { waitedDay = G.clock(S).day; waitRough = false; G.waitDay(S); log.swellWaits = (log.swellWaits || 0) + 1; shop(); }
     waitRough = false;

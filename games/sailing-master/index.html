@@ -570,7 +570,7 @@ import { createCreatures, drawSpeciesIcon } from './creatures.js';
 import { createSound, readAudioPrefs, writeAudioPrefs, audible as heard } from './sound.js';
 import { createMusic, moodOf, TRACKS } from './music.js';
 import { worldOf } from './world.js';
-import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP, SEATS, TRAITS, WX, SAILCLOTH, WATER } from './data.js';
+import { VIEW, NO_GO, HULLS, HULL_TIERS, STAR_STEPS, MODULES, ROLES, RES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, TITLES, DECOR, PAINTS, CAL, TYPHOON, CAPTAINS, STORIES, ITEMS, MAT_IDS, TRADE_IDS, SUPPLY, HERB, WORKSHOP, SEATS, TRAITS, WX, SAILCLOTH, WATER } from './data.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view'), ctx = view.getContext('2d', { alpha: false });
@@ -907,6 +907,12 @@ function drainEvents() {
       case 'droughtOn': snd.play('warn'); showHint('가뭄이다! 여울이 얕아지니 조심해!', 4, true); break;
       // S5 날씨
       case 'stormSoon': snd.play('warn'); showHint(ev.sail === 2 ? '폭풍이 몰려온다! 돛 줄이고 항구 쪽으로 붙어!' : '폭풍이 몰려온다! 단단히 묶어 둬!', 5, true); break;
+      // M3 B2 태풍: 전조(들어오기 전) → 고비(바깥 원에 곧 닿음) → 파국(원 안, 기존 폭풍 피해 체계)
+      case 'typhoonSoon': snd.play('warn'); showHint('🌀 수평선 끝에서 태풍이 들어온다! 해도에서 경로를 봐!', 5, true); break;
+      case 'typhoonNear': snd.play('warn'); snd.play('thunder', 0.2); showHint(`🌀 태풍이 다가온다! 비켜! (약 ${Math.round(ev.d)}m, ${ev.eta}초 안에 닿아)`, 5.5, true); break;
+      case 'typhoonIn': snd.play('gust'); showHint(ev.zone === 'eye' ? '🌀 태풍의 눈이다! 잠깐 잠잠하지만 곧 다시 몰아쳐!' : '🌀 태풍 안이다! 돛 줄이고 버텨!', 4, true); break;
+      case 'typhoonOff': showHint('🌀 태풍 원을 벗어났다!', 3); break;
+      case 'typhoonDone': toast(ev.hurt ? '🌀 태풍이 지나갔다. 배가 상했어' : '🌀 태풍을 피해 없이 넘겼다!'); break;
       case 'stormOn': snd.play('gust'); snd.play('thunder', 0.2); showHint('폭풍이다! 돛 다 펴면 찢어진다, 줄여!', 3, true); break;
       case 'stormOff': showHint(ev.hurt > 0.005 ? `폭풍이 지나갔어. 선체 -${Math.round(ev.hurt * 100)}%, 성한 데가 없구먼!` : '으하하! 폭풍도 뚫었다! 이 배 제법인걸!', 3.5); break;
       case 'squallSoon': showHint(ev.shade ? '소나기 온다! 식량은 그늘막 밑으로!' : '소나기 온다! 그늘막이 없으니 식량이 젖겠어!', 3.5, !ev.shade); break;
@@ -1073,8 +1079,8 @@ function openPort(ev) {
   if (ev?.scoop) toast(`💧 민물을 퍼 담았다! 물통 가득(+${Math.round(ev.scoop * 10) / 10})`);
 }
 // 예보 칸(S5): 그날 오는 날씨 아이콘(심한 것 둘까지)과 가장 심한 것의 이름. 안개는 내일까지만 보여요
-const weatherIcon = (d) => d.ids.slice(0, 2).map((id) => WX[id].icon).join('') || '☀️';
-const weatherWord = (d) => (d.worst ? WX[d.worst].short || WX[d.worst].name : '맑음');
+const weatherIcon = (d) => d.ids.slice(0, 2).map((id) => WX[id].icon).join('') || (d.blind ? '·' : '☀️'); // blind: 예보 창 밖(태풍만 보이는 날)
+const weatherWord = (d) => (d.worst ? WX[d.worst].short || WX[d.worst].name : d.blind ? '모름' : '맑음');
 function forecastTiles(fc) {
   const days = el('div', 'days');
   fc.forEach((d, i) => days.append(el('div', d.sev >= 3 ? 'bad storm' : d.sev >= 2 ? 'bad' : d.sev ? 'mild' : '', `${i === 0 ? '오늘' : `+${i}일`}<span class="ic">${weatherIcon(d)}</span><b>${weatherWord(d)}</b>${d.swell ? `<small class="${d.swell > G.stats(S).sea ? 'hi' : ''}">〰${d.swell.toFixed(1)}m</small>` : ''}`)));
@@ -1523,6 +1529,13 @@ function renderChart(body) {
       }
       g.restore();
     }
+    // 태풍(M3 B2): 오늘 태풍의 예상 경로(점선)와 지금 원(바깥·폭풍·눈)
+    const tv = G.typhoonView(S);
+    if (tv) {
+      const T = tv.track; g.save(); g.setLineDash([7, 6]); g.strokeStyle = 'rgba(255,150,120,.85)'; g.lineWidth = 2; g.beginPath(); g.moveTo(toX(T.sx), toY(T.sy)); g.lineTo(toX(T.ex), toY(T.ey)); g.stroke(); g.setLineDash([]);
+      if (tv.pos) { const [px, py] = tv.pos; for (const [r, c, a] of [[TYPHOON.outer, '255,120,100', 0.1], [TYPHOON.storm, '255,90,70', 0.22], [TYPHOON.eye, '255,255,255', 0.5]]) { g.fillStyle = `rgba(${c},${a})`; g.beginPath(); g.arc(toX(px), toY(py), r * k, 0, Math.PI * 2); g.fill(); } g.font = '18px sans-serif'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText('🌀', toX(px), toY(py) + 6); }
+      g.restore();
+    }
     // 큰 바다 경계(M2a): 지도 끝 짙은 안개 띠는 빗금, 그 바깥은 못 가는 바다
     if (w.coast || w.isles) {
       // 앞바다는 남쪽이 뭍이라 위·옆 세 면, 큰 바다(isles)는 네 면이 모두 경계예요
@@ -1716,7 +1729,8 @@ function syncTop() {
   // 지금 날씨 중 가장 심한 것. 없으면 다가오는 돌풍·폭풍을 예고로
   const wx = S.weather, now = !S.docked && wx.worst ? WX[wx.worst] : null, soon = !S.docked && wx.soon?.find((id) => WX[id].rough);
   const sw = S.docked ? 0 : G.swellHere(S), swellAlert = sw > st.sea * 0.92 ? `너울 ${sw.toFixed(1)}m` : ''; // M2a: 내항성에 가까운 너울이 가장 먼저
-  const color = SEASON_COLOR[c.season.id], alert = swellAlert || (soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : '') || (!S.docked && S.boat.motor ? '⚙ 보조 기관' : ''); // 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저. 보조 기관(M2b)은 맨 나중
+  const tyq = !S.docked && S.weather.ty && S.weather.ty.zone !== undefined ? S.weather.ty : null, tyAlert = tyq ? `🌀 태풍 ${Math.round(tyq.d)}m` : (S.weather.typhoonSoon ? '🌀 태풍 예고' : '');
+  const color = SEASON_COLOR[c.season.id], alert = tyAlert || swellAlert || (soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : '') || (!S.docked && S.boat.motor ? '⚙ 보조 기관' : ''); // 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저. 보조 기관(M2b)은 맨 나중
   $('dateNum').innerHTML = `<i style="background:${color};color:${color}"></i>${c.season.name} ${c.dayOfSeason + 1}일`;
   $('regionName').textContent = `${REGIONS[S.region].name}${alert ? ` · ${alert}` : ''}`;
   $('regionName').classList.toggle('warn', !!alert && !alert.startsWith('⚙'));
@@ -1749,7 +1763,7 @@ function updateHud(dt) {
   if (b.stamina <= 0 && b.row && hintT <= 0) showHint('팔이 떨어지겠어! 노가 느려진다!', 3);
   if (rudderPtr !== null && !b.row && b.sailNow < 0.05 && !S.cap.then && b.spd < 0.5 && hintT <= 0) showHint(G.stats(S).sailArea ? '돛을 올리든 노를 젓든 해야 움직이지!' : '노를 저어야 움직이지!', 2.5);
   snd.ambient(S.docked ? w.speed * 0.6 : w.speed, S.docked ? 0 : b.spd, S.docked ? 0 : S.weather.stormOn ? 1 : S.weather.rain ? 0.55 : 0);
-  music.setMood(moodOf({ docked: !!S.docked, gustOn: S.weather.gustOn, gustSoon: S.weather.gustSoon, storm: !!(S.weather.stormOn || S.weather.stormSoon) })); // S5: 폭풍은 예고부터 폭풍 곡
+  music.setMood(moodOf({ docked: !!S.docked, gustOn: S.weather.gustOn, gustSoon: S.weather.gustSoon, storm: !!(S.weather.stormOn || S.weather.stormSoon || S.weather.typhoonOn || S.weather.typhoonSoon) })); // S5: 폭풍은 예고부터 폭풍 곡
   syncButtons();
   // 상황 단추
   const ctxBox = $('context');

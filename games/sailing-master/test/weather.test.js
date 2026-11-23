@@ -56,7 +56,7 @@ test('S5 계절: 안개는 봄에 잦고, 폭풍은 여름·가을에만, 홍수
   const d = { day: 9, storm: 50, gust: 40, squall: 60, fog: true, heat: true, flood: true, drought: true };
   assert.deepEqual(G.kindsOf('pond', d), ['gust', 'squall', 'fog']);
   assert.deepEqual(G.kindsOf('lake', d), ['storm', 'gust', 'squall', 'fog', 'heat']);
-  assert.deepEqual(G.kindsOf('river', d), WX_ORDER.filter((id) => id !== 'bigswell' && id !== 'seafog' && id !== 'calm'));
+  assert.deepEqual(G.kindsOf('river', d), WX_ORDER.filter((id) => id !== 'bigswell' && id !== 'seafog' && id !== 'calm' && id !== 'typhoon'));
 });
 
 test('S5 예보: 날씨 칸은 심한 것부터, 안개는 내일까지만 보이고 기압계로 폭풍을 더 멀리 본다', () => {

@@ -13,7 +13,7 @@ const SCH = [{ id: 'mast_m', col: 2, row: 2, rot: 0 }, { id: 'mast_d', col: 2, r
 function coastShip(hull = 'schooner', seed = 1) {
   const S = G.newGame(seed);
   S.region = 'coast'; S.visited = { pond: 1, lake: 1, river: 1, coast: 1 }; S.blueprints = { mast_m: 1, telescope: 1 };
-  S.ship = { hull, mods: hull === 'schooner' ? SCH : [{ id: 'mast_m', col: 1, row: 2, rot: 0 }, { id: 'oar', col: 1, row: 4, rot: 0 }], name: 'T', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] };
+  S.ship = { hull, mods: (hull === 'schooner' ? SCH : [{ id: 'mast_m', col: 1, row: 2, rot: 0 }, { id: 'oar', col: 1, row: 4, rot: 0 }]).map((m) => ({ ...m })), name: 'T', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] };
   S.cap.x = HULLS[hull].helmX; S.cap.at = 'helm'; S.food = 50; S.water = 8; S.res.coin = 100;
   G.dock(S, 'yard'); drain(S);
   return S;
@@ -189,4 +189,108 @@ test('B1 출항 점검: 무풍 날 안내, 가까운 항구까지 항속이 모�
   assert.ok(r.ok, '경고일 뿐 막지는 않아요(식수가 아예 없을 때만 막아요)');
   // 앞바다에서는 항속 경고를 따로 만들지 않아요(항구가 가까워요)
   const C = coastShip('schooner'); C.food = 0.4; C.water = 0.4; assert.ok(!G.departureCheck(C, 2).warns.some((t) => t.includes('가장 가까운 항구')));
+});
+
+// ── B2 태풍 ──
+import { TYPHOON } from '../data.js';
+import { readFileSync } from 'node:fs';
+const typhoonDay = (seed, pred = () => true, from = 1) => dayWith(seed, (q) => q.typhoon && pred(q.typhoon), from);
+
+test('B2 태풍 경로: 같은 시드·날짜면 같은 경로, 여름·가을에만, 들어오기 전엔 안 보여요', () => {
+  const seed = 2, d = typhoonDay(seed), a = G.dayWeather(seed, d).typhoon, b = G.dayWeather(seed, d).typhoon;
+  assert.deepEqual(a, b); assert.deepEqual(G.typhoonTrack('sea', a), G.typhoonTrack('sea', b));
+  assert.ok(a.side === -1 || a.side === 1); assert.ok(a.t0 >= TYPHOON.enter[0] * CAL.day - 1e-9 && a.t0 <= TYPHOON.enter[1] * CAL.day + 1e-9);
+  for (let day = 0; day < 140; day++) { const q = G.dayWeather(seed, day).typhoon; if (q) assert.ok([...Array(7).keys()].some((i) => G.clock({ clock: day * CAL.day }).season.id !== 'spring') && G.clock({ clock: day * CAL.day }).season.id !== 'winter', `계절 ${day}`); }
+  // 시작점은 서쪽·동쪽 끝 밖 300m, 지나는 점은 지도 가운데 60% 안
+  const T = G.typhoonTrack('sea', a), sh = REGIONS.sea.shape;
+  assert.equal(T.sx, a.side < 0 ? sh.x0 - 300 : sh.x1 + 300);
+  const [mx, my] = G.typhoonPos('sea', a, 75); assert.ok(Math.abs(mx) <= 0.3 * 4000 + 1e-6 && Math.abs(my) <= 0.3 * 3200 + 1e-6, `가운데 ${mx},${my}`);
+  // 살아 있는 때: t0 ~ t0+150. 하루(180초)를 넘겨 다음 날 새벽까지 이어질 수 있어요
+  const day0 = d * CAL.day;
+  assert.equal(G.liveTyphoon('sea', seed, day0 + a.t0 - 1), null); assert.ok(G.liveTyphoon('sea', seed, day0 + a.t0 + 1)); assert.equal(G.liveTyphoon('sea', seed, day0 + a.t0 + 151)?.day === d, false);
+  if (a.t0 + TYPHOON.cross > CAL.day) assert.equal(G.liveTyphoon('sea', seed, day0 + CAL.day + 1)?.day, d, '다음 날 새벽까지 이어져요');
+  assert.equal(REGIONS.sea.weather[0], 'typhoon');
+});
+
+test('B2 태풍 효과: 눈·폭풍 원·바깥 원의 바람·너울·비와 거리별 세기, 중심을 도는 바람', () => {
+  const seed = 2, d = typhoonDay(seed), tr = G.dayWeather(seed, d).typhoon, clk = d * CAL.day + tr.t0 + 75, [cx, cy] = G.typhoonPos('sea', tr, 75);
+  const at = (dx, dy = 0) => G.typhoonAt('sea', seed, clk, cx + dx, cy + dy);
+  const eye = at(40), storm = at(300), outer = at(1000), far = at(1400);
+  assert.equal(eye.zone, 'eye'); assert.equal(eye.windDown, 0.2); assert.equal(eye.swell, 1.5); assert.equal(eye.rain, 0);
+  assert.equal(storm.zone, 'storm'); assert.equal(storm.windUp, 2.6); assert.equal(storm.swell, 2.4); assert.equal(storm.rain, 1); assert.equal(+storm.strain.toFixed(4), 0.125); assert.equal(storm.sight, 0.5);
+  assert.equal(outer.zone, 'outer'); assert.ok(outer.windUp > 1 && outer.windUp < REGIONS.sea.stormK); assert.ok(outer.swell > 0 && outer.swell < REGIONS.sea.swell.storm);
+  const near = at(700), mid = at(1200); assert.ok(near.windUp > mid.windUp && mid.windUp > 1, '거리가 멀수록 약해요');
+  assert.equal(far.zone, null); assert.equal(far.windUp, 1);
+  // 반시계: 중심 동쪽 점은 북쪽으로 부는 바람(바람이 오는 쪽 = 남쪽 = +y), 북쪽 점은 서쪽으로 부는 바람(오는 쪽 = 동쪽)
+  assert.ok(Math.abs(Math.cos(storm.from)) < 1e-9 && Math.sin(storm.from) > 0.99, '동쪽: 남쪽에서 불어와요(북쪽으로 향함)');
+  const nor = at(0, -300); assert.ok(Math.cos(nor.from) > 0.99, '북쪽: 동쪽에서 불어와요(서쪽으로 향함)');
+  assert.equal(G.typhoonAt('sea', seed, d * CAL.day + tr.t0 - 5, cx, cy), null, '아직 안 왔어요');
+  // 배가 원 안이면 바람은 크고 도는 방향, 너울·비가 더해져요
+  const S = seaShip(seed); S.clock = clk; G.undock(S); S.boat.x = cx + 300; S.boat.y = cy;
+  G.step(S, G.FIXED_DT);
+  assert.equal(S.weather.ty.zone, 'storm'); assert.ok(S.weather.fx.swell >= 2.4 + REGIONS.sea.swell.base && S.weather.rain && S.weather.fx.strain >= 0.125 && S.weather.fx.sight <= 0.5);
+  assert.ok(S.wind.speed > REGIONS.sea.wind.speed * 2, `바람 ${S.wind.speed}`);
+});
+
+test('B2 항구에 대 있으면 태풍 효과가 없어요(대피), 항구에서 기다리면 피해 0', () => {
+  const seed = 2, d = typhoonDay(seed), tr = G.dayWeather(seed, d).typhoon, clk = d * CAL.day + tr.t0 + 75, [cx, cy] = G.typhoonPos('sea', tr, 75);
+  const S = seaShip(seed); S.clock = clk; const w = worldOf('sea'), p = w.ports[1];
+  assert.equal(S.docked, 'southLight'); S.boat.x = cx; S.boat.y = cy; // 항구에 있는 채로 눈 한가운데로 옮겨 봐도(검사용) 효과가 없어요
+  const h0 = S.hull, wx0 = JSON.stringify(S.weather.fx);
+  for (let i = 0; i < 60; i++) G.step(S, G.FIXED_DT);
+  assert.equal(S.hull, h0); assert.equal(JSON.stringify(S.weather.fx), wx0); assert.equal(S.weather.ty, undefined);
+  assert.ok(p.id === 'depot');
+  // 기다리면(waitDay) 시계만 흘러요
+  const L = seaShip(seed); L.clock = d * CAL.day + 10; assert.ok(G.typhoonLeft(L) > 0); let n = 0; while (G.typhoonLeft(L) > 0 && n++ < 5) G.waitDay(L);
+  assert.equal(G.typhoonLeft(L), 0); assert.equal(L.hull, 1);
+});
+
+test('B2 태풍 예보: 기본 2일 앞, 기압계 +1, 측후소 +2. 담수·앞바다엔 안 와요', () => {
+  const seed = 2, d = typhoonDay(seed, () => true, 4);
+  const at = (ahead, mods = []) => { const S = seaShip(seed); S.clock = (d - ahead) * CAL.day + 5; S.ship.mods.push(...mods); S.rev++; return S; };
+  const seen = (S) => G.outlook(S).findIndex((q) => q.ids.includes('typhoon'));
+  assert.equal(seen(at(2)), 2, '기본 2일 전부터'); assert.equal(seen(at(3)), -1, '3일 전엔 안 보여요');
+  const baro = { id: 'barometer', col: 0, row: 0, rot: 0 }, stn = { id: 'station', col: 0, row: 1, rot: 0 };
+  assert.equal(G.stats(at(3, [baro])).typhoonAhead, 3); assert.equal(seen(at(3, [baro])), 3, '기압계 +1일');
+  assert.equal(G.stats(at(4, [baro, stn])).typhoonAhead, 5); assert.equal(G.stats(at(2, [stn])).typhoonAhead, 4, '측후소 +2일');
+  // 예보 칸의 빈 날은 모르는 날(blind)이에요
+  const o = G.outlook(at(2)); assert.ok(o.length >= 3 && o[2].blind && o[2].worst === 'typhoon');
+  // 점검 안내
+  assert.ok(G.departureCheck(at(2), 2).warns.some((t) => t.includes('태풍이 2일 뒤')));
+  const T = seaShip(seed); T.clock = d * CAL.day + 5; assert.ok(G.departureCheck(T, 2).warns.some((t) => t.includes('오늘 태풍')));
+  // 담수·앞바다엔 안 와요
+  for (const region of ['pond', 'lake', 'river', 'coast']) { assert.equal(G.kindsOf(region, G.dayWeather(seed, d)).includes('typhoon'), false, region); assert.equal(G.weatherAt(region, seed, d * CAL.day + 70).typhoonOn, false, region); assert.equal(REGIONS[region].weather.includes('typhoon'), false); }
+  assert.ok(G.kindsOf('sea', G.dayWeather(seed, d)).includes('typhoon') && G.kindsOf('sea', G.dayWeather(seed, d))[0] === 'typhoon');
+});
+
+test('B2 태풍 세 단계와 typhoonSafe: 원에서 멀리 있으면 전조·피해 없이 넘기고 도전과제, 원 안에 있으면 피해', () => {
+  // 지도 한구석이 늘 가장 멀어요. 태풍 경로에서 바깥 원보다 먼 자리가 있는 날을 찾아요
+  const w = worldOf('sea'); let pick = null;
+  for (let seed = 1; seed <= 40 && !pick; seed++) for (let d = 1; d < 120 && !pick; d++) {
+    const dw = G.dayWeather(seed, d), tr = dw.typhoon; if (!tr || dw.bigswell || dw.storm !== null || dw.gust !== null) continue;
+    for (const [bx, by] of [[-1900, 1500], [1900, 1500], [-1900, -1500], [1900, -1500]]) {
+      let m = 1e9; for (let s = 0; s <= 150; s += 5) { const [cx, cy] = G.typhoonPos('sea', tr, s); m = Math.min(m, Math.hypot(bx - cx, by - cy)); }
+      if (m > TYPHOON.outer + 200 && w.isWater(bx, by) && w.dist(bx, by) > 20) { pick = { seed, d, tr, bx, by }; break; }
+    }
+  }
+  assert.ok(pick, '피할 구석이 있는 태풍');
+  const { seed, d, tr, bx, by } = pick, S = seaShip(seed); G.undock(S); S.boat.x = bx; S.boat.y = by; S.food = 500; S.water = 20; S.clock = d * CAL.day + tr.t0 - 40;
+  const kinds = new Set();
+  for (let i = 0; i < 30 * 260; i++) { G.step(S, G.FIXED_DT); for (const e of S.events) kinds.add(e.type); S.events.length = 0; S.vigor = 1; S.boat.stamina = 1; S.boat.x = bx; S.boat.y = by; S.boat.spd = 0; }
+  assert.ok(kinds.has('typhoonSoon'), '전조'); assert.ok(!kinds.has('typhoonNear') && !kinds.has('typhoonIn')); assert.ok(kinds.has('typhoonDone'));
+  assert.equal(S.stats.typhoons, 1); assert.equal(S.stats.typhoonHurt || 0, 0); assert.ok(S.ach.typhoonSafe); // (가장자리 너울·돌풍 피해는 태풍 피해가 아니라 typhoonHurt 0으로 확인해요)
+  assert.ok(ACHIEVEMENTS.some((a) => a.id === 'typhoonSafe' && a.coin === 40));
+  // 같은 태풍을 한가운데서 맞으면 고비(near)·파국(in)이 차례로 오고 피해가 나요(도전과제 없음)
+  const R = seaShip(seed); G.undock(R); R.food = 500; R.water = 20; R.clock = d * CAL.day + tr.t0 + 1;
+  const [c0x, c0y] = G.typhoonPos('sea', tr, 75); R.boat.x = c0x; R.boat.y = c0y; R.boat.sailLevel = 0;
+  const order = []; for (let i = 0; i < 30 * 160; i++) { G.step(R, G.FIXED_DT); for (const e of R.events) if (!order.includes(e.type) && e.type.startsWith('typhoon')) order.push(e.type); R.events.length = 0; R.vigor = 1; R.boat.stamina = 1; R.boat.x = c0x; R.boat.y = c0y; if (R.disaster) break; }
+  assert.ok(order.includes('typhoonIn'), order.join(',')); assert.ok(R.hull < 1 || R.disaster, '원 안에서는 배가 상해요(기존 체계)');
+});
+
+test('B2 index.html 모듈 스크립트가 문법 오류 없이 읽혀요(브라우저를 못 띄우는 환경의 방어선)', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8'), m = html.match(/<script type="module">([\s\S]*?)<\/script>/g);
+  assert.ok(m && m.length === 1);
+  const code = m[0].replace(/^<script type="module">/, '').replace(/<\/script>$/, '').replace(/^import [^;]*;\s*$/gm, '');
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  assert.doesNotThrow(() => new AsyncFunction(code), 'index.html 문법');
 });
