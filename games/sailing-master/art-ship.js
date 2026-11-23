@@ -260,6 +260,13 @@ function sliceModule(g, m, hullId, z) {
       if (top) { g.strokeStyle = '#e8b27a'; g.lineWidth = 0.04; g.beginPath(); g.arc(cx, cy + 0.05, Math.min(hx, hy) * 0.45, 0.4, 5.2); g.stroke(); g.fillStyle = '#9fb7c0'; g.beginPath(); g.arc(cx + 0.18, cy + 0.15, 0.07, 0, TAU); g.fill(); }
       break;
     }
+    case 'raincatch': {
+      // 천 깔때기 + 물통(M4 O1): 깔때기는 위로 갈수록 넓어지는 흰 천, 아래 작은 통
+      const r = Math.min(hx, hy) * (0.45 + 0.4 * Math.min(1, z / M.z));
+      g.fillStyle = top ? '#f1ebd8' : '#d8d0b8'; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
+      if (top) { g.fillStyle = '#7fa6b8'; g.beginPath(); g.arc(cx, cy, r * 0.42, 0, TAU); g.fill(); g.strokeStyle = '#8a7f66'; g.lineWidth = 0.04; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke(); }
+      break;
+    }
     case 'wheel': {
       g.fillStyle = '#5a3f22'; g.fillRect(cx - 0.08, cy - 0.08, 0.16, 0.16); // 받침 기둥
       if (z > M.z - DZ * 3) {

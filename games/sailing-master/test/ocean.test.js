@@ -48,3 +48,50 @@ test('O0 대양에 닿기: 도전과제 oceanGate는 대양에 처음 닿을 때
   const L = G.deserialize(G.serialize(S)); assert.equal(L.crossed, null);
   assert.ok(!S.ach.oceanGate); S.visited.ocean = 1; G.checkAch(S); assert.ok(S.ach.oceanGate);
 });
+
+// ── O1 바람 띠·무풍대·대양 너울·빗물받이 ──
+test('O1 바람 띠: 무역풍(동남쪽 10) → 무풍대(1.5) → 편서풍(서쪽 13), 경계는 300m씩 섞여요', () => {
+  const at = (y) => G.bandAt('ocean', y);
+  assert.deepEqual(['trade', 'doldrums', 'westerlies'], [at(-2000).id, at(-5800).id, at(-9500).id]);
+  assert.equal(G.bandAt('sea', 0), null, '큰 바다는 띠가 없어요');
+  assert.ok(Math.abs(at(-2000).speed - 10) < 1e-9 && Math.abs(at(-5800).speed - 1.5) < 1e-9 && Math.abs(at(-9500).speed - 13) < 1e-9);
+  assert.ok(at(-5800).calm && !at(-2000).calm);
+  // 경계(−4,400)에서 섞여요: 한가운데는 중간 세기, 300m 밖은 순수
+  const mid = at(-4400).speed; assert.ok(mid > 4 && mid < 8, `경계 ${mid}`);
+  assert.ok(Math.abs(at(-4150).speed - 10) < 0.5 && Math.abs(at(-4700).speed - 1.5) < 0.5);
+  // 바람이 오는 방향: 무역풍은 남동(45°), 편서풍은 서쪽(180°)
+  assert.ok(Math.abs(at(-2000).from - Math.PI / 4) < 1e-9 && Math.abs(Math.abs(at(-9500).from) - Math.PI) < 1e-9);
+  // windAt은 배 y를 따라가요
+  const S = openWater('ocean', 0, -5800); const w = G.windAt(S); assert.ok(w.speed < 3, `무풍대 ${w.speed}`);
+  S.boat.y = -9500; assert.ok(G.windAt(S).speed > 9);
+  S.boat.y = -2000; assert.ok(G.windAt(S).speed > 7);
+});
+
+test('O1 대양 너울: 기본 1.8m, 편서풍 ×1.2, 무풍대 ×0.5', () => {
+  const S = openWater('ocean', 0, -2000); S.weather.fx = { ...S.weather.fx, swell: 2 };
+  const hereAt = (y) => G.swellHere(S, 0, y);
+  assert.ok(Math.abs(hereAt(-2000) - 2) < 1e-6); assert.ok(Math.abs(hereAt(-5800) - 1) < 1e-6); assert.ok(Math.abs(hereAt(-9500) - 2.4) < 1e-6);
+  assert.equal(REGIONS.ocean.swell.base, 1.8);
+});
+
+test('O1 빗물받이: 비 오는 동안 20초마다 한 통(대수만큼), 물통 칸까지, 맑은 날엔 안 받아요', () => {
+  const seed = 1, rainAt = (t) => G.weatherAt('ocean', seed, t).rain;
+  let t0 = -1; for (let t = 0; t < 180 * 400 && t0 < 0; t += 5) if ([0, 20, 40, 60, 80, 100].every((d) => rainAt(t + d))) t0 = t; // 100초 이어서 비 오는 때
+  let c0 = -1; for (let t = 0; t < 180 * 400 && c0 < 0; t += 5) if ([0, 50, 100].every((d) => !rainAt(t + d))) c0 = t;
+  assert.ok(t0 >= 0 && c0 >= 0, '비 오는 때·맑은 때를 찾아야 해요');
+  const mk = (n, at) => { const S = openWater('ocean', 0, -2000, seed); S.clock = at; S.ship.hull = 'explorer'; S.ship.mods = [{ id: 'oar', col: 0, row: 2, rot: 0 }]; for (let i = 0; i < n; i++) S.ship.mods.push({ id: 'raincatch', col: 1 + i, row: 8, rot: 0 }); S.rev++; S.water = 2; return S; };
+  const run = (S, sec) => { for (let i = 0; i < sec * 30; i++) { G.step(S, G.FIXED_DT); S.food = 99; S.hull = 1; S.vigor = 1; S.boat.stamina = 1; S.water = Math.max(S.water, 0); } return S; };
+  const none = run(mk(0, t0), 100), one = run(mk(1, t0), 100), two = run(mk(2, t0), 100);
+  assert.equal(G.stats(one).raincatch, 1);
+  assert.ok(one.water > none.water + 3, `한 대 ${one.water} / 없음 ${none.water}`); assert.ok(two.water > one.water + 3, `두 대 ${two.water}`);
+  const dry = run(mk(2, c0), 100), dryNone = run(mk(0, c0), 100); assert.ok(dry.water <= dryNone.water + 0.5, '맑은 날은 안 받아요');
+  const full = mk(2, t0); full.water = G.stats(full).waterCap; run(full, 60); assert.ok(full.water <= G.stats(full).waterCap + 1e-9);
+  assert.deepEqual(REGIONS.ocean.windBands.map((b) => b.id), ['trade', 'doldrums', 'westerlies']);
+});
+
+test('O1 사는 재료: 큰 바다 재료는 대양 항구에서도 사요(전자 부품은 보급항에서만)', () => {
+  const S = openWater('ocean', 0, 252); S.docked = 'lastLight';
+  for (const k of ['teak', 'synth', 'steel', 'oak', 'plate']) assert.ok(G.canBuyMat(S, k), k);
+  assert.equal(G.canBuyMat(S, 'chip'), false);
+  const A = openWater('ocean', 0, -3900); A.docked = 'atollA'; assert.equal(G.canBuyMat(A, 'teak'), false, '산호섬 나루는 가게가 없어요');
+});

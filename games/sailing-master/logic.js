@@ -225,10 +225,25 @@ export function windNow(S, wx = S.weather) {
   const ty = wx.ty; if (ty && ty.mix > 0 && ty.from != null) w.from += Math.atan2(Math.sin(ty.from - w.from), Math.cos(ty.from - w.from)) * ty.mix;
   return w;
 }
+// 바람 띠(M4 O1): 수역에 windBands가 있으면 y로 띠를 골라 경계 300m씩 섞어요(방향은 벡터로, 나머지는 가중 평균). 없으면 null
+const smoothB = (v) => { const t = clamp(v, 0, 1); return t * t * (3 - 2 * t); };
+export function bandAt(region, y) {
+  const bands = REGIONS[region].windBands;
+  if (!bands) return null;
+  let sw = 0, vx = 0, vy = 0, speed = 0, swing = 0, swellK = 0, best = null, bw = -1, gusty = 0;
+  for (const b of bands) {
+    const lo = Math.min(b.y0, b.y1), hi = Math.max(b.y0, b.y1), w = smoothB((y - (lo - 300)) / 600) * smoothB((hi + 300 - y) / 600);
+    if (w <= 0) continue;
+    sw += w; vx += Math.cos(b.from) * w; vy += Math.sin(b.from) * w; speed += b.speed * w; swing += b.swing * w; swellK += b.swellK * w; gusty += (b.gusty || 0) * w;
+    if (w > bw) { bw = w; best = b; }
+  }
+  if (!sw) { const b = y > 0 ? bands[0] : bands[bands.length - 1]; return { ...b, from: b.from, gusty: b.gusty || 0, band: b }; }
+  return { id: best.id, name: best.name, calm: !!best.calm, from: Math.atan2(vy, vx), speed: speed / sw, swing: swing / sw, swellK: swellK / sw, gusty: gusty / sw, band: best };
+}
 export function windAt(S) {
-  const def = REGIONS[S.region].wind, t = S.t, ph = S.ph;
+  const R = REGIONS[S.region], band = bandAt(S.region, S.boat?.y ?? 0), def = band || R.wind, t = S.t, ph = S.ph;
   const from = def.from + def.swing * (Math.sin(t / 83 + ph) + 0.45 * Math.sin(t / 31 + ph * 2));
-  const speed = def.speed * (1 + 0.2 * Math.sin(t / 19 + ph * 3) + 0.12 * Math.sin(t / 6.3 + ph));
+  const speed = def.speed * (1 + (0.2 + 0.1 * (band?.gusty || 0)) * Math.sin(t / 19 + ph * 3) + (0.12 + 0.08 * (band?.gusty || 0)) * Math.sin(t / 6.3 + ph));
   return { from, speed };
 }
 
@@ -1323,7 +1338,7 @@ export const SWELL_FROM = -PI / 2;
 export const swellFrom = (region) => REGIONS[region]?.wind?.from ?? SWELL_FROM;
 export const swellBeamK = (h, from = SWELL_FROM) => WEATHER.swellHead + (WEATHER.swellBeam - WEATHER.swellHead) * Math.abs(Math.sin(angDiff(h, from)));
 // 이 자리의 너울 높이(m)
-export const swellHere = (S, x = S.boat.x, y = S.boat.y) => (S.weather?.fx?.swell || 0) * W(S).swellAt(x, y);
+export const swellHere = (S, x = S.boat.x, y = S.boat.y) => (S.weather?.fx?.swell || 0) * W(S).swellAt(x, y) * (bandAt(S.region, y)?.swellK ?? 1);
 // 돛 찢어짐: 센 바람(돌풍·폭풍)에 줄임보다 더 펴고 있으면 쌓여요. 절반이면 경고, 다 차면 찢어져요. 줄이면 천천히 풀려요
 function strainSail(S, wx, dt) {
   const b = S.boat, full = clamp((b.sailNow - SAIL_LEVELS[1]) / (1 - SAIL_LEVELS[1]), 0, 1);
@@ -1561,6 +1576,11 @@ export function step(S, dt) {
   // 식수(M2a): 짠물 수역에서만 마셔요. 바닥나면 기력이 빨리 빠지고 쉬어도 안 돌아와요
   // 조수기(M2b): 짠물 바다를 항해하는 동안 식수를 만들어요(물통 칸까지)
   if (st.desal && REGIONS[S.region].salt && S.water < st.waterCap) S.water = Math.min(st.waterCap, (S.water || 0) + st.desal * DESAL.perDay * dt / CAL.day);
+  // 빗물받이(M4 O1): 비(소나기·폭풍·태풍 바깥 원)가 오는 동안 한 대당 20초마다 한 통, 물통 칸까지
+  if (st.raincatch && !S.docked && (wx.rain || S.ty?.in) && (S.water || 0) < st.waterCap) {
+    S.catchT = (S.catchT || 0) + dt * st.raincatch;
+    if (S.catchT >= 20) { S.catchT -= 20; S.water = Math.min(st.waterCap, (S.water || 0) + 1); S.stats.rainWater = (S.stats.rainWater || 0) + 1; }
+  }
   const drink = drinkPerDay(S, wx), thirsty = drink > 0 && (S.water || 0) <= 0;
   if (drink > 0 && S.water > 0) { S.water = Math.max(0, S.water - drink * dt / CAL.day); if (S.water <= 0) emit(S, 'waterOut'); }
   const med = medicK(S); // 의무원(M3 B4): 회복 ×1.5, 무더위·목마름 감소 ×0.6

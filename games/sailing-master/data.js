@@ -171,6 +171,8 @@ export const MODULES = {
   oar2: { name: '큰 노 자리', icon: '🚣', fam: 'oar', mk: 2, seat: 'oar', w: 1, h: 1, kg: 2, z: 0.12, color: '#7a4e2c', cost: {}, desc: '둘이 젓는 큰 노', need: { grade: 4 }, future: true },
   water: { name: '물통', icon: '🛢', fam: 'supply', mk: 1, w: 1, h: 1, kg: 4, z: 0.5, color: '#4a7f95', cost: { wood: 8, nail: 2 }, desc: '식수 4통! 짠물 바다에선 이게 목숨이라고', need: { grade: 3, region: 'coast' } },
   // 조수기(M2b): 바닷물을 끓여 식수로. 앞바다 발견지(바다 동굴)에서 설계도를 얻어요. 짠물 바다를 항해하는 동안 하루 DESAL.perDay통
+  // M4 O1: 빗물받이. 비(소나기·폭풍·태풍 바깥 원)가 오는 동안 20초마다 식수 1통(물통 칸까지). 한 칸이라 여럿 달 수 있어요
+  raincatch: { name: '빗물받이', icon: '🌧', fam: 'supply', mk: 1, w: 1, h: 1, kg: 2, z: 0.6, color: '#cfc7b0', cost: { synth: 6, syrope: 2 }, desc: '비가 오면 식수를 받아! 20초에 한 통', need: { grade: 5 } },
   desal: { name: '조수기', icon: '⚗️', fam: 'supply', mk: 2, w: 1, h: 1, kg: 3, z: 0.75, color: '#7a8e96', cost: { plate: 3, gear: 1, nail: 4 }, desc: '바닷물을 끓여 식수로! 항해하는 동안 하루 두 통', need: { grade: 3, blueprint: 'desal' } },
   // M3 B4: 휴게실(쉼 자리 2, 사기 회복 ×2)·조리실(요리사 자리, 식량 소비 ×0.9)·의무실(의무원 자리)·측후소(예보 +4일, 설계도는 버려진 측후소)
   lounge: { name: '휴게실', icon: '🛋', fam: 'rest', mk: 3, seat: 'rest', seats: 2, w: 2, h: 2, kg: 6, z: 0.8, color: '#e8dcc2', cost: { oak: 16, canvas: 8, coin: 20 }, desc: '쉼 자리 둘! 쉬는 동안 사기가 두 배로 돌아와', need: { grade: 4 } },
@@ -253,21 +255,21 @@ export const STORIES = {
 // id wood·cloth는 옛 저장의 목재·천을 그대로 잡목·마포로 이어 받으려고 남겨 둔 이름이에요. vol: 화물칸 부피, sell: 항구에서 1개 팔 때 금화
 export const ITEMS = {
   wood: { name: '잡목', icon: '🪵', kind: 'mat', fam: 'wood', tier: 1, vol: 1, sell: 0.5, buy: 2, buyAt: 'coast' },
-  oak: { name: '참나무', icon: '🌳', kind: 'mat', fam: 'wood', tier: 2, vol: 1, sell: 1.5, buy: 5, buyAt: 'coast' },
+  oak: { name: '참나무', icon: '🌳', kind: 'mat', fam: 'wood', tier: 2, vol: 1, sell: 1.5, buy: 5, buyAt: ['coast', 'ocean'] },
   cloth: { name: '마포', icon: '🧵', kind: 'mat', fam: 'cloth', tier: 1, vol: 1, sell: 1 },
-  canvas: { name: '범포', icon: '🏳', kind: 'mat', fam: 'cloth', tier: 2, vol: 1, sell: 2.5, buy: 6, buyAt: 'coast' },
+  canvas: { name: '범포', icon: '🏳', kind: 'mat', fam: 'cloth', tier: 2, vol: 1, sell: 2.5, buy: 6, buyAt: ['coast', 'ocean'] },
   hemp: { name: '삼 밧줄', icon: '🪢', kind: 'mat', fam: 'rope', tier: 1, vol: 1, sell: 1, buy: 3 },
   tar: { name: '타르 밧줄', icon: '➰', kind: 'mat', fam: 'rope', tier: 2, vol: 1, sell: 2.5 },
   nail: { name: '쇠못', icon: '📌', kind: 'mat', fam: 'metal', tier: 1, vol: 1, sell: 1.5, buy: 4 },
   // M2b 앞바다부터: 철판(금속 고급, 쇠못 3개로 공방에서도 만들어요)·톱니·베어링(기계 부품, 스쿠너 보조 기관). buyAt: 그 수역 항구에서만 사요(앞바다 항구는 참나무·범포·철판도 팔아요: 교역으로 번 금화가 배가 돼요)
-  plate: { name: '철판', icon: '🔳', kind: 'mat', fam: 'metal', tier: 2, vol: 1, sell: 4, buy: 10, buyAt: 'coast' },
-  gear: { name: '톱니·베어링', icon: '⚙️', kind: 'mat', fam: 'mech', tier: 2, vol: 1, sell: 6, buy: 16, buyAt: 'coast' },
+  plate: { name: '철판', icon: '🔳', kind: 'mat', fam: 'metal', tier: 2, vol: 1, sell: 4, buy: 10, buyAt: ['coast', 'ocean'] },
+  gear: { name: '톱니·베어링', icon: '⚙️', kind: 'mat', fam: 'mech', tier: 2, vol: 1, sell: 6, buy: 16, buyAt: ['coast', 'ocean'] },
   // M3 B3 큰 바다부터: 최고급 5종(3등급). buyAt: 큰 바다 항구에서 사요(재료 가게가 없는 shop:false 항구는 빼요). buyPort: 그 항구에서만(전자 부품은 보급항만, 공방으로 못 만들어요)
-  teak: { name: '티크', icon: '🌲', kind: 'mat', fam: 'wood', tier: 3, vol: 1, sell: 4, buy: 12, buyAt: 'sea' },
-  synth: { name: '합성 돛천', icon: '🪁', kind: 'mat', fam: 'cloth', tier: 3, vol: 1, sell: 6, buy: 16, buyAt: 'sea' },
-  syrope: { name: '합성 로프', icon: '➿', kind: 'mat', fam: 'rope', tier: 3, vol: 1, sell: 5, buy: 14, buyAt: 'sea' },
-  steel: { name: '강판', icon: '⬛', kind: 'mat', fam: 'metal', tier: 3, vol: 1, sell: 8, buy: 22, buyAt: 'sea' },
-  chip: { name: '전자 부품', icon: '🔌', kind: 'mat', fam: 'mech', tier: 3, vol: 1, sell: 12, buy: 40, buyAt: 'sea', buyPort: 'depot' },
+  teak: { name: '티크', icon: '🌲', kind: 'mat', fam: 'wood', tier: 3, vol: 1, sell: 4, buy: 12, buyAt: ['sea', 'ocean'] },
+  synth: { name: '합성 돛천', icon: '🪁', kind: 'mat', fam: 'cloth', tier: 3, vol: 1, sell: 6, buy: 16, buyAt: ['sea', 'ocean'] },
+  syrope: { name: '합성 로프', icon: '➿', kind: 'mat', fam: 'rope', tier: 3, vol: 1, sell: 5, buy: 14, buyAt: ['sea', 'ocean'] },
+  steel: { name: '강판', icon: '⬛', kind: 'mat', fam: 'metal', tier: 3, vol: 1, sell: 8, buy: 22, buyAt: ['sea', 'ocean'] },
+  chip: { name: '전자 부품', icon: '🔌', kind: 'mat', fam: 'mech', tier: 3, vol: 1, sell: 12, buy: 40, buyAt: ['sea', 'ocean'], buyPort: 'depot' },
   coffee: { name: '커피', icon: '☕', kind: 'trade', vol: 1, price: 8 },
   spice: { name: '향신료', icon: '🌶', kind: 'trade', vol: 1, price: 14 },
   porcelain: { name: '도자기', icon: '🏺', kind: 'trade', vol: 1, price: 22 },
@@ -477,8 +479,10 @@ export const REGIONS = {
   // 항구 넷: 마지막 등대(남) · 산호섬 둘(−4,000, −8,000) · 새 대륙 항구(북, 처음 닿으면 엔딩은 O4). 바람 띠·무풍대는 O1, 대양 태풍은 O2, 발견지·생물은 O3
   ocean: {
     id: 'ocean', name: '대양', order: 5, grade: 5, theme: 'sea', yard: 5, zoom: 5.5, salt: true, tide: false, edgeFog: 150, fast: true,
-    wind: { from: -80 * D, speed: 10, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
+    wind: { from: 45 * D, speed: 10, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
     swell: { base: 1.8, day: 0.5, gust: 0.4, storm: 1.3 },
+    // 바람 띠(M4 O1, PLAN-M3.md 7-2절): 배 y로 골라요(경계 300m씩 섞어요). 무풍대는 지도에 고정(calm)이라 해도에 빗금 띠로 늘 보여요. from은 바람이 오는 쪽(동 0°·남 90°), swellK는 너울 배율
+    windBands: [{ id: 'trade', name: '무역풍', y0: 400, y1: -4400, from: 45 * D, speed: 10, swing: 0.4, swellK: 1 }, { id: 'doldrums', name: '무풍대', y0: -4400, y1: -7100, from: 100 * D, speed: 1.5, swing: 1.4, swellK: 0.5, calm: true }, { id: 'westerlies', name: '편서풍', y0: -7100, y1: -12800, from: 180 * D, speed: 13, swing: 0.35, swellK: 1.2, gusty: 1 }],
     shape: { kind: 'isles', x0: -900, x1: 900, y0: -12400, y1: 400, cell: 16, nav: 24, swell: { calmR: 180, calmK: 0.3 }, north: { base: -11600, bumps: [[-500, 220, 120], [300, 160, -90], [650, 200, 70]], wig: [[14, 160, 0.4], [7, 55, 1.7]] } },
     currents: [],
     islands: [{ x: 0, y: 285, r: 34, ph: 1.1 }, { x: -250, y: -4000, r: 100, ph: 2.3 }, { x: 300, y: -8000, r: 110, ph: 4.1 }],

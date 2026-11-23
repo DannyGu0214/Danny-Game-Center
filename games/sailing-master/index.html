@@ -1541,6 +1541,13 @@ function renderChart(body) {
       const rr = q.r * Math.sqrt(Math.max(0, (0.05 - q.depth - tide) / 0.7)); // 썰물에 드러난 모래톱
       if (rr > 1) { g.fillStyle = '#e6d39a'; g.beginPath(); g.arc(toX(q.x), toY(q.y), rr * k, 0, Math.PI * 2); g.fill(); }
     }
+    // 무풍대(M4 O1): 지도에 고정된 빗금 띠
+    for (const b of w.def.windBands || []) if (b.calm) {
+      g.save(); g.beginPath(); g.rect(ox, Math.min(toY(b.y0), toY(b.y1)), wide * k, Math.abs(toY(b.y0) - toY(b.y1))); g.clip();
+      g.fillStyle = 'rgba(244,232,190,.14)'; g.fillRect(0, 0, cw, ch);
+      g.strokeStyle = 'rgba(255,244,205,.32)'; g.lineWidth = 1.2; g.beginPath(); for (let d = -ch; d < cw + ch; d += 9) { g.moveTo(d, 0); g.lineTo(d - ch * 0.6, ch); } g.stroke();
+      g.restore();
+    }
     // 조류(M3 B1): 큰 바다의 물 흐름 띠를 화살표로(해도에서만 보여요)
     for (const [cx0, cy0, cx1, cy1, cw2, ck] of w.def.currents || []) {
       const L = Math.hypot(cx1 - cx0, cy1 - cy0), ux = (cx1 - cx0) / L, uy = (cy1 - cy0) / L, n = Math.max(2, Math.round(L / 120));
@@ -1764,7 +1771,7 @@ function syncTop() {
   const wx = S.weather, now = !S.docked && wx.worst ? WX[wx.worst] : null, soon = !S.docked && wx.soon?.find((id) => WX[id].rough);
   const sw = S.docked ? 0 : G.swellHere(S), swellAlert = sw > st.sea * 0.92 ? `너울 ${sw.toFixed(1)}m` : ''; // M2a: 내항성에 가까운 너울이 가장 먼저
   const tyq = !S.docked && S.weather.ty && S.weather.ty.zone !== undefined ? S.weather.ty : null, tyAlert = tyq ? `🌀 태풍 ${Math.round(tyq.d)}m` : (S.weather.typhoonSoon ? '🌀 태풍 예고' : '');
-  const color = SEASON_COLOR[c.season.id], alert = tyAlert || swellAlert || (soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : '') || (!S.docked && S.boat.motor ? '⚙ 보조 기관' : ''); // 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저. 보조 기관(M2b)은 맨 나중
+  const color = SEASON_COLOR[c.season.id], alert = tyAlert || swellAlert || (soon && (!now || WX[soon].sev > now.sev) ? `${WX[soon].name} 예고` : now ? now.short || now.name : '') || (!S.docked && G.bandAt(S.region, S.boat.y)?.calm ? '무풍대' : '') || (!S.docked && S.boat.motor ? '⚙ 보조 기관' : ''); // 무풍대(M4 O1)는 지금 날씨 다음. 다가오는 센 바람이 지금 날씨보다 심하면 예고가 먼저. 보조 기관(M2b)은 맨 나중
   $('dateNum').innerHTML = `<i style="background:${color};color:${color}"></i>${c.season.name} ${c.dayOfSeason + 1}일`;
   $('regionName').textContent = `${REGIONS[S.region].name}${alert ? ` · ${alert}` : ''}`;
   $('regionName').classList.toggle('warn', !!alert && !alert.startsWith('⚙'));
