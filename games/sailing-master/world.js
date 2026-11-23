@@ -184,10 +184,20 @@ export function createWorld(def) {
         L.push([line[i][0] - ty / m * w, line[i][1] + tx / m * w]);
         R.push([line[i][0] + ty / m * w, line[i][1] - tx / m * w]);
       }
-      // 양 끝은 둥글게 닫는다
-      const cap = (c, from, to) => { const pts = []; const r = Math.hypot(from[0] - c[0], from[1] - c[1]), a0 = Math.atan2(from[1] - c[1], from[0] - c[0]); let a1 = Math.atan2(to[1] - c[1], to[0] - c[0]); if (a1 < a0) a1 += TAU; for (let k = 1; k < 10; k++) { const a = a0 + (a1 - a0) * k / 10; pts.push([c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]); } return pts; };
-      const end = line[line.length - 1], start = line[0];
-      out.push([...L, ...cap(end, L[L.length - 1], R[R.length - 1]), ...R.reverse(), ...cap(start, R[R.length - 1] ?? start, L[0])]);
+      // 양 끝은 둥글게 닫는다. 반원은 물길 바깥(끝에서 강 밖으로 나가는 쪽 out)으로 돌아야 해요.
+      // 예전엔 늘 각도가 커지는 쪽으로 돌아서 두 끝 모두 반원이 강 안쪽으로 접혔고, 그 바깥 반원(rawWater로는 물)이 풀밭으로 그려졌어요
+      const cap = (c, from, to, out) => {
+        const pts = [], r = Math.hypot(from[0] - c[0], from[1] - c[1]), a0 = Math.atan2(from[1] - c[1], from[0] - c[0]);
+        let a1 = Math.atan2(to[1] - c[1], to[0] - c[0]);
+        if (a1 < a0) a1 += TAU;
+        const am = (a0 + a1) / 2;
+        if (Math.cos(am) * out[0] + Math.sin(am) * out[1] < 0) a1 -= TAU;
+        for (let k = 1; k < 10; k++) { const a = a0 + (a1 - a0) * k / 10; pts.push([c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]); }
+        return pts;
+      };
+      const n = line.length, end = line[n - 1], start = line[0];
+      const outEnd = [end[0] - line[n - 2][0], end[1] - line[n - 2][1]], outStart = [start[0] - line[1][0], start[1] - line[1][1]];
+      out.push([...L, ...cap(end, L[L.length - 1], R[R.length - 1], outEnd), ...R.reverse(), ...cap(start, R[R.length - 1] ?? start, L[0], outStart)]);
     } else {
       const lake = [];
       for (let i = 0; i < n; i++) {

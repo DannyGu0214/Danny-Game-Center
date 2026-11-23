@@ -1703,7 +1703,7 @@ function openGate(gate) {
   const st = G.gateStatus(S, gate), name = gate.to ? REGIONS[gate.to].name : '대양';
   sheet = null;
   openSheet(`${gate.name}: ${name}`, [{ id: 'g', name: '', render(body) {
-    body.append(el('p', 'note', gate.to === 'coast' ? '강이 넓어지며 짠내가 난다! 이 너머는 앞바다야. 바닷물은 못 마시니 식수를 챙기라고!' : gate.to ? `이 물길을 지나면 ${name}(으)로 간다! 그쪽 항구에 닿을 거야.` : gate.to === 'sea' ? '짙은 안개 너머가 큰 바다다! 4등급 배(스쿠너)라야 넘어간다고. 바람이 세고 섬 사이가 멀어, 식수와 식량을 넉넉히 챙겨!' : '짙은 안개 너머가 대양이다! 5등급 대양 탐사선이라야 넘어간다고.'));
+    body.append(el('p', 'note', gate.to === 'coast' && S.region === 'river' ? '강이 넓어지며 짠내가 난다! 이 너머는 앞바다야. 바닷물은 못 마시니 식수를 챙기라고!' : gate.to === 'sea' ? '짙은 안개 너머가 큰 바다다! 4등급 배(스쿠너)라야 넘어간다고. 바람이 세고 섬 사이가 멀어, 식수와 식량을 넉넉히 챙겨!' : gate.to ? `이 물길을 지나면 ${name}(으)로 간다! 그쪽 항구에 닿을 거야.` : '짙은 안개 너머가 대양이다! 5등급 대양 탐사선이라야 넘어간다고.'));
     body.append(el('div', 'check', st.list.length ? st.list.map((q) => `<div class="${q.ok ? 'ok' : 'no'}">${q.ok ? '✓' : '✗'} ${q.text}</div>`).join('') : '<div class="ok">✓ 어떤 배든 지나갈 수 있어</div>'));
     if (!st.ok) body.append(el('p', 'note', '<br>배가 작아서 못 들어가! 항구 조선소에서 키워 오라고.'));
   } }], 'g', () => {
