@@ -294,6 +294,31 @@ test('산호섬 나루: 식수·빵·건어는 사고(식수 3닢), 재료 가�
   assert.equal(SUPPLY.bread.keep, 5); assert.equal(SUPPLY.dfish.keep, undefined);
 });
 
+// ── 대양 생존(2026-11-25): 금화 바닥 → 구조 → 또 바닥 고리 끊기 ──
+test('대양 구조: 비용은 15닢까지, 물통·식량칸·조수기·차양·격벽·바닥짐은 안 부서지고, 금화가 모자라면 산호섬이 외상으로 그릇 가득 채우고 선체도 고쳐 줘요. 외상은 다음 입항 때 갚아요', () => {
+  const p = worldOf('ocean').ports.find((q) => q.id === 'atollA');
+  for (let i = 0; i < 20; i++) {
+    const S = openWater('ocean', p.x, p.y - 900, i + 1); S.ship.hull = 'explorer'; S.ship.mods = [{ id: 'water', col: 1, row: 8, rot: 0 }, { id: 'food', col: 3, row: 8, rot: 0 }, { id: 'hold', col: 1, row: 6, rot: 0 }, { id: 'ballast', col: 3, row: 6, rot: 0 }]; S.rev++;
+    S.lastPort = { region: 'ocean', id: 'atollA' }; S.res.coin = 1000; S.water = 0; S.food = 0; S.hull = 0; S.disaster = { cause: 'sink' };
+    const r = G.rescue(S);
+    assert.equal(r.fee, 15); assert.equal(S.res.coin, 985);
+    assert.deepEqual(r.broke, ['hold'], '물통·식량칸은 남아요');
+    assert.equal(r.credit, null, '금화가 넉넉하면 외상 없음');
+  }
+  const S = openWater('ocean', p.x, p.y - 900); S.ship.hull = 'explorer'; S.ship.mods = [{ id: 'water', col: 1, row: 8, rot: 0 }]; S.rev++;
+  S.lastPort = { region: 'ocean', id: 'atollA' }; S.res.coin = 4; S.water = 0; S.food = 0; S.disaster = { cause: 'faint' };
+  const r = G.rescue(S), st = G.stats(S);
+  assert.equal(r.fee, 4); assert.ok(r.credit && r.credit.cost > 0);
+  assert.ok(S.water >= st.waterCap - 1 && S.food >= st.foodCap - 1, '그릇 가득'); assert.equal(S.hull, 1, '선체도 외상 수리'); assert.ok(r.credit.fix > 0);
+  assert.equal(S.debt, r.credit.cost); assert.ok(G.pantryOf(S).dfish.n >= r.credit.food, '외상 식량은 안 상하는 건어');
+  // 갚기: 다음 입항 때 가진 금화로 먼저
+  const debt = S.debt; S.docked = null; S.res.coin = debt + 30; G.dock(S, 'atollA');
+  assert.equal(S.debt, 0); assert.equal(S.events.find((e) => e.type === 'docked').paid, debt);
+  // 큰 바다 구조는 그대로(상한·보호 없음)
+  const T = G.newGame(1); T.region = 'sea'; T.lastPort = { region: 'sea', id: worldOf('sea').ports[0].id }; T.ship.hull = 'explorer'; T.res.coin = 100; T.disaster = { cause: 'sink' };
+  assert.equal(G.rescue(T).fee, 50); assert.equal(T.debt, 0);
+});
+
 // ── M4b 지도 정리: 둘째 산호섬을 무풍대 한가운데로 당겨(전엔 4km라 무풍대를 한 번에 건너다 갈증·더위로 멈췄어요) 2.5km 안팎이에요. 2026-11-25 지도 늘리기에서도 무풍대·산호섬 사이는 그대로예요 ──
 test('산호섬 사이 2.5km 안팎, 둘째 산호섬은 무풍대 안, 큰 바다·대양 품삯은 같아요', () => {
   const w = worldOf('ocean'), A = w.ports.find((p) => p.id === 'atollA'), B = w.ports.find((p) => p.id === 'atollB'), N = w.ports.find((p) => p.id === 'newLand');

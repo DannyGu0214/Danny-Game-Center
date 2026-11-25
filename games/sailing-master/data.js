@@ -97,7 +97,7 @@ export const WX_ORDER = Object.keys(WX); // 심한 것부터(같은 날 여럿�
 // crewTime·capTime: 바다에서 갑판원·선장이 꿰매는 데 걸리는 초. spare: 출항할 때 창고에서 화물칸으로 알아서 싣는 수선용 마포
 export const SAILCLOTH = { tornMax: 0.45, warnAt: 0.5, relax: 1 / 20, cloth: 2, coin: 10, crewTime: 20, capTime: 30, spare: 2 };
 // 젖은 식량: 비를 soak초 맞으면 젖어요. 빵은 bread일, 물고기는 ffish일 일찍 상하고, 건어는 dfish일 뒤에 상해요
-export const WET = { soak: 25, bread: 2, ffish: 1, dfish: 3 };
+export const WET = { soak: 25, bread: 2, ffish: 1, dfish: 4 }; // 건어 3 → 4일(2026-11-25): 대양 한 구간(4~6일)에서 한 번 젖은 건어가 다 상해 굶던 고리를 덜어요
 
 // 선체(배 평면 격자는 cols × rows, 칸 한 변 cell m. x0: 0행 앞쪽 끝의 배 좌표). id는 등급과 별을 함께 나타낸다: sloop = 슬루프 ★1, sloop2 = ★2
 // hp: 내구도(피해는 절대값으로 들어온다), yard: 필요한 조선소 등급, speed: 항해 속도 배율(노·돛 모두. 뗏목 2배, 이후 배는 이전 값의 1.5배)
@@ -306,6 +306,8 @@ export const SUPPLY = {
 };
 // 조수기(M2b): 짠물 바다를 항해하는 동안(입항 중엔 안 돌아요) 하루 perDay통씩 식수를 만들어요
 export const DESAL = { perDay: 2 };
+// 대양 구조·외상(2026-11-25): 대양에서 구조받으면 비용은 feeCap까지만, keep 모듈(물통·식량칸·조수기·차양·방수 격벽·바닥짐)은 안 부서져요
+export const OCEAN_AID = { feeCap: 15, keep: ['water', 'food', 'desal', 'awning', 'bulkhead', 'ballast'] };
 export const HERB = { name: '약초', icon: '🌿', price: 3, cap: 5, vigor: 0.45, at: 0.35, desc: '기력이 바닥나기 전에 알아서 씹어 먹지' };
 
 export const SPECIES = {

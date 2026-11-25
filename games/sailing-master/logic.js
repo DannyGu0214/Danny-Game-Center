@@ -1,4 +1,4 @@
-import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, WX, WX_ORDER, SAILCLOTH, WET, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB, TRAITS, CREW_GROW, TIDE, WATER, DESAL, TYPHOON } from './data.js';
+import { BOAT, POLAR, NO_GO, SAIL_K, NAV, SAIL_LEVELS, CAL, SEASONS, WEATHER, WX, WX_ORDER, SAILCLOTH, WET, HULLS, MODULES, ROLES, CREW_NAMES, SPECIES, REGIONS, REGION_ORDER, ACHIEVEMENTS, DECOR, CAPTAINS, CREW, HULL_ORDER, HULL_TIERS, ITEMS, TRADE_IDS, WORKSHOP, TRADE, SUPPLY, HERB, TRAITS, CREW_GROW, TIDE, WATER, DESAL, TYPHOON, OCEAN_AID } from './data.js';
 import { worldOf } from './world.js';
 import * as SH from './ship.js';
 // 게임 규칙 전부. 화면이 없고, 시드와 고정 시간 단계만으로 결과가 같다.
@@ -271,7 +271,7 @@ export function newGame(seed = 1) {
     crew: [], hiredEver: {}, owed: 0, wageDay: 0,
     flot: {}, fog: {}, found: {}, blueprints: {}, seen: {}, photos: {}, ach: {},
     stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0, typhoons: 0, typhoonHurt: 0, calmDays: 0, crossDays: 0 },
-    ended: false, rev: 0, crossed: null, // M4: 새 대륙 항구에 처음 닿은 날짜(없으면 null, O4)
+    ended: false, rev: 0, crossed: null, debt: 0, // crossed — M4: 새 대륙 항구에 처음 닿은 날짜(없으면 null, O4) · debt — 대양 외상(금화, 2026-11-25)
   };
   S.best = JSON.parse(JSON.stringify(S.ship));
   S.wind = windAt(S);
@@ -548,6 +548,7 @@ export function dock(S, portId) {
   const persons = 1 + S.crew.length;
   let gift = 0;
   if (S.food < persons && S.res.coin < persons * FOOD_PRICE) { gift = persons - S.food; stock(S, 'bread', gift); }
+  const paid = payDebt(S), credit = oceanCredit(S); // 대양 외상(선체 수리 포함)이면 아래 '대충 때우기'는 할 일이 없어요
   // 금화도 잡목도 없어 못 고치는 배는 항구 사람들이 절반까지 대충 때워 준다(침몰 → 구조 → 침몰 악순환 방지)
   const patched = patchIfBroke(S), sewn = sewIfBroke(S), wat = portWater(S);
   S.mend = null;
@@ -555,7 +556,7 @@ export function dock(S, portId) {
   const first = S.region === 'ocean' && portId === 'newLand' && S.crossed == null;
   if (first) { S.crossed = clock(S).day + 1; S.stats.crossDays = S.crossed; S.ended = true; }
   checkAch(S);
-  emit(S, 'docked', { got, port: portId, gift, patched, sewn, waterGift: wat.gift || 0, scoop: wat.scoop || 0 });
+  emit(S, 'docked', { got, port: portId, gift, patched, sewn, waterGift: wat.gift || 0, scoop: wat.scoop || 0, paid, credit });
   if (first) emit(S, 'crossed', { day: S.crossed });
   return got;
 }
@@ -735,6 +736,22 @@ function portWater(S) {
   const persons = 1 + S.crew.length, need = Math.min(cap, persons) - S.water;
   if (need > 0 && S.res.coin < Math.ceil(need) * waterPrice(S)) { S.water += need; return { gift: need }; }
   return {};
+}
+// 대양 외상(2026-11-25): 대양 항구에서 다음 구간 채비(건어·식수 그릇 가득, 선체 수리)를 할 금화가 없으면 외상으로 해 줘요. 빚은 다음에 입항할 때 가진 금화로 먼저 갚아요(금화 바닥 → 구조 → 또 바닥 고리 끊기)
+export function oceanCredit(S) {
+  if (S.region !== 'ocean' || !S.docked) return null;
+  const st = stats(S), food = Math.max(0, Math.floor(st.foodCap - S.food + 1e-9)), water = Math.max(0, Math.floor(st.waterCap - (S.water || 0) + 1e-9)), fix = repairCost(S);
+  const cost = food * SUPPLY.dfish.price + water * waterPrice(S) + fix;
+  if (cost <= 0 || S.res.coin >= cost) return null;
+  if (food) { syncPantry(S); stock(S, 'dfish', food); }
+  S.water = (S.water || 0) + water; S.hull = 1; S.debt = (S.debt || 0) + cost;
+  return { food, water, fix, cost };
+}
+export function payDebt(S) {
+  const n = Math.min(S.debt || 0, Math.floor(S.res.coin));
+  if (n <= 0) return 0;
+  S.debt -= n; S.res.coin -= n;
+  return n;
 }
 export function buyHerb(S, n = 1) {
   const q = Math.min(n, HERB.cap - (S.herb || 0), Math.floor(S.res.coin / HERB.price));
@@ -1211,10 +1228,11 @@ export function rescue(S) {
   for (const [k, v] of Object.entries(S.hold)) { const keep = boat ? Math.floor(v / 2) : 0; if (keep) kept[k] = keep; if (v - keep) lost[k] = v - keep; }
   S.hold = kept;
   // 돛대·노는 남기고 모듈 하나가 부서진다
-  const opts = S.ship.mods.filter((m) => !MODULES[m.id].sail && m.id !== 'oar');
+  const ocean = S.region === 'ocean' && port.region === 'ocean'; // 대양 구조(2026-11-25): OCEAN_AID.keep(물통·식량칸·조수기·차양·격벽·바닥짐)은 안 부서지고 비용도 상한까지만 받아요
+  const opts = S.ship.mods.filter((m) => !MODULES[m.id].sail && m.id !== 'oar' && !(ocean && OCEAN_AID.keep.includes(m.id)));
   if (opts.length) { const m = opts[Math.floor(rnd(S) * opts.length)]; S.ship.mods = S.ship.mods.filter((o) => o !== m); broke.push(m.id); S.rev++; }
   const left = S.crew.length ? S.crew.pop() : null;
-  const fee = Math.min(S.res.coin, 10 * HULLS[S.ship.hull].grade);
+  const fee = Math.min(S.res.coin, 10 * HULLS[S.ship.hull].grade, ocean ? OCEAN_AID.feeCap : Infinity);
   S.res.coin -= fee;
   S.hull = 0.35; S.vigor = 0.8; if (S.food < 1) { syncPantry(S); stock(S, 'bread', 1 - S.food); }
   S.region = port.region;
@@ -1223,9 +1241,9 @@ export function rescue(S) {
   S.boat.sailLevel = 0; S.boat.sailNow = 0;
   S.cap.x = HULLS[S.ship.hull].helmX; S.cap.at = 'helm'; S.cap.to = null; S.cap.then = null;
   S.stats.rescues++;
-  const patched = patchIfBroke(S), sewn = sewIfBroke(S);
+  const patched = patchIfBroke(S), sewn = sewIfBroke(S), credit = oceanCredit(S);
   S.mend = null;
-  const out = { lost, broke, left: left && left.name, fee, cause: S.disaster.cause, port: port.id, patched, sewn };
+  const out = { lost, broke, left: left && left.name, fee, cause: S.disaster.cause, port: port.id, patched, sewn, credit };
   S.disaster = null;
   return out;
 }
@@ -1718,7 +1736,7 @@ export function deserialize(raw) {
     o.stats.typhoons ??= 0; o.stats.typhoonHurt ??= 0; o.stats.calmDays ??= 0;
     for (const k of Object.keys(NEW_MATS)) o.res[k] ??= 0; // M3 B3 최고급 재료 5종: 창고 기본 0
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
-    o.crossed ??= null; o.stats.crossDays ??= 0; // v8 → v9(M4 대양): 대양 관련 값 기본
+    o.crossed ??= null; o.stats.crossDays ??= 0; o.debt ??= 0; // v8 → v9(M4 대양): 대양 관련 값 기본
     const stretch = o.v < 10; // v9 → v10(2026-11-25): 대양 지도 ×1.5(아래 맨 끝에서, 선원 값까지 채운 뒤)
     o.v = 10;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
