@@ -125,7 +125,7 @@ test('moveTo + then: gather는 걸어가서 캐요', () => {
   assert.ok(cell);
   applyIntent(state, world, { kind: 'moveTo', cell, then: { kind: 'gather', nodeId: 'tree-08' } });
   assert.equal(state.player.activity.kind, 'walking');
-  run(state, 10);
+  run(state, 16); // 걷기 약 5초 + 통나무 3개 7.2초
   assert.deepEqual(worldToCell(state.player), cell);
   assert.equal(countItem(state.bag, 'log'), 3);
 });
