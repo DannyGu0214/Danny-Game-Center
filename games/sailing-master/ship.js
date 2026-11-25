@@ -99,7 +99,7 @@ export function statsOf(design, cargo = 0, food = 0) {
     foodK: cnt.galley ? MODULES.galley.foodK : 1,
     crewCap: Math.min(H.crew, (cnt.hammock || 0) + (cnt.cabin || 0) + 2 * (cnt.lounge || 0)),
     // M2a: 식수 칸(선체 기본 + 물통 4통씩), 내항성(너울을 견디는 높이 m: 등급 × 0.45 + 별마다 0.1 + 바닥짐 0.1)
-    waterCap: (H.waterBase || 0) + 4 * (cnt.water || 0),
+    waterCap: (H.waterBase || 0) + 4 * (cnt.water || 0), raincatch: cnt.raincatch || 0, autohelm: !!cnt.autohelm, solar: Math.min(2, cnt.solar || 0),
     sea: H.sea ?? H.grade * 0.45 + 0.1 * ((H.star || 1) - 1) + (cnt.ballast ? 0.1 : 0),
     awning: !!cnt.awning, bulkhead: !!cnt.bulkhead, net: !!cnt.net, telescope: !!(cnt.telescope || cnt.crowsnest), crowsnest: !!cnt.crowsnest, forecast: 1 + (cnt.station ? 4 : cnt.barometer ? 2 : 0) + (H.bridge ? 2 : 0), /* 측후소는 기압계 대신(+4일) */ typhoonAhead: 2 + (cnt.barometer ? 1 : 0) + (cnt.station ? 2 : 0), // 태풍 예보는 기본 2일 앞(기압계 +1, 측후소 +2)부터 보여요
     desal: cnt.desal || 0, lifeboat: !!cnt.lifeboat, doubleHull: !!H.doubleHull,

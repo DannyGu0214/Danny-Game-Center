@@ -154,7 +154,7 @@ export const TRACKS = {
   },
 };
 // 상황(기분). S5 날씨가 생기면 그쪽에서 music.setMood('storm')을 부르면 돼요
-export const MOODS = ['sail', 'port', 'storm'];
+export const MOODS = ['sail', 'port', 'storm', 'ending'];
 export function moodOf({ docked = false, gustOn = false, gustSoon = false, storm = false } = {}) {
   if (docked) return 'port';
   if (storm || gustOn || gustSoon) return 'storm'; // 돌풍 예고부터 곡이 바뀌는 것 자체가 전조예요(13절)
@@ -163,7 +163,7 @@ export function moodOf({ docked = false, gustOn = false, gustSoon = false, storm
 // 평소 항해 곡 고르기. 수역마다 선술집 두 곡(자기 곡 + 이웃 수역 곡)을 번갈아 틀어요.
 // 한 차례는 평소 항해 시간으로 TURN_S초(mp3 한 바퀴쯤), 생동감 곡은 LIVELY_S초.
 // 선술집 곡이 2차례 이상 지나면 다음 차례마다 35% 확률로 생동감 곡, 4차례가 지나면 반드시 생동감 곡. 생동감 곡은 연달아 나오지 않아요.
-export const SAIL_SETS = { pond: ['pond', 'lake'], lake: ['lake', 'pond'], river: ['river', 'lake'], coast: ['sea', 'river'], sea: ['sea', 'river'], ocean: ['sea', 'river'] };
+export const SAIL_SETS = { pond: ['pond', 'lake'], lake: ['lake', 'pond'], river: ['river', 'lake'], coast: ['sea', 'river'], sea: ['opensea', 'sea'], ocean: ['ocean', 'opensea'] }; // M4 O5: 큰 바다·대양 새 곡(mp3가 아직 없으면 아래 FALLBACK으로 sea.mp3)
 export const TURN_S = 150, LIVELY_S = 90, LIVELY = { after: 2, chance: 0.35, must: 4 };
 export function startSail(region) { const set = SAIL_SETS[region] || SAIL_SETS.river; return { region, track: set[0], k: 0, since: 0, left: TURN_S }; }
 export function nextSail(d, rand = Math.random) {
@@ -178,14 +178,16 @@ export function nextSail(d, rand = Math.random) {
   return { ...d, track: set[k], k, left: TURN_S };
 }
 // 지금 틀 곡: 항구·폭풍은 그 곡, 평소 항해는 순서표의 곡
-export const trackFor = (mood, d) => (mood === 'port' || mood === 'storm' ? mood : d.track);
+export const trackFor = (mood, d) => (mood === 'port' || mood === 'storm' || mood === 'ending' ? mood : d.track);
 // 슬라이더 값(0~1) → 크기 배율. 귀는 크기를 로그로 느끼니 제곱으로 줄여요(절반 = -12dB). 0이면 정말 0
 export const levelOf = (v) => (v > 0 ? Math.min(1, v) ** 2 : 0);
 const INTRO_BARS = 2;
 
 
 // 곡마다 mp3. 파일이 없거나(READY 밖, 2026-11-12 기준 lively·port·storm) 못 읽는 곡은 합성곡으로 틀어요. 바다·대양 곡(sea)은 앞바다(M2a, SAIL_SETS.coast)부터 써요
-export const FILES = { pond: 'pond', lake: 'lake', river: 'river', sea: 'sea', lively: 'lively', port: 'port', storm: 'storm' };
+export const FILES = { pond: 'pond', lake: 'lake', river: 'river', sea: 'sea', lively: 'lively', port: 'port', storm: 'storm', opensea: 'opensea', ocean: 'ocean', ending: 'ending' };
+// 새 곡 mp3가 없으면 이웃 곡으로(M4 O5): 큰 바다 → 앞바다 곡, 대양 → 큰 바다 곡, 엔딩 → 대양 곡. 합성곡은 따로 만들지 않아요(없는 곡 이름은 강 곡 합성곡으로)
+export const FALLBACK = { opensea: 'sea', ocean: 'opensea', ending: 'ocean' };
 // 저장소에 실제로 있는 mp3. 여기 없는 곡은 찾지 않고 바로 합성곡으로 틀어요(없는 파일을 찾다 콘솔에 404가 쌓이지 않게). 새 mp3가 오면 여기에 더해요
 export const READY = new Set(['pond', 'lake', 'river', 'sea']);
 // mp3는 평균 -17.5dB(RMS 약 0.13)라 합성곡(RMS 약 0.035)과 크기를 맞추려고 줄인다
@@ -198,7 +200,7 @@ export function createMusic({ volume = 0.65, rand = Math.random, base = 'assets/
   let fileCur = null;
   const wanted = () => trackFor(mood, dir);
   const audible = () => on && !paused && user > 0;
-  const fileOf = (id) => (FILES[id] && !failed.has(FILES[id]) ? FILES[id] : null);
+  const fileOf = (id) => { for (let i = 0; id && i < 4; i++, id = FALLBACK[id]) if (FILES[id] && !failed.has(FILES[id])) return FILES[id]; return null; };
   function fileTrack(name) {
     if (files[name]) return files[name];
     const el = new Audio(); el.src = `${base}${name}.mp3`; el.loop = true; el.preload = 'auto'; el.crossOrigin = 'anonymous';

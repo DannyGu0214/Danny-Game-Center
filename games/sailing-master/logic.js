@@ -44,9 +44,11 @@ export function dayWeather(seed, day) {
   if (out.typhoon) out.calm = false; // 태풍이 오는 날엔 무풍이 안 와요(무풍 × 0.15가 태풍 바람까지 깎던 것)
   return out;
 }
+// 기상사(M4 O2): 측후소·기압계 자리에 앉으면 예보 +1일(태풍 예고도 +1일)
+export const officerDays = (S) => (roleWork(S, 'weather') > 0 ? 1 : 0);
 export function forecast(S) {
   const st = stats(S), today = clock(S).day, out = [];
-  for (let d = 0; d <= st.forecast; d++) out.push(dayWeather(S.seed, today + d));
+  for (let d = 0; d <= st.forecast + officerDays(S); d++) out.push(dayWeather(S.seed, today + d));
   return out;
 }
 // 그 수역에 그날 오는 날씨 종류(심한 것부터). ahead: 며칠 앞 예보인가(fc보다 멀면 안 보여요)
@@ -59,7 +61,7 @@ export function outlook(S) {
   const list = forecast(S).map((d, i) => { const ids = kindsOf(S.region, d, i); return { ...d, ids, worst: ids[0] || null, sev: ids.length ? WX[ids[0]].sev : 0, swell: daySwell(S.region, S.seed, d.day) }; });
   // 태풍은 다른 날씨보다 멀리(기본 2일 앞, 기압계 +1, 측후소 +2) 보여요. 예보 창 밖 날은 태풍만 보이고 나머지는 모르는 날(blind)이에요
   if ((REGIONS[S.region].weather || []).includes('typhoon')) {
-    const st = stats(S), today = clock(S).day, reach = st.typhoonAhead ?? TYPHOON.ahead, base = list.length;
+    const st = stats(S), today = clock(S).day, reach = (st.typhoonAhead ?? TYPHOON.ahead) + officerDays(S), base = list.length;
     for (let i = base; i <= reach; i++) { const d = dayWeather(S.seed, today + i), ids = kindsOf(S.region, d, i).filter((id) => id === 'typhoon'); list.push({ ...d, ids, worst: ids[0] || null, sev: ids.length ? WX.typhoon.sev : 0, swell: 0, blind: true }); }
     while (list.length > base && !list[list.length - 1].ids.length) list.pop();
   }
@@ -128,12 +130,25 @@ export function tideInfo(S, clockT = S.clock) {
   const name = h > TIDE.amp * 0.7 ? '밀물' : h < -TIDE.amp * 0.7 ? '썰물' : rising ? '들물' : '날물';
   return { h, rising, name, toLow, toHigh };
 }
+// ── 빨리 가기(M4 O0, PLAN-M3.md 7-4절): 큰 바다·대양(fast)에서 탁 트인 곳만 ×2·×4. 규칙은 그대로고 index.html이 프레임마다 step을 여러 번 불러요 ──
+// 깨지면 index.html이 ×1로 돌려 놓고 why를 한 번 알려요
+export function fastCheck(S) {
+  const R = REGIONS[S.region];
+  if (!R.fast) return { ok: false, why: '여기선 빨리 못 가! 탁 트인 바다에서만 된다고' };
+  if (S.docked || S.disaster || S.ended) return { ok: false, why: '' };
+  if (worldOf(S.region).landDist(S.boat.x, S.boat.y) < 200) return { ok: false, why: '물가가 가까워! 천천히 가자고' };
+  const w = S.weather || {};
+  if ((w.on || []).concat(w.soon || []).some((id) => (WX[id]?.sev || 0) >= 2)) return { ok: false, why: '바람이 수상해! 천천히 가자고' };
+  if (R.weather?.includes('typhoon')) { const q = typhoonAt(S.region, S.seed, S.clock, S.boat.x, S.boat.y); if (q && q.d < TYPHOON.outer + 300) return { ok: false, why: '태풍이 가까워! 천천히 가자고' }; }
+  return { ok: true, why: '' };
+}
 // ── 태풍(M3 B2) ──
 // 경로: 서쪽(side −1)이나 동쪽(+1) 끝 밖 start m에서 들어와, 지도 가운데 60% 안의 점 P를 지나 반대쪽으로 빠져나가요(P는 경로 한가운데). cross초에 건너요
 export function typhoonTrack(region, tr) {
   const sh = REGIONS[region].shape, cx = (sh.x0 + sh.x1) / 2, cy = (sh.y0 + sh.y1) / 2, W0 = sh.x1 - sh.x0, H0 = sh.y1 - sh.y0;
-  const sx = tr.side < 0 ? sh.x0 - TYPHOON.start : sh.x1 + TYPHOON.start, sy = cy + (tr.w - 0.5) * 1.2 * H0;
-  const px = cx + (tr.u - 0.5) * 0.6 * W0, py = cy + (tr.v - 0.5) * 0.6 * H0;
+  // 대양(shape.ty = [ya, yb]): 12km 띠라 경로를 가로로 눕혀요. 한가운데 점의 y는 ya~yb 안, 들어오는 y는 그 위아래 ±(w − 0.5) × 1.2km
+  const sx = tr.side < 0 ? sh.x0 - TYPHOON.start : sh.x1 + TYPHOON.start, sy = sh.ty ? sh.ty[0] + tr.v * (sh.ty[1] - sh.ty[0]) + (tr.w - 0.5) * 2400 : cy + (tr.w - 0.5) * 1.2 * H0;
+  const px = cx + (tr.u - 0.5) * 0.6 * W0, py = sh.ty ? sh.ty[0] + tr.v * (sh.ty[1] - sh.ty[0]) : cy + (tr.v - 0.5) * 0.6 * H0;
   return { sx, sy, ex: sx + 2 * (px - sx), ey: sy + 2 * (py - sy), dur: TYPHOON.cross };
 }
 export function typhoonPos(region, tr, s) { const T = typhoonTrack(region, tr), k = s / T.dur; return [T.sx + (T.ex - T.sx) * k, T.sy + (T.ey - T.sy) * k]; }
@@ -176,7 +191,11 @@ export function typhoonLeft(S) {
 export function typhoonView(S) {
   if (!(REGIONS[S.region].weather || []).includes('typhoon')) return null;
   const live = liveTyphoon(S.region, S.seed, S.clock), day = clock(S).day, tr = live ? live.tr : dayWeather(S.seed, day).typhoon;
-  if (!tr || (!live && S.clock >= day * CAL.day + tr.t0 + TYPHOON.cross)) return null;
+  if (!tr || (!live && S.clock >= day * CAL.day + tr.t0 + TYPHOON.cross)) {
+    // 기상사(M4 O2): 내일 태풍의 예상 경로를 하루 전부터 해도에 그려요
+    const nx = officerDays(S) ? dayWeather(S.seed, day + 1).typhoon : null;
+    return nx ? { track: typhoonTrack(S.region, nx), pos: null, s: null, tr: nx, tomorrow: true } : null;
+  }
   return { track: typhoonTrack(S.region, tr), pos: live ? typhoonPos(S.region, live.tr, live.s) : null, s: live ? live.s : null, tr };
 }
 // 한 틱: 지금 태풍 효과를 날씨 fx에 합치고(바람은 큰 것 하나, 너울은 더하고, 보는 거리는 곱해요) 전조·고비·파국 알림을 내요. 항구에 대 있으면 step이 여기까지 오지 않아요
@@ -213,17 +232,32 @@ export function windNow(S, wx = S.weather) {
   const ty = wx.ty; if (ty && ty.mix > 0 && ty.from != null) w.from += Math.atan2(Math.sin(ty.from - w.from), Math.cos(ty.from - w.from)) * ty.mix;
   return w;
 }
+// 바람 띠(M4 O1): 수역에 windBands가 있으면 y로 띠를 골라 경계 300m씩 섞어요(방향은 벡터로, 나머지는 가중 평균). 없으면 null
+const smoothB = (v) => { const t = clamp(v, 0, 1); return t * t * (3 - 2 * t); };
+export function bandAt(region, y) {
+  const bands = REGIONS[region].windBands;
+  if (!bands) return null;
+  let sw = 0, vx = 0, vy = 0, speed = 0, swing = 0, swellK = 0, best = null, bw = -1, gusty = 0;
+  for (const b of bands) {
+    const lo = Math.min(b.y0, b.y1), hi = Math.max(b.y0, b.y1), w = smoothB((y - (lo - 300)) / 600) * smoothB((hi + 300 - y) / 600);
+    if (w <= 0) continue;
+    sw += w; vx += Math.cos(b.from) * w; vy += Math.sin(b.from) * w; speed += b.speed * w; swing += b.swing * w; swellK += b.swellK * w; gusty += (b.gusty || 0) * w;
+    if (w > bw) { bw = w; best = b; }
+  }
+  if (!sw) { const b = y > 0 ? bands[0] : bands[bands.length - 1]; return { ...b, from: b.from, gusty: b.gusty || 0, band: b }; }
+  return { id: best.id, name: best.name, calm: !!best.calm, from: Math.atan2(vy, vx), speed: speed / sw, swing: swing / sw, swellK: swellK / sw, gusty: gusty / sw, band: best };
+}
 export function windAt(S) {
-  const def = REGIONS[S.region].wind, t = S.t, ph = S.ph;
+  const R = REGIONS[S.region], band = bandAt(S.region, S.boat?.y ?? 0), def = band || R.wind, t = S.t, ph = S.ph;
   const from = def.from + def.swing * (Math.sin(t / 83 + ph) + 0.45 * Math.sin(t / 31 + ph * 2));
-  const speed = def.speed * (1 + 0.2 * Math.sin(t / 19 + ph * 3) + 0.12 * Math.sin(t / 6.3 + ph));
+  const speed = def.speed * (1 + (0.2 + 0.1 * (band?.gusty || 0)) * Math.sin(t / 19 + ph * 3) + (0.12 + 0.08 * (band?.gusty || 0)) * Math.sin(t / 6.3 + ph));
   return { from, speed };
 }
 
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 8, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 9, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: calmWeather(),
@@ -236,8 +270,8 @@ export function newGame(seed = 1) {
     ship: { hull: 'raft', mods: [{ id: 'oar', col: 1, row: 1, rot: 0 }], name: '새벽호', paint: { hull: 0, sail: 0, flag: 0 }, decor: [] },
     crew: [], hiredEver: {}, owed: 0, wageDay: 0,
     flot: {}, fog: {}, found: {}, blueprints: {}, seen: {}, photos: {}, ach: {},
-    stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0, typhoons: 0, typhoonHurt: 0, calmDays: 0 },
-    ended: false, rev: 0,
+    stats: { rowDist: 0, sailDist: 0, dist: 0, tacks: 0, gusts: 0, gustHurt: 0, heatDays: 0, rescues: 0, storms: 0, stormHurt: 0, torn: 0, wet: 0, typhoons: 0, typhoonHurt: 0, calmDays: 0, crossDays: 0 },
+    ended: false, rev: 0, crossed: null, // M4: 새 대륙 항구에 처음 닿은 날짜(없으면 null, O4)
   };
   S.best = JSON.parse(JSON.stringify(S.ship));
   S.wind = windAt(S);
@@ -297,6 +331,7 @@ export function seatsOf(S) {
   const key = shipKey(S);
   if (hit && hit.key === key) { Object.assign(hit, { rev: S.rev, mods, n: mods.length, hull: S.ship.hull }); return hit.seats; }
   const H = HULLS[S.ship.hull], seats = [{ key: 'helm', type: 'helm', x: H.helmX, y: 0.4 }];
+  if (H.bridgeAt) seats.push({ key: 'bridge', type: 'bridge', x: H.bridgeAt[0], y: H.bridgeAt[1] }); // 함교 자리(탐사선, M4 O2)
   if (H.engineAt) seats.push({ key: 'engine', type: 'engine', x: H.engineAt[0], y: H.engineAt[1] }); // 기관 자리는 모듈 없이 생겨요(조타 자리처럼, M3 B4)
   for (const m of S.ship.mods) {
     const M = MODULES[m.id];
@@ -326,7 +361,7 @@ function ensureSeats(S) {
   if (S.crew.some((c) => c.seat === undefined || (c.seat && !seats.some((q) => q.key === c.seat)))) autoSeat(S);
 }
 // 그 자리에 앉아 일하는 선원(없으면 null)
-export function workerAt(S, type) { ensureSeats(S); return S.crew.find((c) => seatType(S, c) === type) || null; }
+export function workerAt(S, type) { ensureSeats(S); return S.crew.find((c) => seatType(S, c) === type) || (type === 'helm' ? S.crew.find((c) => c.role === 'mate' && seatType(S, c) === 'bridge') : null) || null; } // 일등 항해사(함교)는 조타수 몫도 해요(M4 O2)
 // 효과 배율: 기본 × (0.7 + 0.15 × 숙련), 맞지 않는 자리는 50%, 피로가 쌓이면 최대 절반, 사기가 바닥이면 80%
 export function crewEff(S, c, type = seatType(S, c)) {
   if (!c || !type) return 0;
@@ -334,7 +369,7 @@ export function crewEff(S, c, type = seatType(S, c)) {
   return (0.7 + 0.15 * lv) * apt * (1 - 0.5 * (c.fatigue || 0)) * ((c.morale ?? 0.7) < 0.3 ? 0.8 : 1);
 }
 const BASE_EFF = 0.85; // 숙련 1, 맞는 자리, 쌩쌩할 때
-const work = (S, type) => { const c = workerAt(S, type); return c ? crewEff(S, c, type) / BASE_EFF * (c.trait === 'strong' && (type === 'oar' || type === 'carpenter') ? 1.2 : 1) * (type === 'sail' ? bosunK(S) : 1) : 0; };
+const work = (S, type) => { const c = workerAt(S, type); return c ? crewEff(S, c, type) / BASE_EFF * (c.trait === 'strong' && (type === 'oar' || type === 'carpenter') ? 1.2 : 1) * (type === 'sail' ? bosunK(S) : 1) * (type === 'bridge' ? 1 : 1 + 0.1 * roleWork(S, 'mate')) : 0; }; // 일등 항해사: 다른 선원 효과 +10%(M4 O2)
 // M3 B4 역할 효과: 그 역할 선원이 제 자리에 앉아 있을 때의 일솜씨(숙련 1·쌩쌩하면 1). 없으면 0
 export function roleWork(S, role) {
   ensureSeats(S);
@@ -389,7 +424,7 @@ function crewTick(S, dt, wx, st) {
     const type = seatType(S, c);
     c.lv ||= 1; c.xp ||= 0; c.fatigue ??= 0; c.morale ??= 0.7;
     if (type && type !== 'rest') {
-      const k = (c.trait === 'diligent' ? 0.7 : 1) * (c.trait === 'seasick' && wx.gustOn ? 2 : 1);
+      const k = (c.trait === 'diligent' ? 0.7 : 1) * (c.trait === 'seasick' && wx.gustOn ? 2 : 1) * (type === 'bridge' ? 1 : 1 - 0.2 * roleWork(S, 'mate')); // 일등 항해사: 피로 −20%
       c.fatigue = Math.min(1, c.fatigue + dt / (g.tireDays * day) * k);
       if (ROLES[c.role]?.seat === type && c.lv < g.maxLv) {
         c.xp += dt;
@@ -450,12 +485,13 @@ function applyAction(S, a) {
     else walkTo(S, 'oar');
   } else if (a.type === 'row') { b.row = a.on; if (!a.on) walkTo(S, 'helm'); }
 }
-const canSteer = (S) => !!workerAt(S, 'helm') || S.cap.to === null && (S.cap.at === 'helm' || S.cap.at === 'oar');
+const helmed = (S) => !!workerAt(S, 'helm') || !!stats(S).autohelm; // 조타수·일등 항해사·자동 조타(M4 O2)
+const canSteer = (S) => helmed(S) || S.cap.to === null && (S.cap.at === 'helm' || S.cap.at === 'oar');
 export function setRudder(S, r) {
   if (S.docked) return;
   S.boat.rudder = clamp(r, -1, 1);
   S.route = null;
-  if (!workerAt(S, 'helm') && S.cap.at !== 'helm' && S.cap.at !== 'oar' && !S.cap.to) walkTo(S, 'helm');
+  if (!helmed(S) && S.cap.at !== 'helm' && S.cap.at !== 'oar' && !S.cap.to) walkTo(S, 'helm');
 }
 export function setSail(S, level) {
   if (!stats(S).sailArea) return false;
@@ -492,7 +528,7 @@ export function setDest(S, x, y, target = null) {
     if (st.sailArea) setSail(S, b.lastSail);
     else if (st.oars) setRow(S, true);
   }
-  if (!workerAt(S, 'helm') && !S.cap.to && S.cap.at === 'mast') walkTo(S, 'helm');
+  if (!helmed(S) && !S.cap.to && S.cap.at === 'mast') walkTo(S, 'helm');
   return true;
 }
 
@@ -515,8 +551,12 @@ export function dock(S, portId) {
   // 금화도 잡목도 없어 못 고치는 배는 항구 사람들이 절반까지 대충 때워 준다(침몰 → 구조 → 침몰 악순환 방지)
   const patched = patchIfBroke(S), sewn = sewIfBroke(S), wat = portWater(S);
   S.mend = null;
+  // 새 대륙 항구에 처음 닿으면 엔딩(M4 O4): 처음 한 번만. 다시 오면 보통 항구예요
+  const first = S.region === 'ocean' && portId === 'newLand' && S.crossed == null;
+  if (first) { S.crossed = clock(S).day + 1; S.stats.crossDays = S.crossed; S.ended = true; }
   checkAch(S);
   emit(S, 'docked', { got, port: portId, gift, patched, sewn, waterGift: wat.gift || 0, scoop: wat.scoop || 0 });
+  if (first) emit(S, 'crossed', { day: S.crossed });
   return got;
 }
 function patchIfBroke(S) {
@@ -951,7 +991,7 @@ export function passGate(S, gate) {
   if (!gateStatus(S, gate).ok) return false;
   // 이번 단계의 엔딩(M2a): 앞바다의 큰 바다 경계(4등급). 강 끝은 이제 앞바다로 이어져요
   // M3 B0: 앞바다 → 큰 바다(toSea)는 이제 일반 관문이고, 큰 바다 북쪽 대양 어귀(to null)가 이 단계의 끝이에요(엔딩 글은 B7에서)
-  if (!gate.to) { S.ended = true; giveAch(S, 'oceanGate'); emit(S, 'ended'); return true; }
+  if (!gate.to) { S.ended = true; emit(S, 'ended'); return true; } // 지금 쓰는 곳 없음(M4 O0부터 대양 어귀는 대양으로 이어져요). 옛 엔딩 흐름 보존
   const from = S.region, first = !S.visited[gate.to];
   // 화물은 그대로 싣고 넘어간다. 도착 항구에 들르면 창고로 옮겨요
   S.region = gate.to; S.visited[gate.to] = 1;
@@ -981,6 +1021,14 @@ export function bowRide(S, id) {
   recordSpecies(S, id);
   if (S.ach.bowRide) return false;
   giveAch(S, 'bowRide');
+  return true;
+}
+// 고래가 뛰어오르는 순간(M4 O3, PLAN-M3.md 8-3절): 화면의 고래가 물 위로 뛰어오른 때 탭하면 기록 + 도전과제
+export function whaleLeap(S, id) {
+  if (SPECIES[id]?.kind !== 'whale') return false;
+  recordSpecies(S, id);
+  if (S.ach.whaleLeap) return false;
+  giveAch(S, 'whaleLeap');
   return true;
 }
 function giveAch(S, id) {
@@ -1025,6 +1073,7 @@ export function checkAch(S) {
   c('explorer', HULLS[S.ship.hull].grade >= 5);
   c('seaAll', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'coast' || S.seen[id])); // 앞바다 생물(큰 바다 생물은 islandNaturalist)
   c('islandNaturalist', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'sea' || S.seen[id]));
+  c('oceanNaturalist', Object.keys(SPECIES).every((id) => SPECIES[id].region !== 'ocean' || S.seen[id]));
   c('seaIsles', worldDone(S, 'sea'));
   c('lakeAll', worldDone(S, 'lake'));
   const nSeen = Object.keys(S.seen).length;
@@ -1033,6 +1082,8 @@ export function checkAch(S) {
   c('speciesAll', Object.keys(SPECIES).every((id) => SPECIES[id].sea || S.seen[id])); // 민물 생물만(바다 생물은 C3에서 따로)
   c('riverEnd', !!S.visited.coast);
   c('openSea', !!S.visited.sea);
+  c('oceanGate', !!S.visited.ocean);
+  c('crossOcean', S.crossed != null);
 }
 
 // ── 안개 걷기 ──
@@ -1313,7 +1364,7 @@ export const SWELL_FROM = -PI / 2;
 export const swellFrom = (region) => REGIONS[region]?.wind?.from ?? SWELL_FROM;
 export const swellBeamK = (h, from = SWELL_FROM) => WEATHER.swellHead + (WEATHER.swellBeam - WEATHER.swellHead) * Math.abs(Math.sin(angDiff(h, from)));
 // 이 자리의 너울 높이(m)
-export const swellHere = (S, x = S.boat.x, y = S.boat.y) => (S.weather?.fx?.swell || 0) * W(S).swellAt(x, y);
+export const swellHere = (S, x = S.boat.x, y = S.boat.y) => (S.weather?.fx?.swell || 0) * W(S).swellAt(x, y) * (bandAt(S.region, y)?.swellK ?? 1);
 // 돛 찢어짐: 센 바람(돌풍·폭풍)에 줄임보다 더 펴고 있으면 쌓여요. 절반이면 경고, 다 차면 찢어져요. 줄이면 천천히 풀려요
 function strainSail(S, wx, dt) {
   const b = S.boat, full = clamp((b.sailNow - SAIL_LEVELS[1]) / (1 - SAIL_LEVELS[1]), 0, 1);
@@ -1471,7 +1522,8 @@ export function step(S, dt) {
   const onShoal = st.draft > depth;
   let target = Math.max(sailT, rowT) + 0.25 * Math.min(sailT, rowT);
   // 보조 기관(M2b 스쿠너): 연료 없이 느리게. 노를 젓지 않고 돛을 올렸거나 항로가 있을 때, 돛이 기관보다 약하면(바람이 죽거나 맞바람) 저절로 돌아요. 돛 힘에 더하지는 않아요
-  const engW = roleWork(S, 'engineer'), motorV = st.motor * (1 + 0.15 * engW), calmEng = engW > 0 && wx.on.includes('calm'); // 기관사: 기관 +15%, 무풍 날엔 돛보다 기관을 먼저 돌려요
+  const sun = st.solar ? 0.5 * st.solar * (wx.rain || wx.fog || S.ty?.in ? 0.5 : 1) : 0, engW = roleWork(S, 'engineer'), motorV = (st.motor + (st.motor > 0 ? sun : 0)) * (1 + 0.15 * engW), // 태양광(M4 O2): 보조 기관 +0.5m/s(2장까지), 비·해무·태풍엔 절반
+    calmEng = engW > 0 && wx.on.includes('calm'); // 기관사: 기관 +15%, 무풍 날엔 돛보다 기관을 먼저 돌려요
   const motorOn = st.motor > 0 && !b.row && (b.sailLevel > 0 || !!S.route) && sailT < motorV * (calmEng ? 1.5 : 1);
   if (motorOn) target = Math.max(target, motorV);
   if (motorOn !== !!b.motor) { b.motor = motorOn; emit(S, motorOn ? 'motorOn' : 'motorOff'); }
@@ -1551,6 +1603,13 @@ export function step(S, dt) {
   // 식수(M2a): 짠물 수역에서만 마셔요. 바닥나면 기력이 빨리 빠지고 쉬어도 안 돌아와요
   // 조수기(M2b): 짠물 바다를 항해하는 동안 식수를 만들어요(물통 칸까지)
   if (st.desal && REGIONS[S.region].salt && S.water < st.waterCap) S.water = Math.min(st.waterCap, (S.water || 0) + st.desal * DESAL.perDay * dt / CAL.day);
+  // 빗물받이(M4 O1): 비(소나기·폭풍·태풍 바깥 원)가 오는 동안 한 대당 20초마다 한 통, 물통 칸까지
+  // 무풍대를 남에서 북으로 지나기(M4 O3): 무풍대 남쪽 끝(−4,400m) 아래를 지난 배가 북쪽 끝(−7,100m)을 넘으면 도전과제
+  if (S.region === 'ocean' && !S.docked) { const by = S.boat.y; if (by > -4300) S.stats.dolSouth = 1; else if (by < -7150 && S.stats.dolSouth && !S.ach.doldrums) giveAch(S, 'doldrums'); }
+  if (st.raincatch && !S.docked && (wx.rain || S.ty?.in) && (S.water || 0) < st.waterCap) {
+    S.catchT = (S.catchT || 0) + dt * st.raincatch;
+    if (S.catchT >= 20) { S.catchT -= 20; S.water = Math.min(st.waterCap, (S.water || 0) + 1); S.stats.rainWater = (S.stats.rainWater || 0) + 1; }
+  }
   const drink = drinkPerDay(S, wx), thirsty = drink > 0 && (S.water || 0) <= 0;
   if (drink > 0 && S.water > 0) { S.water = Math.max(0, S.water - drink * dt / CAL.day); if (S.water <= 0) emit(S, 'waterOut'); }
   const med = medicK(S); // 의무원(M3 B4): 회복 ×1.5, 무더위·목마름 감소 ×0.6
@@ -1599,7 +1658,7 @@ export function serialize(S) { const { events, ...rest } = S; return JSON.string
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || ![1, 2, 3, 4, 5, 6, 7, 8].includes(o.v) || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
     // v2 → v3(S2 아이템): 목재·천은 잡목·마포로 이어 받는다. 화물칸의 금화는 창고로, 식량은 빵으로(5일 뒤 상함), 찾은 발견지의 유물을 준다
     if (o.v < 3) {
@@ -1633,11 +1692,13 @@ export function deserialize(raw) {
     // v7 → v8(M3 큰 바다): 큰 바다 경계는 이제 엔딩이 아니라 큰 바다로 가는 문이에요. 스쿠너로 그 경계에서 엔딩을 본 저장은 엔딩을 풀고 앞바다 등대섬에 대 둬요(북쪽으로 가면 큰 바다. 도전과제는 그대로라 금화는 다시 안 줘요)
     if (o.ended && o.region === 'coast') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'light'); }
     if (o.region === 'coast' && o.route?.target?.type === 'gate' && o.route.target.id === 'toOcean') o.route = null; // 옛 관문 id
+    if (o.ended && o.region === 'ocean') o.ended = false; // 새 대륙 엔딩 도중 저장했어도 불러오면 항구에서 이어가요(M4 O4)
     if (o.ended && o.region === 'sea') { o.ended = false; o.disaster = null; o.route = null; placeAtPort(o, 'depot'); } // M3 엔딩을 본 저장: 엔딩을 풀고 큰 바다 보급항에 대 둬요(M4에서 관문이 대양으로 이어져도 안전)
     o.stats.typhoons ??= 0; o.stats.typhoonHurt ??= 0; o.stats.calmDays ??= 0;
     for (const k of Object.keys(NEW_MATS)) o.res[k] ??= 0; // M3 B3 최고급 재료 5종: 창고 기본 0
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
-    o.v = 8;
+    o.crossed ??= null; o.stats.crossDays ??= 0; // v8 → v9(M4 대양): 대양 관련 값 기본
+    o.v = 9;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
     if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다

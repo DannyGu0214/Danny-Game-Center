@@ -115,7 +115,52 @@ function clockFace(g, x, y, r, a = 0.8, b = 4) {
 }
 
 // ── 쪽마다 그림 ──
+// ── M4 O4 엔딩 장면(그림 파일 assets/story/end*.webp 가 없을 때 쓰는 캔버스 대체 장면) ──
+function endSea(g, a, b, horizon) { bg(g, a, b, horizon); g.fillStyle = '#2f6f96'; g.fillRect(0, horizon, STORY_W, STORY_H - horizon); g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 1.2; g.beginPath(); for (let i = 0; i < 16; i++) { const x = rnd(i + 5) * STORY_W, y = horizon + 8 + rnd(i + 40) * (STORY_H - horizon - 12); g.moveTo(x, y); g.lineTo(x + 14 + rnd(i) * 18, y); } g.stroke(); }
+function endCoast(g, horizon) { // 새 대륙: 높은 바위 절벽과 하얀 등대, 석조 부두
+  g.fillStyle = '#7d7468'; g.beginPath(); g.moveTo(190, horizon); g.lineTo(206, horizon - 58); g.lineTo(250, horizon - 70); g.lineTo(296, horizon - 52); g.lineTo(330, horizon - 62); g.lineTo(STORY_W, horizon - 40); g.lineTo(STORY_W, horizon); g.closePath(); g.fill();
+  g.fillStyle = '#5f6b4a'; g.fillRect(206, horizon - 62, 154, 6);
+  g.fillStyle = '#f2efe6'; g.fillRect(286, horizon - 100, 11, 44); g.fillStyle = '#c9533f'; g.fillRect(285, horizon - 84, 13, 5); g.fillRect(284, horizon - 106, 15, 6);
+  glow(g, 291, horizon - 108, 26, 'rgba(255,236,160,.55)');
+  g.fillStyle = '#a79d8c'; g.fillRect(214, horizon - 10, 130, 10);
+  for (const [x, w, col] of [[222, 20, '#d98f6b'], [246, 16, '#e3c27a'], [264, 22, '#9fbfa8']]) { g.fillStyle = col; g.fillRect(x, horizon - 28, w, 18); g.fillStyle = '#7a3f31'; g.fillRect(x - 2, horizon - 31, w + 4, 4); }
+}
+function endShip(g, x, y, k) { // 돛대 셋 달린 흰 탐사선(옆모습)
+  g.save(); g.translate(x, y); g.scale(k, k);
+  g.fillStyle = '#3b2b22'; g.beginPath(); g.moveTo(-60, -12); g.lineTo(62, -12); g.lineTo(50, 8); g.lineTo(-48, 8); g.closePath(); g.fill();
+  g.fillStyle = '#f1eee4'; g.fillRect(-18, -26, 36, 14); g.fillStyle = '#c9533f'; g.fillRect(8, -36, 5, 10);
+  for (const [mx, h] of [[-38, 62], [-4, 74], [30, 58]]) { g.fillStyle = '#5a3a1e'; g.fillRect(mx - 1, -12 - h, 2.2, h); g.fillStyle = '#fbf3df'; g.beginPath(); g.moveTo(mx + 2, -10 - h + 6); g.lineTo(mx + 26, -16); g.lineTo(mx + 2, -16); g.closePath(); g.fill(); g.beginPath(); g.moveTo(mx - 2, -10 - h + 10); g.lineTo(mx - 20, -18); g.lineTo(mx - 2, -18); g.closePath(); g.fill(); }
+  g.restore();
+}
 const SCENES = {
+  endArrival(g) { endSea(g, '#f6c68a', '#fbe6b8', 150); glow(g, 70, 120, 90, 'rgba(255,230,170,.7)'); endCoast(g, 150); endShip(g, 112, 176, 1.15); },
+  // 우편 기수: 부두 우체통에 편지를 부쳐요
+  endSailor(g, C) { endSea(g, '#f4c58f', '#fbe2b2', 140); endCoast(g, 140); g.fillStyle = '#8c7a62'; g.fillRect(0, 168, STORY_W, 82); g.fillStyle = '#b9a98f'; for (let x = 0; x < STORY_W; x += 36) g.fillRect(x, 168, 34, 5);
+    g.fillStyle = '#c9533f'; rr(g, 214, 140, 26, 36, 5); g.fillStyle = '#3b2b22'; g.fillRect(220, 150, 14, 3); person(g, C, 170, 232, 1.9, { cap: true, arm: [14, -30], arm2: [-8, -20] });
+    g.save(); g.translate(194, 190); g.rotate(-0.25); g.fillStyle = '#f7f0dc'; g.fillRect(0, 0, 16, 11); g.strokeStyle = '#c9533f'; g.strokeRect(0, 0, 16, 11); g.restore(); },
+  // 운빨: 선실 탁자 위 해도의 빈칸을 채워요
+  endLucky(g, C) { bg(g, '#4a3626', '#2e2118'); g.fillStyle = '#6b4a2e'; g.fillRect(0, 168, STORY_W, 82); glow(g, 180, 110, 150, 'rgba(255,214,140,.45)');
+    g.fillStyle = '#efe0b8'; g.beginPath(); g.moveTo(72, 178); g.lineTo(296, 178); g.lineTo(318, 232); g.lineTo(50, 232); g.closePath(); g.fill();
+    g.fillStyle = '#6aa6c4'; g.fillRect(100, 190, 140, 34); g.fillStyle = '#c9b88a'; g.beginPath(); g.moveTo(240, 192); g.lineTo(290, 190); g.lineTo(296, 216); g.lineTo(244, 224); g.closePath(); g.fill();
+    g.strokeStyle = '#8a3a2b'; g.lineWidth = 2; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(244, 200); g.lineTo(270, 196); g.lineTo(288, 208); g.stroke(); g.setLineDash([]);
+    person(g, C, 150, 176, 1.9, { arm: [34, 14], arm2: [-10, -20] }); g.strokeStyle = '#e6c46a'; g.lineWidth = 3; g.beginPath(); g.moveTo(186, 192); g.lineTo(200, 184); g.stroke(); },
+  // 거래술: 부두 시장에서 저울을 놓고 흥정
+  endTrader(g, C) { bg(g, '#f6c98c', '#fbe3b4', 150); g.fillStyle = '#a79d8c'; g.fillRect(0, 160, STORY_W, 90);
+    g.fillStyle = '#c9533f'; g.beginPath(); g.moveTo(190, 70); g.lineTo(350, 70); g.lineTo(340, 102); g.lineTo(200, 102); g.closePath(); g.fill(); g.fillStyle = '#f2efe6'; for (let x = 200; x < 340; x += 28) g.fillRect(x, 70, 14, 30);
+    g.fillStyle = '#7a5a3a'; g.fillRect(196, 102, 6, 66); g.fillRect(338, 102, 6, 66); g.fillRect(190, 150, 160, 12);
+    for (const [x, col] of [[214, '#e36a45'], [240, '#e9c14a'], [266, '#8fbf5a'], [292, '#b86bc2']]) { g.fillStyle = col; g.beginPath(); g.arc(x, 144, 10, 0, TAU); g.fill(); }
+    g.strokeStyle = '#3b2b22'; g.lineWidth = 2; g.beginPath(); g.moveTo(130, 120); g.lineTo(130, 150); g.moveTo(104, 132); g.lineTo(156, 132); g.stroke(); g.fillStyle = '#c9a24a'; g.beginPath(); g.arc(104, 138, 8, 0, Math.PI); g.arc(156, 134, 8, 0, Math.PI); g.fill();
+    person(g, C, 90, 232, 1.9, { apron: '#f4ead0', arm: [30, -24], arm2: [12, -26] }); person(g, { ...C, coat: '#6b7fb0', hair: '#3a2c24' }, 262, 232, 1.8, { arm: [-18, -26] }); },
+  // 기능공: 손주에게 쓰는 편지와 공구 가방
+  endCrafter(g, C) { endSea(g, '#f2b77a', '#f8dfae', 150); endShip(g, 262, 150, 0.7); g.fillStyle = '#8c7a62'; g.fillRect(0, 176, STORY_W, 74);
+    g.fillStyle = '#7a5a3a'; g.fillRect(34, 178, 5, 44); g.fillRect(104, 178, 5, 44); g.fillRect(30, 172, 84, 9); g.fillStyle = '#f7f0dc'; g.fillRect(48, 164, 40, 12);
+    g.fillStyle = '#6b4a2e'; rr(g, 196, 206, 40, 22, 4); g.fillStyle = '#c9a24a'; g.fillRect(206, 203, 20, 5); g.fillStyle = '#9aa5ad'; g.fillRect(238, 214, 14, 3); g.fillRect(246, 206, 3, 14);
+    person(g, C, 150, 236, 1.95, { arm: [-26, -30], arm2: [-14, -22] }); },
+  // 모두 함께: 갑판에서 새 대륙을 올려다봐요(해 질 녘)
+  endCrew(g, C) { endSea(g, '#e98a54', '#f6d39a', 140); glow(g, 80, 138, 110, 'rgba(255,216,150,.7)'); endCoast(g, 140);
+    g.fillStyle = '#6b4a2e'; g.fillRect(0, 196, STORY_W, 54); g.fillStyle = '#8c6a44'; g.fillRect(0, 196, STORY_W, 6); g.fillStyle = '#4b3422'; g.fillRect(0, 214, STORY_W, 3);
+    for (const [x, c2] of [[80, '#c9533f'], [140, '#5f8f6a'], [210, '#d1a24a'], [268, '#6b7fb0']]) person(g, { ...C, coat: c2, hair: ['#3a2c24', '#2a2320', '#8a5a2b', '#1b1b1b'][Math.round(x) % 4] }, x, 236, 1.5, { flip: x < 150, arm: [16, -30] });
+    person(g, C, 176, 240, 1.9, { cap: true, arm: [16, -34], arm2: [-8, -22] }); },
   // 우편 기수: 비 오는 밤의 항구 도시
   ride(g, C) {
     bg(g, '#0b1729', '#2b3257', 190);

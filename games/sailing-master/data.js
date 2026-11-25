@@ -117,8 +117,8 @@ const schooner = { id: 'schooner', kind: 'schooner', star: 1, grade: 4, name: '�
 const schooner2 = star2(schooner, { len: 16.5, beam: 4.4, rows: 16, x0: 6.7, rowOff: 0, buoy: 220, crew: 7, helmX: -6.9, cockpit: [-7.7, -6.2], engineAt: [-5.3, 0.9], price: { oak: 90, canvas: 50, plate: 16, coin: 160 } });
 // 5등급 대양 탐사선(M3 B5, PLAN-M3.md 6절): 22~27m, 돛대 셋(maxMasts 3), 보조 기관 4.2m/s(연료 없음), 흘수 1.3m라 강·호수 여울엔 못 들어가요(관문 maxGrade 4).
 // 큰 섬 보급항(조선소 5등급)에서 옛 탐험대 난파선 설계도로 지어요. bridge(★3 항해 함교): 예보 +2일, 선장이 조타 자리에서 돛을 바꿔요(돛대까지 안 걸어요)
-const explorer = { id: 'explorer', kind: 'explorer', star: 1, grade: 5, name: '대양 탐사선', len: 22, beam: 5.8, deck: 1.8, cols: 6, rows: 21, cell: 0.9, x0: 10.4, drag: 1.1, row: 2, turn: 0.3, stability: 2.4, buoy: 420, draft: 1.3, crew: 12, minCrew: 6, foodBase: 24, holdBase: 80, waterBase: 20, helmX: -9, cockpit: [-10.2, -7.8], engineAt: [-8.4, 0.9], hp: 400, yard: 5, speed: 1.7, motor: 4.2, maxMasts: 3, sprit: 2.6, blueprint: 'explorer', price: { teak: 36, synth: 18, steel: 7, syrope: 9, chip: 2, coin: 120 } };
-const explorer2 = star2(explorer, { len: 27, beam: 6, rows: 28, x0: 12.9, rowOff: 2, buoy: 520, crew: 14, helmX: -11.5, cockpit: [-12.7, -10.3], engineAt: [-10.9, 0.9], price: { teak: 140, synth: 60, steel: 20, coin: 320 } });
+const explorer = { id: 'explorer', kind: 'explorer', star: 1, grade: 5, name: '대양 탐사선', len: 22, beam: 5.8, deck: 1.8, cols: 6, rows: 21, cell: 0.9, x0: 10.4, drag: 1.1, row: 2, turn: 0.3, stability: 2.4, buoy: 420, draft: 1.3, crew: 12, minCrew: 6, foodBase: 24, holdBase: 80, waterBase: 20, helmX: -9, cockpit: [-10.2, -7.8], engineAt: [-8.4, 0.9], bridgeAt: [8.5, 0], hp: 400, yard: 5, speed: 1.7, motor: 4.2, maxMasts: 3, sprit: 2.6, blueprint: 'explorer', price: { teak: 36, synth: 18, steel: 7, syrope: 9, chip: 2, coin: 120 } };
+const explorer2 = star2(explorer, { len: 27, beam: 6, rows: 28, x0: 12.9, rowOff: 2, buoy: 520, crew: 14, helmX: -11.5, cockpit: [-12.7, -10.3], engineAt: [-10.9, 0.9], bridgeAt: [11, 0], price: { teak: 140, synth: 60, steel: 20, coin: 320 } });
 export const HULLS = {
   raft, raft2,
   raft3: star3(raft2, { row: raft2.row * 1.15, price: { wood: 18, cloth: 4 }, perk: '노걸이 보강', perkDesc: '노 속도 +15%' }),
@@ -163,14 +163,18 @@ export const MODULES = {
   barometer: { name: '기압계', icon: '🌡', fam: 'watch', mk: 1, seat: 'weather', w: 1, h: 1, kg: 1, z: 0.8, color: '#c9c3a8', cost: { coin: 25 }, desc: '예보 +2일', need: { blueprint: 'barometer' } },
   // 뒤 공간에서 여는 모듈: 표에만 두고 잠가 둬요(PLAN-M1.5.md 3-3절)
   // M2b: 스쿠너(4등급)부터 여는 모듈. 타륜은 키를 30% 잘 듣게 하고(큰 배는 키가 무거워요), 주돛대는 앞돛대(돛대)와 함께 돛대 둘을 이뤄요
+  // M4 O2: 자동 조타(조타 Mk3)와 태양광 패널. 자동 조타는 사람 없이 항로를 지켜 선장이 키를 떠나도 돼요. 태양광은 보조 기관을 +0.5m/s(2장까지), 비·해무·태풍엔 절반
+  autohelm: { name: '자동 조타', icon: '🧭', fam: 'helm', mk: 3, w: 1, h: 1, kg: 3, z: 0.8, color: '#b08d4a', cost: { steel: 4, chip: 2 }, desc: '사람 없이 항로를 지켜! 선장이 키를 떠나도 배는 안 헤맨다고', need: { grade: 5 }, autohelm: true },
+  solar: { name: '태양광 패널', icon: '☀️', fam: 'power', mk: 1, w: 2, h: 1, kg: 3, z: 0.25, color: '#2f4f7a', cost: { chip: 2, steel: 2, synth: 4 }, desc: '보조 기관이 +0.5m/s! 두 장까지. 비·안개엔 절반이야', need: { grade: 5 } },
   wheel: { name: '타륜', icon: '☸️', fam: 'helm', mk: 2, seat: 'helm', w: 1, h: 1, kg: 2, z: 0.9, color: '#6b4a2e', cost: { oak: 6, plate: 2, gear: 1 }, desc: '큰 배는 타륜으로 몬다! 키가 30% 잘 듣는다고', need: { grade: 4 }, turnK: 1.3 },
-  autohelm: { name: '자동 조타', icon: '🧭', fam: 'helm', mk: 3, seat: 'helm', w: 1, h: 1, kg: 2, z: 0.6, color: '#5a6a72', cost: {}, desc: '사람 없이 항로를 지킨다. 대양 탐사선', need: { grade: 5 }, future: true },
   // M3 B5: 큰 주돛대(대양 탐사선). 큰 주돛대 + 주돛대 + 돛대 = 돛 약 3.6(가장 큰 돛 + 나머지 × 0.85)
   mast_l: { name: '큰 주돛대', icon: '⛵', fam: 'sail', mk: 4, seat: 'sail', w: 1, h: 2, kg: 20, z: 0.3, color: '#6b4a2e', cost: { teak: 5, synth: 7, syrope: 2, steel: 1, coin: 9 }, desc: '탐사선의 가장 큰 돛대! 돛 셋을 세우면 바람을 세 번 먹지', need: { grade: 5 }, sail: 1.6, mastH: 19, boom: 6.5 },
   mast_d: { name: '주돛대', icon: '⛵', fam: 'sail', mk: 3, seat: 'sail', w: 1, h: 2, kg: 14, z: 0.25, color: '#6b4a2e', cost: { oak: 14, canvas: 20, tar: 6, plate: 3, coin: 15 }, desc: '스쿠너의 큰 돛대! 앞돛대(돛대)랑 둘을 세우면 바람을 두 배로 먹지', need: { grade: 4 }, sail: 1.35, mastH: 15.5, boom: 5.6 },
   oar2: { name: '큰 노 자리', icon: '🚣', fam: 'oar', mk: 2, seat: 'oar', w: 1, h: 1, kg: 2, z: 0.12, color: '#7a4e2c', cost: {}, desc: '둘이 젓는 큰 노', need: { grade: 4 }, future: true },
   water: { name: '물통', icon: '🛢', fam: 'supply', mk: 1, w: 1, h: 1, kg: 4, z: 0.5, color: '#4a7f95', cost: { wood: 8, nail: 2 }, desc: '식수 4통! 짠물 바다에선 이게 목숨이라고', need: { grade: 3, region: 'coast' } },
   // 조수기(M2b): 바닷물을 끓여 식수로. 앞바다 발견지(바다 동굴)에서 설계도를 얻어요. 짠물 바다를 항해하는 동안 하루 DESAL.perDay통
+  // M4 O1: 빗물받이. 비(소나기·폭풍·태풍 바깥 원)가 오는 동안 20초마다 식수 1통(물통 칸까지). 한 칸이라 여럿 달 수 있어요
+  raincatch: { name: '빗물받이', icon: '🌧', fam: 'supply', mk: 1, w: 1, h: 1, kg: 2, z: 0.6, color: '#cfc7b0', cost: { synth: 6, syrope: 2 }, desc: '비가 오면 식수를 받아! 20초에 한 통', need: { grade: 5 } },
   desal: { name: '조수기', icon: '⚗️', fam: 'supply', mk: 2, w: 1, h: 1, kg: 3, z: 0.75, color: '#7a8e96', cost: { plate: 3, gear: 1, nail: 4 }, desc: '바닷물을 끓여 식수로! 항해하는 동안 하루 두 통', need: { grade: 3, blueprint: 'desal' } },
   // M3 B4: 휴게실(쉼 자리 2, 사기 회복 ×2)·조리실(요리사 자리, 식량 소비 ×0.9)·의무실(의무원 자리)·측후소(예보 +4일, 설계도는 버려진 측후소)
   lounge: { name: '휴게실', icon: '🛋', fam: 'rest', mk: 3, seat: 'rest', seats: 2, w: 2, h: 2, kg: 6, z: 0.8, color: '#e8dcc2', cost: { oak: 16, canvas: 8, coin: 20 }, desc: '쉼 자리 둘! 쉬는 동안 사기가 두 배로 돌아와', need: { grade: 4 } },
@@ -195,11 +199,12 @@ export const ROLES = {
   engineer: { name: '기관사', icon: '⚙️', seat: 'engine', desc: '보조 기관을 15% 더 돌리고, 무풍 날엔 돛보다 기관을 먼저 돌려', brief: '바람이 죽어도 내가 배를 밀지!', hire: 30, wage: 3, region: 'coast', grade: 4, z: 1 },
   bosun: { name: '갑판장', icon: '📯', seat: 'sail', desc: '갑판원 효과 +25%, 돌풍·태풍 예고에 곧바로 돛을 줄이고, 돛 바꾸는 시간이 절반', brief: '돛줄은 내가 쥐고 있지!', hire: 30, wage: 3, region: 'coast', grade: 4, z: 1 },
   medic: { name: '의무원', icon: '⚕', seat: 'medic', desc: '기력이 1.5배 빨리 돌아오고, 무더위·목마름에 덜 지치고, 선원 피로도 빨리 풀어 줘', brief: '아픈 사람은 내게 맡겨!', hire: 30, wage: 3, region: 'sea', grade: 4, z: 1 },
-  weather: { name: '기상사', icon: '📡', seat: 'weather', desc: '예보 기간·정확도', hire: 35, wage: 4, region: 'river', grade: 5, future: true },
-  mate: { name: '일등 항해사', icon: '🧭', seat: 'bridge', desc: '선장 대리, 다른 선원 지휘', hire: 50, wage: 6, region: 'river', grade: 5, future: true },
+  // M4 O2: 뒤 공간 역할 둘을 열어요(PLAN-M3.md 8-1절)
+  weather: { name: '기상사', icon: '📡', seat: 'weather', desc: '측후소·기압계 자리에서 예보를 하루 더 보고, 태풍 예상 경로를 하루 전부터 해도에 그려 줘', brief: '구름만 봐도 태풍이 어디로 오는지 알지!', hire: 35, wage: 3, region: 'sea', grade: 5, z: 1 },
+  mate: { name: '일등 항해사', icon: '🧭', seat: 'bridge', desc: '함교 자리에서 다른 선원 효과 +10%, 선원 피로 −20%, 선장이 키를 떠나도 조타수 몫을 해', brief: '선장님, 키는 제게 맡기세요!', hire: 50, wage: 4, region: 'sea', grade: 5, z: 1 },
 };
 // 자리 이름(선원 탭 평면도). helm은 모든 배의 고물에 있고, rest는 해먹·선실이에요
-export const SEATS = { helm: '조타', oar: '노', sail: '돛', look: '견시', fish: '어망', carpenter: '수리대', rest: '쉼', weather: '기상', engine: '기관', cook: '조리', medic: '의무' };
+export const SEATS = { helm: '조타', oar: '노', sail: '돛', look: '견시', fish: '어망', carpenter: '수리대', rest: '쉼', weather: '기상', engine: '기관', cook: '조리', medic: '의무', bridge: '함교' };
 // 특성: 사람마다 하나
 export const TRAITS = {
   diligent: { name: '부지런함', desc: '피로가 30% 덜 쌓여' },
@@ -247,27 +252,38 @@ export const STORIES = {
   ] },
 };
 
+// 엔딩 이야기(M4 O4, PLAN-M3.md 8-5절): 새 대륙 항구에 처음 닿을 때 3쪽. 1·3쪽은 공통, 2쪽은 선장별. 글은 초안이라 대니님 확인이 필요해요
+export const ENDINGS = {
+  arrival: { title: '새 대륙', scene: 'endArrival', text: '안개가 걷히던 아침, 돛대 위 견시가 소리쳤어요. “육지다!”\n수평선 위로 높은 바위 절벽과 하얀 등대가 떠올랐어요. {N은} 키를 쥔 채 한참 말이 없었어요. 갈대 나루의 뗏목 한 척, 노 한 쌍에서 여기까지 온 길이었어요.\n탐사선이 석조 부두에 닿자 종탑이 울렸어요. 건너편 사람들이 손을 흔들며 달려 나왔지요. 길고 긴 대양을 정말로 건넌 거예요!' },
+  captain: {
+    sailor: { title: '가장 먼 곳에서 온 편지', scene: 'endSailor', text: '{N은} 새 대륙 우체국을 찾아가 편지지를 샀어요. 우편 기수 시절엔 남의 편지만 날랐지요. 이번엔 자기 편지예요.\n‘어머니, 조금 멀리 편지 전하러 왔어요. 생각보다 많이 멀지만 배는 튼튼하고 밥도 잘 먹고 있어요.’\n소인을 찍어 주던 우체국 아저씨가 고개를 끄덕였어요. “이 항구에서 부치는 첫 편지가 되겠구먼.” 우편 가방은 반납했지만, {N은} 끝내 가장 먼 곳까지 편지를 전한 기수가 됐어요.' },
+    lucky: { title: '빈칸을 채우다', scene: 'endLucky', text: '{N은} 궤짝에서 나온 낡은 해도를 선실 탁자에 펼쳤어요. 가운데는 바다, 맨 위쪽은 늘 비어 있던 빈칸이었지요. 펜을 들고 새 대륙의 해안선을 한 줄 한 줄 그려 넣었어요. 이름 없는 절벽 옆에는 작은 글씨로 ‘찾았다’ 하고 썼어요.\n유실물 창고 보관증은 아직 주머니에 있었어요. “주인을 찾았네.” 궤짝은 주인을 기다린 게 아니라, 이 빈칸을 채울 사람을 기다렸는지도 몰라요.' },
+    trader: { title: '처음 해 보는 장사', scene: 'endTrader', text: '부두 시장에서 처음 보는 열매를 파는 아주머니가 손짓했어요. 향신료 장사 서른 해의 눈이 번쩍했지요. {N은} 저울을 꺼내 한참 흥정했어요. 말은 안 통해도 손가락 셈은 어느 나라에서나 같았어요.\n결국 에누리 없이 제값을 주고 샀어요. 평생 처음 있는 일이었지요. “이 맛에 장사하는 거지!” 짐칸에는 이 대륙에 팔 향신료가 가득해요.' },
+    crafter: { title: '진짜 배', scene: 'endCrafter', text: '{N은} 부두 우체통 앞에서 편지를 썼어요.\n‘손주야, 할아버지는 진짜 배를 타고 바다를 다 건넜단다. 대야에 띄우던 배보다 훨씬 크고 돛대가 셋이야. 돌아가면 고물부터 구경시켜 줄게.’\n공구 가방은 한 번도 닫혀 있지 못했어요. 대양을 건너는 동안 고친 곳이 열 군데도 넘었으니까요. 시계공의 손은 이제 배의 톱니도 다룰 줄 알아요.' },
+  },
+  crew: { title: '계속되는 항해', scene: 'endCrew', text: '선원들이 갑판에 모여 새 대륙을 올려다봤어요. 누가 먼저랄 것 없이 웃음이 터졌어요.\n“선장, 이제 어디로 가나?” “글쎄, 저 절벽 너머도 궁금하지 않아?”\n이야기는 여기서 끝나지만 항해는 계속돼요. 바다는 아직 넓고, 배는 튼튼하고, 돛은 바람을 기다려요.' },
+};
 
 // 자원. 항해 중엔 화물칸에 담고, 입항하면 창고로 옮겨요
 // 아이템(S2, 2026-11-08). kind: mat 재료 · trade 교역품 · coin 돈. 재료는 계열(fam)과 등급(tier)이 있고, 고급 재료는 뒤 공간에서 나와요.
 // id wood·cloth는 옛 저장의 목재·천을 그대로 잡목·마포로 이어 받으려고 남겨 둔 이름이에요. vol: 화물칸 부피, sell: 항구에서 1개 팔 때 금화
 export const ITEMS = {
   wood: { name: '잡목', icon: '🪵', kind: 'mat', fam: 'wood', tier: 1, vol: 1, sell: 0.5, buy: 2, buyAt: 'coast' },
-  oak: { name: '참나무', icon: '🌳', kind: 'mat', fam: 'wood', tier: 2, vol: 1, sell: 1.5, buy: 5, buyAt: 'coast' },
+  oak: { name: '참나무', icon: '🌳', kind: 'mat', fam: 'wood', tier: 2, vol: 1, sell: 1.5, buy: 5, buyAt: ['coast', 'ocean'] },
   cloth: { name: '마포', icon: '🧵', kind: 'mat', fam: 'cloth', tier: 1, vol: 1, sell: 1 },
-  canvas: { name: '범포', icon: '🏳', kind: 'mat', fam: 'cloth', tier: 2, vol: 1, sell: 2.5, buy: 6, buyAt: 'coast' },
+  canvas: { name: '범포', icon: '🏳', kind: 'mat', fam: 'cloth', tier: 2, vol: 1, sell: 2.5, buy: 6, buyAt: ['coast', 'ocean'] },
   hemp: { name: '삼 밧줄', icon: '🪢', kind: 'mat', fam: 'rope', tier: 1, vol: 1, sell: 1, buy: 3 },
   tar: { name: '타르 밧줄', icon: '➰', kind: 'mat', fam: 'rope', tier: 2, vol: 1, sell: 2.5 },
   nail: { name: '쇠못', icon: '📌', kind: 'mat', fam: 'metal', tier: 1, vol: 1, sell: 1.5, buy: 4 },
   // M2b 앞바다부터: 철판(금속 고급, 쇠못 3개로 공방에서도 만들어요)·톱니·베어링(기계 부품, 스쿠너 보조 기관). buyAt: 그 수역 항구에서만 사요(앞바다 항구는 참나무·범포·철판도 팔아요: 교역으로 번 금화가 배가 돼요)
-  plate: { name: '철판', icon: '🔳', kind: 'mat', fam: 'metal', tier: 2, vol: 1, sell: 4, buy: 10, buyAt: 'coast' },
-  gear: { name: '톱니·베어링', icon: '⚙️', kind: 'mat', fam: 'mech', tier: 2, vol: 1, sell: 6, buy: 16, buyAt: 'coast' },
+  plate: { name: '철판', icon: '🔳', kind: 'mat', fam: 'metal', tier: 2, vol: 1, sell: 4, buy: 10, buyAt: ['coast', 'ocean'] },
+  gear: { name: '톱니·베어링', icon: '⚙️', kind: 'mat', fam: 'mech', tier: 2, vol: 1, sell: 6, buy: 16, buyAt: ['coast', 'ocean'] },
   // M3 B3 큰 바다부터: 최고급 5종(3등급). buyAt: 큰 바다 항구에서 사요(재료 가게가 없는 shop:false 항구는 빼요). buyPort: 그 항구에서만(전자 부품은 보급항만, 공방으로 못 만들어요)
-  teak: { name: '티크', icon: '🌲', kind: 'mat', fam: 'wood', tier: 3, vol: 1, sell: 4, buy: 12, buyAt: 'sea' },
-  synth: { name: '합성 돛천', icon: '🪁', kind: 'mat', fam: 'cloth', tier: 3, vol: 1, sell: 6, buy: 16, buyAt: 'sea' },
-  syrope: { name: '합성 로프', icon: '➿', kind: 'mat', fam: 'rope', tier: 3, vol: 1, sell: 5, buy: 14, buyAt: 'sea' },
-  steel: { name: '강판', icon: '⬛', kind: 'mat', fam: 'metal', tier: 3, vol: 1, sell: 8, buy: 22, buyAt: 'sea' },
-  chip: { name: '전자 부품', icon: '🔌', kind: 'mat', fam: 'mech', tier: 3, vol: 1, sell: 12, buy: 40, buyAt: 'sea', buyPort: 'depot' },
+  teak: { name: '티크', icon: '🌲', kind: 'mat', fam: 'wood', tier: 3, vol: 1, sell: 4, buy: 12, buyAt: ['sea', 'ocean'] },
+  synth: { name: '합성 돛천', icon: '🪁', kind: 'mat', fam: 'cloth', tier: 3, vol: 1, sell: 6, buy: 16, buyAt: ['sea', 'ocean'] },
+  syrope: { name: '합성 로프', icon: '➿', kind: 'mat', fam: 'rope', tier: 3, vol: 1, sell: 5, buy: 14, buyAt: ['sea', 'ocean'] },
+  steel: { name: '강판', icon: '⬛', kind: 'mat', fam: 'metal', tier: 3, vol: 1, sell: 8, buy: 22, buyAt: ['sea', 'ocean'] },
+  chip: { name: '전자 부품', icon: '🔌', kind: 'mat', fam: 'mech', tier: 3, vol: 1, sell: 12, buy: 40, buyAt: ['sea', 'ocean'], buyPort: 'depot' },
   coffee: { name: '커피', icon: '☕', kind: 'trade', vol: 1, price: 8 },
   spice: { name: '향신료', icon: '🌶', kind: 'trade', vol: 1, price: 14 },
   porcelain: { name: '도자기', icon: '🏺', kind: 'trade', vol: 1, price: 22 },
@@ -330,6 +346,15 @@ export const SPECIES = {
   frigatebird: { name: '군함조', kind: 'bird', region: 'sea', color: '#1e2326', pouch: '#d6402f', wing: 2, high: true, sea: true },
   shearwater: { name: '슴새', kind: 'bird', region: 'sea', color: '#4a5058', wing: 1.2, low: true, sea: true },
   coconutcrab: { name: '야자집게', kind: 'crab', region: 'sea', color: '#7a4f3a', size: 1.6, sea: true },
+  // M4 O3 대양 생물 8종(PLAN-M3.md 8-3절). sea: true는 민물 도감(speciesAll)에서 빼려는 표시예요
+  humpback: { name: '혹등고래', kind: 'whale', region: 'ocean', color: '#34495a', belly: '#d7dee2', size: 1.6, head: 'hump', sea: true },
+  spermwhale: { name: '향유고래', kind: 'whale', region: 'ocean', color: '#56606a', belly: '#c9d0d4', size: 1.5, head: 'blunt', sea: true },
+  bluewhale: { name: '대왕고래', kind: 'whale', region: 'ocean', color: '#4c6c86', belly: '#cfe0ea', size: 2.6, head: 'hump', rare: 0.25, sea: true },
+  commondolphin: { name: '참돌고래 떼', kind: 'dolphin', region: 'ocean', color: '#5f7a8d', belly: '#e8eef0', size: 0.9, group: 5, sea: true },
+  sunfish: { name: '개복치', kind: 'sunfish', region: 'ocean', color: '#a9b4ba', size: 1.2, sea: true },
+  petrel: { name: '바다제비', kind: 'bird', region: 'ocean', color: '#2e343a', wing: 0.8, low: true, sea: true },
+  penguin: { name: '펭귄', kind: 'penguin', region: 'ocean', color: '#20262b', belly: '#f3f2ee', size: 1, berg: true, sea: true },
+  shearflock: { name: '슴새 떼', kind: 'bird', region: 'ocean', color: '#4a5058', wing: 1.2, low: true, group: 4, sea: true },
 };
 
 // theme: 풍경 테마 이름(themes.js THEMES)
@@ -439,7 +464,7 @@ export const REGIONS = {
   // M3 B0 큰 바다(2026-11-23, PLAN-M3.md 2절): 섬만 뭍이고 네 끝이 모두 경계예요. 큰 섬의 보급항이 중간 기점(5등급 조선소), 북쪽 끝은 대양 어귀(5등급 관문)
   // shape.kind 'isles': 섬(islands)은 해안선 혹 bumps [각도(도), 폭(rad), 높이(m, 음수면 만)]를 받아요. 발견지 셋은 자리 표시용 임시예요(B3에서 열 곳으로 늘려요)
   sea: {
-    id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, wageK: 0.5, tide: true, edgeFog: 120,
+    id: 'sea', name: '큰 바다', order: 4, grade: 4, theme: 'sea', yard: 4, zoom: 5.5, salt: true, wageK: 0.5, tide: true, edgeFog: 120, fast: true,
     wind: { from: -80 * D, speed: 11, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['typhoon', 'storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
     swell: { base: 1.3, day: 0.4, gust: 0.4, storm: 1.2 },
     // swell(shape): 항구 둘레 calmR m 안은 너울 × calmK(그 밖은 어디나 1). currents(M3 B1): 조류 선분 [x0, y0, x1, y1, 폭 m, 세기 m/s]
@@ -454,7 +479,7 @@ export const REGIONS = {
     lights: [{ x: -200, y: 1322, r: 300 }, { x: 900, y: -1200, r: 260, find: 'farLight' }], // 무인 등대(farLight) 불빛
     start: 'southLight',
     ports: [{ id: 'southLight', name: '남쪽 등대 항', x: -200, y: 1322, water: 2 }, { id: 'depot', name: '큰 섬 보급항', x: 300, y: -40, water: 1, yard: 5 }, { id: 'palm', name: '야자섬 나루', x: -1130, y: 500, water: 3, shop: false }, { id: 'rockVillage', name: '바위섬 어촌', x: -1380, y: -800, water: 2 }],
-    gates: [{ id: 'toCoast', name: '남쪽 물목', x: 0, y: 1560, to: 'coast', entry: 'light', req: {}, open: true }, { id: 'toOcean', name: '대양 어귀', x: 0, y: -1560, to: null, req: { grade: 5 }, open: true }],
+    gates: [{ id: 'toCoast', name: '남쪽 물목', x: 0, y: 1560, to: 'coast', entry: 'light', req: {}, open: true }, { id: 'toOcean', name: '대양 어귀', x: 0, y: -1560, to: 'ocean', entry: 'lastLight', req: { grade: 5 }, open: true }],
     // 발견지 10곳(M3 B3, PLAN-M3.md 4-2절). 좌표는 기본 자리이고 2등급 이상 맵은 판마다 randomFinds가 다시 골라요(경계 70m 안은 빼요). fixed는 자리가 고정(작은 섬 위의 등대)
     finds: [
       { id: 'volcanoRim', name: '화산 분화구 전망대', x: 1400, y: 520, inland: 40, coin: 90, steel: 6, relic: '흑요석 조각', art: 'volcano' },
@@ -473,8 +498,39 @@ export const REGIONS = {
     flot: { cap: 36, table: [['wood', 1, 3, 6], ['oak', 1.5, 2, 5], ['teak', 0.8, 1, 3], ['net', 2, 3, 6], ['syrope', 0.8, 1, 3], ['plate', 1, 1, 2], ['steel', 0.4, 1, 2], ['gear', 0.5, 1, 1], ['water', 3, 2, 3], ['shiny', 6, 1, 2]] },
     trade: [['porcelain', 3], ['silk', 4], ['painting', 1.2], ['spice', 2]], demand: ['spice', 'silk'],
   },
+  // M4 O0 대양(2026-11-24, PLAN-M3.md 7절): 남북으로 긴 바다 한 장(1.8 × 12.4km). 동·서·남 끝은 안개 경계, 북쪽은 새 대륙 해안선(shape.north).
+  // 항구 넷: 마지막 등대(남) · 산호섬 둘(−4,000, −6,500: 둘째는 무풍대 한가운데라 구간이 2.5km예요) · 새 대륙 항구(북, 처음 닿으면 엔딩은 O4). 바람 띠·무풍대는 O1, 대양 태풍은 O2, 발견지·생물은 O3
+  ocean: {
+    id: 'ocean', name: '대양', order: 5, grade: 5, theme: 'ocean', yard: 5, zoom: 5.5, salt: true, wageK: 0.5, tide: false, edgeFog: 150, fast: true,
+    wind: { from: 45 * D, speed: 10, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['typhoon', 'storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
+    swell: { base: 1.8, day: 0.5, gust: 0.4, storm: 1.3 },
+    // 바람 띠(M4 O1, PLAN-M3.md 7-2절): 배 y로 골라요(경계 300m씩 섞어요). 무풍대는 지도에 고정(calm)이라 해도에 빗금 띠로 늘 보여요. from은 바람이 오는 쪽(동 0°·남 90°), swellK는 너울 배율
+    windBands: [{ id: 'trade', name: '무역풍', y0: 400, y1: -4400, from: 45 * D, speed: 10, swing: 0.4, swellK: 1 }, { id: 'doldrums', name: '무풍대', y0: -4400, y1: -7100, from: 100 * D, speed: 1.5, swing: 1.4, swellK: 0.5, calm: true }, { id: 'westerlies', name: '편서풍', y0: -7100, y1: -12800, from: 180 * D, speed: 13, swing: 0.35, swellK: 1.2, gusty: 1 }],
+    shape: { kind: 'isles', x0: -900, x1: 900, y0: -12400, y1: 400, cell: 16, nav: 24, ty: [-10500, -1500], swell: { calmR: 180, calmK: 0.3 }, north: { base: -11600, bumps: [[-500, 220, 120], [300, 160, -90], [650, 200, 70]], wig: [[14, 160, 0.4], [7, 55, 1.7]] } },
+    currents: [],
+    islands: [{ x: 0, y: 285, r: 34, ph: 1.1 }, { x: -250, y: -4000, r: 100, ph: 2.3 }, { x: 300, y: -6500, r: 110, ph: 4.1 }],
+    lights: [{ x: 0, y: 252, r: 320 }],
+    start: 'lastLight',
+    ports: [{ id: 'lastLight', name: '마지막 등대', x: 0, y: 252, water: 2 }, { id: 'atollA', name: '첫째 산호섬 나루', x: -250, y: -3893, water: 3, shop: false }, { id: 'atollB', name: '둘째 산호섬 나루', x: 300, y: -6388, water: 3, shop: false }, { id: 'newLand', name: '새 대륙 항구', x: 0, y: -11570, water: 2, yard: 5 }],
+    gates: [{ id: 'toSea', name: '남쪽 물목', x: 0, y: 360, to: 'sea', entry: 'depot', req: {}, open: true }],
+    // M4 O3 발견지 8곳(PLAN-M3.md 8-2절). 자리는 모두 정해져 있어요(fixed): 띠마다 어울리는 곳에
+    finds: [
+      { id: 'kelpMat', name: '떠도는 해초 숲', x: -420, y: -5600, fixed: true, where: 'water', size: 1.3, coin: 50, syrope: 8, relic: '해초에 엉킨 낡은 닻줄', art: 'kelp' },
+      { id: 'seaVent', name: '해저 화산 김', x: 520, y: -2300, fixed: true, where: 'water', coin: 60, steel: 6, relic: '뜨거운 부석', art: 'vent' },
+      { id: 'iceberg', name: '빙산', x: -560, y: -10900, fixed: true, where: 'water', size: 1.4, coin: 70, synth: 8, relic: '빙산 속 오래된 공기방울', art: 'iceberg' },
+      { id: 'whaleGround', name: '고래가 모이는 바다', x: 520, y: -9300, fixed: true, where: 'water', size: 1.3, coin: 60, teak: 10, relic: '고래 노래를 닮은 소라', art: 'whalespot' },
+      { id: 'expBottle', name: '옛 탐험대의 표류병', x: -380, y: -900, fixed: true, where: 'water', coin: 40, relic: '탐험대의 마지막 편지(「서쪽 별을 따라 북으로 간다」)', art: 'bottle' },
+      { id: 'weatherBuoy', name: '무인 기상 부표', x: 380, y: -1100, fixed: true, where: 'water', coin: 40, chip: 2, relic: '기상 부표 표식판', art: 'buoy' },
+      { id: 'lagoonBoat', name: '석호의 쪽배', x: -140, y: -3995, fixed: true, where: 'beach', coin: 40, teak: 12, relic: '쪽배 이물의 조개 장식', art: 'beached' },
+      { id: 'farSideStone', name: '새 대륙 절벽 표지', x: 120, y: -11500, fixed: true, inland: 30, coin: 80, relic: '건너편 사람들의 표지석', art: 'stone' },
+    ],
+    // 산호초 고리: 수심 1.6~2.0m라 탐사선(흘수 1.3m)도 지나가요. 해도에서 얕은 물로 보여요
+    shoals: [{ x: -250, y: -3860, r: 60, depth: 1.8 }, { x: -180, y: -3990, r: 60, depth: 1.7 }, { x: -320, y: -3990, r: 60, depth: 1.9 }, { x: 300, y: -6360, r: 60, depth: 1.8 }, { x: 390, y: -6500, r: 60, depth: 1.7 }, { x: 230, y: -6590, r: 60, depth: 2 }],
+    flot: { cap: 40, table: [['wood', 0.6, 3, 6], ['teak', 1.2, 1, 3], ['net', 1.6, 3, 6], ['syrope', 1, 1, 3], ['steel', 0.6, 1, 2], ['water', 3.5, 2, 3], ['shiny', 8, 1, 2]] },
+    trade: [['spice', 2], ['porcelain', 2], ['silk', 3], ['painting', 2]], demand: ['coffee', 'porcelain'],
+  },
 };
-export const REGION_ORDER = ['pond', 'lake', 'river', 'coast', 'sea'];
+export const REGION_ORDER = ['pond', 'lake', 'river', 'coast', 'sea', 'ocean'];
 
 // 도전과제. check는 logic.js가 S로 판단하고, 보상은 코인과 꾸미기 해금이에요
 export const ACHIEVEMENTS = [
@@ -506,12 +562,17 @@ export const ACHIEVEMENTS = [
   { id: 'seaIsles', name: '섬과 섬 사이', desc: '큰 바다 발견지 모두 찾기', coin: 60 },
   { id: 'islandNaturalist', name: '섬 바다 박물학자', desc: '큰 바다 생물 모두 기록', coin: 60 },
   { id: 'explorer', name: '대양 탐사선', desc: '대양 탐사선 짓기', coin: 60 },
-  { id: 'oceanGate', name: '대양 앞에서', desc: '5등급 대양 탐사선으로 큰 바다 북쪽 대양 어귀 넘기', coin: 100 },
+  // M4 O3 대양: 고래 브리칭 · 무풍대 · 대양 생물
+  { id: 'whaleLeap', name: '고래의 도약', desc: '뛰어오르는 고래를 탭해 기록하기', coin: 50 },
+  { id: 'doldrums', name: '무풍대를 건너', desc: '무풍대를 남에서 북으로 지나기', coin: 40 },
+  { id: 'oceanNaturalist', name: '대양 박물학자', desc: '대양 생물 모두 기록', coin: 80 },
+  { id: 'crossOcean', name: '대양을 건너', desc: '새 대륙 항구에 닿기(엔딩)', coin: 150 },
+  { id: 'oceanGate', name: '대양 앞에서', desc: '5등급 대양 탐사선으로 대양 어귀를 넘어 대양에 처음 닿기', coin: 100 },
   { id: 'openSea', name: '큰 바다로', desc: '4등급 배로 앞바다 북쪽 경계를 넘어 큰 바다에 들어가기', coin: 80 },
 ];
 
 // 칭호(수역 도달)
-export const TITLES = ['뱃사공', '사공', '강 안내인', '연안 뱃사람', '먼바다 항해사'];
+export const TITLES = ['뱃사공', '사공', '강 안내인', '연안 뱃사람', '먼바다 항해사', '대양 항해사'];
 
 export const DECOR = {
   lantern: { name: '랜턴', icon: '🏮' },

@@ -41,7 +41,7 @@ const smooth01 = (t) => { const v = Math.max(0, Math.min(1, t)); return v * v * 
 
 export function createWorld(def) {
   const sh = def.shape, river = sh.kind === 'river', coast = sh.kind === 'coast', isles = sh.kind === 'isles'; // isles(M3 큰 바다): 섬만 뭍이고 네 끝이 모두 경계
-  const line = river ? smoothLine(sh.pts) : null, coastY = coast ? coastLine(sh) : null;
+  const line = river ? smoothLine(sh.pts) : null, coastY = coast ? coastLine(sh) : null, northY = isles && sh.north ? coastLine(sh.north) : null; // isles + north: 북쪽 끝이 새 대륙 해안선(M4 대양)
   const halfW = (i) => sh.width * (1 + 0.16 * Math.sin(i * 0.11) + 0.1 * Math.sin(i * 0.037 + 1));
 
   function riverNear(x, y) {
@@ -54,6 +54,7 @@ export function createWorld(def) {
       const u = x / sh.ax, v = y / sh.ay;
       if (Math.hypot(u, v) >= lakeShape(Math.atan2(v, u), sh.ph)) return false;
     }
+    if (northY && y <= northY(x)) return false; // 대양(M4): 북쪽은 새 대륙이고 해안선 y = f(x) 위쪽이 뭍
     for (const I of def.islands) {
       const dx = x - I.x, dy = y - I.y;
       if (Math.hypot(dx, dy) < isleShape(I, Math.atan2(dy, dx))) return false;
@@ -100,7 +101,7 @@ export function createWorld(def) {
     const i = fx | 0, j = fy | 0, u = fx - i, v = fy - j, k = j * GW + i;
     return (field[k] * (1 - u) + field[k + 1] * u) * (1 - v) + (field[k + GW] * (1 - u) + field[k + GW + 1] * u) * v;
   }
-  const edgeDist = coast ? (x, y) => Math.min(x - sh.x0, sh.x1 - x, y - sh.y0) : isles ? (x, y) => Math.min(x - sh.x0, sh.x1 - x, y - sh.y0, sh.y1 - y) : () => Infinity;
+  const edgeDist = coast ? (x, y) => Math.min(x - sh.x0, sh.x1 - x, y - sh.y0) : isles ? (x, y) => Math.min(x - sh.x0, sh.x1 - x, northY ? Infinity : y - sh.y0, sh.y1 - y) : () => Infinity;
   const dist = coast || isles ? (x, y) => Math.min(landDist(x, y), edgeDist(x, y)) : landDist;
   function gradient(x, y) {
     const e = CELL, gx = dist(x + e, y) - dist(x - e, y), gy = dist(x, y + e) - dist(x, y - e), m = Math.hypot(gx, gy) || 1;
@@ -114,7 +115,7 @@ export function createWorld(def) {
   }
 
   // 항로 찾기: 8m 칸 BFS로 길을 찾고, 직선으로 이어도 되는 점은 건너뛴다
-  const NC = 8, NAV_CLEAR = 9, NW = Math.ceil((bx1 - bx0) / NC) + 1, NH = Math.ceil((by1 - by0) / NC) + 1;
+  const NC = sh.nav || 8, NAV_CLEAR = sh.nav ? Math.max(9, sh.nav * 0.6) : 9, NW = Math.ceil((bx1 - bx0) / NC) + 1, NH = Math.ceil((by1 - by0) / NC) + 1;
   const passable = new Uint8Array(NW * NH);
   for (let j = 0; j < NH; j++) for (let i = 0; i < NW; i++) passable[j * NW + i] = dist(X0 + i * NC, Y0 + j * NC) >= NAV_CLEAR ? 1 : 0;
   const cellOf = (x, y) => [Math.max(0, Math.min(NW - 1, Math.round((x - X0) / NC))), Math.max(0, Math.min(NH - 1, Math.round((y - Y0) / NC)))];
@@ -175,7 +176,14 @@ export function createWorld(def) {
       const off = pts.map((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], tx = b[0] - a[0], ty = b[1] - a[1], m = Math.hypot(tx, ty) || 1; return [p[0] - ty / m * d, p[1] + tx / m * d]; });
       out.push([[-2990, off[0][1]], ...off, [2990, off[off.length - 1][1]], [2990, -2990], [-2990, -2990]]);
     } else if (isles) {
-      out.push([[-2990, -2990], [2990, -2990], [2990, 2990], [-2990, 2990]]); // 사방이 바다예요. 섬은 아래에서 구멍으로 더해요
+      const R = Math.max(2990, Math.abs(by0) + 200, Math.abs(by1) + 200);
+      out.push([[-R, -R], [R, -R], [R, R], [-R, R]]); // 사방이 바다예요. 섬은 아래에서 구멍으로 더해요
+      if (northY) { // 새 대륙: 해안선을 3m마다 짚고 법선으로 d만큼 옮긴 뒤 북쪽 멀리까지 닫아요
+        const pts = [];
+        for (let x = bx0 - 40; x <= bx1 + 40; x += 6) pts.push([x, northY(x)]);
+        const off = pts.map((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], tx = b[0] - a[0], ty = b[1] - a[1], m = Math.hypot(tx, ty) || 1; return [p[0] + ty / m * d, p[1] - tx / m * d]; });
+        out.push([[off[0][0], -R], ...off, [off[off.length - 1][0], -R]]);
+      }
     } else if (river) {
       const L = [], R = [];
       for (let i = 0; i < line.length; i++) {
