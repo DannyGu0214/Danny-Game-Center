@@ -9,9 +9,8 @@
 
 ## 0. 시작 전 확인
 
-- threejs-* 프로젝트 스킬 9종은 `main`(1cf79a1)에 설치돼 있어요. 이 브랜치의 base(`claude/proto-3d-scaffold` 3777775)에는 없어요.
-  - P0 worktree를 만들기 전에 이 브랜치를 `main`과 합친 base에서 시작해야 하위 칸이 `.claude/skills/threejs-*`를 불러요.
-  - 합치기는 메인 칸이 대니님 승인을 받아 해요.
+- threejs-* 프로젝트 스킬 9종: 대니님 승인(2026-11-25)으로 `main`(1cf79a1)을 이 브랜치에 병합했어요(771b8bb). P0·P1 worktree는 이 브랜치에서 갈라요.
+- P0·P1 구현 지시서: [`docs/p0-p1-tasks.md`](docs/p0-p1-tasks.md). 데이터 모양은 `src/sim/types.ts`·`data.ts`·`map-p1.ts`로 확정했어요.
 - 프로젝트 규칙(`CLAUDE.md`):
   - threejs-* 스킬로 유료 생성(Tripo·Gemini·ElevenLabs)을 하지 않아요.
   - 키 확인 스크립트(`probe_asset_credentials.sh` 등)를 실행하지 않아요.
@@ -34,8 +33,8 @@
 
 | 단계 | 하위 칸 · dispatch | 꺼낼 스킬·문서 | 완료 기준 · 추가 검증 |
 |---|---|---|---|
-| **P0 규칙 코어** (오늘 밤) | opus-1 `design`(데이터 모양·함수 경계) → sonnet-1 `impl`(DESIGN 3~6절 표를 데이터로) · sonnet-2 `test`(사다리·매개체·리스폰 테스트, `tools/sim.ts`) | gamedev-skills `survival-crafting`(원자적 제작, 사다리 점검) · `rpg`(XP 표 점검) · pipeline.md 1-1 기획, 6절 | 테스트 통과, 사다리 점검 통과. 봇이 첫 판매·첫 제작·첫 도구 시간과 매개체별 수입을 출력하고, 첫 도구는 3~5분이에요. 상점·판매함 중 하나가 늘 이기지 않아요 |
-| **P1 첫 루프 그레이박스** (오늘 밤) | opus-1 `design`(장면·입력 경계, P0와 동시 시작) → sonnet-1 `impl` · sonnet-2 `test` | `threejs-gameplay-systems`(설계 3문서·루프 계약 점검, 스캐폴드는 이미 있음) · `threejs-debug-profiler`(검은 화면·느림) · `threejs-qa-release`(e2e·캔버스 픽셀) · pipeline.md 1-2 프로토, 2절 색인 | 공통 검증 통과. e2e: 나무 클릭 → 통나무 +1 → 판자 제작 → 상점 판매로 코인 증가 / 판매함 넣고 잠자기 → 아침 정산. 대니님 플레이 뒤 DESIGN 1절 RESULT 기록 |
+| **P0 규칙 코어** (오늘 밤) | opus-1 `design`(데이터 모양·함수 경계, ✓ `docs/p0-p1-tasks.md`) → sonnet-1 `impl`(DESIGN 3~6절 표를 데이터로) · sonnet-2 `test`(사다리·매개체·리스폰 테스트, `tools/sim.ts`) | gamedev-skills `survival-crafting`(원자적 제작, 사다리 점검) · `rpg`(XP 표 점검) · pipeline.md 1-1 기획, 6절 | 테스트 통과, 사다리 점검 통과. 봇이 첫 판매·첫 제작·첫 도구 시간과 매개체별 수입을 출력하고, 첫 도구는 3~5분이에요. 상점·판매함 중 하나가 늘 이기지 않아요 |
+| **P1 첫 루프 그레이박스** (오늘 밤) | opus-1 `design`(장면·입력 경계, ✓ 같은 지시서 5절) → sonnet-1 `impl` · sonnet-2 `test` | `threejs-gameplay-systems`(설계 3문서·루프 계약 점검, 스캐폴드는 이미 있음) · `threejs-debug-profiler`(검은 화면·느림) · `threejs-qa-release`(e2e·캔버스 픽셀) · pipeline.md 1-2 프로토, 2절 색인 | 공통 검증 통과. e2e: 나무 클릭 → 통나무 +1 → 판자 제작 → 상점 판매로 코인 증가 / 판매함 넣고 잠자기 → 아침 정산. 대니님 플레이 뒤 DESIGN 1절 RESULT 기록 |
 | P2 지형·리스폰 | opus `design`(지형 격자·길찾기·장면 전환) → sonnet `impl` · `test` · neon `bulk-read`(성능 기록이 길 때) | gamedev-skills `procedural-gen`·`camera-systems`·`save-systems` · `threejs-aaa-graphics-builder`(절차적 지형·LOD·인스턴싱) · `threejs-debug-profiler` · pipeline.md 1-5 테스트·튜닝 | 길찾기(층·경사로·사다리), 리스폰(같은 자리·무작위·접속 공백), 저장 이주 테스트. 휴대폰 크기 30fps 측정 기록 |
 | P3 제작·판매·의뢰 | opus `design`(경제 구조) → sonnet `impl` · `test` · sonnet `analyze`(봇 표) | `survival-crafting` · `game-ui-ux` · `threejs-game-ui-designer`(제작·판매·게시판 UI) · pipeline.md 1-4 구현 | 경제 봇: 집 3단계까지 시간, 매개체·의뢰 수입 비율(의뢰 ≤ 40%, 의뢰 XP ≤ 15%). 의뢰 생성 테스트 |
 | P4 캐릭터·주민·스토리 | hydrogen-1 `image`(콘셉트 시트·아이콘, agy 구독) → opus `design`(캐릭터 부품·얼굴 텍스처 구조) → sonnet `impl` · `review` · hydrogen `write`(컷신·대사 초안) → sonnet `review` | `threejs-aaa-graphics-builder`(절차적 캐릭터·재질, 화면 점수표) · `threejs-game-ui-designer`(캐릭터 만들기 화면) · gamedev-skills `dialogue-systems` · pipeline.md 1-3 아트·사운드, 4절 비용표(Tripo를 쓸 때만) | art-style 1절 금지 목록 위반 0. 캐릭터 만들기 e2e(남/여·얼굴·표정·복장 저장). 스크린샷 비교 3장 |
