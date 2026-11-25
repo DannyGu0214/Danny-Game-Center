@@ -59,7 +59,7 @@
 | 이름 | 한 줄 설명 | 쓸 상황 | 엔진 의존도 | 스크립트 유무 | SKILL.md URL |
 |---|---|---|---|---|---|
 | <a id="skill-ai-behavior-trees-utility-ai"></a>`ai-behavior-trees-utility-ai` | 블랙보드, 반응형 컴포지트, 데코레이터, 응답 곡선 스코어링 기반의 범용 BT·유틸리티 AI 코드 | 적이 시야를 잃어도 계속 쫓거나 매 프레임 행동을 재시작·진동할 때 | 개념만 | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/ai-behavior-trees-utility-ai/SKILL.md) |
-| <a id="skill-audio-design"></a>`audio-design` | 버스 레이아웃, 데시벨 볼륨 슬라이더, 음량, 대사 중 덕킹, 적응형 음악, SFX 변주 | 사운드 믹싱, 전투 반응형 BGM, 단조로운 발소리·비트 싱크 개선할 때 | 개념만 (Godot/Unity/FMOD 매핑) | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/audio-design/SKILL.md) |
+| <a id="skill-audio-design"></a>`audio-design` | 버스 레이아웃, 데시벨 볼륨 슬라이더, 음량, 대사 중 덕킹, 적응형 음악, SFX 변주 | 사운드 믹싱, 전투 반응형 BGM, 단조로운 발소리·비트 싱크 개선할 때(효과음 파일 생성은 [sunoapi.org](pipeline.md#sfx-sunoapi) 💳 1순위, 대안 ElevenLabs 💳) | 개념만 (Godot/Unity/FMOD 매핑) | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/audio-design/SKILL.md) |
 | <a id="skill-camera-systems"></a>`camera-systems` | 데드존·선행 시야 2D 추적, 3인칭 오빗, 1인칭 시점, 화면 분할 카메라 튜닝 | 카메라가 덜덜 떨리거나, 맵 밖을 비추거나, 벽을 뚫거나, FPS에 따라 속도가 다를 때 | 개념만 (Godot/Cinemachine 매핑) | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/camera-systems/SKILL.md) |
 | <a id="skill-create-game-assets"></a>`create-game-assets` | 스타일 가이드, 스프라이트, 픽셀아트, 타일셋, 아이콘, 텍스처 제작·검증 및 라이선스 기록 | 게임 아트 일관성 확보, AI 생성 아트의 가짜 투명도·Steam AI 고지 점검할 때 | 개념만 | 있음 (`scripts/`) | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/create-game-assets/SKILL.md) |
 | <a id="skill-dialogue-systems"></a>`dialogue-systems` | Ink, Yarn Spinner 또는 경량 JSON 그래프 러너 기반 분기 대화·조건·변수·로컬라이징 ID | NPC 대화 트리, 짧은 대사(barks), `.ink`/`.yarn` 연동, 막다른 대화 수정할 때 | 개념만 | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/dialogue-systems/SKILL.md) |
@@ -219,12 +219,12 @@
 > **출처**: [YouTube 영상 요약과 타임스탬프](references/video-skills-13.md) · 각 저장소(2026-11-25 대조). 이 13종은 위 80개 목록에 들어 있지 않아요.  
 > **확인 범위**: GitHub 메타데이터·README·파일 트리와 웹 검색에 색인된 문서를 대조했어요. `SKILL.md`·`hooks/`·`scripts/` 원문을 줄 단위로 읽지 않았고, 설치하거나 실행하지 않았어요. 도입하기 전에는 원문을 직접 감사해야 해요.  
 > **우리 적합도 기준(↻ 2026-11-25 재판정)**: 기존 게임은 무빌드 바닐라 JS를 유지하고, **새 게임은 빌드·TypeScript를 허용**해요. 유료 도구는 비용과 대안을 비교해 후보에 넣고 쓸 때마다 승인받아요(💳). 외부 전송은 끄거나 명시해요. 이미지(Gemini 계열)·음악(Suno) 생성 경로와 여러 AI 에이전트 분업은 그대로예요. 표의 `전 → 후`와 ↻ 표시가 바뀐 곳이에요.  
-> **도입 등급**: `참조`(원문을 읽고 요점만 적용) · `설치 후보`(설치는 승인 필요) · `보유`(이미 설정돼 있음) · `보류`(조건이 생기면 다시 검토) · `미사용`. 유료 값은 [pipeline.md의 비용표](pipeline.md#4-유료-후보-비용표-)에 있어요. 단계별로 언제 꺼내는지는 [pipeline.md](pipeline.md)에 있어요.
+> **도입 등급**: `참조`(원문을 읽고 요점만 적용) · `설치 후보`(설치는 승인 필요) · `프로젝트 범위 설치됨`(이 저장소의 `.claude/skills/`에 있음) · `보유`(이미 설정돼 있음) · `보류`(조건이 생기면 다시 검토) · `미사용`. 유료 값은 [pipeline.md의 비용표](pipeline.md#4-유료-후보-비용표-)에 있어요. 단계별로 언제 꺼내는지는 [pipeline.md](pipeline.md)에 있어요.
 
 | 이름 | 저장소 | 라이선스 | 무엇 | 필요 조건 | 텔레메트리·네트워크 | 우리 적합도 (전 → 후) | 도입 등급 (전 → 후) |
 |---|---|---|---|---|---|---|---|
 | <a id="video-img2threejs"></a>`img2threejs` | [img2threejs/img2threejs](https://github.com/img2threejs/img2threejs) | Apache-2.0 | 사진 1장을 코드로 만든 three.js 3D 모델(`THREE.Group`)로 바꾸는 파이프라인. 스킬 1개 | Node 18+, Python 3.10+(표준 라이브러리만), Git. 외부 계정·유료 API 없음 | 텔레메트리 없음. 검수에 로컬 브라우저 렌더 사용 | 중 → **중상** ↻. 출력이 TypeScript라 빌드 방식에 방식상 맞아요 `[추측]`. 시간이 커서 소품 하나씩 맡겨요 | 참조(발상만) → **설치 후보(승인, 본체만)** ↻. 플러그인 `img2glb`는 보류 |
-| <a id="video-threejs-game-skills"></a>`threejs-game-skills` | [majidmanzarpour/threejs-game-skills](https://github.com/majidmanzarpour/threejs-game-skills) | MIT | three.js 게임 기획~QA·배포 스킬 9개 + Vite·TS 스캐폴드 | Node(Vite·TS·Playwright), Python(스캐폴드). 선택 생성기 3종은 외부 API 키 필요(Tripo·Gemini·ElevenLabs) | 코어 텔레메트리 없음. 생성기를 쓰면 외부 API 호출 | 하 → **상** ↻. Vite·TypeScript가 더는 걸림돌이 아니에요. 키 없이 6개 스킬이 남아요 | 미사용 → **참조 1순위 · 설치 후보(승인)** ↻. 생성기 3종은 유료 후보 💳 |
+| <a id="video-threejs-game-skills"></a>`threejs-game-skills` | [majidmanzarpour/threejs-game-skills](https://github.com/majidmanzarpour/threejs-game-skills) | MIT | three.js 게임 기획~QA·배포 스킬 9개 + Vite·TS 스캐폴드 | Node(Vite·TS·Playwright), Python(스캐폴드). 선택 생성기 3종은 외부 API 키 필요(Tripo·Gemini·ElevenLabs) | 코어 텔레메트리 없음. 생성기를 쓰면 외부 API 호출 | 하 → **상** ↻. Vite·TypeScript가 더는 걸림돌이 아니에요. 키 없이 6개 스킬이 남아요 | 미사용 → **참조 1순위** → **프로젝트 범위 설치됨(유료 생성기·키 확인 스크립트 금지)** ↻. 생성기 3종은 유료 후보 💳 |
 | <a id="video-godot-ai"></a>`godot-ai` | [hi-godot/godot-ai](https://github.com/hi-godot/godot-ai) | MIT | 실행 중인 Godot 편집기를 제어하는 MCP 서버·애드온(도구 46개) + 검증 스킬 1개 | Godot 4.7+, `uv`. 외부 계정·유료 API 없음 | **익명 텔레메트리 기본 켜짐.** `GODOT_AI_DISABLE_TELEMETRY=true` 또는 `DISABLE_TELEMETRY=true`로 꺼요 | 하(유지). Godot를 쓰지 않아요 | 미사용(유지) |
 | <a id="video-logo-design-skill"></a>`logo-design-skill` | [kaankiziltug/logo-design-skill](https://github.com/kaankiziltug/logo-design-skill) | MIT | 브리핑·시안·보정·SVG·브랜드 가이드까지의 로고 스킬 1개 + SVG 참고 자료 1,400개 이상 | Python 3.8+ **와 SVG→PNG 변환 도구**(CairoSVG·Inkscape·`rsvg-convert`·headless Chrome 중 하나) | 텔레메트리·외부 호출 없음 | 중 → **상** ↻. 아이콘·로고용. 맥 기본 기능으로 PNG 변환이 될 것으로 보여요 `[추측: 실행 안 함]` | 참조 → **설치 후보(승인)** ↻ |
 | <a id="video-sprite-gen"></a>`sprite-gen` | [aldegad/sprite-gen](https://github.com/aldegad/sprite-gen) | Apache-2.0 | 캐릭터 그림 1장에서 상태별 애니메이션 프레임과 아틀라스를 만드는 스킬 1개 + Python CLI | Python venv, FFmpeg, Node.js, `img2webp`, `rife-ncnn-vulkan`(보간) + **이미지 생성용 외부 계정·API**(ChatGPT·Codex, Grok·`XAI_API_KEY`, `OPENAI_API_KEY` 중) | 자체 텔레메트리 없음. 이미지 생성 때 외부 호출 | 하 → **중** ↻. 구독 로그인 경로와 무료 자르기 도구가 있어요 | 미사용 → **설치 후보(승인): 자르기 도구·`pixel-draw`** ↻. 업체 API 경로는 💳 |
@@ -244,7 +244,7 @@
 | 이름 | 영상에서 | 저장소 대조 결과 |
 |---|---|---|
 | `img2threejs` | three.js 3D 모델이 나와요. 필요 조건은 Python·Node | 출력이 TypeScript(`THREE.Group`)예요. Python은 외부 패키지가 필요 없어요 |
-| `threejs-game-skills` | 화면에 "그림·소리 자동 생성은 유료 키 필요(안 써도 됨)"라고 안내해요 | 유료 키가 필요한 생성기는 9개 중 3개(Tripo·Gemini·ElevenLabs)예요. 스캐폴드는 Vite·TS 전제이고 Python 스크립트도 써요 |
+| `threejs-game-skills` | 화면에 "그림·소리 자동 생성은 유료 키 필요(안 써도 됨)"라고 안내해요 | 유료 키가 필요한 생성기는 9개 중 3개(Tripo·Gemini·ElevenLabs)예요. 우리 효과음 1순위는 이 생성기가 아니라 [sunoapi.org](pipeline.md#sfx-sunoapi) 💳예요. 스캐폴드는 Vite·TS 전제이고 Python 스크립트도 써요 |
 | `logo-design-skill` | Python 필요 | 파비콘·앱 아이콘 PNG를 만들려면 SVG 변환 도구가 하나 더 필요해요 |
 | `sprite-gen` | Python과 ChatGPT 또는 Grok 계정 | FFmpeg·Node.js·`img2webp`·`rife-ncnn-vulkan`도 얽혀 있고, `OPENAI_API_KEY`·`XAI_API_KEY` 방식도 있어요 |
 | `mcp-for-blender` | 사용 통계가 기본으로 켜져 있어요 | 동의하면 프롬프트·코드·화면 캡처까지 보낼 수 있고, 외부 에셋 연동이 있어요 |

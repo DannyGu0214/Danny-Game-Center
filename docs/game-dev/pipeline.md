@@ -2,7 +2,7 @@
 
 > **5줄 요약 (비전공자용)** · ↻ 2026-11-25 재판정
 > 1. 새 3D 시제품은 **Vite·TypeScript** 도구를 써서 만드는 안을 추천해요. AI가 고친 코드의 일부 실수를 실행하기 전에 기계가 잡아 줘요.
-> 2. 그러면 전에 "우리와 안 맞음"이던 three.js 게임 스킬 묶음과 사진→3D 도구를 후보로 쓸 수 있어요. 돈이 드는 생성기를 빼도 스킬 9개 중 6개가 남아요.
+> 2. 그러면 전에 "우리와 안 맞음"이던 three.js 게임 스킬 묶음과 사진→3D 도구를 쓸 길이 열려요. 스킬 묶음은 이 저장소에만 설치했고(돈 드는 생성은 금지), 사진→3D 도구는 아직 후보예요. 돈이 드는 생성기를 빼도 스킬 9개 중 6개가 남아요.
 > 3. 유료 도구도 후보에 넣고 값을 적었어요. 3D 모델 생성(Tripo)은 기본 옵션 모델 10개에 2~3달러로 계산되지만 고급 옵션·리깅·동작을 쓰면 늘어나고, **쓸 때마다 승인**을 받아요.
 > 4. 정보를 밖으로 보내는 기능은 끄는 방법을 적었어요. 이미 쓰는 크롬 점검 도구는 확인 당시 설정에 끄는 옵션이 없어서 꺼야 해요.
 > 5. 지금 있는 게임 6개와 사이트 배포 방식은 그대로 둬요. 새 방식은 새 게임에만 써요.
@@ -101,7 +101,7 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 | 항목 | 내용 |
 |---|---|
 | 목표 | 화풍 기준과 에셋 목록을 정해요. 시제품 판정 전에는 임시 그림을 써요 |
-| 담당 | 이미지 시안과 화풍 초안은 `hydrogen`, 검토는 `sonnet`. 일괄 생성과 음악은 [에셋 의뢰](../agent-bridge.md)로 해요(운영자가 시작). ↻ 주인공 3D 모델은 `img2threejs`(구독 토큰) 또는 Tripo 💳, 효과음 묶음은 ElevenLabs 💳가 후보예요([4절](#4-유료-후보-비용표-)) |
+| 담당 | 이미지 시안과 화풍 초안은 `hydrogen`, 검토는 `sonnet`. 일괄 생성과 음악은 [에셋 의뢰](../agent-bridge.md)로 해요(운영자가 시작). ↻ 주인공 3D 모델은 `img2threejs`(구독 토큰) 또는 Tripo 💳, 효과음 묶음은 **sunoapi.org 💳가 1순위 후보**이고 ElevenLabs 💳는 대안이에요([4절](#4-유료-후보-비용표-)) |
 | 꺼낼 것 | [`create-game-assets`](gamedev-skills-catalog.md#skill-create-game-assets)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/create-game-assets/SKILL.md)) · [`audio-design`](gamedev-skills-catalog.md#skill-audio-design)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/audio-design/SKILL.md)) · 아이콘은 [make-icons.mjs](../../games/ocean-world-3d/tools/make-icons.mjs) 선례 |
 | 완료 기준 | 게임 폴더에 화풍 기준([예](../../games/ocean-world-3d/docs/art-style.md)), 에셋 목록, `assets/CREDITS.md`가 있어요 |
 | 주의 | ↻ 2026-11-25 재판정: `sprite-gen`과 `threejs-game-skills` 생성기는 제외에서 후보로 바꿨어요. 유료·외부 전송 경로는 쓸 때마다 승인받아요 💳. 의뢰서에 생성 모델을 지정하지 않아요. 공개 저장소에 외부 자료를 넣을 때는 라이선스를 확인해요 |
@@ -122,7 +122,7 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 |---|---|
 | 목표 | 규칙이 맞는지, 수치가 재미있는지, 성능이 버티는지 확인해요 |
 | 담당 | 시험 작성은 `sonnet`, 명령 실행은 `hydrogen`, 긴 로그의 1차 정리는 `neon` 뒤 결론은 `sonnet`, 출시 전 검토는 `opus` |
-| 꺼낼 것 | `node --test`(빌드 방식은 ↻ `tsc --noEmit` 추가) · [sim.js](../../games/ocean-world-3d/tools/sim.js) `--table` · ↻ Playwright 화면 검사와 [`threejs-qa-release`](https://github.com/majidmanzarpour/threejs-game-skills/blob/main/skills/threejs-qa-release/SKILL.md)(설치 승인 후) · [chrome-devtools-mcp](gamedev-skills-catalog.md#video-chrome-devtools-mcp)(**끄기 옵션 적용 후**) · [perf-run.mjs](../../games/ocean-world-3d/tools/perf-run.mjs)와 `?perf=1` · [`performance-optimization`](gamedev-skills-catalog.md#skill-performance-optimization)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/performance-optimization/SKILL.md)) |
+| 꺼낼 것 | `node --test`(빌드 방식은 ↻ `tsc --noEmit` 추가) · [sim.js](../../games/ocean-world-3d/tools/sim.js) `--table` · ↻ Playwright 화면 검사와 [`threejs-qa-release`](https://github.com/majidmanzarpour/threejs-game-skills/blob/main/skills/threejs-qa-release/SKILL.md)(스킬은 설치됨, Playwright 설치는 승인 후) · [chrome-devtools-mcp](gamedev-skills-catalog.md#video-chrome-devtools-mcp)(**끄기 옵션 적용 후**) · [perf-run.mjs](../../games/ocean-world-3d/tools/perf-run.mjs)와 `?perf=1` · [`performance-optimization`](gamedev-skills-catalog.md#skill-performance-optimization)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/performance-optimization/SKILL.md)) |
 | 완료 기준 | 시험 통과 수, 측정 표, 성능 수치(프레임 시간·드로우 콜)를 게임 폴더의 보고 문서에 남기고, 화면을 **직접 보고** 확인한 기록이 있어요 |
 | 주의 | `chrome-devtools-mcp`는 사용 통계가 기본으로 켜져 있고, 확인 당시 작업 환경 설정에는 끄는 옵션이 없었어요([5절](#5-외부-전송과-끄는-법)). [capture.mjs](../../games/ocean-world-3d/tools/capture.mjs)는 Playwright가 필요한데, 앞서 확인한 작업 폴더에서는 불러올 수 없었어요(설치는 승인 필요) |
 
@@ -156,7 +156,7 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 | HUD 배치·해상도 대응 | [`game-ui-ux`](gamedev-skills-catalog.md#skill-game-ui-ux)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/game-ui-ux/SKILL.md)) | 읽기 |
 | 스프라이트 시트 | [`create-game-assets`](gamedev-skills-catalog.md#skill-create-game-assets)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/create-game-assets/SKILL.md)) + 보조 모델 이미지 또는 에셋 의뢰. ↻ 자르기·아틀라스는 [sprite-gen](gamedev-skills-catalog.md#video-sprite-gen) 유틸 | 읽기 · 보유 · 승인 |
 | 로고·아이콘·파비콘 | [make-icons.mjs](../../games/ocean-world-3d/tools/make-icons.mjs) → [logo-design-skill](gamedev-skills-catalog.md#video-logo-design-skill)([저장소](https://github.com/kaankiziltug/logo-design-skill))의 작은 크기 전용판·사용 규칙 ↻ | 보유 → 읽기 · 설치는 승인 |
-| 배경음·효과음 | 에셋 의뢰(Suno) · ↻ 효과음이 많이 필요하면 ElevenLabs 💳 · Web Audio 합성 선례 · [`audio-design`](gamedev-skills-catalog.md#skill-audio-design)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/audio-design/SKILL.md)) | 보유 · 읽기 |
+| 배경음·효과음 | 에셋 의뢰(Suno) · ↻ 효과음 생성이 필요하면 [sunoapi.org 효과음](#sfx-sunoapi) 💳 1순위(대안 ElevenLabs 💳) · Web Audio 합성 선례 · [`audio-design`](gamedev-skills-catalog.md#skill-audio-design)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/audio-design/SKILL.md)) | 보유 · 읽기 |
 | 프레임이 떨어진다 | `?perf=1` → [perf-run.mjs](../../games/ocean-world-3d/tools/perf-run.mjs) → 크롬 성능 트레이스 → [`performance-optimization`](gamedev-skills-catalog.md#skill-performance-optimization)([원문](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/performance-optimization/SKILL.md)) · [instancing.js](../../games/ocean-world-3d/render/core/instancing.js)·[batched.js](../../games/ocean-world-3d/render/core/batched.js) | 보유 → 읽기 |
 | 메모리 누수 | 크롬 힙 스냅샷 · [memory-leak-debugging](https://github.com/ChromeDevTools/chrome-devtools-mcp/tree/main/skills/memory-leak-debugging) 스킬([카탈로그 항목](gamedev-skills-catalog.md#video-chrome-devtools-mcp)) | 보유 · 읽기 |
 | 코드가 부풀고 과하게 설계됐다 | [ponytail](gamedev-skills-catalog.md#video-ponytail)([저장소](https://github.com/DietrichGebert/ponytail)) 원칙(필요한 만큼만) · Claude Code의 `/simplify` | 읽기 · 보유 |
@@ -178,7 +178,7 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 
 | 항목 | 전 → 후 | 바뀐 이유 | 외부 전송 |
 |---|---|---|---|
-| [threejs-game-skills](gamedev-skills-catalog.md#video-threejs-game-skills) 코어 | 미사용 → **참조 1순위 · 설치 후보** | Vite·TypeScript가 허용됐어요. [README](https://github.com/majidmanzarpour/threejs-game-skills#readme)는 코어 스킬이 유료 키 없이 동작하고, 키가 없으면 코드·로컬 에셋으로 이어 간다고 적어요 | 생성기를 쓰지 않으면 업체 호출이 없어요 |
+| [threejs-game-skills](gamedev-skills-catalog.md#video-threejs-game-skills) 코어 | 미사용 → **참조 1순위** → **프로젝트 범위 설치됨(유료 생성기·키 확인 스크립트 금지)** ↻ | Vite·TypeScript가 허용됐어요. [README](https://github.com/majidmanzarpour/threejs-game-skills#readme)는 코어 스킬이 유료 키 없이 동작하고, 키가 없으면 코드·로컬 에셋으로 이어 간다고 적어요 | 생성기를 쓰지 않으면 업체 호출이 없어요 |
 | 그 생성기 3종 | 미사용 → **유료 후보 💳** | 유료 도구를 후보에 넣어요 | 생성에 필요한 프롬프트·이미지가 업체로 가요 |
 | [img2threejs](gamedev-skills-catalog.md#video-img2threejs) 본체 | 발상 참조 → **설치 후보(주인공 소품용)** | TypeScript `THREE.Group` 출력이 빌드 방식과 맞아요 `[추측: 실행 안 함]` | `img2glb` 플러그인은 이미지를 외부 TRELLIS 서비스로 보내서 **보류** |
 | [logo-design-skill](gamedev-skills-catalog.md#video-logo-design-skill) | 참조 → **설치 후보** | Python 표준 라이브러리만 쓰고, PNG 변환은 macOS Quick Look 등 있는 도구를 써요 | 카탈로그 대조상 없음 |
@@ -194,8 +194,9 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 | 등급 | 항목 | 이유 |
 |---|---|---|
 | **지금 참조**(원문 읽기) | `threejs-game-skills`의 `SKILL.md`·참고 자료 ↻, 카탈로그 three.js 스킬 3개·공통 분야·장르 템플릿, `prototype-fast`·`game-docs`·`game-jam`, `ponytail` 원칙, `img2threejs` 구조 설명, `chrome-devtools-mcp`의 스킬 | 설치 없이 바로 읽어요 |
-| **설치 후보(승인)** ↻ | `threejs-game-skills` 코어 6개, `img2threejs` 본체(플러그인 제외), `logo-design-skill`, `sprite-gen`(자르기 도구·`pixel-draw`), Playwright(게임 폴더의 개발 의존성) | 유료 키 없이 쓰는 경로가 있어요. 설치 전에 스크립트와 훅을 감사해요 |
-| **유료 후보 💳** ↻ | Tripo, ElevenLabs, xAI, OpenAI 이미지, Gemini API, Together, Anthropic API(`--batch`), Meshy, Rodin, `mcp-for-blender` Premium | [4절](#4-유료-후보-비용표-)을 보고 쓸 때마다 승인받아요 |
+| **프로젝트 범위 설치됨(유료 생성기·키 확인 스크립트 금지)** ↻ | `threejs-game-skills` 9개(`.claude/skills/`, [설치 안내](../../.claude/skills/NOTICE-threejs-game-skills.md)) | 감사한 뒤 이 저장소에만 설치했어요. 유료 생성과 키 확인 스크립트는 운영자 승인 없이 실행하지 않아요 💳 |
+| **설치 후보(승인)** ↻ | `img2threejs` 본체(플러그인 제외), `logo-design-skill`, `sprite-gen`(자르기 도구·`pixel-draw`), Playwright(게임 폴더의 개발 의존성) | 유료 키 없이 쓰는 경로가 있어요. 설치 전에 스크립트와 훅을 감사해요 |
+| **유료 후보 💳** ↻ | Tripo, sunoapi.org 효과음, ElevenLabs(효과음 대안), xAI, OpenAI 이미지, Gemini API, Together, Anthropic API(`--batch`), Meshy, Rodin, `mcp-for-blender` Premium | [4절](#4-유료-후보-비용표-)을 보고 쓸 때마다 승인받아요 |
 | **선택 복사**(출처·라이선스 표기) | `threejs-game-skills` 스캐폴드 구조(MIT) ↻, `game-feel`·`performance-optimization`·`save-systems`·`create-game-assets`의 점검 항목(Apache-2.0, 본문을 읽은 뒤 확정 `[추측]`), 무빌드 게임의 three.js 애드온(MIT) | 필요한 틀만 가져와요 |
 | **설정 변경(승인)** | `chrome-devtools-mcp` 끄기 옵션 ↻, Pages 소스를 Actions로 변경(B안을 고를 때만) | 공통 설정과 사이트 전체에 영향이 있어요 |
 | **보류** ↻ | `mcp-for-blender`, `blender-skills`, `img2glb` 플러그인, `hallmark`, `taste-skill` | 지금 쓸 곳이 없거나 조건이 필요해요 |
@@ -231,7 +232,8 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 | (비교) **Meshy** ([가격](https://docs.meshy.ai/en/api/pricing)) | 이미지→3D 2K 텍스처 30크레딧(`meshy-7.1`·`meshy-6`) | 10개 300크레딧. 크레딧의 USD 값, 구독 월 가격과 API에 필요한 요금제 [미확인] | 구독의 API 크레딧 + 키 | 위와 같음 | Tripo 대비 이득 [미확인] | 💳 필요 |
 | (비교) **Hyper3D Rodin** ([가격](https://hyper3d.ai/pricing)) | Creator $30/월(약 60개), API는 Business $120/월. 직접 크레딧 $1.5 | API로 쓰면 **월 $120**. 모델당 크레딧 [미확인] | 구독(API는 Business) | 위와 같음 | 품질 이득 [미확인]. API 진입가가 높아요 | 💳 필요 |
 | `image-generator` → **Gemini API** ([가격](https://ai.google.dev/gemini-api/docs/pricing)) | ↻ 스킬 스크립트는 **`gemini-3-pro-image-preview` 고정, 새로 만들 때 기본 2K**([아래 정정](#threejs-game-skills-생성기-비용-정정)). 정식 `gemini-3-pro-image` 1K·2K $0.134, 4K $0.24이고 preview 단가가 같다는 것은 `[추측]`. 비교: `gemini-3.1-flash-image` 1K $0.067. 두 정식 모델은 무료 등급 없음 | 50장 2K **약 $6.70** `[추측: preview 단가 동일]` / 월 약 $26.80 | `GEMINI_API_KEY`(결제 연결) | 보조 모델의 이미지 시안(구독) · 에셋 의뢰(이미지 모델은 로컬이 정해요. API 호출이면 과금돼요) | 스킬이 직접 불러 한 작업 안에서 끝나요. 대안 대비 품질 이득 [미확인] | 💳 필요 |
-| `audio-generator` → **ElevenLabs** ([가격](https://elevenlabs.io/pricing/api)) | 효과음 $0.12/분, 음악 $0.15/분(파인튠 $1.50). Starter $6/월(요금표상 효과음 150회 또는 음악 40분), 무료(효과음 8회 또는 음악 3분). 둘은 같은 포함량을 나눠 쓰는 것으로 보여요 `[추측]`. 음악 상업 이용은 Starter 이상 | 시제품 **$0~6** / 월 $6(포함량 안일 때). 무료 등급 효과음의 상업 이용 조건 [미확인] | 계정 + `ELEVENLABS_API_KEY` | 에셋 의뢰(Suno 음악, 유료 호출) · Web Audio 합성(효과음, 무료) | 글로 효과음을 만들어요. 음악은 이미 Suno 경로가 있어요 | 💳 필요 |
+| 효과음 1순위 → **sunoapi.org** ([가격은 홈](https://sunoapi.org/), [API 문서](https://docs.sunoapi.org/suno-api/generate-sounds), [상세](#sfx-sunoapi)) | 1크레딧=$0.005($5/1,000크레딧). **효과음 호출당 크레딧 [미확인]**(참고: 음악 V6는 실측 요청당 12크레딧=$0.06) | 1회·월 [미확인] | 보유한 sunoapi.org 키(Keychain `suno-api`) | Web Audio 합성(효과음, 무료) | 이미 쓰는 업체·키·크레딧이에요 | 💳 필요 |
+| (대안) `audio-generator` → **ElevenLabs** ([가격](https://elevenlabs.io/pricing/api)) | 효과음 $0.12/분, 음악 $0.15/분(파인튠 $1.50). Starter $6/월(요금표상 효과음 150회 또는 음악 40분), 무료(효과음 8회 또는 음악 3분). 둘은 같은 포함량을 나눠 쓰는 것으로 보여요 `[추측]`. 음악 상업 이용은 Starter 이상 | 시제품 **$0~6** / 월 $6(포함량 안일 때). 무료 등급 효과음의 상업 이용 조건 [미확인] | 계정 + `ELEVENLABS_API_KEY` | sunoapi.org 효과음(1순위) · Web Audio 합성(효과음, 무료) | 효과음 길이를 0.5~30초로 지정하고, 요금표의 유료 플랜(Starter)에 상업 라이선스가 적혀 있어요 | 💳 필요 |
 | `sprite-gen gen --provider openai` → **OpenAI** ([가격](https://developers.openai.com/api/docs/guides/image-generation)) | GPT-Image-2 1024×1024 낮음 $0.006, 중간 $0.053, 높음 $0.211 | 50장 중간 **$2.65** / 월 $10.60. 실제 사용 모델은 실행 때 확인 | `OPENAI_API_KEY` | 보조 모델 이미지 + `sprite-gen` 자르기 도구 | 동작 줄 단위의 캐릭터 일관성 흐름을 써요 `[추측]` | 💳 필요 |
 | `sprite-gen --provider codex` → **ChatGPT 로그인** ([가격](https://chatgpt.com/pricing)) | 구독 로그인이면 구독 한도 안에서 써요. **`codex`가 API 키로 로그인돼 있으면 호출마다 과금**([SKILL.md](https://github.com/aldegad/sprite-gen/blob/main/SKILL.md)). 구독 월 가격 [미확인] | 보유 구독 한도 안이면 추가 $0 / 새로 가입하면 월 가격 [미확인] | 로그인한 `codex` CLI. 사용 여부는 운영자가 정해요 | 위와 같음 | 도구의 기본 생성 경로예요 | 💳 필요 |
 | `sprite-gen --provider grok`·영상 → **xAI** ([가격](https://docs.x.ai/docs/models)) | 이미지 $0.02부터, 영상 $0.02/초부터. 상위 모델·해상도 단가 [미확인] | 50장 **$1부터** / 월 $4부터. 걷기 영상 4방향×5초는 $0.40부터(상한 [미확인]) | Grok 로그인 또는 `XAI_API_KEY`(로그인이 있으면 우선) | 정지 그림은 보조 모델 이미지 | 영상에서 반복 동작을 뽑는 경로예요. 현재 우리 경로에는 대안이 없어요 | 💳 필요 |
@@ -241,7 +243,30 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 
 - **하나만 고른다면** Tripo(주인공 모델 몇 개)를 먼저 검토해요. 무료 대안으로 만들기 어려운 것을 채워 준다는 판단이에요 `[추측]`.
 - Gemini API 이미지는 기존 이미지 경로와 겹쳐요. 이 스킬의 이미지 스크립트는 에셋 의뢰 경로와 다른 모델로 고정돼 있어요. 더 새로운 이미지 모델의 단가는 같은 가격 페이지에서 쓰기 직전에 확인해요.
-- ElevenLabs는 효과음이 많이 필요할 때 무료 등급부터 검토해요.
+- 효과음은 sunoapi.org를 먼저 검토하고, 길이를 정확히 지정해야 하거나 요금표에 명시된 상업 라이선스가 필요하면 ElevenLabs를 검토해요.
+
+<a id="sfx-sunoapi"></a>
+
+### 효과음: sunoapi.org 1순위, ElevenLabs 대안
+
+2026-11-25에 공개 문서를 읽어 대조했어요. 효과음 호출은 해 보지 않았어요.
+
+| 항목 | sunoapi.org |
+|---|---|
+| 호출 | `POST /api/v1/generate/sounds` ([문서](https://docs.sunoapi.org/suno-api/generate-sounds)). 이 문서의 OpenAPI 서버는 `https://apibox.erweima.ai`이고, [빠른 시작](https://docs.sunoapi.org/suno-api/quickstart)과 우리 음악 호출은 `https://api.sunoapi.org`를 써요. 효과음이 어느 주소에서 되는지는 첫 호출 때 확인해요 |
+| 필수 파라미터 | `prompt`(최대 500자), `model`(기본 `V6`. 현행 `V6`·`V6_WILD`·`V6_MINI`) |
+| 선택 파라미터 | `soundLoop`(반복용, 기본 `false`), `soundTempo`(1~300 BPM, 생략하면 자동), `soundKey`(기본 `Any`), `grabLyrics`, `callBackUrl`. **길이(초)를 정하는 파라미터는 없어요** |
+| 결과 | 응답은 `taskId`예요. 효과음 문서에는 결과 조회 방법·출력 형식·보관 기간·결과 개수가 없어요 [미확인]. 음악처럼 MP3가 기본일 것으로 봐요 `[추측]` |
+| WAV | [별도 변환](https://docs.sunoapi.org/suno-api/convert-to-wav-format) `POST /api/v1/wav/generate`(`taskId`·`audioId`·`callBackUrl` 필수, 파일 15일 보관). 변환 크레딧 [미확인]. 효과음 결과에도 되는지 [미확인] |
+| 비용 | 1크레딧=$0.005([홈](https://sunoapi.org/) 요금: $5/1,000크레딧). 호출당 크레딧 [미확인] (참고: 음악 V6는 실측 요청당 12크레딧) |
+| 상업 이용 | [홈](https://sunoapi.org/)은 API로 만든 음악을 상업 프로젝트에 쓸 수 있다고 적어요. [이용약관](https://sunoapi.org/terms-of-use)에는 생성물 소유권·라이선스 조항이 없어요. 효과음만 따로 정한 조건은 못 찾았어요 |
+| 키·실행 | 키는 macOS Keychain 서비스 `suno-api`(값은 파일·로그에 남기지 않아요). 호출은 [에셋 의뢰(agent-bridge)](../agent-bridge.md) 경로로 해요. 확인 당시 로컬 `suno.py`에는 효과음 명령이 없어서 첫 사용 전에 추가해야 해요 |
+| 승인 | **사용 전에 대니님 승인**을 받아요. 첫 호출은 1회만 해서 크레딧 차감량·형식·길이를 재요 |
+
+| 후보 | 장점 | 단점 |
+|---|---|---|
+| sunoapi.org(1순위) | 키·크레딧·의뢰 경로가 이미 있고 `soundLoop`·BPM·키를 지정해요 | 길이를 지정할 수 없고, 호출당 크레딧·출력 형식과 약관의 생성물 권리가 확인되지 않았어요 |
+| ElevenLabs(대안) | [API](https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert)로 길이 0.5~30초와 `loop`를 지정하고, [요금표](https://elevenlabs.io/pricing)의 Starter에 상업 라이선스가 적혀 있어요 | 계정·키가 새로 필요하고, 상업 라이선스는 유료 플랜 기준이에요 |
 
 ### threejs-game-skills 생성기 비용 정정
 
@@ -300,8 +325,9 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 1. npm 설치 (games/<proto>/ 안): three@0.187.0, @types/three@0.187.0, vite, typescript
    선택: @playwright/test
 2. chrome-devtools-mcp 설정에 --no-usage-statistics --no-performance-crux 추가
-3. (선택) threejs-game-skills 설치. 안 하면 원문 읽기로 대신해요
 ```
+
+`threejs-game-skills`는 이 저장소에 프로젝트 범위 설치됨(유료 생성기·키 확인 스크립트 금지) 상태라 따로 설치하지 않아요([설치 안내](../../.claude/skills/NOTICE-threejs-game-skills.md)).
 
 승인을 받지 못하면 무빌드 방식으로 시작해요. `ocean-world-3d`의 뼈대와 동봉 three.js를 써요.
 
@@ -388,6 +414,7 @@ games/<proto>/
 ## 7. 남은 불확실성
 
 - 설치 후보는 README·`SKILL.md`·패키지 정의 일부만 읽었어요. 스크립트와 훅 원문은 감사하지 않았고 설치·실행하지 않았어요.
+- 설치한 `threejs-game-skills`는 `SKILL.md` 9개와 스킬 스크립트·설정을 읽었어요. 일부 참고 문서와 스캐폴드 코드는 위험 패턴만 검색했고, 스크립트는 실행하지 않았어요. 금지 문구는 지시일 뿐이라 실행을 기술적으로 막지는 않아요.
 - 비용표의 `[미확인]` 값과, 1회·월 사용량 가정은 실제와 다를 수 있어요. 구독 한도 소모량도 재지 않았어요.
 - 외부 전송은 문서 기준이고, 통신을 관찰하지 않았어요.
 - Vite·TypeScript 첫 설정 시간, 빌드 크기, 자동 화면 검사에서 WebGL이 느려지는지는 재지 않았어요 `[추측]`.
