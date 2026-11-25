@@ -99,10 +99,12 @@ function mudTile({ base = '#7b6c4e' } = {}) {
 const TILES = { grass: grassTile, sand: sandTile, gravel: gravelTile, cliff: cliffTile, rocky: rockyTile, mud: mudTile };
 
 function landPath(outlines, d) {
-  const p = new Path2D();
-  // 바깥 큰 사각형 + 호수 구멍(evenodd) + 섬은 다시 채워진다
-  p.rect(-3000, -3000, 6000, 6000);
-  for (const poly of outlines(d)) {
+  const p = new Path2D(), polys = outlines(d);
+  // 바깥 큰 사각형 + 호수 구멍(evenodd) + 섬은 다시 채워진다. 사각형은 물 윤곽보다 커야 해요(대양은 ±12km라 ±3km로 두면 그 밖 바다가 뭍으로, 새 대륙이 물로 뒤집혀 그려졌어요)
+  let m = 3000;
+  for (const poly of polys) for (const q of poly) m = Math.max(m, Math.abs(q[0]) + 10, Math.abs(q[1]) + 10);
+  p.rect(-m, -m, 2 * m, 2 * m);
+  for (const poly of polys) {
     p.moveTo(poly[0][0], poly[0][1]);
     for (let i = 1; i < poly.length; i++) p.lineTo(poly[i][0], poly[i][1]);
     p.closePath();

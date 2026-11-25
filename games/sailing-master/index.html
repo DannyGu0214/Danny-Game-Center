@@ -771,7 +771,7 @@ function syncButtons() {
 // 빨리 가기(M4 O0): ×1 → ×2 → ×4. 켤 수 없으면 이유를 알려 줘요. 저장하지 않고 늘 ×1로 시작해요
 let fastMul = 1;
 const FAST_WARN = new Set(['gustSoon', 'stormSoon', 'squallSoon', 'typhoonSoon', 'typhoonNear', 'typhoonIn', 'gustOn', 'stormOn', 'disaster', 'sailTorn', 'ground', 'shoal', 'shoalRisk', 'waterLow', 'waterOut', 'foodLow', 'found', 'species', 'arrive', 'atGate', 'region', 'docked', 'edge']);
-function fastBreak(why) { if (fastMul > 1) { fastMul = 1; if (why) showHint(why, 2.5, true); syncButtons(); } }
+function fastBreak(why) { if (fastMul > 1) { fastMul = 1; acc = Math.min(acc, STEP); if (why) showHint(why, 2.5, true); syncButtons(); } } // 빨리 가기 중 쌓인 시간은 버려요(×1로 돌아온 뒤 한 프레임 1틱씩만 따라잡다 느린 기기에서 영영 밀리던 것)
 $('fast').addEventListener('pointerdown', () => {
   if (fastMul > 1) { fastMul = fastMul === 2 ? 4 : 1; syncButtons(); return; }
   const r = G.fastCheck(S); if (!r.ok) { if (r.why) showHint(r.why, 2.5, true); return; }
@@ -2031,7 +2031,7 @@ function frame(now) {
   if (!hold) {
     acc += raw * fastMul;
     let n = 0;
-    while (acc >= STEP && n < 12 * fastMul) { tick(); acc -= STEP; n++; if (fastMul === 1 && acc > STEP * 12) break; }
+    while (acc >= STEP && n < 12 * fastMul) { tick(); acc -= STEP; n++; }
     if (n >= 12 * fastMul) acc = 0;
     drainEvents();
     fxTimers(raw);
