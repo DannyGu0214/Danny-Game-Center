@@ -261,7 +261,7 @@ test('O4 엔딩 장면 6장: 캔버스 대체 그림이 선장 4명 모두 오�
 
 // ── O5 풍경·소리·음악 ──
 import { THEMES, zonesOf, dressLand, BOX } from '../themes.js';
-import { SAIL_SETS, FILES, READY, FALLBACK, MOODS, trackFor, startSail } from '../music.js';
+import { SAIL_SETS, FILES, READY, ONCE, FALLBACK, MOODS, trackFor, startSail } from '../music.js';
 import { FX } from '../sound.js';
 
 test('O5 대양 테마: 산호섬 구간 + 새 대륙 구간(남→북), 새 대륙에는 색 회벽 집(cityhut)이 있고 모두 뭍 위에', () => {
@@ -276,7 +276,7 @@ test('O5 대양 테마: 산호섬 구간 + 새 대륙 구간(남→북), 새 대
 test('O5 소리·음악: 뱃고동·고래 노래·물기둥 효과음이 있고, 새 곡 mp3가 없으면 이웃 곡으로 가요(엔딩곡은 엔딩 기분)', () => {
   for (const k of ['horn', 'whaleSong', 'blow']) assert.equal(typeof FX[k], 'function', k);
   assert.deepEqual(SAIL_SETS.sea, ['opensea', 'sea']); assert.deepEqual(SAIL_SETS.ocean, ['ocean', 'opensea']);
-  for (const id of ['opensea', 'ocean', 'ending']) { assert.ok(FILES[id] && !READY.has(FILES[id]), `${id}: 아직 mp3 없음`); }
+  for (const id of ['opensea', 'ocean', 'ending']) { assert.ok(FILES[id] && READY.has(FILES[id]), `${id}: mp3 있음`); }
   assert.deepEqual([FALLBACK.opensea, FALLBACK.ocean, FALLBACK.ending], ['sea', 'opensea', 'ocean']);
   assert.ok(MOODS.includes('ending')); assert.equal(trackFor('ending', startSail('ocean')), 'ending'); assert.equal(startSail('ocean').track, 'ocean');
 });
@@ -360,4 +360,10 @@ test('저장 v9 → v10: 대양 바다 위 배는 새 지도의 같은 자리(�
   const C = old(openWater('sea', 10, -500), (o) => { (o.findPos ||= {}).ocean = [{ id: 'iceberg', x: 0, y: -10900 }]; }); assert.equal(C.boat.y, -500); assert.equal(C.findPos.ocean, undefined);
   // 새 저장은 v10이고 다시 불러도 옮기지 않아요
   const D = openWater('ocean', 0, -4500); assert.equal(G.deserialize(G.serialize(D)).boat.y, -4500);
+});
+
+test('음악 파일: READY의 곡은 모두 저장소에 있고, 한 번만 트는 곡은 엔딩뿐이에요', async () => {
+  const { existsSync } = await import('node:fs');
+  for (const n of READY) assert.ok(existsSync(new URL(`../assets/music/${n}.mp3`, import.meta.url)), n);
+  assert.deepEqual([...ONCE], ['ending']);
 });

@@ -90,9 +90,9 @@ assets:
     spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 끊김 없는 루프, 4MB 이하, 보컬 없음"
     prompt: "Instrumental fast folk reel in 4/4, about 140 BPM, D major. Fiddle drives a running eighth-note melody, tin whistle takes it on the repeat, plucked mandolin offbeat chords, upright bass, foot stomps on a wooden deck, tambourine. Bright, breezy, a fair wind filling the sails and the crew grinning, a little faster and more energetic than a tavern jig. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
     url: ""
-    status: pending
-    license: ""
-    note: "곡 이름: 순풍이다!(평소 항해 중간중간 나오는 생동감 곡, 모든 수역 공통)"
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6) 생성 — 사이트·문서에 상업 프로젝트 이용 가능 표기, 이용약관(2025-08-01)에는 생성곡 소유권·라이선스 조항 없음(2026-11-25 확인)"
+    note: "곡 이름: 순풍이다!(평소 항해 중간중간 나오는 생동감 곡, 모든 수역 공통) · agent-bridge 2026-11-25-danny-game-center-sailing-master-001 · Suno V6 연주곡 · taskId c67f953d50320f55145bc0c405384986, trackId 137d78e2-7874-44fb-bb19-6175d26ed9b6 · 길이 2:30 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드(ffmpeg) · 평균 -17.5dB 안팎, 128kbps 44.1kHz · 요청 1회 12크레딧(2테이크 중 1개, 파형 수치로 고름·청취 전)"
   - id: bgm-port
     kind: music
     source: generate
@@ -100,9 +100,9 @@ assets:
     spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 끊김 없는 루프, 4MB 이하, 보컬 없음"
     prompt: "Instrumental folk street-festival polka in 4/4, about 120 BPM, F major. Accordion leads a singable oom-pah melody, tin whistle answers, plucked mandolin chords, upright bass, hand claps, foot stomps, tambourine and frequent clinking of mugs, a distant hubbub of a crowded harbor market day. Warm, homely, common folk celebrating on the docks of a small Age of Sail harbor town. Short open-air reverb. Not cute, not childlike. No vocals, no singing, no spoken words. Seamless loop: the ending leads naturally back into the beginning."
     url: ""
-    status: pending
-    license: ""
-    note: "곡 이름: 부두 장날(항구에 있을 때만, 모든 수역 공통)"
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6) 생성 — 사이트·문서에 상업 프로젝트 이용 가능 표기, 이용약관(2025-08-01)에는 생성곡 소유권·라이선스 조항 없음(2026-11-25 확인)"
+    note: "곡 이름: 부두 장날(항구에 있을 때만, 모든 수역 공통) · agent-bridge 2026-11-25-danny-game-center-sailing-master-001 · Suno V6 연주곡 · taskId ab8ee1b132c1c683db9ed597c5fdd7c5, trackId cb17a08d-d7db-4722-9e49-5e2e88c07bdd · 길이 2:31 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드(ffmpeg) · 평균 -17.5dB 안팎, 128kbps 44.1kHz · 요청 1회 12크레딧(2테이크 중 1개, 파형 수치로 고름·청취 전)"
   - id: bgm-storm
     kind: music
     source: generate
@@ -110,9 +110,9 @@ assets:
     spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 끊김 없는 루프, 4MB 이하, 보컬 없음"
     prompt: "Instrumental very fast, intense sea-shanty folk in 4/4, about 156 BPM, E harmonic minor. Aggressive bowed fiddle melody, accordion stabs, driving upright bass on every eighth note, pounding foot stomps and bodhran, tense low drone underneath. A sudden squall hitting a small sailing boat, crew fighting the ropes, urgent and dramatic but still folk, not orchestral, not metal. Short wooden-room reverb. No vocals. Seamless loop: the ending leads naturally back into the beginning."
     url: ""
-    status: pending
-    license: ""
-    note: "곡 이름: 돌풍 속으로(기상이변 곡. 지금은 돌풍 예고·돌풍 동안, S5 날씨 체계부터는 폭풍 이벤트)"
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6) 생성 — 사이트·문서에 상업 프로젝트 이용 가능 표기, 이용약관(2025-08-01)에는 생성곡 소유권·라이선스 조항 없음(2026-11-25 확인)"
+    note: "곡 이름: 돌풍 속으로(기상이변 곡. 돌풍·폭풍·태풍) · agent-bridge 2026-11-25-danny-game-center-sailing-master-001 · Suno V6 연주곡 · taskId ad658e895c1977287bfc069a8df432ee, trackId 16fb2792-38d8-4fd2-9b7a-30bcd54312e6 · 길이 2:30 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드(ffmpeg) · 평균 -17.5dB 안팎, 128kbps 44.1kHz · 요청 1회 12크레딧(2테이크 중 1개, 파형 수치로 고름·청취 전)"
   - id: story-ride
     kind: image
     source: generate
@@ -241,9 +241,9 @@ assets:
     spec: "mp3 스테레오 128kbps, 44.1kHz, 2:00~3:00, 끊김 없는 루프, 4MB 이하, 보컬 없음"
     prompt: "Instrumental sea-shanty folk in 6/8, about 96 BPM, G major. Fiddle and accordion carry a broad, rolling melody, tin whistle answers, plucked mandolin, upright bass, bodhran and soft foot stomps, a sustained low accordion drone like a horizon. Open sea between scattered tropical islands, steady trade wind, sunlight on long swells, confident and free. Short wooden-room reverb. Not cute, not childlike. No vocals. Seamless loop: the ending leads naturally back into the beginning."
     url: ""
-    status: pending
-    license: ""
-    note: "곡 이름: 섬과 섬 사이(큰 바다 항해, sea.mp3와 번갈아)"
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6) 생성 — 사이트·문서에 상업 프로젝트 이용 가능 표기, 이용약관(2025-08-01)에는 생성곡 소유권·라이선스 조항 없음(2026-11-25 확인)"
+    note: "곡 이름: 섬과 섬 사이(큰 바다 항해, sea.mp3와 번갈아) · agent-bridge 2026-11-25-danny-game-center-sailing-master-001 · Suno V6 연주곡 · taskId 1d2d7dfe0699a10f0dd8e34635b137f5, trackId 86332fbb-133e-482e-a836-e24da2e90ba4 · 길이 2:31 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드(ffmpeg) · 평균 -17.5dB 안팎, 128kbps 44.1kHz · 요청 1회 12크레딧(2테이크 중 1개, 파형 수치로 고름·청취 전)"
   - id: bgm-ocean
     kind: music
     source: generate
@@ -251,9 +251,9 @@ assets:
     spec: "mp3 스테레오 128kbps, 44.1kHz, 2:30~3:30, 끊김 없는 루프, 4MB 이하, 보컬 없음"
     prompt: "Instrumental slow folk ballad in 3/4, about 72 BPM, D dorian. Solo fiddle sings a long, lonely melody over a quiet accordion drone, plucked mandolin arpeggios, upright bass on the downbeats, very soft bodhran like distant waves. Crossing an endless ocean at dawn, small ship under a huge sky, solitary but hopeful, grand and calm. Gentle wooden-room reverb, a little wider than a tavern. Not orchestral, not cute. No vocals. Seamless loop: the ending leads naturally back into the beginning."
     url: ""
-    status: pending
-    license: ""
-    note: "곡 이름: 끝없는 물(대양 항해, opensea와 번갈아)"
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6) 생성 — 사이트·문서에 상업 프로젝트 이용 가능 표기, 이용약관(2025-08-01)에는 생성곡 소유권·라이선스 조항 없음(2026-11-25 확인)"
+    note: "곡 이름: 끝없는 물(대양 항해, opensea와 번갈아) · agent-bridge 2026-11-25-danny-game-center-sailing-master-001 · Suno V6 연주곡 · taskId 4934c7f114303d0444083641052043fc, trackId 3b835f77-6fc7-442d-89a4-daf4bcd619a4 · 길이 2:56 · 앞뒤 무음 제거 + 끝 2.5초를 처음에 크로스페이드(ffmpeg) · 평균 -17.5dB 안팎, 128kbps 44.1kHz · 요청 1회 12크레딧(2테이크 중 1개, 파형 수치로 고름·청취 전)"
   - id: bgm-ending
     kind: music
     source: generate
@@ -261,9 +261,9 @@ assets:
     spec: "mp3 스테레오 128kbps, 44.1kHz, 2:30~3:00, 루프 아님(분명한 끝맺음), 4MB 이하, 보컬 없음"
     prompt: "Instrumental folk finale, starts slow in 3/4 at about 70 BPM with solo fiddle and accordion recalling a simple sea-shanty theme, then gathers into a joyful 6/8 reel at about 120 BPM with tin whistle, mandolin, upright bass, bodhran, foot stomps and clinking mugs, and ends on a warm held major chord. A small crew finally reaching a new continent after crossing the ocean, celebration on the docks at sunset, proud and tender. Wooden-room reverb. Not orchestral, not cute. No vocals."
     url: ""
-    status: pending
-    license: ""
-    note: "곡 이름: 건너편 부두(엔딩, 한 번 재생)"
+    status: done
+    license: "sunoapi.org 유료 API(Suno V6) 생성 — 사이트·문서에 상업 프로젝트 이용 가능 표기, 이용약관(2025-08-01)에는 생성곡 소유권·라이선스 조항 없음(2026-11-25 확인)"
+    note: "곡 이름: 건너편 부두(엔딩, 한 번 재생) · agent-bridge 2026-11-25-danny-game-center-sailing-master-001 · Suno V6 연주곡 · taskId b01148769fa39e6a8acf9f3e86db14d4, trackId 9c52ea02-c67d-4940-bee2-26686bdb6f93 · 길이 2:43 · 루프 아님: 앞뒤 무음만 제거 · 평균 -17.5dB 안팎, 128kbps 44.1kHz · 요청 1회 12크레딧(2테이크 중 1개, 파형 수치로 고름·청취 전)"
   - id: story-endArrival
     kind: image
     source: generate
