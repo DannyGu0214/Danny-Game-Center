@@ -59,7 +59,7 @@
 | 이름 | 한 줄 설명 | 쓸 상황 | 엔진 의존도 | 스크립트 유무 | SKILL.md URL |
 |---|---|---|---|---|---|
 | <a id="skill-ai-behavior-trees-utility-ai"></a>`ai-behavior-trees-utility-ai` | 블랙보드, 반응형 컴포지트, 데코레이터, 응답 곡선 스코어링 기반의 범용 BT·유틸리티 AI 코드 | 적이 시야를 잃어도 계속 쫓거나 매 프레임 행동을 재시작·진동할 때 | 개념만 | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/ai-behavior-trees-utility-ai/SKILL.md) |
-| <a id="skill-audio-design"></a>`audio-design` | 버스 레이아웃, 데시벨 볼륨 슬라이더, 음량, 대사 중 덕킹, 적응형 음악, SFX 변주 | 사운드 믹싱, 전투 반응형 BGM, 단조로운 발소리·비트 싱크 개선할 때 | 개념만 (Godot/Unity/FMOD 매핑) | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/audio-design/SKILL.md) |
+| <a id="skill-audio-design"></a>`audio-design` | 버스 레이아웃, 데시벨 볼륨 슬라이더, 음량, 대사 중 덕킹, 적응형 음악, SFX 변주 | 사운드 믹싱, 전투 반응형 BGM, 단조로운 발소리·비트 싱크 개선할 때(효과음 파일 생성은 [sunoapi.org](pipeline.md#sfx-sunoapi) 💳 1순위, 대안 ElevenLabs 💳) | 개념만 (Godot/Unity/FMOD 매핑) | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/audio-design/SKILL.md) |
 | <a id="skill-camera-systems"></a>`camera-systems` | 데드존·선행 시야 2D 추적, 3인칭 오빗, 1인칭 시점, 화면 분할 카메라 튜닝 | 카메라가 덜덜 떨리거나, 맵 밖을 비추거나, 벽을 뚫거나, FPS에 따라 속도가 다를 때 | 개념만 (Godot/Cinemachine 매핑) | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/camera-systems/SKILL.md) |
 | <a id="skill-create-game-assets"></a>`create-game-assets` | 스타일 가이드, 스프라이트, 픽셀아트, 타일셋, 아이콘, 텍스처 제작·검증 및 라이선스 기록 | 게임 아트 일관성 확보, AI 생성 아트의 가짜 투명도·Steam AI 고지 점검할 때 | 개념만 | 있음 (`scripts/`) | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/create-game-assets/SKILL.md) |
 | <a id="skill-dialogue-systems"></a>`dialogue-systems` | Ink, Yarn Spinner 또는 경량 JSON 그래프 러너 기반 분기 대화·조건·변수·로컬라이징 ID | NPC 대화 트리, 짧은 대사(barks), `.ink`/`.yarn` 연동, 막다른 대화 수정할 때 | 개념만 | 없음 | [SKILL.md](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/disciplines/dialogue-systems/SKILL.md) |
@@ -244,7 +244,7 @@
 | 이름 | 영상에서 | 저장소 대조 결과 |
 |---|---|---|
 | `img2threejs` | three.js 3D 모델이 나와요. 필요 조건은 Python·Node | 출력이 TypeScript(`THREE.Group`)예요. Python은 외부 패키지가 필요 없어요 |
-| `threejs-game-skills` | 화면에 "그림·소리 자동 생성은 유료 키 필요(안 써도 됨)"라고 안내해요 | 유료 키가 필요한 생성기는 9개 중 3개(Tripo·Gemini·ElevenLabs)예요. 스캐폴드는 Vite·TS 전제이고 Python 스크립트도 써요 |
+| `threejs-game-skills` | 화면에 "그림·소리 자동 생성은 유료 키 필요(안 써도 됨)"라고 안내해요 | 유료 키가 필요한 생성기는 9개 중 3개(Tripo·Gemini·ElevenLabs)예요. 우리 효과음 1순위는 이 생성기가 아니라 [sunoapi.org](pipeline.md#sfx-sunoapi) 💳예요. 스캐폴드는 Vite·TS 전제이고 Python 스크립트도 써요 |
 | `logo-design-skill` | Python 필요 | 파비콘·앱 아이콘 PNG를 만들려면 SVG 변환 도구가 하나 더 필요해요 |
 | `sprite-gen` | Python과 ChatGPT 또는 Grok 계정 | FFmpeg·Node.js·`img2webp`·`rife-ncnn-vulkan`도 얽혀 있고, `OPENAI_API_KEY`·`XAI_API_KEY` 방식도 있어요 |
 | `mcp-for-blender` | 사용 통계가 기본으로 켜져 있어요 | 동의하면 프롬프트·코드·화면 캡처까지 보낼 수 있고, 외부 에셋 연동이 있어요 |
