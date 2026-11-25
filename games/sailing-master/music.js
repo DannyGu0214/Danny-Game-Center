@@ -184,12 +184,14 @@ export const levelOf = (v) => (v > 0 ? Math.min(1, v) ** 2 : 0);
 const INTRO_BARS = 2;
 
 
-// 곡마다 mp3. 파일이 없거나(READY 밖, 2026-11-12 기준 lively·port·storm) 못 읽는 곡은 합성곡으로 틀어요. 바다·대양 곡(sea)은 앞바다(M2a, SAIL_SETS.coast)부터 써요
+// 곡마다 mp3. 파일이 없거나(READY 밖) 못 읽는 곡은 합성곡으로 틀어요. 바다·대양 곡(sea)은 앞바다(M2a, SAIL_SETS.coast)부터 써요
 export const FILES = { pond: 'pond', lake: 'lake', river: 'river', sea: 'sea', lively: 'lively', port: 'port', storm: 'storm', opensea: 'opensea', ocean: 'ocean', ending: 'ending' };
 // 새 곡 mp3가 없으면 이웃 곡으로(M4 O5): 큰 바다 → 앞바다 곡, 대양 → 큰 바다 곡, 엔딩 → 대양 곡. 합성곡은 따로 만들지 않아요(없는 곡 이름은 강 곡 합성곡으로)
 export const FALLBACK = { opensea: 'sea', ocean: 'opensea', ending: 'ocean' };
 // 저장소에 실제로 있는 mp3. 여기 없는 곡은 찾지 않고 바로 합성곡으로 틀어요(없는 파일을 찾다 콘솔에 404가 쌓이지 않게). 새 mp3가 오면 여기에 더해요
-export const READY = new Set(['pond', 'lake', 'river', 'sea']);
+export const READY = new Set(['pond', 'lake', 'river', 'sea', 'lively', 'port', 'storm', 'opensea', 'ocean', 'ending']);
+// 반복하지 않고 한 번만 트는 곡(분명한 끝맺음). 다시 이 곡으로 올 때만 처음부터
+export const ONCE = new Set(['ending']);
 // mp3는 평균 -17.5dB(RMS 약 0.13)라 합성곡(RMS 약 0.035)과 크기를 맞추려고 줄인다
 const FILE_GAIN = 0.42;
 export function createMusic({ volume = 0.65, rand = Math.random, base = 'assets/music/' } = {}) { // 파도 소리(RMS 약 0.06)에 묻히지 않을 크기
@@ -203,7 +205,7 @@ export function createMusic({ volume = 0.65, rand = Math.random, base = 'assets/
   const fileOf = (id) => { for (let i = 0; id && i < 4; i++, id = FALLBACK[id]) if (FILES[id] && !failed.has(FILES[id])) return FILES[id]; return null; };
   function fileTrack(name) {
     if (files[name]) return files[name];
-    const el = new Audio(); el.src = `${base}${name}.mp3`; el.loop = true; el.preload = 'auto'; el.crossOrigin = 'anonymous';
+    const el = new Audio(); el.src = `${base}${name}.mp3`; el.loop = !ONCE.has(name); el.preload = 'auto'; el.crossOrigin = 'anonymous';
     const g = ac.createGain(); g.gain.value = 0.0001; g.connect(bus);
     const src = ac.createMediaElementSource(el); src.connect(g);
     const f = files[name] = { name, el, g };
@@ -235,8 +237,9 @@ export function createMusic({ volume = 0.65, rand = Math.random, base = 'assets/
       const old = fileCur, f = fileTrack(name);
       if (old) letGo(old);
       stopSynth();
+      if (ONCE.has(name)) f.el.currentTime = 0;
       fileCur = f; playFile(f); fade(f.g, FILE_GAIN, FADE_S);
-    } else if (fileCur.el.paused) playFile(fileCur);
+    } else if (fileCur.el.paused && !(ONCE.has(name) && fileCur.el.ended)) playFile(fileCur); // 끝난 한 번짜리 곡은 다시 안 틀어요
     return true;
   }
   function makeReverb() {
@@ -332,7 +335,7 @@ export function createMusic({ volume = 0.65, rand = Math.random, base = 'assets/
       if (audible()) { tickFile(); prime(); } // 탭한 그 순간에 재생을 시작해야 iOS가 막지 않는다
     },
     // 화면을 탭할 때마다: 막혔던 파일 재생을 그 탭 안에서 다시 시작한다(iOS)
-    kick() { if (ac && audible() && fileCur && fileCur.el.paused) playFile(fileCur); },
+    kick() { if (ac && audible() && fileCur && fileCur.el.paused && !fileCur.el.ended) playFile(fileCur); },
     setRegion(id) { if ((SAIL_SETS[id] || TRACKS[id]) && id !== dir.region) dir = startSail(id); },
     // 상황 바꾸기: 'sail' | 'port' | 'storm'. 곡은 4초 동안 겹쳐 넘어가요(합성곡은 다음 마디부터)
     setMood(m) { if (MOODS.includes(m)) mood = m; },

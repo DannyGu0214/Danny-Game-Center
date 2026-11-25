@@ -97,7 +97,7 @@ export const WX_ORDER = Object.keys(WX); // 심한 것부터(같은 날 여럿�
 // crewTime·capTime: 바다에서 갑판원·선장이 꿰매는 데 걸리는 초. spare: 출항할 때 창고에서 화물칸으로 알아서 싣는 수선용 마포
 export const SAILCLOTH = { tornMax: 0.45, warnAt: 0.5, relax: 1 / 20, cloth: 2, coin: 10, crewTime: 20, capTime: 30, spare: 2 };
 // 젖은 식량: 비를 soak초 맞으면 젖어요. 빵은 bread일, 물고기는 ffish일 일찍 상하고, 건어는 dfish일 뒤에 상해요
-export const WET = { soak: 25, bread: 2, ffish: 1, dfish: 3 };
+export const WET = { soak: 25, bread: 2, ffish: 1, dfish: 4 }; // 건어 3 → 4일(2026-11-25): 대양 한 구간(4~6일)에서 한 번 젖은 건어가 다 상해 굶던 고리를 덜어요
 
 // 선체(배 평면 격자는 cols × rows, 칸 한 변 cell m. x0: 0행 앞쪽 끝의 배 좌표). id는 등급과 별을 함께 나타낸다: sloop = 슬루프 ★1, sloop2 = ★2
 // hp: 내구도(피해는 절대값으로 들어온다), yard: 필요한 조선소 등급, speed: 항해 속도 배율(노·돛 모두. 뗏목 2배, 이후 배는 이전 값의 1.5배)
@@ -252,7 +252,7 @@ export const STORIES = {
   ] },
 };
 
-// 엔딩 이야기(M4 O4, PLAN-M3.md 8-5절): 새 대륙 항구에 처음 닿을 때 3쪽. 1·3쪽은 공통, 2쪽은 선장별. 글은 초안이라 대니님 확인이 필요해요
+// 엔딩 이야기(M4 O4, PLAN-M3.md 8-5절): 새 대륙 항구에 처음 닿을 때 3쪽. 1·3쪽은 공통, 2쪽은 선장별. 글은 대니님이 확정했어요(2026-11-25)
 export const ENDINGS = {
   arrival: { title: '새 대륙', scene: 'endArrival', text: '안개가 걷히던 아침, 돛대 위 견시가 소리쳤어요. “육지다!”\n수평선 위로 높은 바위 절벽과 하얀 등대가 떠올랐어요. {N은} 키를 쥔 채 한참 말이 없었어요. 갈대 나루의 뗏목 한 척, 노 한 쌍에서 여기까지 온 길이었어요.\n탐사선이 석조 부두에 닿자 종탑이 울렸어요. 건너편 사람들이 손을 흔들며 달려 나왔지요. 길고 긴 대양을 정말로 건넌 거예요!' },
   captain: {
@@ -306,6 +306,8 @@ export const SUPPLY = {
 };
 // 조수기(M2b): 짠물 바다를 항해하는 동안(입항 중엔 안 돌아요) 하루 perDay통씩 식수를 만들어요
 export const DESAL = { perDay: 2 };
+// 대양 구조·외상(2026-11-25): 대양에서 구조받으면 비용은 feeCap까지만, keep 모듈(물통·식량칸·조수기·차양·방수 격벽·바닥짐)은 안 부서져요
+export const OCEAN_AID = { feeCap: 15, keep: ['water', 'food', 'desal', 'awning', 'bulkhead', 'ballast'] };
 export const HERB = { name: '약초', icon: '🌿', price: 3, cap: 5, vigor: 0.45, at: 0.35, desc: '기력이 바닥나기 전에 알아서 씹어 먹지' };
 
 export const SPECIES = {
@@ -498,34 +500,35 @@ export const REGIONS = {
     flot: { cap: 36, table: [['wood', 1, 3, 6], ['oak', 1.5, 2, 5], ['teak', 0.8, 1, 3], ['net', 2, 3, 6], ['syrope', 0.8, 1, 3], ['plate', 1, 1, 2], ['steel', 0.4, 1, 2], ['gear', 0.5, 1, 1], ['water', 3, 2, 3], ['shiny', 6, 1, 2]] },
     trade: [['porcelain', 3], ['silk', 4], ['painting', 1.2], ['spice', 2]], demand: ['spice', 'silk'],
   },
-  // M4 O0 대양(2026-11-24, PLAN-M3.md 7절): 남북으로 긴 바다 한 장(1.8 × 12.4km). 동·서·남 끝은 안개 경계, 북쪽은 새 대륙 해안선(shape.north).
-  // 항구 넷: 마지막 등대(남) · 산호섬 둘(−4,000, −6,500: 둘째는 무풍대 한가운데라 구간이 2.5km예요) · 새 대륙 항구(북, 처음 닿으면 엔딩은 O4). 바람 띠·무풍대는 O1, 대양 태풍은 O2, 발견지·생물은 O3
+  // M4 O0 대양(2026-11-24, PLAN-M3.md 7절): 남북으로 긴 바다 한 장(1.8 × 17.25km). 동·서·남 끝은 안개 경계, 북쪽은 새 대륙 해안선(shape.north).
+  // 2026-11-25 지도 늘리기(DESIGN 51절): 무역풍·편서풍 띠만 남북 ×1.5로 늘리고 무풍대(2.7km)와 산호섬 사이(2.5km)는 그대로 북쪽으로 옮겼어요(logic.js OCEAN_V10). 산호섬은 무풍대와 함께, 새 대륙 해안 근처는 해안선과 함께 옮겨요
+  // 항구 넷: 마지막 등대(남) · 산호섬 둘(−6,200, −8,700: 둘째는 무풍대 한가운데라 구간이 2.5km예요) · 새 대륙 항구(북, 처음 닿으면 엔딩은 O4). 바람 띠·무풍대는 O1, 대양 태풍은 O2, 발견지·생물은 O3
   ocean: {
     id: 'ocean', name: '대양', order: 5, grade: 5, theme: 'ocean', yard: 5, zoom: 5.5, salt: true, wageK: 0.5, tide: false, edgeFog: 150, fast: true,
     wind: { from: 45 * D, speed: 10, swing: 0.5 }, gustK: 1.5, stormK: 2.0, heat: true, weather: ['typhoon', 'storm', 'gust', 'squall', 'seafog', 'calm', 'heat', 'bigswell'],
     swell: { base: 1.8, day: 0.5, gust: 0.4, storm: 1.3 },
     // 바람 띠(M4 O1, PLAN-M3.md 7-2절): 배 y로 골라요(경계 300m씩 섞어요). 무풍대는 지도에 고정(calm)이라 해도에 빗금 띠로 늘 보여요. from은 바람이 오는 쪽(동 0°·남 90°), swellK는 너울 배율
-    windBands: [{ id: 'trade', name: '무역풍', y0: 400, y1: -4400, from: 45 * D, speed: 10, swing: 0.4, swellK: 1 }, { id: 'doldrums', name: '무풍대', y0: -4400, y1: -7100, from: 100 * D, speed: 1.5, swing: 1.4, swellK: 0.5, calm: true }, { id: 'westerlies', name: '편서풍', y0: -7100, y1: -12800, from: 180 * D, speed: 13, swing: 0.35, swellK: 1.2, gusty: 1 }],
-    shape: { kind: 'isles', x0: -900, x1: 900, y0: -12400, y1: 400, cell: 16, nav: 24, ty: [-10500, -1500], swell: { calmR: 180, calmK: 0.3 }, north: { base: -11600, bumps: [[-500, 220, 120], [300, 160, -90], [650, 200, 70]], wig: [[14, 160, 0.4], [7, 55, 1.7]] } },
+    windBands: [{ id: 'trade', name: '무역풍', y0: 400, y1: -6600, from: 45 * D, speed: 10, swing: 0.4, swellK: 1 }, { id: 'doldrums', name: '무풍대', y0: -6600, y1: -9300, from: 100 * D, speed: 1.5, swing: 1.4, swellK: 0.5, calm: true }, { id: 'westerlies', name: '편서풍', y0: -9300, y1: -18705, from: 180 * D, speed: 13, swing: 0.35, swellK: 1.2, gusty: 1 }],
+    shape: { kind: 'isles', x0: -900, x1: 900, y0: -18045, y1: 400, cell: 16, nav: 24, ty: [-14910, -2250], swell: { calmR: 180, calmK: 0.3 }, north: { base: -16725, bumps: [[-500, 220, 120], [300, 160, -90], [650, 200, 70]], wig: [[14, 160, 0.4], [7, 55, 1.7]] } },
     currents: [],
-    islands: [{ x: 0, y: 285, r: 34, ph: 1.1 }, { x: -250, y: -4000, r: 100, ph: 2.3 }, { x: 300, y: -6500, r: 110, ph: 4.1 }],
+    islands: [{ x: 0, y: 285, r: 34, ph: 1.1 }, { x: -250, y: -6200, r: 100, ph: 2.3 }, { x: 300, y: -8700, r: 110, ph: 4.1 }],
     lights: [{ x: 0, y: 252, r: 320 }],
     start: 'lastLight',
-    ports: [{ id: 'lastLight', name: '마지막 등대', x: 0, y: 252, water: 2 }, { id: 'atollA', name: '첫째 산호섬 나루', x: -250, y: -3893, water: 3, shop: false }, { id: 'atollB', name: '둘째 산호섬 나루', x: 300, y: -6388, water: 3, shop: false }, { id: 'newLand', name: '새 대륙 항구', x: 0, y: -11570, water: 2, yard: 5 }],
+    ports: [{ id: 'lastLight', name: '마지막 등대', x: 0, y: 252, water: 2 }, { id: 'atollA', name: '첫째 산호섬 나루', x: -250, y: -6093, water: 3, shop: false }, { id: 'atollB', name: '둘째 산호섬 나루', x: 300, y: -8588, water: 3, shop: false }, { id: 'newLand', name: '새 대륙 항구', x: 0, y: -16692, water: 2, yard: 5 }],
     gates: [{ id: 'toSea', name: '남쪽 물목', x: 0, y: 360, to: 'sea', entry: 'depot', req: {}, open: true }],
     // M4 O3 발견지 8곳(PLAN-M3.md 8-2절). 자리는 모두 정해져 있어요(fixed): 띠마다 어울리는 곳에
     finds: [
-      { id: 'kelpMat', name: '떠도는 해초 숲', x: -420, y: -5600, fixed: true, where: 'water', size: 1.3, coin: 50, syrope: 8, relic: '해초에 엉킨 낡은 닻줄', art: 'kelp' },
-      { id: 'seaVent', name: '해저 화산 김', x: 520, y: -2300, fixed: true, where: 'water', coin: 60, steel: 6, relic: '뜨거운 부석', art: 'vent' },
-      { id: 'iceberg', name: '빙산', x: -560, y: -10900, fixed: true, where: 'water', size: 1.4, coin: 70, synth: 8, relic: '빙산 속 오래된 공기방울', art: 'iceberg' },
-      { id: 'whaleGround', name: '고래가 모이는 바다', x: 520, y: -9300, fixed: true, where: 'water', size: 1.3, coin: 60, teak: 10, relic: '고래 노래를 닮은 소라', art: 'whalespot' },
-      { id: 'expBottle', name: '옛 탐험대의 표류병', x: -380, y: -900, fixed: true, where: 'water', coin: 40, relic: '탐험대의 마지막 편지(「서쪽 별을 따라 북으로 간다」)', art: 'bottle' },
-      { id: 'weatherBuoy', name: '무인 기상 부표', x: 380, y: -1100, fixed: true, where: 'water', coin: 40, chip: 2, relic: '기상 부표 표식판', art: 'buoy' },
-      { id: 'lagoonBoat', name: '석호의 쪽배', x: -140, y: -3995, fixed: true, where: 'beach', coin: 40, teak: 12, relic: '쪽배 이물의 조개 장식', art: 'beached' },
-      { id: 'farSideStone', name: '새 대륙 절벽 표지', x: 120, y: -11500, fixed: true, inland: 30, coin: 80, relic: '건너편 사람들의 표지석', art: 'stone' },
+      { id: 'kelpMat', name: '떠도는 해초 숲', x: -420, y: -7800, fixed: true, where: 'water', size: 1.3, coin: 50, syrope: 8, relic: '해초에 엉킨 낡은 닻줄', art: 'kelp' },
+      { id: 'seaVent', name: '해저 화산 김', x: 520, y: -3450, fixed: true, where: 'water', coin: 60, steel: 6, relic: '뜨거운 부석', art: 'vent' },
+      { id: 'iceberg', name: '빙산', x: -560, y: -15570, fixed: true, where: 'water', size: 1.4, coin: 70, synth: 8, relic: '빙산 속 오래된 공기방울', art: 'iceberg' },
+      { id: 'whaleGround', name: '고래가 모이는 바다', x: 520, y: -12930, fixed: true, where: 'water', size: 1.3, coin: 60, teak: 10, relic: '고래 노래를 닮은 소라', art: 'whalespot' },
+      { id: 'expBottle', name: '옛 탐험대의 표류병', x: -380, y: -1350, fixed: true, where: 'water', coin: 40, relic: '탐험대의 마지막 편지(「서쪽 별을 따라 북으로 간다」)', art: 'bottle' },
+      { id: 'weatherBuoy', name: '무인 기상 부표', x: 380, y: -1650, fixed: true, where: 'water', coin: 40, chip: 2, relic: '기상 부표 표식판', art: 'buoy' },
+      { id: 'lagoonBoat', name: '석호의 쪽배', x: -140, y: -6195, fixed: true, where: 'beach', coin: 40, teak: 12, relic: '쪽배 이물의 조개 장식', art: 'beached' },
+      { id: 'farSideStone', name: '새 대륙 절벽 표지', x: 120, y: -16615, fixed: true, inland: 30, coin: 80, relic: '건너편 사람들의 표지석', art: 'stone' },
     ],
     // 산호초 고리: 수심 1.6~2.0m라 탐사선(흘수 1.3m)도 지나가요. 해도에서 얕은 물로 보여요
-    shoals: [{ x: -250, y: -3860, r: 60, depth: 1.8 }, { x: -180, y: -3990, r: 60, depth: 1.7 }, { x: -320, y: -3990, r: 60, depth: 1.9 }, { x: 300, y: -6360, r: 60, depth: 1.8 }, { x: 390, y: -6500, r: 60, depth: 1.7 }, { x: 230, y: -6590, r: 60, depth: 2 }],
+    shoals: [{ x: -250, y: -6060, r: 60, depth: 1.8 }, { x: -180, y: -6190, r: 60, depth: 1.7 }, { x: -320, y: -6190, r: 60, depth: 1.9 }, { x: 300, y: -8560, r: 60, depth: 1.8 }, { x: 390, y: -8700, r: 60, depth: 1.7 }, { x: 230, y: -8790, r: 60, depth: 2 }],
     flot: { cap: 40, table: [['wood', 0.6, 3, 6], ['teak', 1.2, 1, 3], ['net', 1.6, 3, 6], ['syrope', 1, 1, 3], ['steel', 0.6, 1, 2], ['water', 3.5, 2, 3], ['shiny', 8, 1, 2]] },
     trade: [['spice', 2], ['porcelain', 2], ['silk', 3], ['painting', 2]], demand: ['coffee', 'porcelain'],
   },

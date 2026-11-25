@@ -996,7 +996,7 @@ function showDisaster(cause) {
   overlay(`<h3>🆘 구조 신호</h3><p>${why}</p><p>지나가던 배가 신호를 봤어! 가까운 나루까지 끌어다 준대.</p>`, '구조받기', () => {
     const r = G.rescue(S); bakeIfNeeded(); changeRegionArt();
     const lost = fmt(r.lost);
-    overlay(`<h3>살았다!</h3><p>잃은 화물: ${lost}</p>${r.broke.length ? `<p>부서진 모듈: ${r.broke.map((m) => MODULES[m].name).join(', ')}</p>` : ''}${r.left ? `<p>${r.left}이(가) 배에서 내렸어.</p>` : ''}<p>구조 비용 🪙${r.fee} · 선체 35%</p>`, '항구로', () => openPort());
+    overlay(`<h3>살았다!</h3><p>잃은 화물: ${lost}</p>${r.broke.length ? `<p>부서진 모듈: ${r.broke.map((m) => MODULES[m].name).join(', ')}</p>` : ''}${r.left ? `<p>${r.left}이(가) 배에서 내렸어.</p>` : ''}<p>구조 비용 🪙${r.fee} · 선체 ${Math.round(S.hull * 100)}%</p>`, '항구로', () => openPort({ credit: r.credit }));
   });
 }
 // 진짜 엔딩(M4 O4): 새 대륙 항구에 처음 닿으면 뱃고동 + 2초 뒤 이야기 3쪽(공통 · 선장별 · 공통+기록). 닫으면 항구에서 계속 항해해요
@@ -1115,6 +1115,8 @@ function openPort(ev) {
   if (ev?.patched) toast('부두 사람들이 구멍 난 데를 대충 때워 줬어! 다음엔 금화나 잡목을 챙기라고!');
   if (ev?.sewn) toast('돛장이가 외상으로 돛을 꿰매 줬어! 다음엔 마포를 챙기라고!');
   if (ev?.waterGift) toast('💧 마을 사람들이 물 한 통씩 나눠 줬어. 다음엔 금화를 챙기라고!');
+  if (ev?.paid) toast(`🪙 외상 ${ev.paid}닢을 갚았어${S.debt ? ` (남은 외상 ${S.debt})` : ''}`);
+  if (ev?.credit) toast(`🏝 금화가 모자라 외상으로 건어 ${ev.credit.food}·식수 ${ev.credit.water}통${ev.credit.fix ? '·선체 수리' : ''}를 해 줬어! 외상 🪙${S.debt}, 금화가 생기면 갚자`);
   if (ev?.scoop) toast(`💧 민물을 퍼 담았다! 물통 가득(+${Math.round(ev.scoop * 10) / 10})`);
 }
 // 예보 칸(S5): 그날 오는 날씨 아이콘(심한 것 둘까지)과 가장 심한 것의 이름. 안개는 내일까지만 보여요
