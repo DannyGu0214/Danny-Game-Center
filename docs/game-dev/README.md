@@ -53,3 +53,5 @@
 ## 함께 보기
 
 - [게임 개발용 에이전트 스킬 카탈로그](gamedev-skills-catalog.md)
+- [게임 개발 파이프라인](pipeline.md): 단계별 진행 순서와 상황별로 꺼내 읽을 스킬
+- [참고 영상 정리: 클로드 스킬·도구 13종 비교](references/video-skills-13.md)
