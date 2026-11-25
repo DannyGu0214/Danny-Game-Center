@@ -3,6 +3,8 @@ name: threejs-aaa-graphics-builder
 description: "Upgrade Three.js games from prototype visuals to premium browser graphics: art-direction critique, procedural model building, material and texture libraries, world prop kits, shaders, VFX, lighting and render pipeline, LOD and instancing, render budgets, and a 10-category visual scorecard. Use when screenshots still look basic or the user asks for premium, AAA, high-fidelity, showcase, or less-basic graphics."
 ---
 
+> **이 저장소에서는 운영자 승인 전 유료 생성(Tripo·Gemini·ElevenLabs)과 키 확인 스크립트(probe_asset_credentials.sh 등, 셸 설정 source) 실행 금지. 하위 에이전트를 따로 띄우지 말고 현재 작업자가 직접 작업.**
+
 # Three.js AAA Graphics Builder
 
 Own the production graphics pass: turn basic screenshots into authored, high-density, performance-aware visuals.

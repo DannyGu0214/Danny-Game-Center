@@ -10,8 +10,9 @@
 
 ## 원본에서 바꾼 점
 
-아래 세 파일의 YAML 머리말 바로 아래에 사용 금지 문구 한 단락을 넣었어요. 그 밖의 파일은 원본 그대로예요.
+아래 다섯 파일의 YAML 머리말 바로 아래에 금지 문구 한 단락을 넣었어요. 그 밖의 파일은 원본 그대로예요.
 
+- `threejs-game-director/SKILL.md` · `threejs-aaa-graphics-builder/SKILL.md`: 유료 생성·키 확인 스크립트 금지, 하위 에이전트 없이 직접 작업
 - `threejs-3d-generator/SKILL.md`
 - `threejs-image-generator/SKILL.md`
 - `threejs-audio-generator/SKILL.md`
@@ -19,9 +20,9 @@
 ## 이 저장소에서 쓸 때
 
 - **생성기 3개는 승인 전에 쓰지 않아요.** Tripo(`TRIPO_API_KEY`), Gemini(`GEMINI_API_KEY`), ElevenLabs(`ELEVENLABS_API_KEY`)로 프롬프트·이미지·음성이 전송되고 요금이 생길 수 있어요. 이미지 스크립트는 모델이 `gemini-3-pro-image-preview`로 고정돼 있어요.
-- **금지 문구는 생성기 3개에만 있어요.** `threejs-game-director`와 `threejs-aaa-graphics-builder`의 원문은 "키가 있으면 생성 에셋을 쓰라"고 안내해요. 작업을 맡길 때 "외부 생성 서비스 금지, 코드로만 제작"이라고 함께 적어요.
+- `threejs-game-director`와 `threejs-aaa-graphics-builder`의 원문에는 "키가 있으면 생성 에셋을 쓰라"는 안내가 남아 있어요. 파일 맨 위의 금지 문구와 저장소 `CLAUDE.md`의 규칙이 우선해요. 문구는 지시일 뿐이고 실행을 기술적으로 막지는 않아요.
 - **`probe_asset_credentials.sh`는 실행하지 않아요.** 키 확인을 위해 사용자의 셸 설정 파일(`~/.zprofile`, `~/.zshrc`)을 읽어 들여 실행해요. `threejs-audio-generator`의 `probe --validate`는 키로 업체를 호출하고 계정 이메일이나 ID를 출력해요.
-- `threejs-game-director`는 하위 작업자 위임(보통 총괄 1 + 작업자 2 이하)을 안내해요. 이 저장소의 분업과 겹치면 "위임하지 말고 직접 작업"을 함께 적어요.
+- `threejs-game-director` 원문은 하위 작업자 위임(보통 총괄 1 + 작업자 2 이하)을 안내해요. 이 저장소에서는 따라 하지 않고 현재 작업자가 직접 작업해요.
 - 스킬 안의 설치 명령(`npm install`, `npx playwright install`, `uv run`)은 각각 승인 대상이에요. `uv run generate_image.py`는 실행할 때 파이썬 패키지를 내려받아요.
 
 ## three 버전 차이 (0.184 → 0.187)

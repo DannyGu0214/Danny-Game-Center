@@ -3,7 +3,7 @@
 > **5줄 요약 (비전공자용)** · ↻ 2026-11-25 재판정
 > 1. 새 3D 시제품은 **Vite·TypeScript** 도구를 써서 만드는 안을 추천해요. AI가 고친 코드의 일부 실수를 실행하기 전에 기계가 잡아 줘요.
 > 2. 그러면 전에 "우리와 안 맞음"이던 three.js 게임 스킬 묶음과 사진→3D 도구를 후보로 쓸 수 있어요. 돈이 드는 생성기를 빼도 스킬 9개 중 6개가 남아요.
-> 3. 유료 도구도 후보에 넣고 값을 적었어요. 3D 모델 생성(Tripo)은 모델 10개에 2~3달러로 계산되고, **쓸 때마다 승인**을 받아요.
+> 3. 유료 도구도 후보에 넣고 값을 적었어요. 3D 모델 생성(Tripo)은 기본 옵션 모델 10개에 2~3달러로 계산되지만 고급 옵션·리깅·동작을 쓰면 늘어나고, **쓸 때마다 승인**을 받아요.
 > 4. 정보를 밖으로 보내는 기능은 끄는 방법을 적었어요. 이미 쓰는 크롬 점검 도구는 확인 당시 설정에 끄는 옵션이 없어서 꺼야 해요.
 > 5. 지금 있는 게임 6개와 사이트 배포 방식은 그대로 둬요. 새 방식은 새 게임에만 써요.
 
@@ -227,21 +227,47 @@ opus     opus→sonnet   hydrogen        sonnet     sonnet·neon     총괄(승�
 
 | 도구 → 업체 (근거) | 단가 | 1회 / 월 | 필요 계정·키 | 무료·구독 대안 | 대안 대비 이득 | 승인 |
 |---|---|---|---|---|---|---|
-| `3d-generator` → **Tripo** ([가격](https://developers.tripo3d.ai/en/pricing)) | 1크레딧=$0.01. 기본 텍스처: 글→3D $0.20, 이미지→3D $0.30(텍스처 없이는 $0.10·$0.20). HD 텍스처 +$0.10. 충전은 $1부터 | 10개 **$2~3** / 월 $8~12. 무료 크레딧 [미확인] | `TRIPO_API_KEY` | `img2threejs`(구독 토큰, 영상 기준 시간 4배) · 코드로 직접 모델링 | 텍스처가 있는 GLB를 받아요. 코드로 만들기 어려운 형태에 유리해요 `[추측]` | 💳 필요 |
+| `3d-generator` → **Tripo** ([가격](https://developers.tripo3d.ai/en/pricing)) | 1크레딧=$0.01. 기본 텍스처: 글→3D $0.20, 이미지→3D $0.30(텍스처 없이는 $0.10·$0.20). HD 텍스처 +$0.10. 충전은 $1부터 | 기본 옵션 10개 **$2~3** / 월 $8~12. 스킬 예시·기능을 쓰면 더 늘 수 있어요([아래 정정](#threejs-game-skills-생성기-비용-정정)). 무료 크레딧 [미확인] | `TRIPO_API_KEY` | `img2threejs`(구독 토큰, 영상 기준 시간 4배) · 코드로 직접 모델링 | 텍스처가 있는 GLB를 받아요. 코드로 만들기 어려운 형태에 유리해요 `[추측]` | 💳 필요 |
 | (비교) **Meshy** ([가격](https://docs.meshy.ai/en/api/pricing)) | 이미지→3D 2K 텍스처 30크레딧(`meshy-7.1`·`meshy-6`) | 10개 300크레딧. 크레딧의 USD 값, 구독 월 가격과 API에 필요한 요금제 [미확인] | 구독의 API 크레딧 + 키 | 위와 같음 | Tripo 대비 이득 [미확인] | 💳 필요 |
 | (비교) **Hyper3D Rodin** ([가격](https://hyper3d.ai/pricing)) | Creator $30/월(약 60개), API는 Business $120/월. 직접 크레딧 $1.5 | API로 쓰면 **월 $120**. 모델당 크레딧 [미확인] | 구독(API는 Business) | 위와 같음 | 품질 이득 [미확인]. API 진입가가 높아요 | 💳 필요 |
-| `image-generator` → **Gemini API** ([가격](https://ai.google.dev/gemini-api/docs/pricing)) | `gemini-3.1-flash-image` 0.5K $0.045, 1K $0.067, 4K $0.151. `gemini-3-pro-image` 1K·2K $0.134. 이 두 모델은 무료 등급 없음 | 50장(3.1 Flash 1K) **$3.35** / 월 $13.40 | `GEMINI_API_KEY`(결제 연결) | 보조 모델의 이미지 시안(구독) · 에셋 의뢰(같은 Gemini 계열이지만 API 호출이면 과금돼요) | 스킬이 직접 불러 한 작업 안에서 끝나요. 같은 계열이라 품질 이득은 작아 보여요 `[추측]` | 💳 필요 |
+| `image-generator` → **Gemini API** ([가격](https://ai.google.dev/gemini-api/docs/pricing)) | ↻ 스킬 스크립트는 **`gemini-3-pro-image-preview` 고정, 새로 만들 때 기본 2K**([아래 정정](#threejs-game-skills-생성기-비용-정정)). 정식 `gemini-3-pro-image` 1K·2K $0.134, 4K $0.24이고 preview 단가가 같다는 것은 `[추측]`. 비교: `gemini-3.1-flash-image` 1K $0.067. 두 정식 모델은 무료 등급 없음 | 50장 2K **약 $6.70** `[추측: preview 단가 동일]` / 월 약 $26.80 | `GEMINI_API_KEY`(결제 연결) | 보조 모델의 이미지 시안(구독) · 에셋 의뢰(이미지 모델은 로컬이 정해요. API 호출이면 과금돼요) | 스킬이 직접 불러 한 작업 안에서 끝나요. 대안 대비 품질 이득 [미확인] | 💳 필요 |
 | `audio-generator` → **ElevenLabs** ([가격](https://elevenlabs.io/pricing/api)) | 효과음 $0.12/분, 음악 $0.15/분(파인튠 $1.50). Starter $6/월(요금표상 효과음 150회 또는 음악 40분), 무료(효과음 8회 또는 음악 3분). 둘은 같은 포함량을 나눠 쓰는 것으로 보여요 `[추측]`. 음악 상업 이용은 Starter 이상 | 시제품 **$0~6** / 월 $6(포함량 안일 때). 무료 등급 효과음의 상업 이용 조건 [미확인] | 계정 + `ELEVENLABS_API_KEY` | 에셋 의뢰(Suno 음악, 유료 호출) · Web Audio 합성(효과음, 무료) | 글로 효과음을 만들어요. 음악은 이미 Suno 경로가 있어요 | 💳 필요 |
 | `sprite-gen gen --provider openai` → **OpenAI** ([가격](https://developers.openai.com/api/docs/guides/image-generation)) | GPT-Image-2 1024×1024 낮음 $0.006, 중간 $0.053, 높음 $0.211 | 50장 중간 **$2.65** / 월 $10.60. 실제 사용 모델은 실행 때 확인 | `OPENAI_API_KEY` | 보조 모델 이미지 + `sprite-gen` 자르기 도구 | 동작 줄 단위의 캐릭터 일관성 흐름을 써요 `[추측]` | 💳 필요 |
 | `sprite-gen --provider codex` → **ChatGPT 로그인** ([가격](https://chatgpt.com/pricing)) | 구독 로그인이면 구독 한도 안에서 써요. **`codex`가 API 키로 로그인돼 있으면 호출마다 과금**([SKILL.md](https://github.com/aldegad/sprite-gen/blob/main/SKILL.md)). 구독 월 가격 [미확인] | 보유 구독 한도 안이면 추가 $0 / 새로 가입하면 월 가격 [미확인] | 로그인한 `codex` CLI. 사용 여부는 운영자가 정해요 | 위와 같음 | 도구의 기본 생성 경로예요 | 💳 필요 |
 | `sprite-gen --provider grok`·영상 → **xAI** ([가격](https://docs.x.ai/docs/models)) | 이미지 $0.02부터, 영상 $0.02/초부터. 상위 모델·해상도 단가 [미확인] | 50장 **$1부터** / 월 $4부터. 걷기 영상 4방향×5초는 $0.40부터(상한 [미확인]) | Grok 로그인 또는 `XAI_API_KEY`(로그인이 있으면 우선) | 정지 그림은 보조 모델 이미지 | 영상에서 반복 동작을 뽑는 경로예요. 현재 우리 경로에는 대안이 없어요 | 💳 필요 |
 | `sprite-gen pixel-draw --batch` → **Anthropic API** ([가격](https://platform.claude.com/docs/en/about-claude/pricing), [동작](https://github.com/aldegad/sprite-gen/blob/main/docs/pixel-draw.md)) | Opus 5.5 입력 $4·출력 $20(100만 토큰), Batch 50% 할인. 도구의 실제 사용 모델 [미확인] | 토큰 양을 몰라 1회·월 [미확인] | `ANTHROPIC_API_KEY`(`--batch`는 구독이 있어도 API 과금) | **`--batch` 없이 Claude 구독 로그인으로 실행(추가 청구 없음, 구독 한도 사용)** | API 단가의 반값이지만 구독으로 되면 이득이 작아요 | 💳 필요 |
 | `hallmark`의 `imagegen.mjs` → **Together AI** ([가격](https://www.together.ai/pricing)) | FLUX.2 dev $0.0154, pro $0.03, Nano Banana 2 $0.047 | 50장 **$0.77~2.33** / 월 $3.08~9.31 | `TOGETHER_API_KEY` | 보조 모델 이미지 | 소개 페이지 흐름 안에서 바로 만들어요. 게임에는 해당 없어요 | 💳 필요 |
-| **mcp-for-blender Premium** ([가격](https://www.mcp-for-blender.com/premium)) | Hobby $10/월(일반 25개), Pro $20(일반 25 + 고품질 8), Studio $60(일반 60 + 고품질 30), Max $100 | 일반 10개면 월 $10, 고품질 10개면 **월 $60** | Premium 구독(자기 업체 키를 쓰면 업체에 지불) + Blender | Tripo 직접 호출(10개 $2~3) | 키 관리가 줄어요. Blender가 필요하고 직접 호출보다 비싸요 | 💳 필요 |
+| **mcp-for-blender Premium** ([가격](https://www.mcp-for-blender.com/premium)) | Hobby $10/월(일반 25개), Pro $20(일반 25 + 고품질 8), Studio $60(일반 60 + 고품질 30), Max $100 | 일반 10개면 월 $10, 고품질 10개면 **월 $60** | Premium 구독(자기 업체 키를 쓰면 업체에 지불) + Blender | Tripo 직접 호출(기본 옵션 10개 $2~3) | 키 관리가 줄어요. Blender가 필요하고 직접 호출보다 비싸요 | 💳 필요 |
 
 - **하나만 고른다면** Tripo(주인공 모델 몇 개)를 먼저 검토해요. 무료 대안으로 만들기 어려운 것을 채워 준다는 판단이에요 `[추측]`.
-- Gemini API 이미지는 기존 이미지 경로와 겹쳐요. 더 새로운 이미지 모델의 단가는 같은 가격 페이지에서 쓰기 직전에 확인해요.
+- Gemini API 이미지는 기존 이미지 경로와 겹쳐요. 이 스킬의 이미지 스크립트는 에셋 의뢰 경로와 다른 모델로 고정돼 있어요. 더 새로운 이미지 모델의 단가는 같은 가격 페이지에서 쓰기 직전에 확인해요.
 - ElevenLabs는 효과음이 많이 필요할 때 무료 등급부터 검토해요.
+
+### threejs-game-skills 생성기 비용 정정
+
+**↻ 2026-11-25 정정**: 앞선 표는 스킬 스크립트가 실제로 쓰는 모델과 옵션을 반영하지 않았어요. 근거 줄은 원본 커밋 `8286774` 기준이에요(설치한 `SKILL.md`는 금지 문구 때문에 줄 번호가 달라요). Tripo 단가는 [가격 페이지](https://developers.tripo3d.ai/en/pricing)를 2026-11-25에 읽은 값이에요.
+
+**이미지**
+- 모델이 `gemini-3-pro-image-preview`로 고정돼 있어요([generate_image.py 129행](https://github.com/majidmanzarpour/threejs-game-skills/blob/8286774b22a2566bf894dbc825825c16921866af/skills/threejs-image-generator/scripts/generate_image.py#L129)). 모델을 바꾸는 실행 옵션은 없어요.
+- 새로 만들 때 해상도를 안 주면 2K예요([117행](https://github.com/majidmanzarpour/threejs-game-skills/blob/8286774b22a2566bf894dbc825825c16921866af/skills/threejs-image-generator/scripts/generate_image.py#L117)). 기존 그림을 고칠 때는 입력 크기에 따라 1K·2K·4K를 골라요([101~111행](https://github.com/majidmanzarpour/threejs-game-skills/blob/8286774b22a2566bf894dbc825825c16921866af/skills/threejs-image-generator/scripts/generate_image.py#L101)).
+- 2K 50장은 50 × $0.134 = **약 $6.70**이에요 `[추측: preview 단가가 정식 모델과 같음]`. 앞선 $3.35는 `gemini-3.1-flash-image` 1K 값이라 이 스크립트에는 해당하지 않아요. 4K면 같은 가정으로 약 $12예요.
+
+**3D(Tripo)**: 앞선 10개 $2~3은 기본 옵션의 모델 생성만 계산한 값이에요.
+
+| 늘어나는 항목 | 단가 | 근거 |
+|---|---|---|
+| HD 텍스처 / HD 형상 | 모델당 +$0.10 / +$0.20 | 가격 페이지의 추가 옵션. 글→3D 예시 명령은 둘 다 `detailed`예요([SKILL.md 43행](https://github.com/majidmanzarpour/threejs-game-skills/blob/8286774b22a2566bf894dbc825825c16921866af/skills/threejs-3d-generator/SKILL.md#L43)) |
+| 자동 리깅 / 동작 적용 | 회당 $0.25 / 동작당 $0.10(리깅 가능 검사는 무료) | 가격 페이지. 스킬의 관찰값(2026년 6월)도 약 25·10크레딧이에요([api-notes.md 111행](https://github.com/majidmanzarpour/threejs-game-skills/blob/8286774b22a2566bf894dbc825825c16921866af/skills/threejs-3d-generator/references/api-notes.md#L111)) |
+| 리깅 재시도 | 성공한 재시도마다 약 25크레딧. 캐릭터 일괄 명령의 추가 시도 기본값은 2번 | [api-notes.md 98행](https://github.com/majidmanzarpour/threejs-game-skills/blob/8286774b22a2566bf894dbc825825c16921866af/skills/threejs-3d-generator/references/api-notes.md#L98) · [스크립트 1477행](https://github.com/majidmanzarpour/threejs-game-skills/blob/8286774b22a2566bf894dbc825825c16921866af/skills/threejs-3d-generator/scripts/threejs_3d_asset.py#L1477) |
+| 캐릭터 일괄 명령의 기본값 | 동작 3개(idle·walk·run), 텍스처 `detailed`, 형상 `standard` | [1483~1486행](https://github.com/majidmanzarpour/threejs-game-skills/blob/8286774b22a2566bf894dbc825825c16921866af/skills/threejs-3d-generator/scripts/threejs_3d_asset.py#L1483) |
+
+`detailed` 옵션이 가격 페이지의 HD 항목으로 청구된다고 보고 계산하면 이렇게 돼요 `[추측]`. 형식 변환·면 수 제한 같은 후처리와 모델 재생성 비용은 뺐어요.
+
+| 경우 | 모델 1개 | 10개 |
+|---|---|---|
+| 글→3D 예시 명령(HD 텍스처 + HD 형상) | $0.50 | $5.00 |
+| 움직이는 캐릭터, 일괄 명령 기본값, 재시도 없음 | $0.30 + 리깅 $0.25 + 동작 3개 $0.30 = $0.85 | $8.50 |
+| 위에서 리깅을 2번 더 하고 모두 청구될 때 | $1.35 | $13.50 |
 
 ## 5. 외부 전송과 끄는 법
 
