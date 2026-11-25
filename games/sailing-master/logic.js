@@ -257,7 +257,7 @@ export function windAt(S) {
 // ── 시작 ──
 export function newGame(seed = 1) {
   const S = {
-    v: 9, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
+    v: 10, seed, t: 0, clock: 0, rng: (seed * 2654435761) >>> 0,
     ph: (seed * 2.399963) % TAU,
     region: 'pond', visited: { pond: 1 }, lastPort: { region: 'pond', id: 'reed' },
     wind: null, weather: calmWeather(),
@@ -1605,7 +1605,7 @@ export function step(S, dt) {
   if (st.desal && REGIONS[S.region].salt && S.water < st.waterCap) S.water = Math.min(st.waterCap, (S.water || 0) + st.desal * DESAL.perDay * dt / CAL.day);
   // 빗물받이(M4 O1): 비(소나기·폭풍·태풍 바깥 원)가 오는 동안 한 대당 20초마다 한 통, 물통 칸까지
   // 무풍대를 남에서 북으로 지나기(M4 O3): 무풍대 남쪽 끝(−4,400m) 아래를 지난 배가 북쪽 끝(−7,100m)을 넘으면 도전과제
-  if (S.region === 'ocean' && !S.docked) { const by = S.boat.y; if (by > -4300) S.stats.dolSouth = 1; else if (by < -7150 && S.stats.dolSouth && !S.ach.doldrums) giveAch(S, 'doldrums'); }
+  if (S.region === 'ocean' && !S.docked) { const by = S.boat.y, dol = REGIONS.ocean.windBands.find((q) => q.calm); if (by > dol.y0 + 100) S.stats.dolSouth = 1; else if (by < dol.y1 - 50 && S.stats.dolSouth && !S.ach.doldrums) giveAch(S, 'doldrums'); } // 무풍대 남쪽 끝 100m 앞 → 북쪽 끝 50m 너머
   if (st.raincatch && !S.docked && (wx.rain || S.ty?.in) && (S.water || 0) < st.waterCap) {
     S.catchT = (S.catchT || 0) + dt * st.raincatch;
     if (S.catchT >= 20) { S.catchT -= 20; S.water = Math.min(st.waterCap, (S.water || 0) + 1); S.stats.rainWater = (S.stats.rainWater || 0) + 1; }
@@ -1644,6 +1644,27 @@ export function storyLine(text, name) {
   const pair = { 은: ['은', '는'], 이: ['이', '가'], 을: ['을', '를'] };
   return text.replace(/\{N([은이을])\}/g, (_, j) => name + (hangul ? pair[j][batchim ? 0 : 1] : `${pair[j][0]}(${pair[j][1]})`));
 }
+// v9 → v10(2026-11-25, DESIGN 51절): 대양 무역풍·편서풍 띠를 남북 ×1.5로 늘리고, 무풍대(옛 −4,400~−7,100)는 길이 그대로 2,200m 북쪽으로 옮겼어요.
+// 옛 y → 새 y. 산호섬·나루는 무풍대와 같이(−2,200), 새 대륙 해안·항구는 해안선과 같이(−4,450) 옮겼어요(data.js)
+export const OCEAN_V10 = (y) => (y >= 0 ? y : y >= -4400 ? 1.5 * y : y >= -7100 ? y - 2200 : -9300 + (y + 7100) * 1.5);
+const OCEAN_V10_BACK = (y) => (y >= 0 ? y : y >= -6600 ? y / 1.5 : y >= -9300 ? y + 2200 : -7100 + (y + 9300) / 1.5);
+// 대양에 있던 판은 배를 새 지도의 같은 자리로 옮기고, 항구에 대 있었으면 그 항구의 새 자리에 대요. 밝힌 해도도 같은 자리로 옮겨요.
+// 옛 자리를 쓰는 발견지 자리·표류물·항로는 버려요. 찾은 발견지(found)는 id라 그대로예요
+export function oceanStretch(o) {
+  if (o.findPos) delete o.findPos.ocean;
+  if (o.flot) delete o.flot.ocean;
+  const g = fogGrid('ocean'), old = o.fog?.ocean, oy0 = -12480; // 옛 대양 해도 아래끝(shape.y0 −12,400 − 80)
+  if (old && old.length % g.cols === 0 && old.length !== g.cols * g.rows) {
+    const orows = old.length / g.cols, arr = new Array(g.cols * g.rows).fill('0');
+    for (let j = 0; j < g.rows; j++) { const oj = Math.floor((OCEAN_V10_BACK(g.y0 + (j + 0.5) * FOG_CELL) - oy0) / FOG_CELL); if (oj >= 0 && oj < orows) for (let i = 0; i < g.cols; i++) arr[j * g.cols + i] = old[oj * g.cols + i]; }
+    o.fog.ocean = arr.join('');
+  }
+  if (o.region !== 'ocean') return;
+  o.route = null;
+  if (o.docked && REGIONS.ocean.ports.some((q) => q.id === o.docked)) { placeAtPort(o, o.docked); return; }
+  const b = o.boat; b.y = OCEAN_V10(b.y);
+  const w = worldOf('ocean'); if (!w.isWater(b.x, b.y)) { const [x, y] = w.nearestWater(b.x, b.y); b.x = x; b.y = y; b.spd = 0; }
+}
 function refreshFindPos(o) {
   for (const [region, list] of Object.entries(o.findPos || {})) {
     const def = REGIONS[region];
@@ -1658,7 +1679,7 @@ export function serialize(S) { const { events, ...rest } = S; return JSON.string
 export function deserialize(raw) {
   try {
     const o = JSON.parse(raw);
-    if (!o || ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(o.v) || !o.boat || !o.ship) return null;
+    if (!o || ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(o.v) || !o.boat || !o.ship) return null;
     o.events = [];
     // v2 → v3(S2 아이템): 목재·천은 잡목·마포로 이어 받는다. 화물칸의 금화는 창고로, 식량은 빵으로(5일 뒤 상함), 찾은 발견지의 유물을 준다
     if (o.v < 3) {
@@ -1698,7 +1719,8 @@ export function deserialize(raw) {
     for (const k of Object.keys(NEW_MATS)) o.res[k] ??= 0; // M3 B3 최고급 재료 5종: 창고 기본 0
     // v1 → v2: 뗏목·나룻배·슬루프는 그대로 ★1이고, 강에서 이미 찾은 물레방아는 슬루프 설계도를 준다
     o.crossed ??= null; o.stats.crossDays ??= 0; // v8 → v9(M4 대양): 대양 관련 값 기본
-    o.v = 9;
+    const stretch = o.v < 10; // v9 → v10(2026-11-25): 대양 지도 ×1.5(아래 맨 끝에서, 선원 값까지 채운 뒤)
+    o.v = 10;
     o.best ??= JSON.parse(JSON.stringify(o.ship));
     if (o.found?.mill2) o.blueprints.sloop = 1;
     // 능력치가 없던 예전 선원은 기준값으로 채운다
@@ -1707,6 +1729,7 @@ export function deserialize(raw) {
       c.gender ??= OLD_WOMEN.includes(c.name) ? '여' : '남';
       c.skill ??= CREW.baseStat; c.humor ??= CREW.baseStat; c.drink ??= CREW.baseStat;
     }
+    if (stretch) oceanStretch(o);
     return o;
   } catch { return null; }
 }

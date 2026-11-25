@@ -7,14 +7,14 @@ import { REGIONS, REGION_ORDER, TITLES, ACHIEVEMENTS } from '../data.js';
 
 const openWater = (id, x, y, seed = 1) => { const S = G.newGame(seed); S.region = id; S.visited[id] = 1; S.docked = null; S.boat.x = x; S.boat.y = y; S.weather = { ...G.calmWeather(), on: [], soon: [] }; return S; };
 
-test('O0 대양 지도: 12km 띠, 북쪽은 새 대륙, 항구 넷은 물가 12m 안, 남쪽 등대에서 새 대륙 항구까지 길이 있어요', () => {
+test('O0 대양 지도: 17.65km 띠, 북쪽은 새 대륙, 항구 넷은 물가 12m 안, 남쪽 등대에서 새 대륙 항구까지 길이 있어요', () => {
   const t0 = performance.now(), w = worldOf('ocean'), ms = performance.now() - t0;
   assert.ok(ms < 1500, `만들기 ${Math.round(ms)}ms`);
   assert.equal(REGION_ORDER.at(-1), 'ocean'); assert.ok(TITLES.length >= REGION_ORDER.length);
-  const sh = REGIONS.ocean.shape; assert.deepEqual([sh.x1 - sh.x0, sh.y1 - sh.y0], [1800, 12800]);
+  const sh = REGIONS.ocean.shape; assert.deepEqual([sh.x1 - sh.x0, sh.y1 - sh.y0], [1800, 17650]);
   assert.ok(w.isWater(0, -2000) && w.isWater(-600, -6000), '바다');
-  for (const [x, y] of [[0, -11900], [-500, -12100], [700, -12000]]) assert.ok(w.dist(x, y) < 0, `새 대륙 ${x},${y}`); // 북쪽은 뭍
-  assert.ok(w.isWater(0, -11300), '해안 앞 바다');
+  for (const [x, y] of [[0, -16350], [-500, -16550], [700, -16450]]) assert.ok(w.dist(x, y) < 0, `새 대륙 ${x},${y}`); // 북쪽은 뭍
+  assert.ok(w.isWater(0, -15750), '해안 앞 바다');
   for (const [x, y] of [[-950, -3000], [950, -3000], [0, 430]]) assert.ok(w.dist(x, y) < 0, `경계 밖 ${x},${y}`);
   assert.deepEqual(w.ports.map((p) => p.id), ['lastLight', 'atollA', 'atollB', 'newLand']);
   for (const p of w.ports) { const d = w.dist(p.x, p.y); assert.ok(d >= 8 && d <= 12.5, `${p.id} 물가 ${d.toFixed(1)}m`); }
@@ -31,7 +31,7 @@ test('O0 빨리 가기: 큰 바다·대양의 탁 트인 곳에서만 되고, �
   assert.equal(G.fastCheck(openWater('coast', 0, -300)).ok, false, '앞바다는 안 돼요');
   const S = openWater('ocean', 0, -2000); assert.equal(G.fastCheck(S).ok, true);
   S.docked = 'lastLight'; assert.equal(G.fastCheck(S).ok, false); S.docked = null;
-  const near = openWater('ocean', 0, -11450); assert.equal(G.fastCheck(near).ok, false); assert.match(G.fastCheck(near).why, /물가/);
+  const near = openWater('ocean', 0, -15900); assert.equal(G.fastCheck(near).ok, false); assert.match(G.fastCheck(near).why, /물가/);
   for (const id of ['storm', 'typhoon']) { const T = openWater('ocean', 0, -2000); T.weather.soon = [id]; assert.equal(G.fastCheck(T).ok, false, id); assert.match(G.fastCheck(T).why, /수상/); }
   const U = openWater('ocean', 0, -2000); U.weather.on = ['calm']; assert.equal(G.fastCheck(U).ok, true, '무풍은 괜찮아요');
   const V = openWater('ocean', 0, -2000); V.disaster = { cause: 'faint' }; assert.equal(G.fastCheck(V).ok, false);
@@ -42,9 +42,9 @@ test('O0 빨리 가기: 큰 바다·대양의 탁 트인 곳에서만 되고, �
   assert.equal(A.t, B.t); assert.equal(A.boat.y, B.boat.y);
 });
 
-test('O0 대양에 닿기: 도전과제 oceanGate는 대양에 처음 닿을 때, 칭호 「대양 항해사」, 저장은 v9(crossed·crossDays 기본값)', () => {
+test('O0 대양에 닿기: 도전과제 oceanGate는 대양에 처음 닿을 때, 칭호 「대양 항해사」, 저장은 v10(crossed·crossDays 기본값)', () => {
   assert.equal(TITLES[5], '대양 항해사'); assert.ok(ACHIEVEMENTS.find((a) => a.id === 'oceanGate').desc.includes('대양'));
-  const S = G.newGame(2); assert.equal(S.v, 9); assert.equal(S.crossed, null); assert.equal(S.stats.crossDays, 0);
+  const S = G.newGame(2); assert.equal(S.v, 10); assert.equal(S.crossed, null); assert.equal(S.stats.crossDays, 0);
   const L = G.deserialize(G.serialize(S)); assert.equal(L.crossed, null);
   assert.ok(!S.ach.oceanGate); S.visited.ocean = 1; G.checkAch(S); assert.ok(S.ach.oceanGate);
 });
@@ -52,25 +52,25 @@ test('O0 대양에 닿기: 도전과제 oceanGate는 대양에 처음 닿을 때
 // ── O1 바람 띠·무풍대·대양 너울·빗물받이 ──
 test('O1 바람 띠: 무역풍(동남쪽 10) → 무풍대(1.5) → 편서풍(서쪽 13), 경계는 300m씩 섞여요', () => {
   const at = (y) => G.bandAt('ocean', y);
-  assert.deepEqual(['trade', 'doldrums', 'westerlies'], [at(-2000).id, at(-5800).id, at(-9500).id]);
+  assert.deepEqual(['trade', 'doldrums', 'westerlies'], [at(-2000).id, at(-7950).id, at(-12000).id]);
   assert.equal(G.bandAt('sea', 0), null, '큰 바다는 띠가 없어요');
-  assert.ok(Math.abs(at(-2000).speed - 10) < 1e-9 && Math.abs(at(-5800).speed - 1.5) < 1e-9 && Math.abs(at(-9500).speed - 13) < 1e-9);
-  assert.ok(at(-5800).calm && !at(-2000).calm);
-  // 경계(−4,400)에서 섞여요: 한가운데는 중간 세기, 300m 밖은 순수
-  const mid = at(-4400).speed; assert.ok(mid > 4 && mid < 8, `경계 ${mid}`);
-  assert.ok(Math.abs(at(-4150).speed - 10) < 0.5 && Math.abs(at(-4700).speed - 1.5) < 0.5);
+  assert.ok(Math.abs(at(-2000).speed - 10) < 1e-9 && Math.abs(at(-7950).speed - 1.5) < 1e-9 && Math.abs(at(-12000).speed - 13) < 1e-9);
+  assert.ok(at(-7950).calm && !at(-2000).calm);
+  // 경계(−6,600)에서 섞여요: 한가운데는 중간 세기, 300m 밖은 순수
+  const mid = at(-6600).speed; assert.ok(mid > 4 && mid < 8, `경계 ${mid}`);
+  assert.ok(Math.abs(at(-6350).speed - 10) < 0.5 && Math.abs(at(-6900).speed - 1.5) < 0.5);
   // 바람이 오는 방향: 무역풍은 남동(45°), 편서풍은 서쪽(180°)
-  assert.ok(Math.abs(at(-2000).from - Math.PI / 4) < 1e-9 && Math.abs(Math.abs(at(-9500).from) - Math.PI) < 1e-9);
+  assert.ok(Math.abs(at(-2000).from - Math.PI / 4) < 1e-9 && Math.abs(Math.abs(at(-12000).from) - Math.PI) < 1e-9);
   // windAt은 배 y를 따라가요
-  const S = openWater('ocean', 0, -5800); const w = G.windAt(S); assert.ok(w.speed < 3, `무풍대 ${w.speed}`);
-  S.boat.y = -9500; assert.ok(G.windAt(S).speed > 9);
+  const S = openWater('ocean', 0, -7950); const w = G.windAt(S); assert.ok(w.speed < 3, `무풍대 ${w.speed}`);
+  S.boat.y = -12000; assert.ok(G.windAt(S).speed > 9);
   S.boat.y = -2000; assert.ok(G.windAt(S).speed > 7);
 });
 
 test('O1 대양 너울: 기본 1.8m, 편서풍 ×1.2, 무풍대 ×0.5', () => {
   const S = openWater('ocean', 0, -2000); S.weather.fx = { ...S.weather.fx, swell: 2 };
   const hereAt = (y) => G.swellHere(S, 0, y);
-  assert.ok(Math.abs(hereAt(-2000) - 2) < 1e-6); assert.ok(Math.abs(hereAt(-5800) - 1) < 1e-6); assert.ok(Math.abs(hereAt(-9500) - 2.4) < 1e-6);
+  assert.ok(Math.abs(hereAt(-2000) - 2) < 1e-6); assert.ok(Math.abs(hereAt(-7950) - 1) < 1e-6); assert.ok(Math.abs(hereAt(-12000) - 2.4) < 1e-6);
   assert.equal(REGIONS.ocean.swell.base, 1.8);
 });
 
@@ -93,7 +93,7 @@ test('O1 사는 재료: 큰 바다 재료는 대양 항구에서도 사요(전�
   const S = openWater('ocean', 0, 252); S.docked = 'lastLight';
   for (const k of ['teak', 'synth', 'steel', 'oak', 'plate']) assert.ok(G.canBuyMat(S, k), k);
   assert.equal(G.canBuyMat(S, 'chip'), false);
-  const A = openWater('ocean', 0, -3900); A.docked = 'atollA'; assert.equal(G.canBuyMat(A, 'teak'), false, '산호섬 나루는 가게가 없어요');
+  const A = openWater('ocean', 0, -6100); A.docked = 'atollA'; assert.equal(G.canBuyMat(A, 'teak'), false, '산호섬 나루는 가게가 없어요');
 });
 
 // ── O2 장비·역할·대양 태풍 ──
@@ -146,7 +146,7 @@ test('O2 자동 조타: 사람 없이 항로를 지켜요(선장이 키를 떠�
 test('O2 태양광 패널: 보조 기관 +0.5m/s(2장까지), 비·해무·태풍엔 절반', () => {
   assert.deepEqual([MODULES.solar.w, MODULES.solar.h, MODULES.solar.cost], [2, 1, { chip: 2, steel: 2, synth: 4 }]);
   const calm = (() => { for (let d = 1; d < 400; d++) { const ok = (t) => { const w = G.weatherAt('ocean', 3, t); return !w.rain && !w.fog && !w.gustOn && !w.stormOn && !w.on.length && !w.gustSoon && !w.stormSoon && !w.typhoonSoon; }; if ([0, 20, 40, 60, 80].every((x) => ok(d * 180 + 40 + x))) return d * 180 + 40; } throw new Error('맑은 날'); })();
-  const top = (n) => { const S = bigShip([{ id: 'mast_l', col: 2, row: 3 }, ...Array.from({ length: n }, (_, i) => ({ id: 'solar', col: 0 + (i ? 3 : 0), row: 12 }))], 'explorer', 3); G.undock(S); S.seed = 3; S.clock = calm; S.boat.sailLevel = 1; S.boat.h = -Math.PI / 2; S.boat.y = -5800; S.wind = { from: 0, speed: 0 }; let m = 0; for (let i = 0; i < 30 * 60; i++) { G.step(S, G.FIXED_DT); S.boat.y = -5800; S.food = 99; S.boat.sailLevel = 1; S.hull = 1; m = Math.max(m, S.boat.spd); } return [m, S]; };
+  const top = (n) => { const S = bigShip([{ id: 'mast_l', col: 2, row: 3 }, ...Array.from({ length: n }, (_, i) => ({ id: 'solar', col: 0 + (i ? 3 : 0), row: 12 }))], 'explorer', 3); G.undock(S); S.seed = 3; S.clock = calm; S.boat.sailLevel = 1; S.boat.h = -Math.PI / 2; S.boat.y = -7950; S.wind = { from: 0, speed: 0 }; let m = 0; for (let i = 0; i < 30 * 60; i++) { G.step(S, G.FIXED_DT); S.boat.y = -7950; S.food = 99; S.boat.sailLevel = 1; S.hull = 1; m = Math.max(m, S.boat.spd); } return [m, S]; };
   const [m0] = top(0), [m1, S1] = top(1), [m2, S2] = top(2), [m3] = top(3);
   assert.equal(G.stats(S1).solar, 1); assert.equal(G.stats(S2).solar, 2);
   assert.ok(m0 > 3.9 && m0 < 4.4, `무풍대 기관 ${m0}`); assert.ok(m1 > m0 + 0.35 && m1 < m0 + 0.65, `1장 ${m1}`); assert.ok(m2 > m0 + 0.85 && m2 < m0 + 1.15, `2장 ${m2}`); assert.ok(Math.abs(m3 - m2) < 0.05, '세 장째는 안 늘어요');
@@ -177,7 +177,7 @@ test('O3 발견지 8곳: 띠마다 어울리는 자리, 항구·수문과 겹치
   const arts = w.finds.map((q) => q.art).sort(); assert.deepEqual(arts, ['beached', 'bottle', 'buoy', 'iceberg', 'kelp', 'stone', 'vent', 'whalespot']);
   const band = (y) => REGIONS.ocean.windBands.find((b) => y <= b.y0 && y > b.y1).id;
   assert.equal(band(f.kelpMat.y), 'doldrums'); assert.equal(band(f.iceberg.y), 'westerlies'); assert.equal(band(f.weatherBuoy.y), 'trade');
-  assert.ok(f.iceberg.y < -10000, '편서풍 띠 북쪽 끝'); assert.equal(f.farSideStone.where, 'inland'); assert.ok(w.dist(f.farSideStone.x, f.farSideStone.y) < -25, '새 대륙 내륙');
+  assert.ok(f.iceberg.y < -14000, '편서풍 띠 북쪽 끝'); assert.equal(f.farSideStone.where, 'inland'); assert.ok(w.dist(f.farSideStone.x, f.farSideStone.y) < -25, '새 대륙 내륙');
   for (const q of w.finds) for (const p of [...w.ports, ...w.gates]) assert.ok(Math.hypot(p.x - q.x, p.y - q.y) > 40, `${q.id} 가 ${p.id} 와 겹쳐요`);
   for (const q of w.finds.filter((v) => v.where === 'water')) assert.ok(w.dist(q.x, q.y) > 30, `${q.id} 물 위`);
   const o = { mats: ['steel', 'chip', 'teak', 'syrope', 'synth'] }; assert.ok(f.weatherBuoy.chip === 2 && f.seaVent.steel === 6 && f.kelpMat.syrope === 8 && f.lagoonBoat.teak > 0 && o.mats.length);
@@ -204,7 +204,7 @@ test('O3 생물이 실제로 나와요: 고래·개복치·돌고래·새를 시
   try { for (let i = 0; i < 20000; i++) { cr.update(0.1, cam, 400, 600, boat, false, { tide: 0, len: 9, docked: false }); for (const c of cr.list) seen.add(c.sp); if (i % 40 === 0) cr.clear(); } } finally { Math.random = R; }
   for (const id of ['humpback', 'spermwhale', 'commondolphin', 'sunfish', 'petrel', 'shearflock']) assert.ok(seen.has(id), `${id} 안 나와요`);
   assert.ok(!seen.has('penguin'), '펭귄은 빙산 없이 안 나와요');
-  const cr2 = createCreatures(w); cr2.update(0.1, { x: -560, y: -10900, zoom: 5.5, cy: 300 }, 400, 600, boat, false, { berg: { x: -560, y: -10900 } });
+  const cr2 = createCreatures(w); cr2.update(0.1, { x: -560, y: -15000, zoom: 5.5, cy: 300 }, 400, 600, boat, false, { berg: { x: -560, y: -15000 } });
   assert.equal(cr2.list.filter((c) => c.sp === 'penguin').length, 2);
 });
 
@@ -221,10 +221,10 @@ test('O3 고래의 도약: 뛰어오르는 고래를 탭하면 기록 + 도전�
   assert.ok(any > 0 && any <= 3, '30분 안에 뛰어올라야 해요');
 });
 
-test('O3 무풍대를 건너: 남쪽(−4,400m 아래)을 지난 배가 북쪽 끝(−7,100m)을 넘으면 40닢', () => {
+test('O3 무풍대를 건너: 남쪽(−6,600m 아래)을 지난 배가 북쪽 끝(−9,300m)을 넘으면 40닢', () => {
   const S = openWater('ocean', 0, -3000); S.food = 99; const c0 = S.res.coin;
-  S.boat.y = -7200; G.step(S, G.FIXED_DT); assert.ok(!S.ach.doldrums, '북쪽만 온 배는 안 돼요');
-  const T = openWater('ocean', 0, -3000, 2); T.boat.y = -4000; G.step(T, G.FIXED_DT); assert.ok(!T.ach.doldrums); T.boat.y = -7200; G.step(T, G.FIXED_DT);
+  S.boat.y = -9400; G.step(S, G.FIXED_DT); assert.ok(!S.ach.doldrums, '북쪽만 온 배는 안 돼요');
+  const T = openWater('ocean', 0, -3000, 2); T.boat.y = -6000; G.step(T, G.FIXED_DT); assert.ok(!T.ach.doldrums); T.boat.y = -9400; G.step(T, G.FIXED_DT);
   assert.ok(T.ach.doldrums, '남에서 북으로 건넜어요'); assert.ok(T.res.coin >= c0 + 40);
 });
 
@@ -232,12 +232,12 @@ test('O3 무풍대를 건너: 남쪽(−4,400m 아래)을 지난 배가 북쪽 �
 import { ENDINGS, CAPTAINS, STORIES } from '../data.js';
 
 test('O4 엔딩: 새 대륙 항구에 처음 대면 ended·crossed·crossOcean(150닢), 두 번째는 보통 항구, 저장해도 이어져요', () => {
-  const S = openWater('ocean', 0, -11400); S.ship.hull = 'explorer'; const c0 = S.res.coin, evs = [];
+  const S = openWater('ocean', 0, -15850); S.ship.hull = 'explorer'; const c0 = S.res.coin, evs = [];
   S.crossed = null; G.dock(S, 'newLand'); for (const e of S.events || []) evs.push(e.type || e.k);
   assert.ok(S.ended && S.crossed >= 1 && S.stats.crossDays === S.crossed && S.ach.crossOcean);
   assert.ok(S.res.coin >= c0 + 150);
   const day = S.crossed; S.ended = false; G.undock(S); G.dock(S, 'newLand'); assert.ok(!S.ended && S.crossed === day, '두 번째는 엔딩 없음');
-  const T = openWater('ocean', 0, -11400); G.dock(T, 'lastLight'); assert.ok(!T.ended && T.crossed == null, '다른 항구는 엔딩이 아니에요');
+  const T = openWater('ocean', 0, -15850); G.dock(T, 'lastLight'); assert.ok(!T.ended && T.crossed == null, '다른 항구는 엔딩이 아니에요');
   // 엔딩 도중 저장 → 불러오면 항구에서 이어가요
   const R = G.deserialize(G.serialize(S)); R.ended = true; const R2 = G.deserialize(G.serialize(R)); assert.ok(!R2.ended && R2.crossed === day);
 });
@@ -267,7 +267,7 @@ import { FX } from '../sound.js';
 test('O5 대양 테마: 산호섬 구간 + 새 대륙 구간(남→북), 새 대륙에는 색 회벽 집(cityhut)이 있고 모두 뭍 위에', () => {
   assert.equal(REGIONS.ocean.theme, 'ocean'); const th = THEMES.ocean, w = worldOf('ocean');
   assert.deepEqual(th.sections.map((q) => q.id), ['atolls', 'newland']); assert.ok(BOX.cityhut);
-  const z = zonesOf(w, th); assert.equal(z.at(0, 252), 0); assert.equal(z.at(-250, -4000), 0); assert.equal(z.at(0, -11570), 1);
+  const z = zonesOf(w, th); assert.equal(z.at(0, 252), 0); assert.equal(z.at(-250, -6200), 0); assert.equal(z.at(0, -16020), 1);
   const { props } = dressLand(w, th, []); const huts = props.filter((p) => p.kind === 'cityhut');
   assert.ok(huts.length >= 3 && huts.every((p) => z.at(p.x, p.y) === 1 && w.dist(p.x, p.y) < -5), '새 대륙 집');
   assert.ok(props.filter((p) => p.kind === 'palm').every((p) => z.at(p.x, p.y) === 0), '야자수는 산호섬에만');
@@ -294,7 +294,7 @@ test('산호섬 나루: 식수·빵·건어는 사고(식수 3닢), 재료 가�
   assert.equal(SUPPLY.bread.keep, 5); assert.equal(SUPPLY.dfish.keep, undefined);
 });
 
-// ── M4b 지도 정리: 둘째 산호섬을 무풍대 한가운데로 당겨 산호섬 사이가 2.5km 안팎이에요(전엔 4km라 무풍대를 한 번에 건너다 갈증·더위로 멈췄어요) ──
+// ── M4b 지도 정리: 둘째 산호섬을 무풍대 한가운데로 당겨(전엔 4km라 무풍대를 한 번에 건너다 갈증·더위로 멈췄어요) 2.5km 안팎이에요. 2026-11-25 지도 늘리기에서도 무풍대·산호섬 사이는 그대로예요 ──
 test('산호섬 사이 2.5km 안팎, 둘째 산호섬은 무풍대 안, 큰 바다·대양 품삯은 같아요', () => {
   const w = worldOf('ocean'), A = w.ports.find((p) => p.id === 'atollA'), B = w.ports.find((p) => p.id === 'atollB'), N = w.ports.find((p) => p.id === 'newLand');
   const gap = Math.hypot(B.x - A.x, B.y - A.y);
@@ -305,4 +305,30 @@ test('산호섬 사이 2.5km 안팎, 둘째 산호섬은 무풍대 안, 큰 바�
   for (const isl of REGIONS.ocean.islands.filter((q) => Math.abs(q.y - B.y) < 400)) assert.ok(Math.hypot(isl.x - B.x, isl.y - B.y) < 200, '섬이 나루 곁에 있어요');
   assert.equal(REGIONS.ocean.wageK, REGIONS.sea.wageK);
   for (const s of REGIONS.ocean.shoals.filter((q) => Math.abs(q.y - B.y) < 400)) assert.ok(Math.hypot(s.x - B.x, s.y - B.y) < 260, '산호초가 나루 곁에 있어요');
+});
+
+// ── 2026-11-25 대양 지도 ×1.5(저장 v10): 대양에 있던 옛 저장은 배·해도를 새 지도의 같은 자리로 옮겨요 ──
+test('저장 v9 → v10: 대양 바다 위 배는 새 지도의 같은 자리(무역풍 띠는 y × 1.5), 항구에 댄 배는 새 항구 자리, 밝힌 해도도 같은 자리로, 옛 발견지 자리·표류물·항로는 버려요', () => {
+  const old = (S, mut) => { const o = JSON.parse(G.serialize(S)); o.v = 9; mut(o); return G.deserialize(JSON.stringify(o)); };
+  const fog = G.fogInfo('ocean'), oldRows = Math.ceil((480 + 12480) / fog.cell);
+  const A = openWater('ocean', 100, -3000); A.route = { pts: [{ x: 0, y: -3500 }], i: 0 };
+  const L = old(A, (o) => {
+    o.boat.y = -3000;
+    const arr = new Array(fog.cols * oldRows).fill('0'), j = Math.floor((-3000 + 12480) / fog.cell); for (let i = 0; i < fog.cols; i++) arr[j * fog.cols + i] = '1'; (o.fog ||= {}).ocean = arr.join('');
+    (o.findPos ||= {}).ocean = [{ id: 'iceberg', x: -560, y: -10900, art: 'iceberg', where: 'water' }]; (o.flot ||= {}).ocean = [{ k: 'wood', x: 0, y: -9000, n: 1 }];
+  });
+  assert.equal(L.v, 10); assert.equal(L.boat.x, 100); assert.equal(L.boat.y, -4500); assert.equal(L.route, null);
+  assert.equal(L.fog.ocean.length, fog.cols * fog.rows);
+  const at = (y) => L.fog.ocean[Math.floor((y - fog.y0) / fog.cell) * fog.cols + 20];
+  assert.equal(at(-4480), '1', '밝힌 줄이 새 자리로'); assert.equal(at(-3000), '0'); assert.equal(at(-9000), '0');
+  assert.equal(G.findsOf(L, 'ocean').find((f) => f.id === 'iceberg').y, -15000, '발견지는 새 표 자리');
+  assert.equal((L.flot.ocean || []).length, 0);
+  // 둘째 산호섬 나루에 대 있던 판은 새 나루 자리에
+  const B = openWater('ocean', 300, -6388); const M = old(B, (o) => { o.docked = 'atollB'; o.boat.x = 300; o.boat.y = -6388; });
+  const nb = worldOf('ocean').ports.find((p) => p.id === 'atollB'); assert.equal(M.docked, 'atollB'); assert.deepEqual([M.boat.x, M.boat.y], [nb.x, nb.y]);
+  // 남쪽 끝(y ≥ 0)은 그대로, 다른 수역 판은 대양 표만 버리고 배는 그대로
+  const N = old(openWater('ocean', 0, 200), () => {}); assert.equal(N.boat.y, 200);
+  const C = old(openWater('sea', 10, -500), (o) => { (o.findPos ||= {}).ocean = [{ id: 'iceberg', x: 0, y: -10900 }]; }); assert.equal(C.boat.y, -500); assert.equal(C.findPos.ocean, undefined);
+  // 새 저장은 v10이고 다시 불러도 옮기지 않아요
+  const D = openWater('ocean', 0, -4500); assert.equal(G.deserialize(G.serialize(D)).boat.y, -4500);
 });

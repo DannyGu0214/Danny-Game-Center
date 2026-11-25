@@ -242,7 +242,7 @@ test('M2b 저장 v6 → v7: 정해 둔 앞바다 발견지 자리는 그대로 �
   S.findPos.coast = old; S.found.fishRuin = 1;
   const o = JSON.parse(G.serialize(S)); o.v = 6; delete o.boat.motor;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 9); assert.equal(T.boat.motor, false);
+  assert.equal(T.v, 10); assert.equal(T.boat.motor, false);
   const list = T.findPos.coast, by = Object.fromEntries(list.map((f) => [f.id, f]));
   assert.equal(list.length, 10);
   for (const f of old) { assert.equal(by[f.id].x, f.x); assert.equal(by[f.id].y, f.y); }

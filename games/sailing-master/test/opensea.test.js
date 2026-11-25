@@ -89,22 +89,22 @@ test('B0 저장 v7 → v8: 앞바다에서 M2 엔딩을 본 저장은 엔딩을 
   o.route = { pts: [{ x: 0, y: -665 }], i: 0, target: { type: 'gate', id: 'toOcean' } };
   delete o.stats.typhoons; delete o.stats.typhoonHurt; delete o.stats.calmDays;
   const T = G.deserialize(JSON.stringify(o));
-  assert.equal(T.v, 9); assert.equal(T.ended, false); assert.equal(T.region, 'coast'); assert.equal(T.docked, 'light'); assert.equal(T.route, null);
+  assert.equal(T.v, 10); assert.equal(T.ended, false); assert.equal(T.region, 'coast'); assert.equal(T.docked, 'light'); assert.equal(T.route, null);
   assert.ok(T.ach.openSea); assert.equal(T.res.coin, 77, '금화를 다시 주지 않아요');
   assert.equal(T.stats.typhoons, 0); assert.equal(T.stats.typhoonHurt, 0); assert.equal(T.stats.calmDays, 0);
   // 엔딩 안 본 v7(앞바다 도중)은 그대로
   const p = JSON.parse(G.serialize(coastShip('schooner'))); p.v = 7; p.docked = 'yard';
   const U = G.deserialize(JSON.stringify(p));
-  assert.equal(U.v, 9); assert.equal(U.region, 'coast'); assert.equal(U.docked, 'yard'); assert.equal(U.ended, false);
+  assert.equal(U.v, 10); assert.equal(U.region, 'coast'); assert.equal(U.docked, 'yard'); assert.equal(U.ended, false);
   // v8 왕복, 큰 바다 저장도 그대로 불러와요
   const sea = coastShip('schooner'); G.passGate(sea, worldOf('coast').gates.find((g) => g.id === 'toSea'));
   const R = G.deserialize(G.serialize(sea));
-  assert.equal(R.region, 'sea'); assert.equal(R.docked, 'southLight'); assert.equal(R.v, 9);
+  assert.equal(R.region, 'sea'); assert.equal(R.docked, 'southLight'); assert.equal(R.v, 10);
 });
 
 test('B0 새 게임·새 저장 모양: v8, 태풍·무풍 통계 0, 도전과제 openSea는 큰 바다 도착이에요', () => {
   const S = G.newGame(1);
-  assert.equal(S.v, 9); assert.deepEqual([S.stats.typhoons, S.stats.typhoonHurt, S.stats.calmDays], [0, 0, 0]);
+  assert.equal(S.v, 10); assert.deepEqual([S.stats.typhoons, S.stats.typhoonHurt, S.stats.calmDays], [0, 0, 0]);
   const a = ACHIEVEMENTS.find((q) => q.id === 'openSea'); assert.ok(a && a.desc.includes('큰 바다'));
 });
 
@@ -662,10 +662,10 @@ test('M4 O0 대양 어귀: 탐사선으로 넘으면 대양 마지막 등대에 
   const back = worldOf('ocean').gates.find((g) => g.id === 'toSea'); G.undock(S); assert.equal(G.passGate(S, back), true); assert.equal(S.region, 'sea'); assert.equal(S.docked, 'depot');
   // M3 엔딩을 본 옛 저장(v8, ended + 큰 바다)은 엔딩을 풀고 보급항에 대요
   const o = JSON.parse(G.serialize(explorerShip())); o.v = 8; o.region = 'sea'; o.ended = true; delete o.crossed;
-  const L = G.deserialize(JSON.stringify(o)); assert.equal(L.ended, false); assert.equal(L.docked, 'depot'); assert.equal(L.v, 9); assert.equal(L.crossed, null); assert.equal(L.stats.crossDays, 0);
+  const L = G.deserialize(JSON.stringify(o)); assert.equal(L.ended, false); assert.equal(L.docked, 'depot'); assert.equal(L.v, 10); assert.equal(L.crossed, null); assert.equal(L.stats.crossDays, 0);
 });
 test('B7 저장 v8 호환: B4~B5가 저장 모양을 안 바꿔요(탐사선·역할 선원도 그대로 불러와져요)', () => {
   const S = explorerShip('explorer3'); S.crew = [mate(1, 'cook'), mate(2, 'medic')];
   const L = G.deserialize(G.serialize(S));
-  assert.equal(L.v, 9); assert.equal(L.ship.hull, 'explorer3'); assert.equal(L.crew.length, 2); assert.equal(G.stats(L).forecast, G.stats(S).forecast);
+  assert.equal(L.v, 10); assert.equal(L.ship.hull, 'explorer3'); assert.equal(L.crew.length, 2); assert.equal(G.stats(L).forecast, G.stats(S).forecast);
 });
