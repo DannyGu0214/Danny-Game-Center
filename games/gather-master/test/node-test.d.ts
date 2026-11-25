@@ -7,6 +7,9 @@ declare module 'node:test' {
 declare module 'node:assert/strict' {
   const assert: {
     equal<T>(actual: T, expected: T, message?: string): void;
+    notEqual<T>(actual: T, expected: T, message?: string): void;
+    deepEqual<T>(actual: T, expected: T, message?: string): void;
+    throws(block: () => unknown, message?: string): void;
     ok(value: unknown, message?: string): asserts value;
     deepEqual<T>(actual: T, expected: T, message?: string): void;
     notEqual<T>(actual: T, expected: T, message?: string): void;
