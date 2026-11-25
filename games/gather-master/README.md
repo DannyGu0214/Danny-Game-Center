@@ -1,6 +1,8 @@
-# 3D 시제품 뼈대 (임시 이름 `proto-3d`)
+# 줍줍 마스터 (Gather Master) — 3D 시제품 (폴더 이름 `gather-master`)
 
 Vite + TypeScript + npm `three` 뼈대예요. 게임 규칙은 아직 없고, 도는 상자와 조명, 끌어서 돌려 보는 카메라만 있어요. 구성 기준은 [파이프라인 문서](../../docs/game-dev/pipeline.md)의 3D 시제품 절이에요. 아직 배포하지 않았고 게임센터 첫 화면에도 연결하지 않았어요.
+
+설계는 [`DESIGN.md`](DESIGN.md), 진행 계획은 [`PLAN.md`](PLAN.md), 화풍은 [`docs/art-style.md`](docs/art-style.md)에 있어요. 아래 뼈대 설명은 아직 기획 전 상태 그대로예요.
 
 ## 명령
 
